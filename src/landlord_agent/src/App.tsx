@@ -403,6 +403,8 @@ export function AppContent() {
   const [userRole, setUserRole] = useState<UserRole>('landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [isPortfolioLoading, setIsPortfolioLoading] = useState(true);
+  const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   // Stable ref to `properties` so loadScopedTenants can read the latest list
   // without needing `properties` in its useCallback dependency array.
@@ -492,23 +494,43 @@ export function AppContent() {
   React.useEffect(() => {
     setIsAuthLoading(hostIsLoading);
     setIsAuthenticated(hostIsAuthenticated);
+
+    // While host auth is still resolving, do not wipe portfolio state or force
+    // loading off — that caused a skeleton → empty flash on first paint.
+    if (hostIsLoading) {
+      return;
+    }
+
     if (hostIsAuthenticated && hostUser) {
       if (hostUser.roles?.includes('agent')) {
         setUserRole('agent');
       } else if (hostUser.roles?.includes('landlord')) {
         setUserRole('landlord');
       }
-      
-      setUserProfile(prev => {
-        const existingCompanyProfile = prev?.companyProfile;
+
+      const nextName =
+        hostUser.name ||
+        `${hostUser.givenName || ''} ${hostUser.familyName || ''}`.trim() ||
+        'Landlord';
+
+      setUserProfile((prev) => {
+        if (
+          prev &&
+          (prev as any).id === hostUser.id &&
+          prev.email === hostUser.email &&
+          prev.name === nextName &&
+          (prev.phone || '') === (hostUser.phone || '')
+        ) {
+          return prev;
+        }
         return {
           id: hostUser.id,
-          name: hostUser.name || `${hostUser.givenName || ''} ${hostUser.familyName || ''}`.trim() || 'Landlord',
+          name: nextName,
           email: hostUser.email,
           phone: hostUser.phone || '',
-          companyProfile: existingCompanyProfile,
+          companyProfile: prev?.companyProfile,
           companyName: prev?.companyName || 'Proptii',
-          logo: prev?.logo
+          logo: prev?.logo,
         } as any;
       });
     } else {
@@ -519,8 +541,8 @@ export function AppContent() {
       setArrearsAlerts([]);
       setAlerts([]);
       setMarketInsights([]);
-      setIsAuthLoading(false);
-    };
+      setIsPortfolioLoading(false);
+    }
 
     // Authentication state changes are now handled by the parent SPA bridging (AUTH_STATE message listener below)
   }, [hostIsAuthenticated, hostIsLoading, hostUser, clearSignInQueryParam, getCachedAuthUser]);
@@ -958,30 +980,61 @@ export function AppContent() {
     setNavigationScreen('dashboard');
   };
 
-  // Load properties from Firebase on mount (scoped to current user)
+  // Load properties from Firebase when the signed-in identity is known.
+  // Avoid depending on `userProfile` object identity / `loadScopedTenants` —
+  // those recreated often and re-flashed the dashboard skeleton.
   React.useEffect(() => {
+    let cancelled = false;
+
     const loadProperties = async () => {
-      try {
-        const currentUserId = resolveManagerId();
-        const userEmail = userProfile?.email;
+      const currentUserId = resolveManagerId();
+      const userEmail = userProfile?.email;
 
-        if (!currentUserId && !userEmail) {
-          console.warn('⚠️ No userId or userEmail found');
+      if (!currentUserId && !userEmail) {
+        if (!hostIsAuthenticated && !hostIsLoading) {
+          setIsPortfolioLoading(false);
         }
+        return;
+      }
 
+      // Only show the full-page skeleton when we have nothing to display yet.
+      // Background refetches keep the current overview mounted.
+      if (propertiesRef.current.length === 0) {
+        setIsPortfolioLoading(true);
+      }
+
+      try {
         const fetchedProperties = await propertyService.getProperties({
           ...(currentUserId ? { userId: currentUserId } : {}),
-          ...(userEmail ? { email: userEmail } : {})
+          ...(userEmail ? { email: userEmail } : {}),
         });
-        setProperties(fetchedProperties);
+        if (!cancelled) {
+          setProperties(fetchedProperties);
+        }
       } catch (error) {
         console.error('Error loading properties:', error);
-        // Don't set mock data - keep empty array if Firebase fails
-        setProperties([]);
+        if (!cancelled) {
+          setProperties([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsPortfolioLoading(false);
+        }
       }
     };
+
     loadProperties();
-  }, [userProfile, loadScopedTenants]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hostIsAuthenticated,
+    hostIsLoading,
+    hostUser?.id,
+    userProfile?.email,
+    resolveManagerId,
+    portfolioRefreshKey,
+  ]);
 
   // Helper function to get current user ID — delegates to resolveManagerId
   const getCurrentUserId = (): string | null => resolveManagerId();
@@ -1600,6 +1653,7 @@ export function AppContent() {
             tenants={tenants}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
+            isPortfolioLoading={isPortfolioLoading}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -1618,6 +1672,9 @@ export function AppContent() {
               navigateToScreen('photo-management');
             }}
             onViewInsights={() => handleNavigation('insights')}
+            onViewAllProperties={() => handleNavigation('properties')}
+            onViewViewings={() => handleNavigation('viewings')}
+            onViewClients={() => handleNavigation('clients')}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -1644,6 +1701,11 @@ export function AppContent() {
             properties={properties}
             tenants={tenants}
             arrearsAlerts={arrearsAlerts}
+            isPortfolioLoading={isPortfolioLoading}
+            onViewInsights={() => handleNavigation('insights')}
+            onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -2102,6 +2164,7 @@ export function AppContent() {
             properties={properties}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
+            isPortfolioLoading={isPortfolioLoading}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -2121,6 +2184,9 @@ export function AppContent() {
             }}
             // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
             onViewInsights={() => {/* navigateToScreen('portfolio-insights') */ }}
+            onViewAllProperties={() => handleNavigation('properties')}
+            onViewViewings={() => handleNavigation('viewings')}
+            onViewClients={() => handleNavigation('clients')}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {

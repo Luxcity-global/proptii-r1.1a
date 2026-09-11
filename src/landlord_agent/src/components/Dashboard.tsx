@@ -1,75 +1,40 @@
-import React, { useState } from "react";
-import { Button } from "./ui/button";
-import { Card } from "./ui/card";
-import { Badge } from "./ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import { Input } from "./ui/input";
+import React, { useMemo, useState } from "react";
 import {
   Plus,
   Building2,
   Users,
   AlertTriangle,
-  Search,
-  Filter,
-  Eye,
-  Edit3,
   FileText,
   Image,
-  MoreHorizontal,
-  PoundSterling,
-  Calendar,
-  MapPin,
   BarChart3,
-  TrendingUp,
   Bell,
-  X,
   Home,
-  ChevronLeft,
+  Check,
+  User,
   ChevronRight,
-  CheckCircle2,
+  Bath,
+  BedDouble,
+  CalendarDays,
+  PoundSterling,
 } from "lucide-react";
-import { useIsMobile } from "./ui/use-mobile";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import { trackEvent } from "../../../utils/analytics";
-import { LandlordPageEmptyShell } from "./LandlordPageEmptyShell";
-import { isNewPortfolioUser } from "../utils/portfolioStatus";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-} from "recharts";
+import "../styles/dashboardOverview.css";
 
 interface DashboardProps {
   properties: Property[];
   tenants?: Tenant[];
   userProfile: UserProfile | null;
   isAuthenticated?: boolean;
+  isPortfolioLoading?: boolean;
   onAddProperty: () => void;
   onViewProperty: (property: Property) => void;
   onManageDocuments: (property: Property) => void;
   onManagePhotos: (property: Property) => void;
   onViewInsights: () => void;
+  onViewAllProperties?: () => void;
+  onViewViewings?: () => void;
+  onViewClients?: () => void;
   onViewVacancyAlert?: (alertId: string) => void;
   onViewArrearsAlert?: (alertId: string) => void;
   marketInsights: MarketInsight[];
@@ -78,35 +43,320 @@ interface DashboardProps {
   onSignIn?: () => void;
 }
 
+type PropertyPill = "all" | "latest" | "highest" | "expiring";
+
+const defaultSignIn = () => {
+  if (window.self !== window.top) {
+    window.parent.postMessage({ type: "REQUIRE_AUTH", payload: {} }, "*");
+  } else {
+    sessionStorage.setItem("redirectAfterLogin", "/landlord");
+    window.location.href = "/landlord?signin=1";
+  }
+};
+
+function docBadgeClass(type: string): string {
+  const t = (type || "").toLowerCase();
+  if (t.includes("epc") || t.includes("gas")) return "blue";
+  if (t.includes("tenancy") || t.includes("agreement")) return "orange";
+  if (t.includes("insurance")) return "green";
+  return "red";
+}
+
+function docExtLabel(type: string, name: string): string {
+  const lower = `${type} ${name}`.toLowerCase();
+  if (lower.includes("pdf")) return "PDF";
+  if (lower.includes("xls") || lower.includes("csv")) return "XLS";
+  if (lower.includes("txt") || lower.includes("note")) return "TXT";
+  return "DOC";
+}
+
+function coverUrl(property: Property): string | null {
+  const cover = property.photos?.find((p) => p.isCover) || property.photos?.[0];
+  return cover?.url || null;
+}
+
+function timeAgo(date?: Date): string {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const days = Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+  if (days === 0) return "Today";
+  if (days === 1) return "1 day ago";
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? "1 month ago" : `${months} months ago`;
+}
+
+function ContainerEmpty({
+  icon,
+  iconTone = "blue",
+  title,
+  description,
+  actionLabel,
+  actionVariant = "primary",
+  onAction,
+  footer,
+  className = "",
+}: {
+  icon: React.ReactNode;
+  iconTone?: "blue" | "orange" | "green" | "white" | "default";
+  title: string;
+  description: string;
+  actionLabel?: string;
+  actionVariant?: "primary" | "secondary";
+  onAction?: () => void;
+  footer?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`ll-empty-view ${className}`.trim()}>
+      <div className={`ll-empty-icon${iconTone !== "default" ? ` ${iconTone}` : ""}`}>{icon}</div>
+      <div className="ll-empty-title">{title}</div>
+      <div className="ll-empty-desc">{description}</div>
+      {actionLabel && onAction && (
+        <button type="button" className={`ll-empty-btn ${actionVariant}`} onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
+      {footer}
+    </div>
+  );
+}
+
+function OccupancyDonut({
+  occupied,
+  total,
+}: {
+  occupied: number;
+  vacant: number;
+  total: number;
+}) {
+  const pct = total > 0 ? occupied / total : 0;
+  const r = 42;
+  const c = 2 * Math.PI * r;
+  const occupiedLen = c * pct;
+  const vacantLen = c - occupiedLen;
+
+  return (
+    <div className="ll-donut-wrap" aria-label={`Occupancy ${Math.round(pct * 100)}%`}>
+      <svg viewBox="0 0 110 110">
+        <circle
+          cx="55"
+          cy="55"
+          r={r}
+          fill="none"
+          stroke="#165c40"
+          strokeWidth="14"
+          strokeDasharray={`${occupiedLen} ${vacantLen}`}
+          strokeLinecap="butt"
+        />
+        <circle
+          cx="55"
+          cy="55"
+          r={r}
+          fill="none"
+          stroke="#f2fbf7"
+          strokeWidth="14"
+          strokeDasharray={`${vacantLen} ${occupiedLen}`}
+          strokeDashoffset={-occupiedLen}
+          strokeLinecap="butt"
+        />
+      </svg>
+    </div>
+  );
+}
+
+function DashboardOverviewHeader({
+  userName,
+  onViewInsights,
+  onAddProperty,
+  addLabel = "Add Property",
+  showInsights = true,
+}: {
+  userName: string;
+  onViewInsights?: () => void;
+  onAddProperty?: () => void;
+  addLabel?: string;
+  showInsights?: boolean;
+}) {
+  return (
+    <header className="ll-header-bar">
+      <div>
+        <h1>
+          Welcome, <span>{userName}</span>
+        </h1>
+        <p>Here&apos;s the latest update on your portfolio today.</p>
+      </div>
+      <div className="ll-header-actions">
+        {showInsights && (
+          <button type="button" className="ll-btn-insights" onClick={onViewInsights}>
+            <BarChart3 size={16} />
+            Portfolio Insights
+          </button>
+        )}
+        {onAddProperty && (
+          <button type="button" className="ll-btn-add" onClick={onAddProperty}>
+            <Plus size={16} strokeWidth={2.5} />
+            {addLabel}
+          </button>
+        )}
+      </div>
+    </header>
+  );
+}
+
+function DashboardSkeleton({ userName }: { userName: string }) {
+  return (
+    <div className="ll-overview">
+      <div className="ll-overview-inner">
+        <DashboardOverviewHeader userName={userName} showInsights={false} />
+
+        <div className="ll-top-stat-grid">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className={`ll-stat-card ${i === 0 ? "ll-card-profile" : i === 1 ? "ll-card-revenue" : "ll-card-occupancy"}`}
+            >
+              <div className="ll-sk-light" style={{ width: 44, height: 44, borderRadius: "50%", margin: "0 auto 10px" }} />
+              <div className="ll-sk-light" style={{ width: "55%", height: 16, margin: "0 auto 8px" }} />
+              <div className="ll-sk-light" style={{ width: "70%", height: 12, margin: "0 auto 16px" }} />
+              <div style={{ display: "flex", gap: 10, marginTop: "auto" }}>
+                <div className="ll-sk-light" style={{ flex: 1, height: 52, borderRadius: 14 }} />
+                <div className="ll-sk-light" style={{ flex: 1, height: 52, borderRadius: 14 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="ll-mid-grid">
+          <div className="ll-mid-left">
+            <div className="ll-content-box">
+              <div className="ll-sk" style={{ width: 140, height: 16, marginBottom: 16 }} />
+              <div style={{ display: "flex", gap: 12 }}>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="ll-sk" style={{ width: 140, height: 52, borderRadius: 12 }} />
+                ))}
+              </div>
+            </div>
+            <div className="ll-content-box">
+              <div className="ll-sk" style={{ width: 160, height: 16, marginBottom: 16 }} />
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+                  <div className="ll-sk" style={{ width: 80, height: 12 }} />
+                  <div className="ll-sk" style={{ flex: 1, height: 8, borderRadius: 999 }} />
+                  <div className="ll-sk" style={{ width: 28, height: 12 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="ll-mid-right">
+            <div className="ll-content-box">
+              <div className="ll-sk" style={{ width: 100, height: 16, marginBottom: 16 }} />
+              <div className="ll-sk" style={{ width: "100%", height: 72, borderRadius: 12 }} />
+            </div>
+            <div className="ll-content-box">
+              <div className="ll-sk" style={{ width: 80, height: 16, marginBottom: 16 }} />
+              <div className="ll-sk" style={{ width: "100%", height: 64, borderRadius: 12, marginBottom: 10 }} />
+              <div className="ll-sk" style={{ width: "100%", height: 64, borderRadius: 12 }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="ll-properties-section">
+          <div className="ll-sk" style={{ width: 120, height: 22, marginBottom: 14 }} />
+          <div className="ll-property-grid">
+            {[0, 1].map((i) => (
+              <div key={i} className="ll-property-card">
+                <div className="ll-sk" style={{ height: 160, borderRadius: 0 }} />
+                <div className="ll-prop-body">
+                  <div className="ll-sk" style={{ width: "40%", height: 18 }} />
+                  <div className="ll-sk" style={{ width: "70%", height: 14 }} />
+                  <div className="ll-sk" style={{ width: "90%", height: 12 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardGlobalEmpty({
+  variant,
+  userName,
+  onAddProperty,
+  onSignIn,
+  onViewInsights,
+}: {
+  variant: "guest" | "new-user";
+  userName: string;
+  onAddProperty?: () => void;
+  onSignIn?: () => void;
+  onViewInsights?: () => void;
+}) {
+  const isGuest = variant === "guest";
+  return (
+    <div className="ll-overview">
+      <div className="ll-overview-inner">
+        {!isGuest && (
+          <DashboardOverviewHeader
+            userName={userName}
+            onViewInsights={onViewInsights}
+            onAddProperty={onAddProperty}
+            addLabel="Add Property"
+          />
+        )}
+        <div className="ll-global-empty">
+          <div className="ll-global-empty-icon">
+            <Home size={32} />
+          </div>
+          <div className="ll-global-empty-title">Welcome to your Proptii Portfolio!</div>
+          <div className="ll-global-empty-desc">
+            {isGuest
+              ? "Sign in to view and manage your properties, tenants, and contracts."
+              : "You don't have any properties or active tenancies yet. Add your first property listing to start tracking monthly revenue, tenant alerts, and occupancy rates."}
+          </div>
+          {isGuest ? (
+            <button type="button" className="ll-btn-add" onClick={onSignIn || defaultSignIn}>
+              Sign in
+            </button>
+          ) : (
+            <button type="button" className="ll-btn-add" onClick={onAddProperty}>
+              <Plus size={16} strokeWidth={2.5} />
+              Add First Property
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Dashboard({
   properties,
   tenants = [],
   userProfile,
   isAuthenticated,
+  isPortfolioLoading = false,
   onAddProperty,
   onViewProperty,
   onManageDocuments,
   onManagePhotos,
   onViewInsights,
+  onViewAllProperties,
+  onViewViewings,
+  onViewClients,
   onViewVacancyAlert,
   onViewArrearsAlert,
-  marketInsights,
   vacancyAlerts = [],
   arrearsAlerts = [],
   onSignIn,
 }: DashboardProps) {
   const isUserAuthenticated = isAuthenticated ?? Boolean(userProfile);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [complianceFilter, setComplianceFilter] =
-    useState("all");
-  const [dismissedInsights, setDismissedInsights] = useState<
-    string[]
-  >([]);
-  const [currentChartIndex, setCurrentChartIndex] = useState(0);
-  const isMobile = useIsMobile();
+  const [propertyPill, setPropertyPill] = useState<PropertyPill>("all");
 
-  const uniqueVacancyAlerts = React.useMemo(() => {
+  const uniqueVacancyAlerts = useMemo(() => {
     if (!vacancyAlerts) return [];
     const seen = new Set<string>();
     return vacancyAlerts.filter((alert) => {
@@ -115,18 +365,15 @@ export function Dashboard({
         alert.id ||
         alert.propertyId ||
         `${alert.propertyAddress || "unknown"}-${alert.predictedVacancyDate || ""}`;
-      if (seen.has(key)) {
-        return false;
-      }
+      if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
   }, [vacancyAlerts]);
 
-  const uniqueArrearsAlerts = React.useMemo(() => {
+  const uniqueArrearsAlerts = useMemo(() => {
     if (!arrearsAlerts) return [];
     const byTenantOrAddress = new Map<string, (typeof arrearsAlerts)[number]>();
-
     arrearsAlerts.forEach((alert) => {
       if (!alert) return;
       const key =
@@ -134,18 +381,15 @@ export function Dashboard({
         (alert.propertyAddress && alert.propertyAddress.trim().toLowerCase()) ||
         alert.id;
       if (!key) return;
-
       const existing = byTenantOrAddress.get(key);
       if (!existing) {
         byTenantOrAddress.set(key, alert);
         return;
       }
-
       const existingAmount = existing.overdueAmount ?? 0;
       const currentAmount = alert.overdueAmount ?? 0;
       const existingDays = existing.daysPastDue ?? 0;
       const currentDays = alert.daysPastDue ?? 0;
-
       if (
         currentAmount > existingAmount ||
         (currentAmount === existingAmount && currentDays > existingDays)
@@ -153,26 +397,16 @@ export function Dashboard({
         byTenantOrAddress.set(key, alert);
       }
     });
-
     return Array.from(byTenantOrAddress.values());
   }, [arrearsAlerts]);
 
-  const combinedAlerts = React.useMemo(
+  const combinedAlerts = useMemo(
     () => [
-      ...uniqueVacancyAlerts.map((alert) => ({
-        type: "vacancy" as const,
-        alert,
-      })),
-      ...uniqueArrearsAlerts.map((alert) => ({
-        type: "arrears" as const,
-        alert,
-      })),
+      ...uniqueVacancyAlerts.map((alert) => ({ type: "vacancy" as const, alert })),
+      ...uniqueArrearsAlerts.map((alert) => ({ type: "arrears" as const, alert })),
     ],
-    [uniqueVacancyAlerts, uniqueArrearsAlerts]
+    [uniqueVacancyAlerts, uniqueArrearsAlerts],
   );
-
-  const totalPriorityAlerts = combinedAlerts.length;
-
 
   React.useEffect(() => {
     trackEvent("landlord_dashboard_view", {
@@ -181,1206 +415,613 @@ export function Dashboard({
     });
   }, [properties.length, tenants.length]);
 
-  const displayProperties = properties.filter(
-    (property) => {
-      const matchesSearch =
-        property.address
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        property.type
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all" ||
-        property.status === statusFilter;
-      const matchesCompliance =
-        complianceFilter === "all" ||
-        (complianceFilter === "expiring" &&
-          property.documents.some(
-            (d) => d.status === "expiring-soon",
-          )) ||
-        (complianceFilter === "expired" &&
-          property.documents.some(
-            (d) => d.status === "expired",
-          ));
-
-      return (
-        matchesSearch && matchesStatus && matchesCompliance
-      );
-    },
+  const tenantOccupiedIds = useMemo(
+    () => new Set((tenants || []).map((t) => t.propertyId)),
+    [tenants],
   );
 
   const totalProperties = properties.length;
-  // Derive occupancy: A property is occupied if it has a tenant OR if status is explicitly 'occupied'
-  // A property is vacant if status is 'vacant' AND it has no tenant
-  const tenantOccupiedIds = new Set((tenants || []).map(t => t.propertyId));
-  const occupiedProperties = properties.filter(p => {
+  const occupiedProperties = properties.filter((p) => {
     const hasTenant = tenantOccupiedIds.has(p.id);
-    return p.status === 'occupied' || hasTenant;
+    return p.status === "occupied" || hasTenant;
   }).length;
-  
-  const renovatingCount = properties.filter(p => p.status === 'under-renovation').length;
-  
-  const vacantProperties = properties.filter(p => {
+  const vacantProperties = properties.filter((p) => {
     const hasTenant = tenantOccupiedIds.has(p.id);
-    return p.status === 'vacant' && !hasTenant;
+    return p.status === "vacant" && !hasTenant;
   }).length;
-  const expiringDocuments = properties.reduce(
-    (count, p) =>
-      count +
-      p.documents.filter(
-        (d) =>
-          d.status === "expiring-soon" ||
-          d.status === "expired",
-      ).length,
-    0,
-  );
 
   const totalRent = properties
-    .filter(p => {
-      const hasTenant = tenantOccupiedIds.has(p.id);
-      return p.status === 'occupied' || hasTenant;
-    })
+    .filter((p) => p.status === "occupied" || tenantOccupiedIds.has(p.id))
     .reduce((sum, p) => sum + (p.rent || 0), 0);
 
-  // Chart data processing
-  const getOccupancyData = () => {
-    const data = [
-      { name: "Occupied", value: occupiedProperties, color: "#22c55e" },
-      { name: "Vacant", value: vacantProperties, color: "#ef4444" },
-      {
-        name: "Renovating",
-        value: properties.filter(p => p.status === 'under-renovation').length,
-        color: "#f59e0b"
-      }
-    ].filter(item => item.value > 0); // Only include non-zero values
-    
-    return data.length > 0 ? data : [{ name: 'No Data', value: 1, color: '#e5e7eb' }];
-  };
-
-  const getRentData = () => {
-    const occupiedList = properties.filter(p => {
-      const hasTenant = tenantOccupiedIds.has(p.id);
-      return p.status === 'occupied' || hasTenant;
-    });
-    const rentData = occupiedList
-      .map(p => ({
-        name: p.address.split(',')[0].slice(0, 20) + (p.address.split(',')[0].length > 20 ? '...' : ''),
-        rent: p.rent,
-        type: p.type
-      }))
-      .sort((a, b) => b.rent - a.rent)
-      .slice(0, 4);
-    
-    return rentData.length > 0 ? rentData : [{ name: 'No Data', rent: 0, type: '' }];
-  };
-
-  const getPropertyTypeData = () => {
-    if (properties.length === 0) {
-      return [{ name: 'No Properties', value: 1, color: '#e5e7eb' }];
+  const revenueSeries = useMemo(() => {
+    const monthlyData: { month: string; revenue: number }[] = [];
+    const currentDate = new Date();
+    for (let i = 5; i >= 0; i -= 1) {
+      const targetMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+      const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0, 23, 59, 59);
+      const monthName = monthStart.toLocaleDateString("en-GB", { month: "short" });
+      let monthlyRevenue = 0;
+      properties.forEach((property) => {
+        const propertyAddedDate = property.createdAt || new Date();
+        if (propertyAddedDate > monthEnd) return;
+        if (property.tenant) {
+          const leaseStart = property.tenant.leaseStart;
+          const leaseEnd = property.tenant.leaseEnd;
+          if (leaseStart <= monthEnd && leaseEnd >= monthStart) {
+            const revenueStartDate = leaseStart > propertyAddedDate ? leaseStart : propertyAddedDate;
+            if (revenueStartDate <= monthEnd) monthlyRevenue += property.rent;
+          }
+        } else if (property.status === "occupied" && propertyAddedDate <= monthEnd) {
+          monthlyRevenue += property.rent;
+        }
+      });
+      monthlyData.push({ month: monthName, revenue: monthlyRevenue });
     }
+    return monthlyData;
+  }, [properties]);
 
+  const maxRevenue = Math.max(...revenueSeries.map((r) => r.revenue), 1);
+
+  const occupancyBars = useMemo(() => {
+    return properties.slice(0, 5).map((p) => {
+      const occupied = p.status === "occupied" || tenantOccupiedIds.has(p.id);
+      return {
+        id: p.id,
+        label: (p.address.split(",")[0] || p.address).slice(0, 14),
+        pct: occupied ? 100 : p.status === "under-renovation" ? 50 : 0,
+      };
+    });
+  }, [properties, tenantOccupiedIds]);
+
+  const topRent = useMemo(() => {
+    return [...properties]
+      .sort((a, b) => (b.rent || 0) - (a.rent || 0))
+      .slice(0, 4)
+      .map((p) => ({
+        name: (p.address.split(",")[0] || p.address).slice(0, 18),
+        rent: p.rent || 0,
+      }));
+  }, [properties]);
+
+  const composition = useMemo(() => {
     const normalizeType = (raw: string) => {
-      const t = (raw || '').toLowerCase();
-      if (t.includes('apartment') || t.includes('flat')) return 'Apartment';
-      if (t.includes('house')) return 'House';
-      if (t.includes('studio')) return 'Studio';
-      if (t.includes('shared')) return 'Shared';
-      if (t.includes('commercial')) return 'Commercial';
-      if (t.includes('bungalow')) return 'Bungalow';
-      return 'Other';
+      const t = (raw || "").toLowerCase();
+      if (t.includes("apartment") || t.includes("flat")) return "Apartment";
+      if (t.includes("house")) return "House";
+      if (t.includes("studio")) return "Studio";
+      if (t.includes("commercial")) return "Commercial";
+      if (t.includes("hmo") || t.includes("shared")) return "HMO";
+      return "Other";
     };
-
-    const typeCount = properties.reduce((acc, p) => {
+    const counts = properties.reduce((acc, p) => {
       const key = normalizeType(p.type);
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-
-    const colorMap: Record<string, string> = {
-      Apartment: '#8b5cf6',
-      House: '#3b82f6',
-      Studio: '#06b6d4',
-      Shared: '#10b981',
-      Commercial: '#f97316',
-      Bungalow: '#84cc16',
-      Other: '#f59e0b',
+    const colors: Record<string, string> = {
+      Apartment: "#8b5cf6",
+      House: "#3b82f6",
+      Studio: "#06b6d4",
+      Commercial: "#f97316",
+      HMO: "#16a34a",
+      Other: "#f59e0b",
     };
-
-    return Object.entries(typeCount).map(([name, value]) => ({
+    const total = properties.length || 1;
+    return Object.entries(counts).map(([name, value]) => ({
       name,
       value,
-      color: colorMap[name] || colorMap.Other,
+      pct: Math.round((value / total) * 100),
+      color: colors[name] || colors.Other,
     }));
-  };
+  }, [properties]);
 
-  const getRevenueData = () => {
-    const monthlyData: { month: string; revenue: number }[] = [];
-    const currentDate = new Date();
-    
-    // Calculate revenue for each of the last 6 months
-    for (let i = 5; i >= 0; i--) {
-      const targetMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
-      const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0, 23, 59, 59);
-      const monthName = monthStart.toLocaleDateString('en-GB', { month: 'short' });
-      
-      // Calculate revenue for this month based on properties with active leases
-      let monthlyRevenue = 0;
-      
-      properties.forEach((property) => {
-        // Only count revenue if the property was added before or during this month
-        // Default to now if createdAt is missing (shouldn't happen for real data)
-        const propertyAddedDate = property.createdAt || new Date(); 
-        
-        if (propertyAddedDate > monthEnd) {
-          // Property was added after this month, so no revenue for this month
-          return;
-        }
-        
-        // Check if property has a tenant with lease dates
-        if (property.tenant) {
-          const leaseStart = property.tenant.leaseStart;
-          const leaseEnd = property.tenant.leaseEnd;
-          
-          // Only count if lease was active during this month AND property was already added
-          // Lease is active if monthStart is before leaseEnd and monthEnd is after leaseStart
-          if (leaseStart <= monthEnd && leaseEnd >= monthStart) {
-            // Also check if tenant was added during or before this month
-            // Only count from when the tenant's lease actually started or when property was added, whichever is later
-            const revenueStartDate = leaseStart > propertyAddedDate ? leaseStart : propertyAddedDate;
-            
-            // If revenue started during or before this month, count it
-            if (revenueStartDate <= monthEnd) {
-              monthlyRevenue += property.rent;
-            }
-          }
-        } else if (property.status === 'occupied') {
-          // Property is marked as occupied but no tenant data available
-          // Only count from when the property was added to the system
-          if (propertyAddedDate <= monthEnd) {
-            monthlyRevenue += property.rent;
-          }
-        }
-        // Skip vacant/under-renovation properties without tenant info
+  const documentChips = useMemo(() => {
+    const docs: Array<{ id: string; name: string; type: string; property: Property }> = [];
+    properties.forEach((p) => {
+      (p.documents || []).forEach((d) => {
+        docs.push({ id: d.id, name: d.name, type: d.type, property: p });
       });
-      
-      monthlyData.push({
-        month: monthName,
-        revenue: monthlyRevenue
+    });
+    return docs.slice(0, 8);
+  }, [properties]);
+
+  const displayProperties = useMemo(() => {
+    let list = [...properties];
+    if (propertyPill === "latest") {
+      list.sort((a, b) => {
+        const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return db - da;
       });
+      return list.slice(0, 4);
     }
-    
-    return monthlyData;
-  };
-
-  const chartData = [
-    {
-      title: "Property Occupancy",
-      type: "pie",
-      data: getOccupancyData()
-    },
-    {
-      title: "Top Performing Properties",
-      type: "bar",
-      data: getRentData()
-    },
-    {
-      title: "Portfolio Composition",
-      type: "donut",
-      data: getPropertyTypeData()
-    },
-    {
-      title: "Revenue Trend",
-      type: "line",
-      data: getRevenueData()
+    if (propertyPill === "highest") {
+      list.sort((a, b) => (b.rent || 0) - (a.rent || 0));
+      return list.slice(0, 4);
     }
-  ];
-
-  // Ensure currentChartIndex is valid
-  const safeCurrentIndex = Math.max(0, Math.min(currentChartIndex, chartData.length - 1));
-  const currentChart = chartData[safeCurrentIndex];
-
-  // Filter insights that haven't been dismissed locally
-  // Note: Real dismissals are handled via marketInsightService
-  const activeInsights = marketInsights.filter(
-    (insight) => !dismissedInsights.includes(insight.id)
-  );
-  
-  // Debug logging
-  React.useEffect(() => {
-    console.log('📊 Dashboard: marketInsights prop:', marketInsights.length);
-    console.log('📊 Dashboard: activeInsights after filtering:', activeInsights.length);
-    if (marketInsights.length > 0) {
-      console.log('📊 Dashboard: Sample insight:', marketInsights[0]);
+    if (propertyPill === "expiring") {
+      list = list.filter((p) =>
+        (p.documents || []).some((d) => d.status === "expiring-soon" || d.status === "expired"),
+      );
+      return list.slice(0, 8);
     }
-  }, [marketInsights, activeInsights]);
+    return list.slice(0, 8);
+  }, [properties, propertyPill]);
 
-  const dismissInsight = async (insightId: string) => {
-    // Add to local dismissed list for immediate UI update
-    setDismissedInsights((prev) => [...prev, insightId]);
-    
-    // Also save dismissal to Firestore (if userId available)
-    // This would require passing userId to Dashboard, or handling it in App.tsx
-    // For now, we'll just handle local dismissal
-    try {
-      // If you have userId available, you can call:
-      // await marketInsightService.dismissInsight(insightId, userId);
-      console.log(`📌 Insight ${insightId} dismissed (local only)`);
-    } catch (error) {
-      console.error('Error dismissing insight:', error);
-      // Revert local dismissal on error
-      setDismissedInsights((prev) => prev.filter(id => id !== insightId));
-    }
-  };
+  const occupancyPct = totalProperties > 0 ? Math.round((occupiedProperties / totalProperties) * 100) : 0;
+  const userName = userProfile?.name || "there";
+  const maxRent = Math.max(...properties.map((p) => p.rent || 0), 0);
 
-  const getInsightIcon = (type: MarketInsight["type"]) => {
-    switch (type) {
-      case "market-trend":
-      case "rental-demand":
-        return <TrendingUp className="w-4 h-4 text-blue-600" />;
-      case "regulatory-change":
-      case "epc-requirements":
-        return (
-          <AlertTriangle className="w-4 h-4 text-red-600" />
-        );
-      case "demand-shift":
-        return <Users className="w-4 h-4 text-green-600" />;
-      case "price-change":
-      case "property-values":
-        return (
-          <PoundSterling className="w-4 h-4 text-purple-600" />
-        );
-      default:
-        return <Bell className="w-4 h-4 text-gray-600" />;
-    }
-  };
-
-  const getSeverityColor = (
-    severity: MarketInsight["severity"]
-  ) => {
-    switch (severity) {
-      case "high":
-        return "border-red-200 bg-red-50";
-      case "medium":
-        return "border-orange-200 bg-orange-50";
-      case "low":
-        return "border-blue-200 bg-blue-50";
-      default:
-        return "border-gray-200 bg-gray-50";
-    }
-  };
-
-  const getStatusColor = (status: Property["status"]) => {
-    switch (status) {
-      case "occupied":
-        return "bg-green-500";
-      case "vacant":
-        return "bg-red-500";
-      case "under-renovation":
-        return "bg-yellow-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const getStatusText = (status: Property["status"]) => {
-    switch (status) {
-      case "occupied":
-        return "Occupied";
-      case "vacant":
-        return "Vacant";
-      case "under-renovation":
-        return "Renovating";
-      default:
-        return status;
-    }
-  };
-
-  // For unauthenticated users: show header, 4 summary cards (all 0), and empty state mascot only.
-  // Authenticated users can render with partial profile data while identity hydration finishes.
   if (!isUserAuthenticated) {
-    return (
-      <LandlordPageEmptyShell
-        page="dashboard"
-        variant="guest"
-        onSignIn={onSignIn}
-      />
-    );
+    return <DashboardGlobalEmpty variant="guest" userName={userName} onSignIn={onSignIn} />;
   }
 
-  if (isNewPortfolioUser(properties)) {
-    return (
-      <LandlordPageEmptyShell
-        page="dashboard"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile?.name}
-      />
-    );
+  if (isPortfolioLoading) {
+    return <DashboardSkeleton userName={userName} />;
   }
+
+  const hasRevenue = totalRent > 0 || revenueSeries.some((r) => r.revenue > 0);
+  const hasOccupancy = occupiedProperties > 0;
+  const firstProperty = properties[0];
+  const handleUploadDocument = () => {
+    if (firstProperty) onManageDocuments(firstProperty);
+    else onAddProperty();
+  };
+  const handleAssignTenant = () => {
+    if (onViewClients) onViewClients();
+    else if (firstProperty) onViewProperty(firstProperty);
+    else onAddProperty();
+  };
+  const handleScheduleViewing = () => {
+    if (onViewViewings) onViewViewings();
+    else if (onViewAllProperties) onViewAllProperties();
+    else onAddProperty();
+  };
+  const handleRecordRent = () => {
+    if (onViewAllProperties) onViewAllProperties();
+    else onAddProperty();
+  };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
-      {/* Dashboard actions */}
-      <div className="max-w-7xl mx-auto px-4 md:px-6">
-        {isMobile ? (
-          <div className="flex items-center gap-2 mb-2">
-            <div
-              className="bg-white rounded-lg border border-gray-200 px-4 py-2 cursor-pointer transition-all duration-300 flex items-center justify-center flex-1"
-              onClick={onViewInsights}
-              style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}
-            >
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="w-4 h-4" style={{ color: '#136C9E' }} />
-                <span className="text-sm font-medium" style={{ color: '#374957' }}>Portfolio Insights</span>
-              </div>
-            </div>
-            <Button
-              onClick={onAddProperty}
-              className="flex items-center space-x-1 px-4 py-2 rounded-lg flex-shrink-0"
-              style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12' }}
-            >
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
-              <span className="text-sm">Add</span>
-            </Button>
-          </div>
-        ) : (
-          <div className="flex justify-end items-center space-x-4 mb-6">
-            <div
-              className="bg-white rounded-2xl border border-gray-200 px-6 py-4 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
-              onClick={onViewInsights}
-              style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 248, 220, 0.6), 0 4px 10px rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.background = 'linear-gradient(135deg, #F3FFDD 0%, #EEFFFF 100%)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.transform = 'translateY(0px)';
-                e.currentTarget.style.background = 'white';
-              }}
-            >
-              <div className="flex items-center space-x-3">
-                <div className="text-left">
-                  <p className="text-sm leading-tight font-medium" style={{ color: '#374957' }}>Portfolio Insights</p>
-                  <p className="text-xs leading-tight" style={{ color: '#717182' }}>AI Powered</p>
+    <div className="ll-overview">
+      <div className="ll-overview-inner">
+        <DashboardOverviewHeader
+          userName={userName}
+          onViewInsights={onViewInsights}
+          onAddProperty={onAddProperty}
+        />
+
+        <section className="ll-top-stat-grid">
+          <div className="ll-stat-card ll-card-profile">
+            <div>
+              <div className="ll-profile-avatar-wrap">
+                <div className="ll-profile-avatar">
+                  <User size={22} />
                 </div>
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: '#136C9E' }}
-                >
-                  <BarChart3 className="w-4 h-4 text-white" />
+                <div className="ll-avatar-badge">
+                  <Check size={8} color="#fff" strokeWidth={3} />
                 </div>
               </div>
+              <h3>{userName}</h3>
+              <div className="ll-profile-email">{userProfile?.email || "—"}</div>
+              <div className="ll-profile-phone">{userProfile?.phone || "Phone not provided"}</div>
             </div>
-
-            <Button
-              onClick={onAddProperty}
-              className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-lg transition-all duration-300 flex-shrink-0 w-auto"
-              style={{
-                backgroundColor: '#DC5F12',
-                borderColor: '#DC5F12',
-                minWidth: '180px',
-                background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.transform = 'translateY(0px)';
-              }}
-            >
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
-              <span>Add Property</span>
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="max-w-7xl mx-auto px-3 py-6">
-        {/* Overview Section */}
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
-            Overview
-          </h2>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground mb-1 text-sm">
-                  Total Properties
-                </p>
-                <p className="text-lg font-semibold">
-                  {totalProperties}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-primary" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-6 flex-1">
-                <div className="text-center">
-                  <p className="text-muted-foreground mb-1 text-sm">
-                  Occupied
-                </p>
-                <p className="text-lg font-semibold text-green-600">
-                  {occupiedProperties}
-                </p>
-                </div>
-                
-                <div className="w-px h-12 bg-gray-200"></div>
-                
-                <div className="text-center">
-                  <p className="text-muted-foreground mb-1 text-sm">
-                    Vacant
-                  </p>
-                  <p className="text-lg font-semibold text-orange-600">
-                    {vacantProperties}
-                  </p>
+            <div className="ll-pill-stats">
+              <div className="ll-pill-stat">
+                <span className="ll-pill-icon">
+                  <Home size={16} />
+                </span>
+                <div>
+                  <div className="ll-pill-label">Properties</div>
+                  <div className="ll-pill-val">{totalProperties}</div>
                 </div>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground mb-1 text-sm">
-                  Monthly rental revenue
-                </p>
-                <p className="text-lg font-semibold">
-                  £{totalRent.toLocaleString()}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <PoundSterling className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-muted-foreground mb-1 text-sm">
-                  Document Alerts
-                </p>
-                <p className="text-lg font-semibold text-orange-600">
-                  {expiringDocuments}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        <div className={`grid ${isMobile ? 'grid-cols-1' : 'lg:grid-cols-2'} gap-4 md:gap-8 mb-8`}>
-          {/* Left Column - Priority Alerts */}
-          <div>
-            {/* Priority Alerts Section - Redesigned */}
-            <div className="shadow-sm overflow-hidden" style={{ 
-              background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
-              border: '1px solid #80B2FF', 
-              height: isMobile ? 'auto' : '320px',
-              minHeight: isMobile ? '280px' : '320px',
-              borderRadius: '20px'
-            }}>
-              <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
-                {/* Left Blue Panel */}
-                <div className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px] rounded-l-xl'} flex`} style={{ 
-                  background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
-                  color: '#374957', 
-                  fontFamily: 'Archivo, sans-serif'
-                }}>
-                  <div className="flex items-center">
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mr-3">
-                    <AlertTriangle className="w-5 h-5" style={{ color: '#374957' }} />
-                  </div>
-                    <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>
-                      {isMobile ? 'Priority Alerts' : <>Priority<br />Alerts</>}
-                    </h2>
-                  </div>
-                  {!isMobile && <div className="flex-1"></div>}
-                  <div className={isMobile ? '' : 'mt-auto'}>
-                    <div className={`font-bold block mb-1 ${isMobile ? 'text-2xl' : ''}`} style={{ fontSize: isMobile ? '24px' : '32px', lineHeight: '1' }}>
-                      {totalPriorityAlerts}
-                    </div>
-                    <div className="text-sm opacity-90 mb-2 block">Alerts</div>
-                    <div className="text-xs opacity-75">
-                      As of {new Date().toLocaleDateString('en-GB', { 
-                        day: '2-digit', 
-                        month: '2-digit', 
-                        year: 'numeric' 
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right White Panel */}
-                <div className={`flex-1 p-4 bg-white relative z-10 overflow-hidden flex flex-col ${isMobile ? 'rounded-b-xl' : ''}`} style={{ borderRadius: isMobile ? '0 0 20px 20px' : '20px', boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)' }}>
-                  {totalPriorityAlerts === 0 ? (
-                    // Empty State
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <CheckCircle2 className="w-8 h-8 text-green-500" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-700 mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                          All Clear!
-                        </h3>
-                        <p className="text-sm text-gray-500 max-w-xs" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                          You have no priority alerts at this time. Everything is running smoothly.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div 
-                      className={`space-y-3 overflow-y-auto flex-1 pr-2 ${isMobile ? '' : ''}`} 
-                      style={{ 
-                        maxHeight: isMobile && combinedAlerts.length > 2 ? '250px' : '100%'
-                      }}
-                    >
-                  {combinedAlerts.map((item, index) => {
-                    const isVacancy = item.type === "vacancy";
-                    const alert = item.alert;
-                    const predictedDate =
-                      isVacancy && alert?.predictedVacancyDate
-                        ? alert.predictedVacancyDate instanceof Date
-                          ? alert.predictedVacancyDate
-                          : new Date(alert.predictedVacancyDate)
-                        : null;
-
-                    return (
-                      <React.Fragment key={alert.id}>
-                        {index > 0 && (
-                          <div className="border-t border-gray-200"></div>
-                        )}
-                        <Card
-                          className="p-6 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer"
-                          onClick={() =>
-                            isVacancy
-                              ? onViewVacancyAlert?.(alert.id)
-                              : onViewArrearsAlert?.(alert.id)
-                          }
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start space-x-4 flex-1">
-                              {isVacancy ? (
-                                <AlertTriangle className="w-4 h-4 text-[#ca390c] mt-1" />
-                              ) : (
-                                <PoundSterling className="w-4 h-4 text-[#b8585e] mt-1" />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <h4
-                                  className={`font-medium mb-1 text-[14px] ${
-                                    isVacancy
-                                      ? "text-[#ca390c]"
-                                      : "text-[#b44d53]"
-                                  }`}
-                                >
-                                  {isVacancy ? "High Vacancy Risk" : "Rent Arrears"}
-                                </h4>
-                                <p className="text-[12px] text-[#374957] mb-3">
-                                  {isVacancy ? (
-                                    alert.propertyAddress
-                                  ) : (
-                                    <>
-                                      {alert.tenantName}
-                                      <br />
-                                      {alert.propertyAddress}
-                                    </>
-                                  )}
-                                </p>
-                                <div className="flex items-baseline space-x-3">
-                                  {isVacancy ? (
-                                    <>
-                                      <span className="text-[12px] font-bold text-[#ca390c]">
-                                        {alert.riskScore}% Risk Score
-                                      </span>
-                                      <span className="text-[12px] text-[#374957]">
-                                        Predicted:{" "}
-                                        {predictedDate
-                                          ? predictedDate.toLocaleDateString("en-GB", {
-                                              day: "2-digit",
-                                              month: "2-digit",
-                                              year: "numeric",
-                                            })
-                                          : "Date TBC"}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="text-[12px] font-bold text-[#b44d53]">
-                                        £{alert.overdueAmount?.toLocaleString() ?? "0"} overdue
-                                      </span>
-                                      <span className="text-[12px] text-[#374957]">
-                                        {(alert.daysPastDue ?? 0)} days past due
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div
-                              className={`border rounded-[6px] px-4 py-1 flex items-center justify-center ${
-                                isVacancy
-                                  ? "border-[#ffbc73]"
-                                  : "border-[#ffacac]"
-                              }`}
-                            >
-                              <span
-                                className={`text-[10px] font-bold ${
-                                  isVacancy ? "text-[#ca390c]" : "text-[#c61626]"
-                                }`}
-                              >
-                                {isVacancy ? "View Details" : "Manage"}
-                              </span>
-                            </div>
-                          </div>
-                        </Card>
-                      </React.Fragment>
-                    );
-                  })}
-                    </div>
-                  )}
+              <div className="ll-pill-stat">
+                <span className="ll-pill-icon alert">
+                  <Bell size={16} />
+                </span>
+                <div>
+                  <div className="ll-pill-label">Alerts</div>
+                  <div className="ll-pill-val">{combinedAlerts.length}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column - Quick Stats */}
-          <div>
-            <div className="shadow-sm overflow-hidden" style={{ 
-              background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
-              border: '1px solid #80B2FF', 
-              height: isMobile ? 'auto' : '320px',
-              minHeight: isMobile ? '280px' : '320px',
-              borderRadius: '20px'
-            }}>
-              <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
-                {/* Left Blue Panel */}
-                <div className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'px-6 py-4 flex-col items-start min-w-[200px] rounded-l-xl'} flex`} style={{ background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
-                  <div className="flex items-center">
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mr-3">
-                    <BarChart3 className="w-5 h-5" style={{ color: '#374957' }} />
-                  </div>
-                    <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>
-                      {isMobile ? 'Quick Stats' : <>Quick<br />Stats</>}
-                    </h2>
-                  </div>
-                  {!isMobile && <div className="flex-1"></div>}
-                  <div className={isMobile ? '' : 'mt-auto'}>
-                    <div className={`font-bold block mb-1 ${isMobile ? 'text-2xl' : ''}`} style={{ fontSize: isMobile ? '24px' : '32px', lineHeight: '1' }}>
-                      {chartData.length}
-                    </div>
-                    <div className="text-sm opacity-90 mb-2 block">Charts</div>
-                    <div className="text-xs opacity-75">
-                      As of {new Date().toLocaleDateString('en-GB', { 
-                        day: '2-digit', 
-                        month: '2-digit', 
-                        year: 'numeric' 
-                      })}
-                    </div>
-                  </div>
+          <div className={`ll-stat-card ll-card-revenue${!hasRevenue ? " ll-is-empty" : ""}`}>
+            <div className="ll-card-rev-header">
+              <span className="label">Monthly Rental Revenue</span>
+              <div className="ll-card-rev-badge">£</div>
+            </div>
+            {!hasRevenue ? (
+              <ContainerEmpty
+                icon={<PoundSterling size={22} />}
+                iconTone="white"
+                title="No Revenue Logged"
+                description="Transactions will appear once rental disbursements are processed."
+                actionLabel="+ Record Rent"
+                actionVariant="secondary"
+                onAction={handleRecordRent}
+              />
+            ) : (
+              <>
+                <div>
+                  <div className="ll-revenue-amount">£ {totalRent.toLocaleString()}</div>
+                  <div className="ll-revenue-sub">Last 6 months</div>
                 </div>
-
-                {/* Right White Panel */}
-                <div className={`flex-1 p-4 flex flex-col bg-white relative z-10 ${isMobile ? 'rounded-b-xl' : ''}`} style={{ borderRadius: isMobile ? '0 0 20px 20px' : '20px', boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)', fontFamily: 'Archivo, sans-serif' }}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[16px] font-normal text-[#374957]">
-                  {currentChart.title}
-                </h3>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-1 h-6 w-6"
-                    onClick={() => setCurrentChartIndex((prev) => (prev - 1 + chartData.length) % chartData.length)}
-                  >
-                    <ChevronLeft className="w-3 h-3" />
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    {safeCurrentIndex + 1} / {chartData.length}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-1 h-6 w-6"
-                    onClick={() => setCurrentChartIndex((prev) => (prev + 1) % chartData.length)}
-                  >
-                    <ChevronRight className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="flex-1 min-h-0 relative">
-                {currentChart && currentChart.data && currentChart.data.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height="100%">
-                      {/* Pie Chart */}
-                      {currentChart.type === "pie" && (
-                        <PieChart>
-                          <Pie
-                            data={currentChart.data}
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}`}
-                          >
-                            {currentChart.data.map((entry: any, index: number) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      )}
-                      
-                      {/* Bar Chart */}
-                      {currentChart.type === "bar" && (
-                        <BarChart data={currentChart.data}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip formatter={(value) => [`£${value}`, 'Rent']} />
-                          <Bar dataKey="rent" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      )}
-                      
-                      {/* Donut Chart */}
-                      {currentChart.type === "donut" && (
-                        <PieChart>
-                          <Pie
-                            data={currentChart.data}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={40}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}`}
-                          >
-                            {currentChart.data.map((entry: any, index: number) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      )}
-                      
-                      {/* Line Chart */}
-                      {currentChart.type === "line" && (
-                        <LineChart data={currentChart.data}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip formatter={(value) => [`£${value}`, 'Revenue']} />
-                          <Line 
-                            type="monotone" 
-                            dataKey="revenue" 
-                            stroke="#22c55e"
-                            strokeWidth={3}
-                            dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
-                            activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
-                          />
-                        </LineChart>
-                      )}
-                    </ResponsiveContainer>
-                    {currentChart.title === "Revenue Trend" && 
-                      ((currentChart.data.every((d: any) => d.revenue === 0) || 
-                       currentChart.data.filter((d: any) => d.revenue > 0).length < 2) && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded z-10">
-                          <div className="text-center px-4">
-                            <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                            <p className="text-sm font-medium text-gray-700 mb-1">Building Your Revenue History</p>
-                            <p className="text-xs text-gray-500">
-                              {currentChart.data.every((d: any) => d.revenue === 0)
-                                ? "Add properties and tenants to start tracking revenue"
-                                : "This graph will show meaningful trends after 2+ months of usage"}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    <div className="text-center">
-                      <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No data available</p>
+                <div className="ll-revenue-chart" aria-hidden="true">
+                  {revenueSeries.map((row) => (
+                    <div key={row.month} className="ll-rev-bar-wrap" title={`${row.month}: £${row.revenue}`}>
+                      <div
+                        className="ll-rev-bar"
+                        style={{ height: `${Math.max(8, Math.round((row.revenue / maxRevenue) * 100))}%` }}
+                      />
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      </div>
-            </div>
 
-      {/* ── Received Referencing Passports section moved to /landlord/referencing ── */}
-
-      <div className="max-w-7xl mx-auto px-3 md:px-3 pb-6">
-        {/* Filters */}
-        <Card className="p-4 md:p-6 mb-6">
-          {isMobile ? (
-            <div className="flex flex-col gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search properties..."
-                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
-                  style={{
-                    '--tw-ring-color': '#8FCDFF',
-                    '--tw-ring-opacity': '0.5'
-                  } as React.CSSProperties}
-                  value={searchTerm}
-                  onChange={(e) =>
-                    setSearchTerm(e.target.value)
-                  }
-                />
-              </div>
-              <div className="flex gap-3">
-                <Select
-                  value={statusFilter}
-                  onValueChange={setStatusFilter}
-                >
-                  <SelectTrigger className="flex-1">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">
-                      All Status
-                    </SelectItem>
-                    <SelectItem value="occupied">
-                      Occupied
-                    </SelectItem>
-                    <SelectItem value="vacant">Vacant</SelectItem>
-                    <SelectItem value="under-renovation">
-                      Under Renovation
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={complianceFilter}
-                  onValueChange={setComplianceFilter}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="All Properties" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">
-                      All Properties
-                    </SelectItem>
-                    <SelectItem value="expiring">
-                      Expiring Soon
-                    </SelectItem>
-                    <SelectItem value="expired">
-                      Expired
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+          <div className={`ll-stat-card ll-card-occupancy${!hasOccupancy ? " ll-is-empty" : ""}`}>
+            <div className="ll-card-occ-header">
+              <span className="label">Occupancy</span>
+              <div className="ll-card-occ-badge">
+                <Check size={14} strokeWidth={3} />
               </div>
             </div>
-          ) : (
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search properties by address or type..."
-                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
-                  style={{
-                    '--tw-ring-color': '#8FCDFF',
-                    '--tw-ring-opacity': '0.5'
-                  } as React.CSSProperties}
-                  value={searchTerm}
-                  onChange={(e) =>
-                    setSearchTerm(e.target.value)
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Select
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    All Status
-                  </SelectItem>
-                  <SelectItem value="occupied">
-                    Occupied
-                  </SelectItem>
-                  <SelectItem value="vacant">Vacant</SelectItem>
-                  <SelectItem value="under-renovation">
-                    Under Renovation
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={complianceFilter}
-                onValueChange={setComplianceFilter}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Compliance" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    All Properties
-                  </SelectItem>
-                  <SelectItem value="expiring">
-                    Expiring Soon
-                  </SelectItem>
-                  <SelectItem value="expired">
-                    Expired
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          )}
-        </Card>
-
-        {/* Properties Grid */}
-        {displayProperties.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="mb-2" style={{ color: '#374957' }}>No properties found</h3>
-            <p className="text-muted-foreground mb-6">
-              {searchTerm ||
-              statusFilter !== "all" ||
-              complianceFilter !== "all"
-                ? "Try adjusting your search or filters"
-                : "Get started by adding your first property"}
-            </p>
-            <Button 
-              onClick={onAddProperty} 
-              className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
-              style={{ 
-                backgroundColor: '#DC5F12', 
-                borderColor: '#DC5F12', 
-                minWidth: '180px',
-                background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.transform = 'translateY(0px)';
-              }}
-            >
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
-              <span>Add Property</span>
-            </Button>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {displayProperties.map((property) => {
-              const hasTenant = tenants?.some(t => t.propertyId === property.id);
-              const displayStatus = hasTenant ? 'occupied' : property.status;
-              return (
-              <Card
-                key={property.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow"
-              >
-                {/* Property Image */}
-                <div className="aspect-video relative overflow-hidden">
-                  {property.photos.length > 0 ? (
-                    <img
-                      src={
-                        property.photos.find((p) => p.isCover)
-                          ?.url || property.photos[0].url
-                      }
-                      alt={property.address}
-                      className="w-full h-full object-cover"
+            {!hasOccupancy ? (
+              <ContainerEmpty
+                icon={<Home size={22} />}
+                iconTone="white"
+                title="0% Occupancy"
+                description="No active units leased out. Add tenant records to see occupancy breakdown."
+                actionLabel="+ Assign Tenant"
+                actionVariant="secondary"
+                onAction={handleAssignTenant}
+              />
+            ) : (
+              <>
+                <div>
+                  <div className="ll-occupancy-body">
+                    <OccupancyDonut
+                      occupied={occupiedProperties}
+                      vacant={vacantProperties}
+                      total={totalProperties}
                     />
-                  ) : (
-                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                      <Image className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                  )}
-
-                  {/* Status Badge */}
-                  <div className="absolute top-3 left-3">
-                    <Badge
-                      className={`${getStatusColor(displayStatus)} text-white border-0`}
-                    >
-                      {getStatusText(displayStatus)}
-                    </Badge>
-                  </div>
-
-                  {/* Document Alert */}
-                  {property.documents.some(
-                    (d) =>
-                      d.status === "expiring-soon" ||
-                      d.status === "expired",
-                  ) && (
-                    <div className="absolute top-3 right-3">
-                      <Badge variant="destructive">
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                        Alert
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-
-                {/* Property Details */}
-                <div className="p-6 flex flex-col">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="mb-1 whitespace-normal break-words" style={{ color: '#374957' }}>
-                        {property.address}
-                      </h3>
-                      <p className="text-muted-foreground flex items-center flex-wrap">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        {property.type ? property.type.charAt(0).toUpperCase() + property.type.slice(1) : ''} • {property.bedrooms}{" "}
-                        bed{property.bedrooms !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="p-2"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            onViewProperty(property)
-                          }
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            onManageDocuments(property)
-                          }
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          Documents
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            onManagePhotos(property)
-                          }
-                        >
-                          <Image className="w-4 h-4 mr-2" />
-                          Photos
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center text-lg font-semibold">
-                      <PoundSterling className="w-4 h-4 mr-1" />
-                      {property.rent.toLocaleString()}
-                      <span className="text-sm text-muted-foreground ml-1">
-                        /month
+                    <div className="ll-occ-meta">
+                      <span className="ll-meta-label">Total Properties</span>
+                      <span className="ll-meta-val">{totalProperties}</span>
+                      <span className="ll-meta-label" style={{ marginTop: 6 }}>
+                        {occupancyPct}% occupied
                       </span>
                     </div>
                   </div>
-
-                  {/* Amenities */}
-                  {property.amenities.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1 mb-1">
-                      {property.amenities
-                        .slice(0, 3)
-                        .map((amenity) => (
-                          <Badge
-                            key={amenity}
-                            variant="secondary"
-                            className="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 border-0"
-                          >
-                            {amenity ? amenity.charAt(0).toUpperCase() + amenity.slice(1) : ''}
-                          </Badge>
-                        ))}
-                      {property.amenities.length > 3 && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 border-0"
-                        >
-                          +{property.amenities.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => onViewProperty(property)}
-                      style={{ borderColor: '#f3f3f3' }}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        onManageDocuments(property)
-                      }
-                      style={{ borderColor: '#f3f3f3' }}
-                    >
-                      <FileText className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onManagePhotos(property)}
-                      style={{ borderColor: '#f3f3f3' }}
-                    >
-                      <Image className="w-4 h-4" />
-                    </Button>
+                </div>
+                <div className="ll-occ-legend">
+                  <div className="ll-legend-item">
+                    <span className="ll-legend-box occupied" />
+                    <span>Occupied - {occupiedProperties}</span>
+                  </div>
+                  <div className="ll-legend-item">
+                    <span className="ll-legend-box vacant" />
+                    <span>Vacant - {vacantProperties}</span>
                   </div>
                 </div>
-              </Card>
-            );})}
+              </>
+            )}
           </div>
-        )}
-      </div>
+        </section>
+
+        <div className="ll-mid-grid">
+          <div className="ll-mid-left">
+            <div className={`ll-content-box${documentChips.length === 0 ? " ll-is-empty" : ""}`}>
+              <div className="ll-box-header">
+                <h3 className="ll-box-title ll-heading">Your Documents</h3>
+              </div>
+              {documentChips.length === 0 ? (
+                <ContainerEmpty
+                  icon={<FileText size={22} />}
+                  iconTone="blue"
+                  title="No documents stored"
+                  description="Upload tenancy agreements, inventories, and compliance records for quick access."
+                  actionLabel="+ Upload Document"
+                  actionVariant="primary"
+                  onAction={handleUploadDocument}
+                />
+              ) : (
+                <div className="ll-docs-carousel">
+                  {documentChips.map((doc) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      className="ll-doc-chip"
+                      onClick={() => onManageDocuments(doc.property)}
+                      title={doc.name}
+                    >
+                      <div className={`ll-doc-icon ${docBadgeClass(doc.type)}`}>
+                        {docExtLabel(doc.type, doc.name)}
+                      </div>
+                      <div>
+                        <div className="ll-doc-name">{doc.name}</div>
+                        <div className="ll-doc-meta">{doc.type}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={`ll-content-box${occupancyBars.length === 0 ? " ll-is-empty" : ""}`}>
+              <div className="ll-box-header">
+                <h3 className="ll-box-title ll-heading">Portfolio Analytics</h3>
+                {occupancyBars.length > 0 && (
+                  <button type="button" className="ll-box-link" onClick={onViewInsights}>
+                    View analytics page
+                    <ChevronRight size={14} />
+                  </button>
+                )}
+              </div>
+              {occupancyBars.length === 0 ? (
+                <ContainerEmpty
+                  icon={<BarChart3 size={24} />}
+                  iconTone="blue"
+                  title="No Analytics Available"
+                  description="Performance graphs, property occupancy rankings, and portfolio breakdown will appear once tenancies begin."
+                  actionLabel="+ Add Property Listing"
+                  actionVariant="primary"
+                  onAction={onAddProperty}
+                />
+              ) : (
+                <>
+                  <div className="ll-section-subtitle">Property Occupancy</div>
+                  {occupancyBars.map((row) => (
+                    <div key={row.id} className="ll-bar-row">
+                      <span className="ll-bar-label" title={row.label}>
+                        {row.label}
+                      </span>
+                      <div className="ll-bar-track">
+                        <div className="ll-bar-fill" style={{ width: `${row.pct}%` }} />
+                      </div>
+                      <span className="ll-bar-pct">{row.pct}%</span>
+                    </div>
+                  ))}
+                  <div className="ll-analytics-sub">
+                    <div>
+                      <div className="ll-subchart-title ll-heading">Top Performing Properties</div>
+                      <div className="ll-subchart-sub">Monthly gross rent - GBP</div>
+                      {topRent.map((row) => (
+                        <div key={row.name} className="ll-rent-row">
+                          <span>{row.name}</span>
+                          <strong>£{row.rent.toLocaleString()}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="ll-subchart-title ll-heading">Portfolio Composition</div>
+                      <div className="ll-subchart-sub">By property type</div>
+                      {composition.map((row) => (
+                        <div key={row.name} className="ll-comp-row">
+                          <span className="ll-comp-dot" style={{ background: row.color }} />
+                          <span>
+                            {row.name} <strong>{row.pct}%</strong> · {row.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="ll-mid-right">
+            <div className="ll-content-box ll-is-empty">
+              <div className="ll-box-header">
+                <h3 className="ll-box-title ll-heading">Viewings</h3>
+              </div>
+              <ContainerEmpty
+                icon={<CalendarDays size={22} />}
+                iconTone="orange"
+                title="No viewings scheduled"
+                description="Upcoming appointments with prospective buyers and tenants will appear here."
+                actionLabel="+ Schedule Viewing"
+                actionVariant="primary"
+                onAction={handleScheduleViewing}
+              />
+            </div>
+
+            <div className={`ll-content-box${combinedAlerts.length === 0 ? " ll-is-empty" : ""}`}>
+              <div className="ll-box-header">
+                <h3 className="ll-box-title ll-heading">Priority Alerts</h3>
+              </div>
+              {combinedAlerts.length === 0 ? (
+                <ContainerEmpty
+                  icon={<Check size={22} strokeWidth={2.5} />}
+                  iconTone="green"
+                  title="All caught up!"
+                  description="You have zero pending arrears, inspections, or lease expirations today."
+                  footer={<div className="ll-empty-badge">✓ All systems clear</div>}
+                />
+              ) : (
+                <div className="ll-alert-list">
+                  {combinedAlerts.slice(0, 5).map(({ type, alert }) => (
+                    <button
+                      key={`${type}-${alert.id}`}
+                      type="button"
+                      className="ll-alert-item"
+                      onClick={() => {
+                        if (type === "vacancy") onViewVacancyAlert?.(alert.id);
+                        else onViewArrearsAlert?.(alert.id);
+                      }}
+                    >
+                      <div className={`ll-alert-icon ${type}`}>
+                        {type === "vacancy" ? <AlertTriangle size={16} /> : <Users size={16} />}
+                      </div>
+                      <div>
+                        <div className="ll-alert-title">
+                          {type === "vacancy" ? "Vacancy risk" : "Rent arrears"}
+                        </div>
+                        <div className="ll-alert-desc">
+                          {alert.propertyAddress ||
+                            alert.tenantName ||
+                            (type === "vacancy" ? "Lease ending soon" : "Payment overdue")}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <section className="ll-properties-section">
+          <div className="ll-properties-header">
+            <h2 className="ll-heading">Properties</h2>
+            {onViewAllProperties && displayProperties.length > 0 && (
+              <button type="button" className="ll-box-link" onClick={onViewAllProperties}>
+                View properties page
+                <ChevronRight size={16} />
+              </button>
+            )}
+          </div>
+
+          {totalProperties > 0 && (
+            <div className="ll-filter-pills">
+              {(
+                [
+                  ["all", "All Properties"],
+                  ["latest", "Latest Property"],
+                  ["highest", "Highest Lease"],
+                  ["expiring", "Expiring Soon"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`ll-filter-pill ${propertyPill === id ? "active" : ""}`}
+                  onClick={() => setPropertyPill(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {displayProperties.length === 0 ? (
+            <div className="ll-properties-empty">
+              <ContainerEmpty
+                icon={<Building2 size={28} />}
+                iconTone="blue"
+                title="No properties found"
+                description="No properties match your current filter or you haven't added any listings yet."
+                actionLabel="Add Property"
+                actionVariant="primary"
+                onAction={onAddProperty}
+              />
+            </div>
+          ) : (
+            <div className="ll-property-grid">
+              {displayProperties.map((property) => {
+                const img = coverUrl(property);
+                const showHighest = property.rent === maxRent && maxRent > 0;
+                return (
+                  <article key={property.id} className="ll-property-card">
+                    <div className="ll-prop-img">
+                      {img ? (
+                        <img src={img} alt={property.address} />
+                      ) : (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#94a3b8",
+                            background: "#e2e8f0",
+                          }}
+                        >
+                          <Building2 size={36} />
+                        </div>
+                      )}
+                      <div className="ll-prop-badge">
+                        {propertyPill === "highest" || showHighest
+                          ? "Highest Lease"
+                          : property.status === "occupied"
+                            ? "Occupied"
+                            : property.status === "vacant"
+                              ? "Vacant"
+                              : "Renovating"}
+                      </div>
+                    </div>
+                    <div className="ll-prop-body">
+                      <div className="ll-prop-price-row">
+                        <div className="ll-prop-price">
+                          £{(property.rent || 0).toLocaleString()} <span>/ month</span>
+                        </div>
+                        <div className="ll-prop-time">{timeAgo(property.createdAt)}</div>
+                      </div>
+                      <div className="ll-prop-name">
+                        {(property.address.split(",")[0] || property.address).trim()}
+                      </div>
+                      <div className="ll-prop-address">{property.address}</div>
+                      <div className="ll-prop-specs">
+                        <span className="ll-spec-item">
+                          <BedDouble size={14} />
+                          {property.bedrooms} Bedrooms
+                        </span>
+                        {typeof property.bathrooms === "number" && (
+                          <span className="ll-spec-item">
+                            <Bath size={14} />
+                            {property.bathrooms} Bathrooms
+                          </span>
+                        )}
+                      </div>
+                      {(property.amenities || []).length > 0 && (
+                        <div className="ll-prop-tags">
+                          {property.amenities.slice(0, 3).map((tag) => (
+                            <span key={tag} className="ll-prop-tag">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="ll-prop-actions">
+                        <button
+                          type="button"
+                          className="ll-btn-view"
+                          onClick={() => onViewProperty(property)}
+                        >
+                          View Details
+                        </button>
+                        <button
+                          type="button"
+                          className="ll-btn-icon"
+                          title="Photos"
+                          onClick={() => onManagePhotos(property)}
+                        >
+                          <Image size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="ll-btn-icon"
+                          title="Documents"
+                          onClick={() => onManageDocuments(property)}
+                        >
+                          <FileText size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

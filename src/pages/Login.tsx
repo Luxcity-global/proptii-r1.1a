@@ -59,8 +59,13 @@ export const LoginPage: React.FC = () => {
       sessionStorage.removeItem('last_redirect_path');
 
       // If new user has no assigned role, direct them to role selection screen
+      // except when they were heading to the internal admin dashboard.
       const hasRole = user?.roles && user.roles.length > 0;
-      const targetPath = hasRole ? from : '/select-role';
+      const fromPath = typeof from === 'string' ? from : '';
+      const isAdminDest =
+        fromPath.toLowerCase() === '/proptiiadmin' ||
+        fromPath.toLowerCase().startsWith('/proptiiadmin/');
+      const targetPath = hasRole || isAdminDest ? from : '/select-role';
       
       console.log('✅ Already authenticated, redirecting to:', targetPath);
       trackEvent('login_success', {

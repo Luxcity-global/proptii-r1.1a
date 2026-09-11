@@ -15,6 +15,7 @@ import { ContractController } from './controllers/contract.controller';
 import { BillingController } from './controllers/billing.controller';
 import { UserProfileController } from './controllers/user-profile.controller';
 import { HealthController } from './controllers/health.controller';
+import { AdminDashboardController } from './controllers/admin-dashboard.controller';
 
 // ── New controllers (gap-fill) ────────────────────────────────────────────────
 import { LandlordsController } from './controllers/landlords.controller';
@@ -46,6 +47,7 @@ import { GuestEnquiryService } from './services/guest-enquiry.service';
 import { ContractService } from './services/contract.service';
 import { BillingService } from './services/billing.service';
 import { UserProfileService } from './services/user-profile.service';
+import { AdminDashboardService } from './services/admin-dashboard.service';
 
 // ── New services (gap-fill) ───────────────────────────────────────────────────
 import { LandlordsService } from './services/landlords.service';
@@ -75,6 +77,7 @@ import { StorageController } from './controllers/storage.controller';
     ContractController,
     BillingController,
     UserProfileController,
+    AdminDashboardController,
     // Gap-fill controllers
     LandlordsController,
     PropertySelectionsController,
@@ -105,6 +108,7 @@ import { StorageController } from './controllers/storage.controller';
     ContractService,
     BillingService,
     UserProfileService,
+    AdminDashboardService,
     // Gap-fill services
     LandlordsService,
     PropertySelectionsService,

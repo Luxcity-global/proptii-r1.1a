@@ -1,4 +1,8 @@
 /*! tailwindcss v4.1.3 | MIT License | https://tailwindcss.com */
+@import "./styles/dashboardOverview.css";
+@import "./styles/sidebarOverview.css";
+@import "./styles/propertiesPage.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

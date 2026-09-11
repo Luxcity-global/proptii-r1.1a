@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { serializeUserDates } from '../utils/firestore-date';
 
 @Injectable()
 export class LandlordsService {
@@ -22,7 +23,7 @@ export class LandlordsService {
       const snap = await col
         .where('role', 'in', ['landlord', 'agent'])
         .get();
-      const users = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const users = snap.docs.map((doc) => serializeUserDates({ id: doc.id, ...doc.data() }));
       return { users };
     } catch (err: any) {
       this.logger.warn(`getAllLandlords error: ${err?.message || err}`);

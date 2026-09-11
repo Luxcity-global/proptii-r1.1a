@@ -73,6 +73,14 @@ const FileTable           = lazy(() => import('./components/dashboard/sections/Y
 const TenantReferencing   = lazy(() => import('./components/dashboard/sections/TenantReferencing-new'));
 const TenantMessages      = lazy(() => import('./pages/dashboard/TenantMessages'));
 const DashboardSettings   = lazy(() => import('./components/dashboard/sections/DashboardSettings'));
+const ProptiiAdminPage    = lazy(() => import('./pages/admin/ProptiiAdminPage'));
+
+/** Preserve subpaths when redirecting /proptiiadmin → /ProptiiAdmin. */
+function ProptiiAdminCaseRedirect() {
+  const { pathname, search } = useLocation();
+  const rest = pathname.replace(/^\/proptiiadmin/i, '');
+  return <Navigate to={`/ProptiiAdmin${rest}${search}`} replace />;
+}
 
 /** Minimal spinner shown while an async route chunk is loading. */
 function RouteLoadingFallback() {
@@ -257,6 +265,13 @@ export const App: React.FC = () => {
 
                 {/* New agent contract route */}
                 {/* <Route path="/agent-contracts" element={<AgentContractLanding />} /> */}
+
+                {/* Internal ops dashboard — isolated from product routes */}
+                <Route path="/ProptiiAdmin/*" element={<ProptiiAdminPage />} />
+                <Route
+                  path="/proptiiadmin/*"
+                  element={<ProptiiAdminCaseRedirect />}
+                />
 
                 {/* Catch-all route for 404 */}
                   <Route path="*" element={<NotFoundPage />} />

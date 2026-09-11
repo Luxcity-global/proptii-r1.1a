@@ -1,0 +1,240 @@
+/* Landlord sidebar — scoped to match HTML overview design */
+
+.ll-sidebar {
+  --ll-sb-border: #e2e8f0;
+  --ll-sb-radius: 12px;
+  --ll-sb-orange: #dc5f12;
+  --ll-sb-blue: #136c9e;
+  --ll-sb-text: #334155;
+  font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #ffffff;
+  border-right: 1px solid var(--ll-sb-border);
+  color: var(--ll-sb-text);
+}
+
+.ll-sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px 18px;
+  transition: padding 0.3s ease;
+}
+
+.ll-sidebar.is-collapsed .ll-sidebar-inner {
+  padding: 24px 12px;
+}
+
+.ll-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 24px;
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  width: 100%;
+  text-align: left;
+}
+
+.ll-sidebar.is-collapsed .ll-sidebar-brand {
+  justify-content: center;
+  padding: 4px 0 24px;
+}
+
+.ll-sidebar-brand-icon {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.ll-sidebar-brand-title {
+  font-family: 'Archivo', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ll-sb-orange);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.ll-sidebar.is-collapsed .ll-sidebar-brand-title {
+  display: none;
+}
+
+.ll-sidebar-nav {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+}
+
+.ll-sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 11px 18px;
+  margin: 1px 0;
+  border-radius: var(--ll-sb-radius);
+  color: #334155;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  background: #f8fafc;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.ll-sidebar-nav-item:hover {
+  padding: 12px 18px;
+  margin: 0;
+  background: #ecf7ff;
+  color: #1e5178;
+}
+
+.ll-sidebar-nav-item:hover svg {
+  color: #1e5178;
+  stroke: #1e5178;
+}
+
+.ll-sidebar-nav-item svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.ll-sidebar-nav-item.is-active {
+  padding: 12px 18px;
+  margin: 0;
+  background: #e8f3f8;
+  border-color: #bcd9ea;
+  color: var(--ll-sb-blue);
+  box-shadow: 0 2px 8px rgba(19, 108, 158, 0.1);
+}
+
+.ll-sidebar-nav-item.is-active svg {
+  color: var(--ll-sb-blue);
+  stroke: var(--ll-sb-blue);
+}
+
+.ll-sidebar-nav-item.is-active:hover {
+  background: #e8f3f8;
+  color: var(--ll-sb-blue);
+}
+
+.ll-sidebar.is-collapsed .ll-sidebar-nav-item {
+  justify-content: center;
+  padding: 11px 12px;
+  margin: 1px 0;
+  gap: 0;
+}
+
+.ll-sidebar.is-collapsed .ll-sidebar-nav-item:hover,
+.ll-sidebar.is-collapsed .ll-sidebar-nav-item.is-active {
+  padding: 12px;
+  margin: 0;
+}
+
+.ll-sidebar.is-collapsed .ll-sidebar-nav-text {
+  display: none;
+}
+
+.ll-sidebar-nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.ll-sidebar-nav-dot {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 10px;
+  height: 10px;
+  background: #ef4444;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  z-index: 1;
+}
+
+.ll-sidebar-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 42px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: var(--ll-sb-radius);
+  color: #64748b;
+  cursor: pointer;
+  margin-top: 14px;
+  margin-bottom: 16px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.ll-sidebar-collapse:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.ll-sidebar-user {
+  padding: 14px 16px;
+  background: #fffdfa;
+  border: 1px solid #fed7aa;
+  border-radius: var(--ll-sb-radius);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.ll-sidebar-user-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ll-sidebar-user-email {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ll-sidebar.is-collapsed .ll-sidebar-user {
+  padding: 8px;
+  text-align: center;
+}
+
+.ll-sidebar.is-collapsed .ll-sidebar-user-email {
+  display: none;
+}
+
+/* Mobile drawer reuse */
+.ll-sidebar-mobile .ll-sidebar-inner {
+  padding: 20px 16px;
+}
+
+.ll-sidebar-mobile .ll-sidebar-nav {
+  gap: 10px;
+}

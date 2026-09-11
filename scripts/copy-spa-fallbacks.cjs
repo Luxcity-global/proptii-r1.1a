@@ -23,6 +23,7 @@ const SPA_ROUTE_DIRS = [
   'pricing/confirmed',
   'login',
   'dashboard',
+  'ProptiiAdmin',
 ];
 
 function main() {

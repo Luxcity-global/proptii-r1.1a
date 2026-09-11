@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBillingStatus } from '../../hooks/useBillingStatus';
 import { createBillingPortalSession } from '../../services/billingService';
@@ -7,11 +7,16 @@ import { createBillingPortalSession } from '../../services/billingService';
 /** S3-16 — In-app banner when subscription is past_due. */
 const BillingStatusBanner: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { status, trialEndsAt, loading } = useBillingStatus();
   const [busy, setBusy] = useState(false);
 
-  if (!isAuthenticated || loading) {
+  const onAdminDashboard =
+    location.pathname.toLowerCase() === '/proptiiadmin' ||
+    location.pathname.toLowerCase().startsWith('/proptiiadmin/');
+
+  if (onAdminDashboard || !isAuthenticated || loading) {
     return null;
   }
 
