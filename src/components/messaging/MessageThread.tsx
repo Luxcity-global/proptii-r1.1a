@@ -80,7 +80,9 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
     const bottomRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = useCallback(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (typeof bottomRef.current?.scrollIntoView === 'function') {
+            bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
         onScrollRequest?.();
     }, [onScrollRequest]);
 

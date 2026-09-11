@@ -117,7 +117,7 @@ export default defineConfig(({ mode = 'development' }) => {
     server: {
       proxy: {
         '/api/search-backend': {
-          target: viteSearchBackendUrl || 'http://127.0.0.1:3001',
+          target: viteSearchBackendUrl || 'https://proptii-r1-1a-q95f.onrender.com',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/search-backend/, ''),
           secure: false,
@@ -130,6 +130,18 @@ export default defineConfig(({ mode = 'development' }) => {
                 proxyRes.headers['cache-control'] = 'no-cache';
                 proxyRes.headers['x-accel-buffering'] = 'no';
                 proxyRes.headers['connection'] = 'keep-alive';
+              }
+            });
+            proxy.on('error', (err, req, res: any) => {
+              const dest = viteSearchBackendUrl || 'https://proptii-r1-1a-q95f.onrender.com';
+              console.error(`[Vite Search Proxy] Could not connect to search backend at ${dest}:`, err.message);
+              if (res && !res.headersSent) {
+                res.writeHead(502, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                  error: 'Search backend unavailable',
+                  message: `Cannot connect to search backend at ${dest}. If running locally, ensure proptii-search is running on port 3001. Otherwise configure VITE_SEARCH_BACKEND_URL to https://proptii-r1-1a-q95f.onrender.com.`,
+                  code: (err as any).code,
+                }));
               }
             });
           },
