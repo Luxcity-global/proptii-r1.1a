@@ -242,3 +242,26 @@ button[data-onboarding-option]:focus,
 button[data-onboarding-option]:focus-visible {
   outline: none !important;
 }
+
+/* Very thin scrollbar for referencing g-card field lists */
+.gcard-fields-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
+}
+
+.gcard-fields-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+
+.gcard-fields-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gcard-fields-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+}
+
+.gcard-fields-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "spreadsheetId": "1WBACyGHtXUMfD9UeCUYcBM-2McIB3UJywcYWSPwj5nk",
+    "data": {
+      "source": "viewing_completion",
+      "timestamp": "2026-08-11T22:15:15.6935742Z",
+      "userId": "test-user",
+      "rating": 4,
+      "feedback": "No feedback provided",
+      "userType": "tenant",
+      "userEmail": "test@example.com"
+    },
+    "receivedAt": "2026-08-11T22:15:16.061Z",
+    "storage": "local"
+  }
+]

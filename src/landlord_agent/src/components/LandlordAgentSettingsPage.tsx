@@ -12,7 +12,6 @@ import type { UserProfile, UserRole } from '../App';
 import { useLandlordBillingStatus } from '../hooks/useLandlordBillingStatus';
 import { getPlanById, type PlanId } from '../../../config/plans';
 import { createBillingPortalSession } from '../../../services/billingService';
-import LandlordDashboardHeader from './LandlordDashboardHeader';
 import { useIsMobile } from './ui/use-mobile';
 import LandlordPlanCompareModal from './LandlordPlanCompareModal';
 import { requestAuthAction } from '../utils/authBridge';
@@ -219,14 +218,6 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
 
   return (
     <div style={{ fontFamily: 'Archivo, sans-serif' }}>
-      <div className={`${isMobile ? 'mt-4 px-4' : 'mt-6 px-5 lg:px-6'} w-full max-w-6xl mx-auto`}>
-        <LandlordDashboardHeader
-          userProfile={userProfile}
-          userRole={userRole}
-          isAuthenticated={isAuthenticated}
-        />
-      </div>
-
       <div className={`${isMobile ? 'px-4 pb-4' : 'px-5 lg:px-6 pb-8'} w-full max-w-6xl mx-auto`}>
         <div className="w-full text-left mt-6 md:mt-8 mb-8">
           <h1 className="text-2xl font-bold" style={{ color: '#1a2332' }}>

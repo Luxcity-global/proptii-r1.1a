@@ -42,7 +42,7 @@ interface ReferencingPageProps {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
-  sent:    'bg-blue-100 text-blue-700',
+  sent:    'bg-[#E6F3FF] text-[#136C9E]',
   viewed:  'bg-green-100 text-green-700',
   claimed: 'bg-purple-100 text-purple-700',
 };
@@ -56,7 +56,7 @@ const STATUS_LABELS: Record<string, string> = {
 function getReferencingStatusColor(status: 'not-started' | 'in-progress' | 'complete') {
   switch (status) {
     case 'complete':    return 'bg-green-100 text-green-800';
-    case 'in-progress': return 'bg-blue-100 text-blue-800';
+    case 'in-progress': return 'bg-[#E6F3FF] text-[#136C9E]';
     default:            return 'bg-gray-100 text-gray-800';
   }
 }
@@ -145,7 +145,7 @@ function ReceivedPassports({ onOpenMessages }: { onOpenMessages?: () => void }) 
           <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 font-medium">
             {shares.length} total
           </span>
-          <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+          <span className="px-2.5 py-1 rounded-full bg-[#E6F3FF] text-[#136C9E] font-medium">
             {shares.filter(s => s.status === 'sent').length} new
           </span>
           <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">
@@ -159,7 +159,7 @@ function ReceivedPassports({ onOpenMessages }: { onOpenMessages?: () => void }) 
 
       {filtered.length === 0 ? (
         <div className="text-center py-16 px-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-          <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-3">
+          <div className="w-12 h-12 rounded-full bg-[#E6F3FF] flex items-center justify-center mx-auto mb-3">
             <ShieldCheck className="w-6 h-6 text-[#136C9E]" />
           </div>
           <p className="font-semibold text-gray-800 text-sm">
@@ -538,7 +538,7 @@ export function ReferencingPage({ tenants, userProfile, onViewTenant, onOpenMess
 
         {/* Page header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-[#E6F3FF] flex items-center justify-center flex-shrink-0">
             <ShieldCheck className="w-5 h-5 text-[#136C9E]" />
           </div>
           <div>

@@ -159,16 +159,6 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
               ) : (
                 <>
                   <NavLink
-                    to="/"
-                    className={({ isActive }) =>
-                      isActive && pathname === '/'
-                        ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
-                        : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
-                    }
-                  >
-                    Search Properties
-                  </NavLink>
-                  <NavLink
                     to="/bookviewing"
                     className={({ isActive }) =>
                       isActive
@@ -381,17 +371,6 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     </>
                   ) : (
                     <>
-                      <NavLink
-                        to="/"
-                        onClick={closeMobileMenu}
-                        className={({ isActive }) =>
-                          isActive && pathname === '/'
-                            ? 'block px-3 py-2 text-[#F15A22] font-bold rounded-lg bg-white/5'
-                            : 'block px-3 py-2 text-white/90 hover:text-[#F15A22] transition-colors'
-                        }
-                      >
-                        Search Properties
-                      </NavLink>
                       <NavLink
                         to="/bookviewing"
                         onClick={closeMobileMenu}
