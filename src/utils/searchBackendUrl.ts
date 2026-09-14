@@ -15,6 +15,7 @@ const NON_SEARCH_API_HOST_FRAGMENTS = [
   'api-staging.proptii.com',
   'localhost:5000',
   '127.0.0.1:5000',
+  'proptii-r1-1a-search.onrender.com', // Blocked by client ad-blockers (ERR_BLOCKED_BY_CLIENT) due to '-search.' subdomain
 ];
 
 const normalizeBackendUrl = (rawUrl: string): string => {

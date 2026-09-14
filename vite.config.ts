@@ -76,11 +76,18 @@ export default defineConfig(({ mode = 'development' }) => {
   const isStaging = mode === 'staging';
 
   // Render dashboard may set SEARCH_BACKEND_URL; Vite only exposes VITE_* to the client.
-  const viteSearchBackendUrl = (envFromFile.VITE_SEARCH_BACKEND_URL || process.env.VITE_SEARCH_BACKEND_URL || '').trim();
-  const aliasSearchBackendUrl = process.env.SEARCH_BACKEND_URL?.trim() || '';
+  const rawViteSearchBackendUrl = (envFromFile.VITE_SEARCH_BACKEND_URL || process.env.VITE_SEARCH_BACKEND_URL || '').trim();
+  const rawAliasSearchBackendUrl = process.env.SEARCH_BACKEND_URL?.trim() || '';
+  
+  // Exclude 'proptii-r1-1a-search.onrender.com' as it is blocked by client ad-blockers (ERR_BLOCKED_BY_CLIENT)
+  const viteSearchBackendUrl = rawViteSearchBackendUrl.includes('proptii-r1-1a-search.onrender.com') ? '' : rawViteSearchBackendUrl;
+  const aliasSearchBackendUrl = rawAliasSearchBackendUrl.includes('proptii-r1-1a-search.onrender.com') ? '' : rawAliasSearchBackendUrl;
+
   const define: Record<string, string> = {};
   if (!viteSearchBackendUrl && aliasSearchBackendUrl) {
     define['import.meta.env.VITE_SEARCH_BACKEND_URL'] = JSON.stringify(aliasSearchBackendUrl);
+  } else if (!viteSearchBackendUrl && !aliasSearchBackendUrl) {
+    define['import.meta.env.VITE_SEARCH_BACKEND_URL'] = JSON.stringify('https://proptii-r1-1a-q95f.onrender.com');
   }
 
   return {

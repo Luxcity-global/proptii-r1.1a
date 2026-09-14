@@ -150,10 +150,26 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
       
       const response = await apiService.get(url);
       
-      const items = Array.isArray(response.items) ? response.items : (Array.isArray(response) ? response : (response.data || []));
-      const fetchedAllIds = response.allIds || items.map((i: any) => i.id);
-      const hasMoreFlag = response.hasMore || false;
-      const newLast = response.lastVisible || null;
+      const payload: any = (response && typeof response === 'object' && 'data' in response && response.data !== undefined)
+        ? response.data
+        : response;
+
+      const items: any[] = Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload)
+          ? payload
+          : Array.isArray((response as any)?.items)
+            ? (response as any).items
+            : [];
+
+      const fetchedAllIds: string[] = Array.isArray(payload?.allIds)
+        ? payload.allIds
+        : Array.isArray((response as any)?.allIds)
+          ? (response as any).allIds
+          : items.map((i: any) => i?.id || i?.propertyId).filter(Boolean);
+
+      const hasMoreFlag = Boolean(payload?.hasMore ?? (response as any)?.hasMore ?? false);
+      const newLast = payload?.lastVisible ?? (response as any)?.lastVisible ?? null;
 
       if (reset) {
         setSavedProperties(items);
@@ -195,8 +211,17 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
       if (!local.length) return;
       try {
         const response = await apiService.get('/users/me/saved-properties?limit=100');
-        const existing = Array.isArray(response.items) ? response.items : (Array.isArray(response) ? response : (response.data || []));
-        const existingIds = new Set(existing.map((d: any) => d.id));
+        const payload: any = (response && typeof response === 'object' && 'data' in response && response.data !== undefined)
+          ? response.data
+          : response;
+        const existing: any[] = Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload)
+            ? payload
+            : Array.isArray((response as any)?.items)
+              ? (response as any).items
+              : [];
+        const existingIds = new Set(existing.map((d: any) => d?.id || d?.propertyId).filter(Boolean));
         for (const prop of local) {
           if (!existingIds.has(prop.id)) {
             await apiService.post('/users/me/saved-properties', { ...prop, savedAt: prop.savedAt || new Date().toISOString() });

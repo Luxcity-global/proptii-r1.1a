@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { Property } from '../types';
 
 const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3001';
-const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-search.onrender.com';
+const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-q95f.onrender.com';
 
 const NON_SEARCH_API_HOST_FRAGMENTS = [
   'railway.app',
@@ -11,6 +11,7 @@ const NON_SEARCH_API_HOST_FRAGMENTS = [
   'proptii-r1-1a-1.onrender.com',
   'api.proptii.com',
   'api-staging.proptii.com',
+  'proptii-r1-1a-search.onrender.com',
 ];
 
 const normalizeBackendUrl = (rawUrl: string): string => {

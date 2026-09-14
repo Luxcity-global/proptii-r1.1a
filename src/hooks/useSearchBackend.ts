@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { resolveSearchBackendUrl } from '../utils/searchBackendUrl';
+import { resolveSearchBackendUrl, PROD_SEARCH_BACKEND_URL } from '../utils/searchBackendUrl';
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
 const cleanPropertyPrice = (price: string): string => {
@@ -56,7 +56,18 @@ export const useSearchBackend = () => {
       });
       return response.ok;
     } catch (error) {
-      console.warn('Network connectivity check failed:', error);
+      console.warn('Network connectivity check failed on primary URL:', error);
+      if (searchBackendUrl !== PROD_SEARCH_BACKEND_URL) {
+        try {
+          const fallbackRes = await fetch(`${PROD_SEARCH_BACKEND_URL}/health`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(10000)
+          });
+          return fallbackRes.ok;
+        } catch {
+          return false;
+        }
+      }
       return false;
     }
   };
@@ -142,12 +153,29 @@ export const useSearchBackend = () => {
       }
 
       // 2. SSE Scraper Search (hits proptii-search port 3001)
-      const response = await fetch(`${searchBackendUrl}/api/v1/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery, filters: {} }),
-        signal: AbortSignal.timeout(120000) // Increased to 120 seconds for slow scraper streams
-      });
+      let targetUrl = searchBackendUrl;
+      let response: Response;
+      try {
+        response = await fetch(`${targetUrl}/api/v1/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: searchQuery, filters: {} }),
+          signal: AbortSignal.timeout(120000) // Increased to 120 seconds for slow scraper streams
+        });
+      } catch (fetchErr) {
+        if (targetUrl !== PROD_SEARCH_BACKEND_URL) {
+          console.warn('[Search] Primary search endpoint failed (possible ad-blocker or network error), retrying with canonical fallback:', fetchErr);
+          targetUrl = PROD_SEARCH_BACKEND_URL;
+          response = await fetch(`${targetUrl}/api/v1/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: searchQuery, filters: {} }),
+            signal: AbortSignal.timeout(120000)
+          });
+        } else {
+          throw fetchErr;
+        }
+      }
 
       if (!response.ok) {
         throw new Error(`Scraper responded with ${response.status}`);
