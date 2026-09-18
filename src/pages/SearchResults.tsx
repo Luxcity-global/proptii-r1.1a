@@ -1,17 +1,47 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Bath, BedDouble, Check, Loader2, Lock, MapPin, MessageSquare, Square, X as XIcon } from 'lucide-react';
+import {
+  Bath,
+  BedDouble,
+  Bell,
+  Car,
+  Check,
+  Dumbbell,
+  Home,
+  Loader2,
+  Lock,
+  MapPin,
+  MessageSquare,
+  PawPrint,
+  Sparkles,
+  Square,
+  Train,
+  Trees,
+  X as XIcon,
+  Zap,
+} from 'lucide-react';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import { useGovDataLayer } from '../contexts/GovDataLayerContext';
 import { maskEmail, maskPhone } from '../utils/formatters';
 import { useBatchedPropertyFacts } from '../hooks/useBatchedPropertyFacts';
 import { useClassifyQuery } from '../hooks/useClassifyQuery';
+import { usePropertyFilters } from '../hooks/usePropertyFilters';
+import { SearchFilterBar } from '../components/search/SearchFilterBar';
 import { FilterPills } from '../components/search/FilterPills';
 import { FactsBadgeRow } from '../components/property/FactsBadgeRow';
 import { ProptiiModule } from '../components/property/ProptiiModule';
 import { resolveListingId } from '../utils/listingId';
 import { getPropertyDisplayTitle, getPropertyListingDescription } from '../utils/propertyDisplay';
+import {
+  hasPetFriendlyFeature,
+  hasBillsIncludedFeature,
+  hasBalconyOrGardenFeature,
+  hasParkingFeature,
+  hasStationNearbyFeature,
+  hasGymFeature,
+  hasConciergeFeature,
+} from '../utils/propertyParsers';
 import Footer from '../components/Footer';
 import { SearchLoadingAnimation } from '../components/SearchLoadingAnimation';
 import type { FactFlag } from '../types/govData';
@@ -99,6 +129,14 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
     /pcm|pw|rent|let/i.test(`${property.price} ${property.propertyType}`) ||
     !/sale|buy/i.test(property.propertyType || '');
   const displayTitle = getPropertyDisplayTitle(property);
+  const fullPropertyText = `${property.title || ''} ${property.description || ''} ${property.summary || ''}`;
+  const isPetFriendly = hasPetFriendlyFeature(fullPropertyText, property.amenities);
+  const isBillsIncluded = hasBillsIncludedFeature(fullPropertyText, property.amenities);
+  const hasGarden = hasBalconyOrGardenFeature(fullPropertyText);
+  const hasStation = hasStationNearbyFeature(fullPropertyText, property.amenities);
+  const hasParking = hasParkingFeature(fullPropertyText);
+  const hasGym = hasGymFeature(fullPropertyText, property.amenities);
+  const hasConcierge = hasConciergeFeature(fullPropertyText, property.amenities);
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -134,12 +172,12 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
               }`}
             />
 
-            <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#136C9E] text-white shadow-sm">
+            <div className="absolute top-3 left-3 flex flex-col gap-1.5 max-w-[70%]">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#136C9E] text-white shadow-sm w-fit">
                 {isRent ? 'To Rent' : 'For Sale'}
               </span>
-              <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-sm">
-                Available Now
+              <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-sm w-fit truncate">
+                {property.addedOrReduced || 'Available Now'}
               </span>
             </div>
 
@@ -203,7 +241,13 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z" />
               </svg>
-              <span>{property.bedrooms || '—'} Beds</span>
+              <span>
+                {property.bedrooms === 0
+                  ? 'Studio'
+                  : property.bedrooms
+                  ? `${property.bedrooms} Beds`
+                  : 'Beds unspecified'}
+              </span>
             </div>
             {property.bathrooms && (
               <div className="flex items-center gap-1">
@@ -227,6 +271,53 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
               </div>
             )}
           </div>
+
+          {(isPetFriendly || isBillsIncluded || hasStation || hasGarden || hasParking || hasGym || hasConcierge) && (
+            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              {isPetFriendly && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-xs">
+                  <PawPrint className="w-3 h-3 text-amber-700" aria-hidden />
+                  <span>Pet Friendly</span>
+                </span>
+              )}
+              {isBillsIncluded && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200/80 shadow-xs">
+                  <Zap className="w-3 h-3 text-blue-700" aria-hidden />
+                  <span>Bills Inc.</span>
+                </span>
+              )}
+              {hasStation && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-xs">
+                  <Train className="w-3 h-3 text-emerald-700" aria-hidden />
+                  <span>Near Station</span>
+                </span>
+              )}
+              {hasGarden && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-800 border border-teal-200/80 shadow-xs">
+                  <Trees className="w-3 h-3 text-teal-700" aria-hidden />
+                  <span>Balcony/Garden</span>
+                </span>
+              )}
+              {hasParking && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200/80 shadow-xs">
+                  <Car className="w-3 h-3 text-indigo-700" aria-hidden />
+                  <span>Parking</span>
+                </span>
+              )}
+              {hasGym && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-800 border border-purple-200/80 shadow-xs">
+                  <Dumbbell className="w-3 h-3 text-purple-700" aria-hidden />
+                  <span>Gym</span>
+                </span>
+              )}
+              {hasConcierge && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 text-orange-800 border border-orange-200/80 shadow-xs">
+                  <Bell className="w-3 h-3 text-orange-700" aria-hidden />
+                  <span>Concierge</span>
+                </span>
+              )}
+            </div>
+          )}
 
           {(factsLoading || factFlags || factsUnresolved) && (
             <div className="mb-3" onClick={(e) => e.stopPropagation()}>
@@ -357,9 +448,12 @@ function PropertyDetailsModal({
       .filter(Boolean)
       .join(', ') || property.location;
   const listingDescription = getPropertyListingDescription(property);
+  const rawAmenities = (property.amenities || [])
+    .map((a: any) => (typeof a === 'string' ? a : (a?.description || a?.htmlDescription || a?.title || '')).trim())
+    .filter(Boolean);
   const featureItems =
-    property.amenities && property.amenities.length > 0
-      ? property.amenities.slice(0, 6)
+    rawAmenities.length > 0
+      ? rawAmenities.slice(0, 12)
       : [
           property.description?.split('.')[0]?.trim(),
           property.propertyType ? `Property type: ${property.propertyType}` : null,
@@ -390,7 +484,7 @@ function PropertyDetailsModal({
                 {isRent ? 'To Rent' : 'For Sale'}
               </span>
               <span className="bg-emerald-600 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md">
-                Available Now
+                {property.addedOrReduced || 'Available Now'}
               </span>
             </div>
 
@@ -439,7 +533,7 @@ function PropertyDetailsModal({
         </div>
 
         <div className="p-6 sm:p-8">
-          <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+          <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
             <div className="min-w-0">
               <h2
                 className="text-xl font-semibold text-gray-900 tracking-tight"
@@ -457,6 +551,68 @@ function PropertyDetailsModal({
               {showPcm && <span className="text-xs text-gray-500 font-normal">pcm</span>}
             </p>
           </div>
+
+          {(() => {
+            const fullModalText = `${property.title || ''} ${property.description || ''} ${property.summary || ''}`;
+            const mPet = hasPetFriendlyFeature(fullModalText, property.amenities);
+            const mBills = hasBillsIncludedFeature(fullModalText, property.amenities);
+            const mGarden = hasBalconyOrGardenFeature(fullModalText);
+            const mStation = hasStationNearbyFeature(fullModalText, property.amenities);
+            const mParking = hasParkingFeature(fullModalText);
+            const mGym = hasGymFeature(fullModalText, property.amenities);
+            const mConcierge = hasConciergeFeature(fullModalText, property.amenities);
+
+            if (!mPet && !mBills && !mGarden && !mStation && !mParking && !mGym && !mConcierge) {
+              return null;
+            }
+
+            return (
+              <div className="flex flex-wrap items-center gap-2 mb-6">
+                {mPet && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-xs">
+                    <PawPrint className="w-3.5 h-3.5 text-amber-700" aria-hidden />
+                    <span>Pet Friendly</span>
+                  </span>
+                )}
+                {mBills && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200/80 shadow-xs">
+                    <Zap className="w-3.5 h-3.5 text-blue-700" aria-hidden />
+                    <span>Bills Included</span>
+                  </span>
+                )}
+                {mStation && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-xs">
+                    <Train className="w-3.5 h-3.5 text-emerald-700" aria-hidden />
+                    <span>Near Station</span>
+                  </span>
+                )}
+                {mGarden && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200/80 shadow-xs">
+                    <Trees className="w-3.5 h-3.5 text-teal-700" aria-hidden />
+                    <span>Balcony / Garden</span>
+                  </span>
+                )}
+                {mParking && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200/80 shadow-xs">
+                    <Car className="w-3.5 h-3.5 text-indigo-700" aria-hidden />
+                    <span>Parking</span>
+                  </span>
+                )}
+                {mGym && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-800 border border-purple-200/80 shadow-xs">
+                    <Dumbbell className="w-3.5 h-3.5 text-purple-700" aria-hidden />
+                    <span>Gym / Fitness</span>
+                  </span>
+                )}
+                {mConcierge && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-800 border border-orange-200/80 shadow-xs">
+                    <Bell className="w-3.5 h-3.5 text-orange-700" aria-hidden />
+                    <span>Concierge</span>
+                  </span>
+                )}
+              </div>
+            );
+          })()}
 
           {govDataEnabled && (
             <ProptiiModule
@@ -508,7 +664,13 @@ function PropertyDetailsModal({
                 <div className="flex items-center gap-2 text-gray-700">
                   <BedDouble className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
                   <span>
-                    <strong>{property.bedrooms || '—'}</strong>&nbsp;Bedrooms
+                    <strong>
+                      {property.bedrooms === 0
+                        ? 'Studio'
+                        : property.bedrooms
+                        ? `${property.bedrooms} ${Number(property.bedrooms) === 1 ? 'Bedroom' : 'Bedrooms'}`
+                        : 'Beds unspecified'}
+                    </strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-gray-700">
@@ -527,7 +689,7 @@ function PropertyDetailsModal({
                 </div>
                 {property.propertyType && (
                   <div className="flex items-center gap-2 text-gray-700">
-                    <span className="text-gray-500">⌂</span>
+                    <Home className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
                     <span className="capitalize">
                       <strong>{property.propertyType}</strong>
                     </span>
@@ -874,7 +1036,7 @@ function LocationInsights({ searchQuery, propertyCount }: { searchQuery: string;
 
             <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">⚡</span>
+                <Zap className="w-5 h-5 text-green-600" aria-hidden />
                 <h4 className="font-semibold text-gray-900">Quick Actions</h4>
               </div>
               <div className="space-y-2 text-sm">
@@ -977,7 +1139,7 @@ const SearchResults = () => {
   const searchTypeParam =
     rawSearchTypeParam === 'proptii' || rawSearchTypeParam === 'onthemarket'
       ? rawSearchTypeParam
-      : 'proptii';
+      : 'onthemarket';
   const searchType = searchTypeParam as 'onthemarket' | 'proptii';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -988,7 +1150,7 @@ const SearchResults = () => {
   const [loginPromptAction, setLoginPromptAction] = useState<'booking' | 'chat'>('booking');
   const [quickRequestProperty, setQuickRequestProperty] = useState<Property | null>(null);
 
-  const { results, isLoading, error, retry, searchProperties, clearCache } = useSearchBackend();
+  const { results, isLoading, error, retry, searchProperties, clearCache, resolvedLocation } = useSearchBackend();
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
   const { enabled: govDataEnabled, audience, setAudience } = useGovDataLayer();
   const { user, isAuthenticated, login } = useAuth();
@@ -1001,6 +1163,27 @@ const SearchResults = () => {
     enabled: Boolean(searchQuery),
     query: searchQuery,
   });
+
+  const {
+    filters,
+    filteredProperties,
+    counts: filterCounts,
+    setPriceRange,
+    setMinPrice,
+    setMaxPrice,
+    toggleBedroom,
+    setBedrooms,
+    togglePropertyType,
+    setFurnishing,
+    toggleParking,
+    toggleBalconyOrGarden,
+    togglePetFriendly,
+    toggleBillsIncluded,
+    setKeywords,
+    setSortBy,
+    resetFilters,
+    removeFilter,
+  } = usePropertyFilters(results, classification?.entities);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showMap, setShowMap] = useState(false);
@@ -1015,7 +1198,7 @@ const SearchResults = () => {
   const boundsFittedTimeRef = useRef<number>(0); // Timestamp when bounds were fitted
   
   // Helper function to safely set map center - prevents resets after bounds are fitted
-  const safeSetMapCenter = (location: { lat: number; lng: number }, zoom?: number) => {
+  const safeSetMapCenter = (location: { lat: number; lng: number } | google.maps.LatLng, zoom?: number) => {
     // Check if bounds were fitted recently (within last 5 seconds) or if markers are present
     const timeSinceBoundsFitted = Date.now() - boundsFittedTimeRef.current;
     if (boundsFittedRef.current || markersGeocodedRef.current || markersRef.current.length > 0 || timeSinceBoundsFitted < 5000) {
@@ -1047,33 +1230,76 @@ const SearchResults = () => {
     return false;
   };
 
-  // Perform search when component mounts or search params change
+  // ─── Macro Filter Server-Side Sync ──────────────────────────────────────────
+  const urlBeds = searchParams.get('beds');
+  const urlMinPrice = searchParams.get('minPrice');
+  const urlMaxPrice = searchParams.get('maxPrice');
+  const urlTypes = searchParams.get('types');
+  const urlTenure = searchParams.get('tenure');
+
+  const macroFilters = useMemo(() => {
+    const f: Record<string, any> = {};
+    if (urlBeds && urlBeds !== 'any') {
+      const bedList = urlBeds.split(',').map((b) => parseInt(b, 10)).filter(Number.isFinite);
+      if (bedList.length === 1) {
+        f.minBeds = bedList[0];
+        f.maxBeds = bedList[0];
+        f.bedrooms = bedList[0];
+      } else if (bedList.length > 1) {
+        f.minBeds = Math.min(...bedList);
+        f.maxBeds = Math.max(...bedList);
+      }
+    }
+    if (urlMinPrice) f.minPrice = parseInt(urlMinPrice, 10);
+    if (urlMaxPrice) f.maxPrice = parseInt(urlMaxPrice, 10);
+    if (urlTypes) f.propertyType = urlTypes.split(',')[0];
+    if (urlTenure) f.channel = urlTenure;
+    if (classification?.entities?.location) {
+      f.location = classification.entities.location;
+    }
+    return f;
+  }, [urlBeds, urlMinPrice, urlMaxPrice, urlTypes, urlTenure, classification?.entities?.location]);
+
+  const macroSignature = useMemo(() => {
+    return `${searchQuery.trim().toLowerCase()}|${searchTypeParam}|beds:${urlBeds || ''}|minP:${urlMinPrice || ''}|maxP:${urlMaxPrice || ''}|types:${urlTypes || ''}|tenure:${urlTenure || ''}|loc:${classification?.entities?.location || ''}`;
+  }, [searchQuery, searchTypeParam, urlBeds, urlMinPrice, urlMaxPrice, urlTypes, urlTenure, classification?.entities?.location]);
+
+  const lastExecutedMacroSigRef = useRef<string | null>(null);
+
+  // Perform debounced server-side search whenever query or macro filters change
   useEffect(() => {
-    if (searchQuery) {
-      // Check if we have cached results for this exact query
+    if (!searchQuery) return;
+
+    if (lastExecutedMacroSigRef.current === macroSignature) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      lastExecutedMacroSigRef.current = macroSignature;
+
+      // Check if session cache already has this exact macroSignature
       const cachedData = sessionStorage.getItem('searchResults');
       if (cachedData) {
         try {
           const parsed = JSON.parse(cachedData);
-          // Re-fetch if the query/type changed OR if the cache is empty (stale failed search)
           if (
-            parsed.query !== searchQuery ||
-            parsed.searchType !== searchTypeParam ||
-            !Array.isArray(parsed.results) ||
-            parsed.results.length === 0
+            parsed.query?.toLowerCase() === searchQuery.toLowerCase() &&
+            parsed.searchType === searchTypeParam &&
+            parsed.macroSignature === macroSignature &&
+            Array.isArray(parsed.results) &&
+            parsed.results.length > 0
           ) {
-            searchProperties(searchQuery, searchType);
+            // Already cached for this exact macro combination
+            return;
           }
-        } catch (error) {
-          // If cache is corrupted, perform new search
-          searchProperties(searchQuery, searchType);
-        }
-      } else {
-        // No cache, perform new search
-        searchProperties(searchQuery, searchType);
+        } catch {}
       }
-    }
-  }, [searchQuery, searchTypeParam, searchProperties]);
+
+      searchProperties(searchQuery, searchType, macroFilters);
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [macroSignature, searchQuery, searchTypeParam, searchType, macroFilters, searchProperties]);
 
   // Reset navigation state when component mounts (when returning from BookViewing)
   useEffect(() => {
@@ -1221,12 +1447,23 @@ const SearchResults = () => {
     }
   }, [searchQuery]);
 
+  // Instantly center map when backend resolvedLocation arrives via Postcodes Architecture (SSE)
+  useEffect(() => {
+    if (showMap && isMapLoaded && mapInstanceRef.current && resolvedLocation?.coordinates) {
+      if (!boundsFittedRef.current && (!markersGeocodedRef.current || markersRef.current.length === 0)) {
+        console.log('Centering map on backend resolved location:', resolvedLocation.displayName, resolvedLocation.coordinates);
+        safeSetMapCenter(resolvedLocation.coordinates, 13);
+        searchLocationCenteredRef.current = searchQuery;
+      }
+    }
+  }, [resolvedLocation, showMap, isMapLoaded, searchQuery]);
+
   // Geocode properties and add markers when results change
   // This runs AFTER the map is initialized and centered on search location
   useEffect(() => {
-    if (showMap && isMapLoaded && mapInstanceRef.current && window.google && window.google.maps && results.length > 0) {
+    if (showMap && isMapLoaded && mapInstanceRef.current && window.google && window.google.maps && filteredProperties.length > 0) {
       // Create a unique key for this results set to prevent re-geocoding
-      const resultsKey = results.map(r => `${r.location}-${r.title}`).join('|');
+      const resultsKey = filteredProperties.map(r => `${r.location}-${r.title}-${r.price}`).join('|');
       
       // Skip if we've already geocoded these exact results
       if (lastResultsKeyRef.current === resultsKey && markersGeocodedRef.current) {
@@ -1251,7 +1488,7 @@ const SearchResults = () => {
           boundsFittedRef.current = false; // Reset bounds fitted flag when starting new geocode
         
         // Filter properties with valid addresses
-        const propertiesWithAddresses = results.filter(prop => prop.location && prop.location.trim());
+        const propertiesWithAddresses = filteredProperties.filter(prop => prop.location && prop.location.trim());
         const totalProperties = propertiesWithAddresses.length;
         
         if (totalProperties === 0) {
@@ -1386,132 +1623,156 @@ const SearchResults = () => {
           }
         };
 
-        // Step 4: Geocode each property and add markers
-        propertiesWithAddresses.forEach((property, index) => {
-          const address = property.location.trim();
+        // Helper to construct marker and info window
+        const createMarkerForProperty = (
+          location: google.maps.LatLng | google.maps.LatLngLiteral,
+          property: any,
+          index: number
+        ) => {
+          // Create marker with animation
+          const marker = new window.google.maps.Marker({
+            position: location,
+            map: mapInstanceRef.current,
+            title: property.title,
+            animation: window.google.maps.Animation.DROP,
+            optimized: false, // Force markers to render
+          });
+
+          // Create unique ID for this property's info window
+          const propertyId = `prop-${index}-${Date.now()}`;
+          const imageUrls = property.imageUrls || [];
+          const firstImageUrl = imageUrls.length > 0 ? imageUrls[0] : '';
           
-          // Add delay between requests to avoid rate limiting
+          // Create info window with property details and image navigation
+          const infoWindow = new window.google.maps.InfoWindow({
+            content: `
+              <div style="max-width: 280px; padding: 0;">
+                ${firstImageUrl ? `
+                  <div style="position: relative; width: 100%; height: 150px; overflow: hidden; border-radius: 8px 8px 0 0; background-color: #f0f0f0;">
+                    <img id="info-img-${propertyId}" src="${firstImageUrl}" alt="Property" style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s;" />
+                    ${imageUrls.length > 1 ? `
+                      <button id="prev-btn-${propertyId}" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">‹</button>
+                      <button id="next-btn-${propertyId}" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">›</button>
+                      <div id="img-counter-${propertyId}" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; z-index: 10;">1/${imageUrls.length}</div>
+                    ` : ''}
+                  </div>
+                ` : ''}
+                <div style="padding: 12px;">
+                  <h4 style="font-weight: bold; margin: 0 0 8px 0; font-size: 15px; color: #1a1a1a; display: flex; align-items: start;">
+                    <svg width="14" height="14" style="margin-right: 6px; margin-top: 2px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span style="flex: 1;">${property.location}</span>
+                  </h4>
+                  <p style="margin: 0 0 8px 0; font-size: 13px; color: #666;">${property.title || 'Property'}</p>
+                  <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #E65D24;">${property.price || 'N/A'}</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">
+                    <strong>${property.bedrooms === 0 ? 'Studio' : (property.bedrooms ? `${property.bedrooms} beds` : 'Beds unspecified')}</strong> • <strong>${property.propertyType || 'Property'}</strong>
+                  </p>
+                </div>
+              </div>
+            `,
+          });
+
+          // Set up image navigation when info window is ready
+          window.google.maps.event.addListener(infoWindow, 'domready', () => {
+            const imgEl = document.getElementById(`info-img-${propertyId}`) as HTMLImageElement;
+            const prevBtn = document.getElementById(`prev-btn-${propertyId}`) as HTMLButtonElement;
+            const nextBtn = document.getElementById(`next-btn-${propertyId}`) as HTMLButtonElement;
+            const counterEl = document.getElementById(`img-counter-${propertyId}`) as HTMLDivElement;
+            
+            if (!imgEl || imageUrls.length <= 1) {
+              if (prevBtn) prevBtn.style.display = 'none';
+              if (nextBtn) nextBtn.style.display = 'none';
+              return;
+            }
+            
+            let currentIndex = 0;
+            
+            const updateImage = () => {
+              if (imgEl) {
+                imgEl.src = imageUrls[currentIndex];
+              }
+              if (counterEl) {
+                counterEl.textContent = `${currentIndex + 1}/${imageUrls.length}`;
+              }
+              if (prevBtn) {
+                prevBtn.style.display = currentIndex > 0 ? 'flex' : 'none';
+              }
+              if (nextBtn) {
+                nextBtn.style.display = currentIndex < imageUrls.length - 1 ? 'flex' : 'none';
+              }
+            };
+            
+            if (prevBtn) {
+              prevBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (currentIndex > 0) {
+                  currentIndex--;
+                  updateImage();
+                }
+              });
+            }
+            
+            if (nextBtn) {
+              nextBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (currentIndex < imageUrls.length - 1) {
+                  currentIndex++;
+                  updateImage();
+                }
+              });
+            }
+            
+            updateImage();
+          });
+
+          marker.addListener('click', () => {
+            // Close all other info windows
+            markersRef.current.forEach(m => {
+              if (m.infoWindow) m.infoWindow.close();
+            });
+            infoWindow.open(mapInstanceRef.current, marker);
+          });
+
+          (marker as any).infoWindow = infoWindow;
+          markersRef.current.push(marker);
+          bounds.extend(location);
+          successfulGeocodes++;
+        };
+
+        // Step 4: Add markers — Fast path for native coordinates, fallback to Geocoder
+        let fallbackGeocodeDelay = 0;
+
+        propertiesWithAddresses.forEach((property, index) => {
+          // Fast Path: Check if property already has coordinates
+          if (
+            property.coordinates &&
+            typeof property.coordinates.lat === 'number' &&
+            typeof property.coordinates.lng === 'number' &&
+            !isNaN(property.coordinates.lat) &&
+            !isNaN(property.coordinates.lng)
+          ) {
+            createMarkerForProperty(property.coordinates, property, index);
+            checkAndFitBounds();
+            return;
+          }
+
+          // Slow Fallback Path: Only call Google Geocoder when coordinates are missing
+          const address = property.location.trim();
+          fallbackGeocodeDelay++;
           setTimeout(() => {
             geocoder.geocode({ address: address }, (geocodeResults, status) => {
               if (status === 'OK' && geocodeResults && geocodeResults[0]) {
                 const location = geocodeResults[0].geometry.location;
-                
-                // Create marker with animation
-                const marker = new window.google.maps.Marker({
-                  position: location,
-                  map: mapInstanceRef.current,
-                  title: property.title,
-                  animation: window.google.maps.Animation.DROP,
-                  optimized: false, // Force markers to render
-                });
-
-                // Create unique ID for this property's info window
-                const propertyId = `prop-${index}-${Date.now()}`;
-                const imageUrls = property.imageUrls || [];
-                const firstImageUrl = imageUrls.length > 0 ? imageUrls[0] : '';
-                
-                // Create info window with property details and image navigation
-                const infoWindow = new window.google.maps.InfoWindow({
-                  content: `
-                    <div style="max-width: 280px; padding: 0;">
-                      ${firstImageUrl ? `
-                        <div style="position: relative; width: 100%; height: 150px; overflow: hidden; border-radius: 8px 8px 0 0; background-color: #f0f0f0;">
-                          <img id="info-img-${propertyId}" src="${firstImageUrl}" alt="Property" style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s;" />
-                          ${imageUrls.length > 1 ? `
-                            <button id="prev-btn-${propertyId}" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">‹</button>
-                            <button id="next-btn-${propertyId}" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">›</button>
-                            <div id="img-counter-${propertyId}" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; z-index: 10;">1/${imageUrls.length}</div>
-                          ` : ''}
-                        </div>
-                      ` : ''}
-                      <div style="padding: 12px;">
-                        <h4 style="font-weight: bold; margin: 0 0 8px 0; font-size: 15px; color: #1a1a1a; display: flex; align-items: start;">
-                          <svg width="14" height="14" style="margin-right: 6px; margin-top: 2px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span style="flex: 1;">${property.location}</span>
-                        </h4>
-                        <p style="margin: 0 0 8px 0; font-size: 13px; color: #666;">${property.title || 'Property'}</p>
-                        <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #E65D24;">${property.price || 'N/A'}</p>
-                        <p style="margin: 0; font-size: 12px; color: #666;">
-                          <strong>${property.bedrooms || 'N/A'}</strong> bedrooms • <strong>${property.propertyType || 'Property'}</strong>
-                        </p>
-                      </div>
-                    </div>
-                  `,
-                });
-
-                // Set up image navigation when info window is ready
-                window.google.maps.event.addListener(infoWindow, 'domready', () => {
-                  const imgEl = document.getElementById(`info-img-${propertyId}`) as HTMLImageElement;
-                  const prevBtn = document.getElementById(`prev-btn-${propertyId}`) as HTMLButtonElement;
-                  const nextBtn = document.getElementById(`next-btn-${propertyId}`) as HTMLButtonElement;
-                  const counterEl = document.getElementById(`img-counter-${propertyId}`) as HTMLDivElement;
-                  
-                  if (!imgEl || imageUrls.length <= 1) {
-                    if (prevBtn) prevBtn.style.display = 'none';
-                    if (nextBtn) nextBtn.style.display = 'none';
-                    return;
-                  }
-                  
-                  let currentIndex = 0;
-                  
-                  const updateImage = () => {
-                    if (imgEl) {
-                      imgEl.src = imageUrls[currentIndex];
-                    }
-                    if (counterEl) {
-                      counterEl.textContent = `${currentIndex + 1}/${imageUrls.length}`;
-                    }
-                    if (prevBtn) {
-                      prevBtn.style.display = currentIndex > 0 ? 'flex' : 'none';
-                    }
-                    if (nextBtn) {
-                      nextBtn.style.display = currentIndex < imageUrls.length - 1 ? 'flex' : 'none';
-                    }
-                  };
-                  
-                  if (prevBtn) {
-                    prevBtn.addEventListener('click', (e) => {
-                      e.stopPropagation();
-                      if (currentIndex > 0) {
-                        currentIndex--;
-                        updateImage();
-                      }
-                    });
-                  }
-                  
-                  if (nextBtn) {
-                    nextBtn.addEventListener('click', (e) => {
-                      e.stopPropagation();
-                      if (currentIndex < imageUrls.length - 1) {
-                        currentIndex++;
-                        updateImage();
-                      }
-                    });
-                  }
-                  
-                  updateImage();
-                });
-
-                marker.addListener('click', () => {
-                  // Close all other info windows
-                  markersRef.current.forEach(m => {
-                    if (m.infoWindow) m.infoWindow.close();
-                  });
-                  infoWindow.open(mapInstanceRef.current, marker);
-                });
-
-                marker.infoWindow = infoWindow;
-                markersRef.current.push(marker);
-                bounds.extend(location);
-                successfulGeocodes++;
+                createMarkerForProperty(location, property, index);
+              } else {
+                console.warn(`Geocoding failed for ${address}: ${status}`);
               }
-              
               checkAndFitBounds();
             });
-          }, index * 150);
+          }, fallbackGeocodeDelay * 150);
         });
       }, 500);
 
@@ -1520,7 +1781,7 @@ const SearchResults = () => {
         };
       }
     }
-  }, [showMap, isMapLoaded, results, mapNode]);
+  }, [showMap, isMapLoaded, filteredProperties, mapNode]);
   
   // Reset geocoded flag when map is hidden
   useEffect(() => {
@@ -1716,13 +1977,12 @@ const SearchResults = () => {
       error.includes('502');
 
     // Only treat it as a format error if the message is explicitly about the query
-    // format / no results — not infrastructure failures.
+    // syntax/structure — empty results should correctly show "No Results Found".
     const isFormatError =
       !isNetworkError &&
-      (error.includes('No properties found') ||
-        error.includes('Please try a different search') ||
-        error.includes('invalid') ||
-        error.includes('format'));
+      (error.toLowerCase().includes('format') ||
+        error.toLowerCase().includes('invalid query') ||
+        error.toLowerCase().includes('enter a search query'));
 
     return (
       <div className="min-h-screen flex flex-col font-nunito">
@@ -1826,7 +2086,7 @@ const SearchResults = () => {
                         key={chip.label}
                         onClick={() => {
                           clearCache();
-                          navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
+                          navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
                         }}
                         className="px-4 py-2 rounded-full border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
                       >
@@ -1875,7 +2135,7 @@ const SearchResults = () => {
                         key={index}
                         onClick={() => {
                           clearCache();
-                          navigate(`/search?q=${encodeURIComponent(example.query)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
+                          navigate(`/search?q=${encodeURIComponent(example.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
                         }}
                         className="bg-white border border-gray-200 rounded-lg p-4 text-left hover:border-[#E65D24] hover:shadow-md transition-all group"
                       >
@@ -1976,11 +2236,28 @@ const SearchResults = () => {
                   </div>
                   <div className="flex items-center">
                     <span className="text-gray-500 font-medium w-16 md:w-20">Results:</span>
-                    <span className="text-gray-900 font-semibold">{results.length} properties found</span>
+                    <span className="text-gray-900 font-semibold">
+                      {filterCounts.hasActiveFilters
+                        ? `${filterCounts.filtered} of ${filterCounts.total} properties found`
+                        : `${results.length} properties found`}
+                    </span>
                     {sessionStorage.getItem('searchResults') && (
                       <span className="ml-2 px-2 py-1 bg-[#136C9E]/10 text-[#136C9E] text-xs font-medium rounded-full">cached</span>
                     )}
                   </div>
+                  {/* AI Intent Summary */}
+                  {classification?.entities?.intentSummary && (
+                    <div className="mt-2.5 flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-[#136C9E]/10 via-[#136C9E]/5 to-transparent border border-[#136C9E]/20 rounded-xl text-xs text-[#0F5A8A]">
+                      <Sparkles className="w-4 h-4 text-[#136C9E] shrink-0 animate-pulse" aria-hidden />
+                      <span>
+                        Understood intent:{' '}
+                        <strong className="font-semibold text-[#0B4368]">
+                          {classification.entities.intentSummary}
+                        </strong>
+                      </span>
+                    </div>
+                  )}
+
                   {/* Search Intent / Classification Filter Pills */}
                   <div className="pt-2">
                     <FilterPills
@@ -2015,7 +2292,7 @@ const SearchResults = () => {
                   {showMap ? 'Hide Map' : 'Show Map'}
                 </button>
                 <button
-                  onClick={() => searchProperties(searchQuery, searchType)}
+                  onClick={() => searchProperties(searchQuery, searchType, { ...classification?.entities })}
                   className="flex items-center px-6 py-3 bg-gradient-to-r from-[#136C9E] to-[#0F5A8A] text-white rounded-lg hover:from-[#0F5A8A] hover:to-[#0D4A7A] transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2035,6 +2312,31 @@ const SearchResults = () => {
               </div>
             </div>
           </div>
+
+          {/* Interactive Search Filter Bar */}
+          {results.length > 0 && (
+            <div className="mb-8">
+              <SearchFilterBar
+                filters={filters}
+                counts={filterCounts}
+                setPriceRange={setPriceRange}
+                setMinPrice={setMinPrice}
+                setMaxPrice={setMaxPrice}
+                toggleBedroom={toggleBedroom}
+                setBedrooms={setBedrooms}
+                togglePropertyType={togglePropertyType}
+                setFurnishing={setFurnishing}
+                toggleParking={toggleParking}
+                toggleBalconyOrGarden={toggleBalconyOrGarden}
+                togglePetFriendly={togglePetFriendly}
+                toggleBillsIncluded={toggleBillsIncluded}
+                setKeywords={setKeywords}
+                setSortBy={setSortBy}
+                resetFilters={resetFilters}
+                removeFilter={removeFilter}
+              />
+            </div>
+          )}
 
           {/* Results */}
           {results.length === 0 ? (
@@ -2150,7 +2452,7 @@ const SearchResults = () => {
                             key={chip.label}
                             onClick={() => {
                               clearCache();
-                              navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
+                              navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
                             }}
                             className="px-4 py-2 rounded-full border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
                           >
@@ -2163,6 +2465,137 @@ const SearchResults = () => {
                 })()}
               </div>
             </div>
+          ) : filteredProperties.length === 0 ? (
+            <div className="py-16 sm:py-20">
+              <div className="max-w-xl mx-auto px-4 text-center bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+                <div className="w-16 h-16 rounded-full bg-[#136C9E]/10 text-[#136C9E] flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  No Properties Match Your Active Filters
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  We found {results.length} {results.length === 1 ? 'property' : 'properties'} for this search, but none match your current filter criteria.
+                </p>
+                <div className="mt-6 flex flex-col items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+                    {filters.bedrooms !== 'any' && Array.isArray(filters.bedrooms) && (
+                      <button
+                        type="button"
+                        onClick={() => removeFilter('bedrooms')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                      >
+                        <span>Remove {filters.bedrooms.join('/')} bed filter</span>
+                        <XIcon className="w-3.5 h-3.5 text-gray-500" aria-hidden />
+                      </button>
+                    )}
+                    {filters.maxPrice !== null && (
+                      <button
+                        type="button"
+                        onClick={() => removeFilter('price')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                      >
+                        <span>Remove max £{filters.maxPrice.toLocaleString('en-GB')} filter</span>
+                        <XIcon className="w-3.5 h-3.5 text-gray-500" aria-hidden />
+                      </button>
+                    )}
+                    {filters.propertyTypes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFilter('propertyTypes')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                      >
+                        <span>Remove {filters.propertyTypes.join(', ')} filter</span>
+                        <XIcon className="w-3.5 h-3.5 text-gray-500" aria-hidden />
+                      </button>
+                    )}
+                    {filters.isPetFriendly && (
+                      <button
+                        type="button"
+                        onClick={() => removeFilter('pets')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors"
+                      >
+                        <PawPrint className="w-3.5 h-3.5 text-amber-700" aria-hidden />
+                        <span>Remove Pet Friendly filter</span>
+                        <XIcon className="w-3.5 h-3.5 text-amber-600" aria-hidden />
+                      </button>
+                    )}
+                    {filters.billsIncluded && (
+                      <button
+                        type="button"
+                        onClick={() => removeFilter('bills')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 transition-colors"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-blue-700" aria-hidden />
+                        <span>Remove Bills Included filter</span>
+                        <XIcon className="w-3.5 h-3.5 text-blue-600" aria-hidden />
+                      </button>
+                    )}
+                    {filters.hasBalconyOrGarden && (
+                      <button
+                        type="button"
+                        onClick={() => removeFilter('outside')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors"
+                      >
+                        <Trees className="w-3.5 h-3.5 text-teal-700" aria-hidden />
+                        <span>Remove Balcony/Garden filter</span>
+                        <XIcon className="w-3.5 h-3.5 text-teal-600" aria-hidden />
+                      </button>
+                    )}
+                    {filters.hasParking && (
+                      <button
+                        type="button"
+                        onClick={() => removeFilter('parking')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+                      >
+                        <Car className="w-3.5 h-3.5 text-indigo-700" aria-hidden />
+                        <span>Remove Parking filter</span>
+                        <XIcon className="w-3.5 h-3.5 text-indigo-600" aria-hidden />
+                      </button>
+                    )}
+                    {Boolean(filters.keywords) && (
+                      <button
+                        type="button"
+                        onClick={() => removeFilter('keywords')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                      >
+                        <span>Remove &quot;{filters.keywords}&quot; filter</span>
+                        <XIcon className="w-3.5 h-3.5 text-gray-500" aria-hidden />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      className="inline-flex items-center justify-center px-6 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-[#136C9E] to-[#0F5A8A] hover:opacity-95 transition-all shadow-sm text-sm w-full sm:w-auto"
+                    >
+                      Clear All Filters & Show All {results.length} Properties
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearCache();
+                        searchProperties(searchQuery, searchType, {
+                          ...macroFilters,
+                          pet_friendly: filters.isPetFriendly ? true : undefined,
+                          bills_included: filters.billsIncluded ? true : undefined,
+                          balcony_or_garden: filters.hasBalconyOrGarden ? true : undefined,
+                          parking: filters.hasParking ? true : undefined,
+                          keywords: filters.keywords || undefined,
+                        });
+                      }}
+                      className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-[#E65D24] to-[#D54D14] hover:opacity-95 transition-all shadow-sm text-sm w-full sm:w-auto"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" aria-hidden />
+                      Re-query Portals With These Filters
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className={showMap ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : ""}>
               {/* Property Listings */}
@@ -2171,7 +2604,7 @@ const SearchResults = () => {
                   // When map is shown, display in single column
                   <div className="grid grid-cols-1 gap-6">
                     <>
-                      {results.map((property, index) => (
+                      {filteredProperties.map((property, index) => (
                         <PropertyCard 
                           key={index} 
                           property={property} 
@@ -2201,7 +2634,7 @@ const SearchResults = () => {
                 ) : (
                   // When map is hidden, display in grid
                   <>
-                    {results.map((property, index) => (
+                    {filteredProperties.map((property, index) => (
                       <PropertyCard 
                         key={index} 
                         property={property} 

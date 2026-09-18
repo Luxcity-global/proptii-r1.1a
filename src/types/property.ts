@@ -31,7 +31,12 @@ export interface Property {
   town?: string;
   postcode?: string;
   amenities?: string[];
+  addedOrReduced?: string;
+  publishedOn?: string;
   squareFootage?: string;
+  uprn?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface SearchResponse {

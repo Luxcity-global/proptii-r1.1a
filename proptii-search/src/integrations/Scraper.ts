@@ -15,6 +15,10 @@ export interface PropertyData {
   source: string;
   url: string;
   coordinates?: { lat: number; lng: number };
+  amenities?: string[];
+  addedOrReduced?: string;
+  publishedOn?: string;
+  description?: string;
 }
 
 export interface IScraper {

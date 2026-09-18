@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Property } from '../types/property';
 import type { BatchedFactsResponse, FactFlag } from '../types/govData';
 import { fetchBatchedPropertyFacts } from '../services/govDataService';
@@ -24,48 +24,73 @@ export function useBatchedPropertyFacts(
 ): UseBatchedPropertyFactsResult {
   const [factsByListingId, setFactsByListingId] = useState<BatchedFactsResponse>({});
   const [isFactsLoading, setIsFactsLoading] = useState(false);
-  const lastKeyRef = useRef('');
+  const requestedListingIdsRef = useRef<Set<string>>(new Set());
 
-  const listingPayload = useMemo(() => {
-    const listingIds: string[] = [];
-    const uprns: string[] = [];
-    results.forEach((p) => {
-      const id = resolveListingId(p);
-      listingIds.push(id);
-      if (p.uprn) uprns.push(p.uprn);
-    });
-    return { listingIds, uprns };
-  }, [results]);
-
+  // Reset tracked IDs if results are emptied (fresh search)
   useEffect(() => {
-    if (!enabled || listingPayload.listingIds.length === 0) {
+    if (results.length === 0) {
+      requestedListingIdsRef.current.clear();
       setFactsByListingId({});
       setIsFactsLoading(false);
+    }
+  }, [results.length]);
+
+  useEffect(() => {
+    if (!enabled || results.length === 0) {
       return;
     }
 
-    const key = listingPayload.listingIds.join('|');
-    if (key === lastKeyRef.current) return;
-    lastKeyRef.current = key;
+    // Identify only new listings that haven't been requested yet
+    const unrequestedListingIds: string[] = [];
+    const unrequestedUprns: string[] = [];
 
-    let cancelled = false;
+    results.forEach((p) => {
+      const id = resolveListingId(p);
+      if (!requestedListingIdsRef.current.has(id)) {
+        unrequestedListingIds.push(id);
+        if (p.uprn) unrequestedUprns.push(p.uprn);
+      }
+    });
+
+    if (unrequestedListingIds.length === 0) {
+      return;
+    }
+
+    // Debounce by 400ms to accumulate incoming SSE stream chunks
     setIsFactsLoading(true);
+    let cancelled = false;
 
-    void (async () => {
-      const batch = await fetchBatchedPropertyFacts(listingPayload);
-      if (cancelled) return;
-      setFactsByListingId(batch);
-      setIsFactsLoading(false);
-      trackEvent('gov_data_facts_batch', {
-        requested: listingPayload.listingIds.length,
-        resolved: Object.keys(batch).length,
-      });
-    })();
+    const timer = setTimeout(async () => {
+      // Mark as requested before firing to avoid duplicate requests during transit
+      unrequestedListingIds.forEach((id) => requestedListingIdsRef.current.add(id));
+
+      try {
+        const batch = await fetchBatchedPropertyFacts({
+          listingIds: unrequestedListingIds,
+          uprns: unrequestedUprns,
+        });
+
+        if (cancelled) return;
+
+        setFactsByListingId((prev) => ({ ...prev, ...batch }));
+        trackEvent('gov_data_facts_batch', {
+          requested: unrequestedListingIds.length,
+          resolved: Object.keys(batch).length,
+        });
+      } catch (err) {
+        console.warn('[useBatchedPropertyFacts] Failed to fetch facts for batch:', err);
+      } finally {
+        if (!cancelled) {
+          setIsFactsLoading(false);
+        }
+      }
+    }, 400);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [enabled, listingPayload]);
+  }, [enabled, results]);
 
   const getFlagsFor = (property: Property): FactFlag[] | null => {
     const id = resolveListingId(property);

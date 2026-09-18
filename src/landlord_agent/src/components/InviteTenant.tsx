@@ -69,7 +69,10 @@ export function InviteTenant({ properties, onBack, onSuccess, landlordEmail, lan
       ? 'create a new account and complete your tenant profile'
       : 'complete your tenant profile';
     
-    const inviteLink = new URL('https://proptii-frontend.onrender.com/');
+    const frontendBaseUrl = (typeof window !== 'undefined' && window.location.origin) 
+      ? window.location.origin 
+      : ((import.meta as any)?.env?.VITE_APP_URL || 'https://proptii.co');
+    const inviteLink = new URL('/', frontendBaseUrl);
     inviteLink.searchParams.append('invite', 'true');
     if (formData.propertyId) inviteLink.searchParams.append('propertyId', formData.propertyId);
     if (landlordEmail) inviteLink.searchParams.append('landlordEmail', landlordEmail);

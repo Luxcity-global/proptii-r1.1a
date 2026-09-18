@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "vite",
+    "start:local": "bash scripts/start-local.sh",
     "dev": "vite",
     "dev:all": "bash scripts/start-dev.sh",
     "dev:api": "bash scripts/start-dev.sh --api-only",

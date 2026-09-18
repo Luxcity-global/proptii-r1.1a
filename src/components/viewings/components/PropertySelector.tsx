@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import { useBookViewing } from '../context/BookViewingContext';
 import { Tooltip } from '../../Tooltip';
+import { maskEmail, maskPhone } from '../../../utils/formatters';
 
 // Constants
 const BLUE_COLOR = '#136C9E';
@@ -136,31 +137,68 @@ const PropertySelector: React.FC = () => {
           onChange={(e) => handleAgentChange('company', e.target.value)}
           sx={{ mb: 2 }}
         />
-        <Box sx={{ position: 'relative', mb: 2 }}>
-          <Tooltip
-            content="If the email isn't listed on the property page, try searching for the agency's contact details online and add the agent's email address here."
-            position="top"
-            trigger="hover"
-            forcePosition={true}
-          >
-            <div>
-              <TextField
-                fullWidth
-                label="Agent Email"
-                value={state.selectedProperty?.agent?.email || ''}
-                onChange={(e) => handleAgentChange('email', e.target.value)}
-                type="email"
-              />
-            </div>
-          </Tooltip>
-        </Box>
-        <TextField
-          fullWidth
-          label="Agent Phone"
-          value={state.selectedProperty?.agent?.phone || ''}
-          onChange={(e) => handleAgentChange('phone', e.target.value)}
-          sx={{ mb: 2 }}
-        />
+        {state.selectedProperty?.agent?.email ? (
+          <Box sx={{ position: 'relative', mb: 2 }}>
+            <TextField
+              fullWidth
+              label="Agent Email"
+              value={maskEmail(state.selectedProperty.agent.email)}
+              InputProps={{ readOnly: true }}
+              helperText="Masked for privacy — your viewing enquiry is forwarded automatically."
+              sx={{
+                '& .MuiInputBase-input': {
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.05em',
+                  color: '#555',
+                }
+              }}
+            />
+          </Box>
+        ) : (
+          <Box sx={{ position: 'relative', mb: 2 }}>
+            <Tooltip
+              content="If the email isn't listed on the property page, try searching for the agency's contact details online and add the agent's email address here."
+              position="top"
+              trigger="hover"
+              forcePosition={true}
+            >
+              <div>
+                <TextField
+                  fullWidth
+                  label="Agent Email"
+                  value={state.selectedProperty?.agent?.email || ''}
+                  onChange={(e) => handleAgentChange('email', e.target.value)}
+                  type="email"
+                />
+              </div>
+            </Tooltip>
+          </Box>
+        )}
+        {state.selectedProperty?.agent?.phone ? (
+          <TextField
+            fullWidth
+            label="Agent Phone"
+            value={maskPhone(state.selectedProperty.agent.phone)}
+            InputProps={{ readOnly: true }}
+            helperText="Masked for privacy."
+            sx={{
+              mb: 2,
+              '& .MuiInputBase-input': {
+                fontFamily: 'monospace',
+                letterSpacing: '0.05em',
+                color: '#555',
+              }
+            }}
+          />
+        ) : (
+          <TextField
+            fullWidth
+            label="Agent Phone"
+            value={state.selectedProperty?.agent?.phone || ''}
+            onChange={(e) => handleAgentChange('phone', e.target.value)}
+            sx={{ mb: 2 }}
+          />
+        )}
       </Box>
     </Box>
   );

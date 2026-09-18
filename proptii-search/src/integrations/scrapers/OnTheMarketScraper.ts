@@ -1,12 +1,46 @@
 import * as cheerio from 'cheerio';
 import { IScraper, PropertyData } from '../Scraper';
+import { postcodeLocationService, ResolvedLocation } from '../../core/services/PostcodeLocationService';
 
 export class OnTheMarketScraper implements IScraper {
   name = 'OnTheMarket';
 
-  async scrape(query: string, _filters: any): Promise<PropertyData[]> {
-    const { location, maxPrice, minBeds, isRental } = this.parseQuery(query);
-    const url = this.buildUrl(location, maxPrice, minBeds, isRental);
+  async scrape(query: string, filters: any = {}): Promise<PropertyData[]> {
+    const parsed = this.parseQuery(query);
+    
+    let resolvedLoc: ResolvedLocation | undefined = filters.resolvedLocation;
+    if (!resolvedLoc && !filters.locationSlug && !filters.location) {
+      try {
+        resolvedLoc = await postcodeLocationService.resolve(query, filters);
+      } catch (e: any) {
+        console.warn('[OnTheMarket] Location resolution failed:', e?.message || e);
+      }
+    }
+
+    // Structured filters or resolved location override parsed query
+    const location = resolvedLoc?.otmLocationSlug || filters.locationSlug || filters.location || parsed.location;
+    const isRental = filters.isRental !== undefined 
+      ? Boolean(filters.isRental) 
+      : (filters.channel ? filters.channel !== 'sale' : (filters.tenure ? filters.tenure !== 'buy' : parsed.isRental));
+      
+    const rawBeds = filters.bedrooms !== undefined ? String(filters.bedrooms) : undefined;
+    const minBeds = filters.minBeds !== undefined 
+      ? String(filters.minBeds) 
+      : (rawBeds !== undefined ? rawBeds : parsed.minBeds);
+    const maxBeds = filters.maxBeds !== undefined 
+      ? String(filters.maxBeds) 
+      : (rawBeds !== undefined ? rawBeds : undefined);
+      
+    const minPrice = filters.minPrice !== undefined 
+      ? String(filters.minPrice) 
+      : (filters.price_min !== undefined ? String(filters.price_min) : undefined);
+    const maxPrice = filters.maxPrice !== undefined 
+      ? String(filters.maxPrice) 
+      : (filters.price_max !== undefined ? String(filters.price_max) : (filters.budget ? String(filters.budget) : parsed.maxPrice));
+      
+    const propertyType = filters.propertyType || filters.property_type || filters.types?.[0];
+
+    const url = this.buildUrl(location, minPrice, maxPrice, minBeds, maxBeds, isRental, propertyType);
 
     try {
       console.log(`[OnTheMarket] Fetching ${url}`);
@@ -86,8 +120,14 @@ export class OnTheMarketScraper implements IScraper {
         },
         source:       'OnTheMarket',
         url:          fullUrl,
-        coordinates:  (p.location?.lat && p.location?.lon) ? { lat: p.location.lat, lng: p.location.lon } :
-                      (p.latitude && p.longitude) ? { lat: p.latitude, lng: p.longitude } : undefined,
+        coordinates:  (p.location?.lat && p.location?.lon) ? { lat: Number(p.location.lat), lng: Number(p.location.lon) } :
+                      (p.latitude && p.longitude) ? { lat: Number(p.latitude), lng: Number(p.longitude) } : undefined,
+        amenities:    (Array.isArray(p.features) ? p.features : (Array.isArray(p.key_features) ? p.key_features : []))
+                        .map((f: any) => (typeof f === 'string' ? f : (f?.description || f?.title || '')).trim())
+                        .filter(Boolean),
+        addedOrReduced: p.humanised_publish_date || (p.publish_date ? `Added ${new Date(p.publish_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : undefined),
+        publishedOn:  p.publish_date || p.created || undefined,
+        description:  p.description || p.summary || undefined,
       });
     }
 
@@ -95,29 +135,49 @@ export class OnTheMarketScraper implements IScraper {
     return results;
   }
 
-  private buildUrl(location: string, maxPrice?: string, minBeds?: string, isRental: boolean = true): string {
+  private buildUrl(
+    location: string,
+    minPrice?: string,
+    maxPrice?: string,
+    minBeds?: string,
+    maxBeds?: string,
+    isRental: boolean = true,
+    propertyType?: string
+  ): string {
     const base = isRental 
       ? 'https://www.onthemarket.com/to-rent/property/' 
       : 'https://www.onthemarket.com/for-sale/property/';
       
-    const loc = encodeURIComponent(location.toLowerCase().replace(/\s+/g, '-'));
+    const loc = encodeURIComponent(location.toLowerCase().trim().replace(/\s+/g, '-'));
     
     const params = new URLSearchParams({
       view: 'map-list'
     });
 
+    if (minPrice) params.set('price-min', minPrice);
     if (maxPrice) params.set('price-max', maxPrice);
     if (minBeds) params.set('min-bedrooms', minBeds);
+    if (maxBeds) params.set('max-bedrooms', maxBeds);
+    if (propertyType) {
+      const lower = propertyType.toLowerCase();
+      if (lower.includes('flat') || lower.includes('apartment')) {
+        params.set('prop-types', 'flat-apartment');
+      } else if (lower.includes('house')) {
+        params.set('prop-types', 'houses');
+      } else if (lower.includes('bungalow')) {
+        params.set('prop-types', 'bungalows');
+      }
+    }
 
     return `${base}${loc}/?${params.toString()}`;
   }
 
   private parseQuery(query: string) {
-    const q = query.toLowerCase();
+    const q = query.toLowerCase().trim();
     const isRental = q.includes('rent') || q.includes('pcm') || !q.includes('sale');
     
-    // Simple extraction logic
-    const locMatch = q.match(/in\s+([a-z\s]+?)(?:\s+under|\s+for|\s+max|\s*$)/i);
+    // Improved location regex matching multi-word areas
+    const locMatch = q.match(/(?:in|around|near)\s+([a-z\s]+?)(?:\s+under|\s+for|\s+max|\s+from|\s*$)/i);
     const location = locMatch ? locMatch[1].trim() : 'london';
 
     const bedsMatch = q.match(/(\d+)\s*bed/i);
@@ -127,7 +187,7 @@ export class OnTheMarketScraper implements IScraper {
     let maxPrice: string | undefined;
     if (priceMatch) {
       const raw = priceMatch[1].replace(/,/g, '');
-      maxPrice = q.includes('k') ? String(parseInt(raw) * 1000) : raw;
+      maxPrice = q.includes('k') && Number(raw) < 100 ? String(parseInt(raw) * 1000) : raw;
     }
 
     return { location, maxPrice, minBeds, isRental };

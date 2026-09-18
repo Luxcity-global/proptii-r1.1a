@@ -1,26 +1,140 @@
 import * as cheerio from 'cheerio';
 import { IScraper, PropertyData } from '../Scraper';
+import { postcodeLocationService, ResolvedLocation } from '../../core/services/PostcodeLocationService';
 
-// Rightmove location identifiers for common cities
+// Rightmove location identifiers for UK cities, London boroughs, and key districts
 const LOCATION_IDS: Record<string, string> = {
-  london:     'REGION%5E87490',
+  // Major UK Cities
+  london: 'REGION%5E87490',
   manchester: 'REGION%5E904',
   birmingham: 'REGION%5E162',
-  leeds:      'REGION%5E787',
-  bristol:    'REGION%5E219',
-  edinburgh:  'REGION%5E475',
-  glasgow:    'REGION%5E550',
-  liverpool:  'REGION%5E796',
-  sheffield:  'REGION%5E1259',
+  leeds: 'REGION%5E787',
+  bristol: 'REGION%5E219',
+  edinburgh: 'REGION%5E475',
+  glasgow: 'REGION%5E550',
+  liverpool: 'REGION%5E796',
+  sheffield: 'REGION%5E1259',
   nottingham: 'REGION%5E981',
+  newcastle: 'REGION%5E953',
+  brighton: 'REGION%5E245',
+  cambridge: 'REGION%5E274',
+  oxford: 'REGION%5E1035',
+  bath: 'REGION%5E115',
+  cardiff: 'REGION%5E285',
+  belfast: 'REGION%5E131',
+  southampton: 'REGION%5E1287',
+  reading: 'REGION%5E1139',
+  york: 'REGION%5E1489',
+  norwich: 'REGION%5E978',
+  plymouth: 'REGION%5E1077',
+  exeter: 'REGION%5E494',
+  bournemouth: 'REGION%5E189',
+  aberdeen: 'REGION%5E8',
+  swansea: 'REGION%5E1318',
+  leicester: 'REGION%5E791',
+  coventry: 'REGION%5E364',
+  'milton keynes': 'REGION%5E919',
+  miltonkeynes: 'REGION%5E919',
+
+  // Greater London Boroughs & Key Areas
+  'canary wharf': 'REGION%5E70384',
+  canary: 'REGION%5E70384',
+  docklands: 'REGION%5E70384',
+  islington: 'REGION%5E87508',
+  camden: 'REGION%5E87500',
+  hackney: 'REGION%5E87506',
+  kensington: 'REGION%5E87510',
+  chelsea: 'REGION%5E87510',
+  westminster: 'REGION%5E87532',
+  greenwich: 'REGION%5E87504',
+  shoreditch: 'REGION%5E85398',
+  stratford: 'REGION%5E85408',
+  brixton: 'REGION%5E85246',
+  clapham: 'REGION%5E85262',
+  wandsworth: 'REGION%5E87530',
+  richmond: 'REGION%5E87522',
+  wimbledon: 'REGION%5E85458',
+  hammersmith: 'REGION%5E87507',
+  fulham: 'REGION%5E87507',
+  southwark: 'REGION%5E87526',
+  lambeth: 'REGION%5E87514',
+  lewisham: 'REGION%5E87515',
+  croydon: 'REGION%5E87501',
+  ealing: 'REGION%5E87502',
+  enfield: 'REGION%5E87503',
+  barnet: 'REGION%5E87494',
+  haringey: 'REGION%5E87509',
+  harrow: 'REGION%5E87511',
+  havering: 'REGION%5E87512',
+  brent: 'REGION%5E87498',
+  bromley: 'REGION%5E87499',
+  bexley: 'REGION%5E87496',
+  kingston: 'REGION%5E87513',
+  hillingdon: 'REGION%5E87516',
+  hounslow: 'REGION%5E87517',
+  merton: 'REGION%5E87520',
+  newham: 'REGION%5E87521',
+  redbridge: 'REGION%5E87523',
+  sutton: 'REGION%5E87528',
+  'tower hamlets': 'REGION%5E87529',
+  towerhamlets: 'REGION%5E87529',
+  'waltham forest': 'REGION%5E87531',
+  walthamforest: 'REGION%5E87531',
+  angel: 'REGION%5E87508',
+  paddington: 'REGION%5E85362',
+  marylebone: 'REGION%5E85348',
+  mayfair: 'REGION%5E85350',
+  soho: 'REGION%5E85400',
+  vauxhall: 'REGION%5E85438',
+  bermondsey: 'REGION%5E85236',
+  battersea: 'REGION%5E85230',
+  putney: 'REGION%5E85376',
+  'notting hill': 'REGION%5E85358',
+  nottinghill: 'REGION%5E85358',
+  hampstead: 'REGION%5E85304',
+  highgate: 'REGION%5E85310',
 };
 
 export class RightmoveScraper implements IScraper {
   name = 'Rightmove';
 
-  async scrape(query: string, _filters: any): Promise<PropertyData[]> {
-    const { isRental, locationId, locationName, minBeds, maxBeds, maxPrice } = this.parseQuery(query);
-    const url = this.buildUrl(isRental, locationId, minBeds, maxBeds, maxPrice);
+  async scrape(query: string, filters: any = {}): Promise<PropertyData[]> {
+    const parsed = this.parseQuery(query);
+    
+    let resolvedLoc: ResolvedLocation | undefined = filters.resolvedLocation;
+    if (!resolvedLoc && !filters.locationId) {
+      try {
+        resolvedLoc = await postcodeLocationService.resolve(query, filters);
+      } catch (e: any) {
+        console.warn('[Rightmove] Location resolution failed:', e?.message || e);
+      }
+    }
+
+    // Allow structured filters or resolved location to override or enhance parsed query
+    const isRental = filters.isRental !== undefined 
+      ? Boolean(filters.isRental) 
+      : (filters.channel ? filters.channel !== 'sale' : (filters.tenure ? filters.tenure !== 'buy' : parsed.isRental));
+    const locationId = resolvedLoc?.rightmoveLocationId || filters.locationId || parsed.locationId;
+    const locationName = resolvedLoc?.displayName || parsed.locationName;
+    
+    const rawBeds = filters.bedrooms !== undefined ? String(filters.bedrooms) : undefined;
+    const minBeds = filters.minBeds !== undefined 
+      ? String(filters.minBeds) 
+      : (rawBeds !== undefined ? rawBeds : parsed.minBeds);
+    const maxBeds = filters.maxBeds !== undefined 
+      ? String(filters.maxBeds) 
+      : (rawBeds !== undefined ? rawBeds : parsed.maxBeds);
+      
+    const minPrice = filters.minPrice !== undefined 
+      ? String(filters.minPrice) 
+      : (filters.price_min !== undefined ? String(filters.price_min) : undefined);
+    const maxPrice = filters.maxPrice !== undefined 
+      ? String(filters.maxPrice) 
+      : (filters.price_max !== undefined ? String(filters.price_max) : (filters.budget ? String(filters.budget) : parsed.maxPrice));
+      
+    const propertyType = filters.propertyType || filters.property_type || filters.types?.[0];
+
+    const url = this.buildUrl(isRental, locationId, minBeds, maxBeds, minPrice, maxPrice, propertyType);
 
     try {
       console.log(`[Rightmove] Fetching ${url}`);
@@ -87,8 +201,14 @@ export class RightmoveScraper implements IScraper {
         ? `https://www.rightmove.co.uk${p.customer.branchLandingPageUrl}` 
         : fullUrl;
 
+      // Sanitize title to avoid 'no_data...'
+      const rawSummary = (p.summary || '').trim();
+      const isBogusSummary = !rawSummary || rawSummary.toLowerCase().startsWith('no_data') || rawSummary.length < 5;
+      const fallbackTitle = `${p.bedrooms !== undefined && p.bedrooms !== null ? `${p.bedrooms} bed ` : ''}${p.propertySubType || 'Property'} in ${p.displayAddress}`;
+      const title = isBogusSummary ? fallbackTitle : rawSummary;
+
       results.push({
-        title:        p.summary || `${p.bedrooms || '?'} bed ${p.propertySubType || 'property'} in ${p.displayAddress}`,
+        title,
         price:        priceStr,
         location:     p.displayAddress,
         bedrooms:     (p.bedrooms !== undefined && p.bedrooms !== null && !isNaN(Number(p.bedrooms))) ? Number(p.bedrooms) : null,
@@ -103,8 +223,16 @@ export class RightmoveScraper implements IScraper {
         source:       'Rightmove',
         url:          fullUrl,
         coordinates:  p.location && p.location.latitude && p.location.longitude 
-                        ? { lat: p.location.latitude, lng: p.location.longitude } 
+                        ? { lat: Number(p.location.latitude), lng: Number(p.location.longitude) } 
                         : undefined,
+        amenities:    Array.isArray(p.keyFeatures) 
+                        ? p.keyFeatures
+                            .map((f: any) => (typeof f === 'string' ? f : (f?.description || f?.htmlDescription || '')).trim())
+                            .filter(Boolean) 
+                        : [],
+        addedOrReduced: p.addedOrReduced || (p.firstVisibleDate ? `Added ${new Date(p.firstVisibleDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : undefined),
+        publishedOn:  p.firstVisibleDate || undefined,
+        description:  p.summary || undefined,
       });
     }
 
@@ -112,7 +240,15 @@ export class RightmoveScraper implements IScraper {
     return results;
   }
 
-  private buildUrl(isRental: boolean, locationId: string, minBeds?: string, maxBeds?: string, maxPrice?: string): string {
+  private buildUrl(
+    isRental: boolean,
+    locationId: string,
+    minBeds?: string,
+    maxBeds?: string,
+    minPrice?: string,
+    maxPrice?: string,
+    propertyType?: string
+  ): string {
     const base = isRental
       ? 'https://www.rightmove.co.uk/property-to-rent/find.html'
       : 'https://www.rightmove.co.uk/property-for-sale/find.html';
@@ -125,18 +261,56 @@ export class RightmoveScraper implements IScraper {
 
     if (minBeds) params.set('minBedrooms', minBeds);
     if (maxBeds) params.set('maxBedrooms', maxBeds);
+    if (minPrice) params.set('minPrice', minPrice);
     if (maxPrice) params.set('maxPrice', maxPrice);
+    if (propertyType) {
+      const lower = propertyType.toLowerCase();
+      if (lower.includes('flat') || lower.includes('apartment')) {
+        params.set('propertyTypes', 'flat');
+      } else if (lower.includes('house') || lower.includes('terraced') || lower.includes('detached')) {
+        params.set('propertyTypes', 'detached,semi-detached,terraced');
+      } else if (lower.includes('bungalow')) {
+        params.set('propertyTypes', 'bungalow');
+      }
+    }
 
     return `${base}?${params.toString()}`;
   }
 
   private parseQuery(query: string) {
-    const q = query.toLowerCase();
-    const isRental = q.includes('rent') || q.includes('pcm');
+    const q = query.toLowerCase().trim();
+    const isRental = q.includes('rent') || q.includes('pcm') || !q.includes('sale');
 
-    const locMatch = q.match(/in\s+([a-z\s]+?)(?:\s+under|\s+for|\s+max|\s*$)/i);
-    const rawLoc = locMatch ? locMatch[1].trim().split(/\s+/)[0] : 'london';
-    const locationId = LOCATION_IDS[rawLoc] || LOCATION_IDS['london'];
+    // Match multi-word locations after "in" or "around" or "near"
+    const locMatch = q.match(/(?:in|around|near)\s+([a-z\s]+?)(?:\s+under|\s+for|\s+max|\s+from|\s*$)/i);
+    let rawLoc = 'london';
+    let locationId = LOCATION_IDS['london'];
+
+    if (locMatch) {
+      const candidate = locMatch[1].trim();
+      const candidateNoSpaces = candidate.replace(/\s+/g, '');
+      const firstWord = candidate.split(/\s+/)[0];
+
+      if (LOCATION_IDS[candidate]) {
+        rawLoc = candidate;
+        locationId = LOCATION_IDS[candidate];
+      } else if (LOCATION_IDS[candidateNoSpaces]) {
+        rawLoc = candidate;
+        locationId = LOCATION_IDS[candidateNoSpaces];
+      } else if (LOCATION_IDS[firstWord]) {
+        rawLoc = firstWord;
+        locationId = LOCATION_IDS[firstWord];
+      } else {
+        // Find partial match in keys
+        const matchKey = Object.keys(LOCATION_IDS).find(key => candidate.includes(key));
+        if (matchKey) {
+          rawLoc = matchKey;
+          locationId = LOCATION_IDS[matchKey];
+        } else {
+          rawLoc = candidate;
+        }
+      }
+    }
 
     const bedsMatch = q.match(/(\d+)\s*bed/i);
     const beds = bedsMatch ? bedsMatch[1] : undefined;
@@ -145,7 +319,7 @@ export class RightmoveScraper implements IScraper {
     let maxPrice: string | undefined;
     if (priceMatch) {
       const raw = priceMatch[1].replace(/,/g, '');
-      maxPrice = q.includes('k') ? String(parseInt(raw) * 1000) : raw;
+      maxPrice = q.includes('k') && Number(raw) < 100 ? String(parseInt(raw) * 1000) : raw;
     }
 
     return { isRental, locationId, locationName: rawLoc, minBeds: beds, maxBeds: beds, maxPrice };

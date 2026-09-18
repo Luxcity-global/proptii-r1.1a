@@ -24,12 +24,26 @@ export type MatchStatus = 'exact' | 'partial' | 'none';
 export type LensSeverity = 'info' | 'caution' | 'alert';
 
 export interface ClassifyEntities {
-  location: string | null;
-  radius_hint: string | null;
-  bedrooms: number | null;
-  tenure: Tenure | null;
-  price_max: number | null;
-  address_full: string | null;
+  location?: string | null;
+  cleanLocation?: string | null;
+  radius_hint?: string | null;
+  radius?: number | null;
+  bedrooms?: number | string | null;
+  minBeds?: number | null;
+  maxBeds?: number | null;
+  tenure?: Tenure | null;
+  channel?: 'rent' | 'sale' | null;
+  price_max?: number | string | null;
+  price_min?: number | string | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  propertyType?: string | null;
+  property_type?: string | null;
+  address_full?: string | null;
+  intentSummary?: string | null;
+  expandedKeywords?: string[] | null;
+  amenities?: string[] | null;
+  [key: string]: any;
 }
 
 export interface ClassifyResponse {

@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { OpenAISearchService } from '../search/search.service';
 import { LocalStorageService } from './LocalStorageService';
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 import {
   buildZooplaUrl,
   buildOpenRentUrl
@@ -32,7 +33,7 @@ export class SearchService {
   private readonly RETRY_DELAY = 1000; // 1 second
 
   private constructor() {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    const apiUrl = getResolvedApiBaseUrl();
     this.axiosInstance = axios.create({
       baseURL: apiUrl,
       headers: {

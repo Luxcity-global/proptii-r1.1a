@@ -56,8 +56,8 @@ describe('searchWorker — no MongoDB writes', () => {
         const { searchWorker } = await import('../workers/searchWorker');
 
         // Simulate job processing by calling the worker processor directly
-        // (BullMQ workers expose the processor via the worker instance internals)
-        // We test the underlying behaviour via redis mock calls
+        await (searchWorker as any).processFn({ data: { query: 'london', filters: {} }, id: 'job-1' });
+
         expect(redis.publish).toHaveBeenCalledWith(
             expect.stringContaining('search:events:'),
             expect.stringContaining('"type":"results"'),
@@ -65,7 +65,9 @@ describe('searchWorker — no MongoDB writes', () => {
     });
 
     it('writes the final results to Redis cache with 24h TTL', async () => {
-        await import('../workers/searchWorker');
+        const { searchWorker } = await import('../workers/searchWorker');
+
+        await (searchWorker as any).processFn({ data: { query: 'london', filters: {} }, id: 'job-2' });
 
         expect(redis.set).toHaveBeenCalledWith(
             expect.stringContaining('search:'),

@@ -22,11 +22,14 @@ const hasBedrooms = (bedrooms: PropertyDisplayFields['bedrooms']): boolean => {
 };
 
 const formatBedroomLabel = (bedrooms: string | number): string | null => {
+  const str = String(bedrooms).trim().toLowerCase();
+  if (str.includes('studio')) return 'Studio';
+
   const numeric = Number(bedrooms);
   if (Number.isNaN(numeric)) {
     return `${String(bedrooms).trim()} Bedroom`;
   }
-  if (numeric === 0) return null;
+  if (numeric === 0) return 'Studio';
   return numeric === 1 ? '1 Bedroom' : `${numeric} Bedroom`;
 };
 

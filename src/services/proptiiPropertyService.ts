@@ -74,8 +74,8 @@ async function transformProperty(firestoreProperty: FirestoreProperty): Promise<
     throw new Error(`Property missing or invalid rent field: ${firestoreProperty.rent}`);
   }
   if (typeof firestoreProperty.bedrooms !== 'number' || firestoreProperty.bedrooms < 0) {
-    console.warn(`⚠️ [ProptiiProperty] Property ${firestoreProperty.id} (${firestoreProperty.address}) has invalid bedrooms: ${firestoreProperty.bedrooms}, using default 0`);
-    firestoreProperty.bedrooms = 0; // Provide default instead of throwing
+    // If bedrooms are not specified, do not default to 0 (0 represents a Studio)
+    delete firestoreProperty.bedrooms;
   }
 
   const coverPhoto = firestoreProperty.photos?.find(p => p.isCover) || firestoreProperty.photos?.[0];
@@ -417,7 +417,7 @@ async function transformProperty(firestoreProperty: FirestoreProperty): Promise<
     title,
     price,
     location: firestoreProperty.address,
-    bedrooms: firestoreProperty.bedrooms.toString(),
+    bedrooms: typeof firestoreProperty.bedrooms === 'number' ? firestoreProperty.bedrooms.toString() : undefined,
     propertyType: firestoreProperty.type,
     imageUrls,
     agent: agentInfo,

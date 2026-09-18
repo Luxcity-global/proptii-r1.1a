@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import { useDashboardData } from '../../../hooks/useDashboardData';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import zIndex from "@mui/material/styles/zIndex";
 
 interface CheckItem {
@@ -209,7 +210,7 @@ const TenantReferencing: React.FC = () => {
       console.log(`[TenantReferencing] Fetching referee/guarantor responses for: ${user.email}`);
 
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const apiUrl = getResolvedApiBaseUrl();
         const response = await fetch(`${apiUrl}/referencing/responses/${encodeURIComponent(user.email)}`);
         
         if (response.ok) {

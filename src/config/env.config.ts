@@ -1,9 +1,11 @@
 // Remove the Firebase configuration section.
 
+import { getResolvedApiBaseUrl } from './apiBaseUrl';
+
 export const envConfig = {
   // API Configuration
   api: {
-    baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
+    baseUrl: getResolvedApiBaseUrl(),
   },
 
   // App Configuration

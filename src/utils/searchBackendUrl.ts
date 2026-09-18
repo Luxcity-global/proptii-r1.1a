@@ -1,7 +1,15 @@
 /** Canonical production search service (property scraper on Render). */
-export const PROD_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-q95f.onrender.com';
+export const PROD_SEARCH_BACKEND_URL = (
+  (import.meta as any)?.env?.VITE_SEARCH_BACKEND_URL ||
+  (import.meta as any)?.env?.VITE_SEARCH_API_URL ||
+  (import.meta as any)?.env?.VITE_SEARCH_URL ||
+  'https://proptii-r1-1a-q95f.onrender.com'
+).trim().replace(/\/$/, '');
 
-const LOCAL_SEARCH_BACKEND_URL = 'http://localhost:3001';
+const LOCAL_SEARCH_BACKEND_URL = (
+  (import.meta as any)?.env?.VITE_LOCAL_SEARCH_URL ||
+  'http://localhost:3001'
+).trim().replace(/\/$/, '');
 
 /**
  * Hosts that belong to the main Nest API or invalid ports, not the search scraper.
@@ -33,7 +41,12 @@ const isMisconfiguredSearchBackendUrl = (url: string): boolean => {
 };
 
 const readEnvSearchBackendUrl = (): string => {
-  const envUrl = (import.meta.env.VITE_SEARCH_BACKEND_URL || '').trim();
+  const envUrl = (
+    (import.meta as any)?.env?.VITE_SEARCH_BACKEND_URL ||
+    (import.meta as any)?.env?.VITE_SEARCH_API_URL ||
+    (import.meta as any)?.env?.VITE_SEARCH_URL ||
+    ''
+  ).trim();
   if (!envUrl || isMisconfiguredSearchBackendUrl(envUrl)) {
     return '';
   }

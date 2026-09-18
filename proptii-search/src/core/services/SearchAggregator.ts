@@ -6,12 +6,25 @@ const CACHE_TTL_FRESH = 3600;  // 1 hour
 const CACHE_TTL_STALE = 86400; // 24 hours
 
 export class SearchAggregator {
+  private buildCacheKey(query: string, filters: any = {}): string {
+    const cleanQuery = query.toLowerCase().trim();
+    if (!filters || typeof filters !== 'object') {
+      return `search:${cleanQuery}`;
+    }
+    const relevantKeys = ['minPrice', 'maxPrice', 'minBeds', 'maxBeds', 'propertyType', 'isRental'];
+    const parts = relevantKeys
+      .filter(k => filters[k] !== undefined && filters[k] !== null && filters[k] !== '')
+      .map(k => `${k}=${filters[k]}`);
+
+    return parts.length > 0 ? `search:${cleanQuery}:${parts.join('&')}` : `search:${cleanQuery}`;
+  }
+
   /**
    * Cache-only lookup — no background jobs triggered.
    * Used by the SSE controller, which handles live scraping itself.
    */
-  async getCachedResults(query: string): Promise<any[]> {
-    const cacheKey = `search:${query.toLowerCase().trim()}`;
+  async getCachedResults(query: string, filters: any = {}): Promise<any[]> {
+    const cacheKey = this.buildCacheKey(query, filters);
     const metaKey  = `meta:${cacheKey}`;
 
     try {
@@ -41,9 +54,9 @@ export class SearchAggregator {
    * Saves freshly-scraped results to Redis + MongoDB.
    * Called by the SSE controller after live scraping completes.
    */
-  async saveResults(query: string, results: any[]): Promise<void> {
+  async saveResults(query: string, results: any[], filters: any = {}): Promise<void> {
     if (results.length === 0) return;
-    const cacheKey = `search:${query.toLowerCase().trim()}`;
+    const cacheKey = this.buildCacheKey(query, filters);
     await this.saveToCache(cacheKey, results);
     console.log(`[Aggregator] Saved ${results.length} results to cache for: ${query}`);
   }
@@ -53,7 +66,7 @@ export class SearchAggregator {
    * Checks cache → MongoDB → triggers background scrape job.
    */
   async search(query: string, filters: any = {}) {
-    const cached = await this.getCachedResults(query);
+    const cached = await this.getCachedResults(query, filters);
     if (cached.length > 0) return cached;
 
     // Total miss — queue a background scrape

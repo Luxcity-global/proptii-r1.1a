@@ -6,6 +6,7 @@
  * fail CORS. We default to local Nest unless VITE_USE_REMOTE_API=true.
  */
 const LOCAL_DEFAULT = 'http://127.0.0.1:3002/api';
+const PROD_DEFAULT = 'https://proptii-r1-1a-1-hcw6.onrender.com/api';
 
 function isBrowserLocalhost(): boolean {
   if (typeof window === 'undefined') return false;
@@ -20,6 +21,7 @@ function isRemoteUrl(url: string): boolean {
 export function getResolvedApiBaseUrl(): string {
   const envUrl = (
     import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
     import.meta.env.VITE_NEST_API_ENDPOINT ||
     import.meta.env.VITE_API_ENDPOINT ||
     ''
@@ -48,5 +50,5 @@ export function getResolvedApiBaseUrl(): string {
     return resolved;
   }
 
-  return LOCAL_DEFAULT;
+  return import.meta.env.DEV ? LOCAL_DEFAULT : PROD_DEFAULT;
 }

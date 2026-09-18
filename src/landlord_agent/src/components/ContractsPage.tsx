@@ -370,7 +370,7 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
             <p>Please find attached your contract for review.</p>
             ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
             <div style="text-align: center;">
-              <a href="https://proptii-frontend.onrender.com/contracts" class="cta-button">View Contracts</a>
+              <a href="${((import.meta as any)?.env?.VITE_APP_URL || (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://proptii.co')}/contracts" class="cta-button">View Contracts</a>
             </div>
             <p>Best regards,<br>Proptii Team</p>
           </body>
@@ -550,7 +550,7 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
             <p>This is a test email from Proptii Property Management System.</p>
             ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
             <div style="text-align: center;">
-              <a href="https://proptii-frontend.onrender.com/contracts" class="cta-button">View Contracts</a>
+              <a href="${((import.meta as any)?.env?.VITE_APP_URL || (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://proptii.co')}/contracts" class="cta-button">View Contracts</a>
             </div>
             <p>Best regards,<br>Proptii Team</p>
           </body>

@@ -1,20 +1,33 @@
 const normalizeBaseUrl = (url: string) => url.replace(/\/$/, '');
 
-export const CANONICAL_PROD_API_BASE_URL =
-  (import.meta as any)?.env?.VITE_API_URL?.trim?.() ||
-  ((import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.()
-    ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
-    : (typeof window !== 'undefined' ? `${window.location.origin}/api` : ''));
+/** Windows: `localhost` often resolves to ::1 and can hit a hung listener on :3000. */
+const toIpv4Loopback = (url: string) =>
+  url.replace(/\/\/localhost(?=[:/])/gi, '//127.0.0.1');
 
-/** Nest backend for local development (port 3000). */
-export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
+const ensureApiPathPrefix = (base: string) => {
+  const normalized = normalizeBaseUrl(toIpv4Loopback(base));
+  return /\/api$/i.test(normalized) ? normalized : `${normalized}/api`;
+};
+
+const rawProdEnvUrl =
+  (import.meta as any)?.env?.VITE_API_URL?.trim?.() ||
+  (import.meta as any)?.env?.VITE_API_BASE_URL?.trim?.() ||
+  (import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.() ||
+  (import.meta as any)?.env?.VITE_API_ENDPOINT?.trim?.() ||
+  (typeof window !== 'undefined' ? window.location.origin : 'https://proptii-r1-1a-1-hcw6.onrender.com');
+
+export const CANONICAL_PROD_API_BASE_URL = ensureApiPathPrefix(rawProdEnvUrl);
+
+/** Nest backend for local development (port 3002 for v2-backend, with 3000 as legacy fallback). */
+export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3002/api';
+export const DEV_LEGACY_API_BASE = 'http://127.0.0.1:3000/api';
 
 const RENDER_REMOTE_FALLBACKS = Array.from(new Set([
   CANONICAL_PROD_API_BASE_URL,
-  (import.meta as any)?.env?.VITE_API_URL?.trim?.(),
-  (import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.()
-    ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
-    : null,
+  (import.meta as any)?.env?.VITE_API_URL?.trim?.() ? ensureApiPathPrefix((import.meta as any).env.VITE_API_URL.trim()) : null,
+  (import.meta as any)?.env?.VITE_API_BASE_URL?.trim?.() ? ensureApiPathPrefix((import.meta as any).env.VITE_API_BASE_URL.trim()) : null,
+  (import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.() ? ensureApiPathPrefix((import.meta as any).env.VITE_NEST_API_ENDPOINT.trim()) : null,
+  (import.meta as any)?.env?.VITE_API_ENDPOINT?.trim?.() ? ensureApiPathPrefix((import.meta as any).env.VITE_API_ENDPOINT.trim()) : null,
 ].filter(Boolean) as string[]));
 
 const LEGACY_REMOTE_FALLBACKS: string[] = [];
@@ -31,15 +44,10 @@ export const KNOWN_API_ORIGINS = Array.from(new Set([
   }).filter(Boolean) as string[]
 ]));
 
-/** Windows: `localhost` often resolves to ::1 and can hit a hung listener on :3000. */
-const toIpv4Loopback = (url: string) =>
-  url.replace(/\/\/localhost(?=[:/])/gi, '//127.0.0.1');
-
-// Only include URLs for services that actually exist in this project.
-// Port 3002 was a ghost entry — nothing runs there; every call waited 2 s
-// for a connection-refused before moving on.
+// Prefer port 3002 where v2-backend runs, followed by 3000 if legacy backend is active.
 const LOCAL_FALLBACKS = [
-  DEV_LOCAL_API_BASE,             // NestJS backend (npm run start:backend)
+  DEV_LOCAL_API_BASE,
+  DEV_LEGACY_API_BASE,
 ];
 
 const isLocalApiUrl = (url: string) => /localhost|127\.0\.0\.1/i.test(url);
@@ -57,13 +65,14 @@ export function isBrowserLocalDevOrigin(): boolean {
   return h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
 }
 
-const ensureApiPathPrefix = (base: string) => {
-  const normalized = normalizeBaseUrl(toIpv4Loopback(base));
-  return /\/api$/i.test(normalized) ? normalized : `${normalized}/api`;
-};
-
 const buildCandidateList = () => {
-  const envUrl = (import.meta as any)?.env?.VITE_API_URL?.trim?.() || '';
+  const envUrl = (
+    (import.meta as any)?.env?.VITE_API_URL ||
+    (import.meta as any)?.env?.VITE_API_BASE_URL ||
+    (import.meta as any)?.env?.VITE_NEST_API_ENDPOINT ||
+    (import.meta as any)?.env?.VITE_API_ENDPOINT ||
+    ''
+  ).trim();
   const isLocalDevOrigin = isBrowserLocalDevOrigin();
 
   /**

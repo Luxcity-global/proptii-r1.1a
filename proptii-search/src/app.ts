@@ -11,6 +11,10 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: (origin, callback) => {
+    const envOrigins = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    const frontendUrl = process.env.FRONTEND_URL ? [process.env.FRONTEND_URL.trim()] : [];
     const allowedOrigins = [
       'https://proptii.co',
       'https://www.proptii.co',
@@ -19,6 +23,8 @@ app.use(cors({
       'http://localhost:5173',
       'http://localhost:4173',
       'http://localhost:3000',
+      ...envOrigins,
+      ...frontendUrl,
     ];
     if (!origin || allowedOrigins.includes(origin) || /\.onrender\.com$/.test(origin)) {
       callback(null, true);

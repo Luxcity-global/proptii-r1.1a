@@ -1,6 +1,7 @@
 import { IScraper, PropertyData } from './Scraper';
 import { RightmoveScraper } from './scrapers/RightmoveScraper';
 import { OnTheMarketScraper } from './scrapers/OnTheMarketScraper';
+import { ZooplaScraper } from './scrapers/ZooplaScraper';
 
 const SCRAPER_TIMEOUT_MS = 60_000; 
 
@@ -8,6 +9,7 @@ export class ScraperManager {
   private scrapers: IScraper[] = [
     new RightmoveScraper(),
     new OnTheMarketScraper(),
+    new ZooplaScraper(),
   ];
 
   getProviderNames(): string[] {

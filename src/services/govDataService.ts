@@ -328,10 +328,23 @@ export async function classifySearchQuery(query: string): Promise<ClassifyRespon
       return propertySearchFallback();
     }
 
+    const rawEntities = (data.entities || {}) as any;
+    const normalizedBedrooms = rawEntities.bedrooms != null && rawEntities.bedrooms !== ''
+      ? (typeof rawEntities.bedrooms === 'number' ? rawEntities.bedrooms : parseInt(String(rawEntities.bedrooms), 10))
+      : null;
+    const normalizedPriceMax = rawEntities.price_max != null && rawEntities.price_max !== ''
+      ? (typeof rawEntities.price_max === 'number' ? rawEntities.price_max : parseInt(String(rawEntities.price_max).replace(/[^0-9]/g, ''), 10))
+      : null;
+
     return {
       intent: data.intent,
       audience: data.audience ?? null,
-      entities: { ...EMPTY_ENTITIES, ...(data.entities || {}) },
+      entities: {
+        ...EMPTY_ENTITIES,
+        ...rawEntities,
+        bedrooms: !isNaN(Number(normalizedBedrooms)) && normalizedBedrooms !== null ? Number(normalizedBedrooms) : null,
+        price_max: !isNaN(Number(normalizedPriceMax)) && normalizedPriceMax !== null ? Number(normalizedPriceMax) : null,
+      },
       confidence: typeof data.confidence === 'number' ? data.confidence : 0,
       fallback: Boolean(data.fallback),
       cacheHit: Boolean(data.cacheHit),

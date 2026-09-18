@@ -37,12 +37,20 @@ const cleanPropertyPrice = (price: string): string => {
 
 import { Property, SearchResponse } from '../types/property';
 
+export interface ResolvedLocationData {
+  displayName: string;
+  outcode?: string;
+  adminDistrict?: string;
+  coordinates: { lat: number; lng: number };
+}
+
 export type { Property };
 export const useSearchBackend = () => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Property[]>([]);
+  const [resolvedLocation, setResolvedLocation] = useState<ResolvedLocationData | null>(null);
   const [searchType, setSearchType] = useState<'onthemarket' | 'internet' | 'proptii'>('onthemarket');
 
   const searchBackendUrl = resolveSearchBackendUrl();
@@ -72,20 +80,23 @@ export const useSearchBackend = () => {
     }
   };
 
-  // Load cached results on mount
+  // Load cached results on mount only if query matches current URL search query
   useEffect(() => {
     const cachedData = sessionStorage.getItem('searchResults');
     if (cachedData) {
       try {
         const parsed = JSON.parse(cachedData);
-        // Clean the pricing for cached results as well
-        const cleanedCachedResults = (parsed.results || []).map((property: Property) => ({
-          ...property,
-          price: cleanPropertyPrice(property.price)
-        }));
-        setResults(cleanedCachedResults);
-        setQuery(parsed.query || '');
-        setSearchType(parsed.searchType || 'onthemarket');
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+        const currentQ = urlParams.get('q');
+        if (!currentQ || parsed.query?.toLowerCase() === currentQ.toLowerCase()) {
+          const cleanedCachedResults = (parsed.results || []).map((property: Property) => ({
+            ...property,
+            price: cleanPropertyPrice(property.price)
+          }));
+          setResults(cleanedCachedResults);
+          setQuery(parsed.query || '');
+          setSearchType(parsed.searchType || 'onthemarket');
+        }
       } catch (error) {
         console.error('Error parsing cached search results:', error);
         sessionStorage.removeItem('searchResults');
@@ -93,7 +104,11 @@ export const useSearchBackend = () => {
     }
   }, []);
 
-  const searchProperties = useCallback(async (searchQuery: string, type: 'onthemarket' | 'internet' | 'proptii' = 'onthemarket') => {
+  const searchProperties = useCallback(async (
+    searchQuery: string,
+    type: 'onthemarket' | 'internet' | 'proptii' = 'onthemarket',
+    filters: Record<string, any> = {}
+  ) => {
     if (!searchQuery.trim()) {
       setError('Please enter a search query');
       return [];
@@ -155,11 +170,12 @@ export const useSearchBackend = () => {
       // 2. SSE Scraper Search (hits proptii-search port 3001)
       let targetUrl = searchBackendUrl;
       let response: Response;
+      const requestPayload = { query: searchQuery, filters: filters || {} };
       try {
         response = await fetch(`${targetUrl}/api/v1/search`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: searchQuery, filters: {} }),
+          body: JSON.stringify(requestPayload),
           signal: AbortSignal.timeout(120000) // Increased to 120 seconds for slow scraper streams
         });
       } catch (fetchErr) {
@@ -169,7 +185,7 @@ export const useSearchBackend = () => {
           response = await fetch(`${targetUrl}/api/v1/search`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: searchQuery, filters: {} }),
+            body: JSON.stringify(requestPayload),
             signal: AbortSignal.timeout(120000)
           });
         } else {
@@ -203,7 +219,9 @@ export const useSearchBackend = () => {
           try {
             const event = JSON.parse(trimmed.slice(6));
             
-            if (event.type === 'initial' || event.type === 'results') {
+            if (event.type === 'location_resolved' && event.data) {
+              setResolvedLocation(event.data);
+            } else if (event.type === 'initial' || event.type === 'results') {
               const incoming = (event.data as any[]).map((p) => ({
                 ...p,
                 price: cleanPropertyPrice(p.price),
@@ -226,6 +244,22 @@ export const useSearchBackend = () => {
                 const unique = incoming.filter(p => !seen.has(deduplicationKey(p)));
                 return [...prev, ...unique];
               });
+            } else if (event.type === 'agent_enriched') {
+              const { url, agent } = event;
+              if (url && agent) {
+                setResults(prev => prev.map(p => {
+                  if (p.url === url) {
+                    return {
+                      ...p,
+                      agent: {
+                        ...p.agent,
+                        ...agent
+                      }
+                    };
+                  }
+                  return p;
+                }));
+              }
             } else if (event.type === 'done') {
               // Scraper is finished
             }
@@ -251,10 +285,15 @@ export const useSearchBackend = () => {
         throw new Error('No properties found. Please try a different search.');
       }
 
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+      const macroSig = `${searchQuery.trim().toLowerCase()}|${type}|beds:${urlParams.get('beds') || ''}|minP:${urlParams.get('minPrice') || ''}|maxP:${urlParams.get('maxPrice') || ''}|types:${urlParams.get('types') || ''}|tenure:${urlParams.get('tenure') || ''}|loc:${filters.location || ''}`;
+
       sessionStorage.setItem('searchResults', JSON.stringify({
         results: finalResults,
         query: searchQuery,
         searchType: type,
+        filters,
+        macroSignature: macroSig,
         timestamp: Date.now()
       }));
 
@@ -283,6 +322,7 @@ export const useSearchBackend = () => {
     setResults([]);
     setError(null);
     setQuery('');
+    setResolvedLocation(null);
     // Clear cached results
     sessionStorage.removeItem('searchResults');
   }, []);
@@ -305,6 +345,7 @@ export const useSearchBackend = () => {
     results,
     searchType,
     setSearchType,
+    resolvedLocation,
     searchProperties,
     clearResults,
     clearCache,

@@ -21,7 +21,7 @@ function normaliseForSearch(doc: any): Record<string, any> {
     title: doc.title,
     price: doc.price ?? '',
     location,
-    bedrooms: doc.bedrooms ?? 0,
+    bedrooms: (doc.bedrooms !== undefined && doc.bedrooms !== null && doc.bedrooms !== '') ? Number(doc.bedrooms) : undefined,
     bathrooms: doc.bathrooms ?? undefined,
     propertyType,
     description: doc.notes ?? doc.description ?? '',
