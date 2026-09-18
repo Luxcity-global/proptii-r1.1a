@@ -198,4 +198,25 @@ export class LeadsService {
 
     return [headers.join(','), ...rows].join('\n');
   }
+
+  /** Admin: delete a specific lead by ID */
+  async deleteLead(leadId: string): Promise<void> {
+    const docRef = this.db.collection(this.COLLECTION).doc(leadId);
+    const snap = await docRef.get();
+    if (!snap.exists) throw new BadRequestException('Lead not found');
+    await docRef.delete();
+    this.logger.log(`Lead deleted: ${leadId}`);
+  }
+
+  /** Admin: clear all campaign leads */
+  async clearAllLeads(): Promise<{ deletedCount: number }> {
+    const snaps = await this.db.collection(this.COLLECTION).get();
+    const batch = this.db.batch();
+    snaps.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    this.logger.log(`Cleared all campaign leads (${snaps.size} deleted)`);
+    return { deletedCount: snaps.size };
+  }
 }
