@@ -12,7 +12,7 @@ import {
   setPendingPlan,
   CHECKOUT_NOT_CONFIGURED_MSG,
 } from '../../services/billingService';
-import { getPlanById, type PlanId } from '../../config/plans';
+import { getPlanById, getDashboardForPlanId, type PlanId } from '../../config/plans';
 import {
   getPricingFlow,
   hasPostStripeCheckout,
@@ -78,8 +78,13 @@ const WelcomeContent: React.FC = () => {
       setRedirectingToStripe(true);
       const priceId = await resolveStripePriceId(planId, cycle);
       if (!priceId) {
+        // Direct free trial activation (no credit card required)
         setRedirectingToStripe(false);
-        setCheckoutError(CHECKOUT_NOT_CONFIGURED_MSG);
+        try {
+          await setPendingPlan(planId, cycle);
+        } catch {
+          /* best-effort */
+        }
         return;
       }
 
@@ -103,9 +108,8 @@ const WelcomeContent: React.FC = () => {
       } catch (e) {
         checkoutStarted.current = false;
         setRedirectingToStripe(false);
-        setCheckoutError(
-          e instanceof Error ? e.message : 'Could not start checkout',
-        );
+        console.warn('Stripe checkout session not available, starting free trial without card:', e);
+        // Do not block the user with a fatal error for free trial
       }
     };
 
@@ -173,7 +177,13 @@ const WelcomeContent: React.FC = () => {
 
           <div style={{ marginTop: 8 }}>
             <Link
-              to="/dashboard"
+              to={
+                user?.roles?.includes('landlord') ||
+                user?.roles?.includes('agent') ||
+                getDashboardForPlanId(planId) === 'landlord'
+                  ? '/landlord'
+                  : '/dashboard'
+              }
               className="pr-btn pr-btn-primary"
               style={{ padding: '16px 36px', fontSize: '17px' }}
             >

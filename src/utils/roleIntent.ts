@@ -12,7 +12,7 @@
  *      writes it to Firestore users/{uid}, then calls clearRoleIntent().
  */
 
-export type RoleIntentValue = 'tenant' | 'landlord';
+export type RoleIntentValue = 'tenant' | 'landlord' | 'agent';
 
 const ROLE_INTENT_KEY = 'proptii_signup_role_intent';
 
@@ -33,7 +33,7 @@ export function setRoleIntent(role: RoleIntentValue): void {
 export function getRoleIntent(): RoleIntentValue | null {
   try {
     const value = sessionStorage.getItem(ROLE_INTENT_KEY);
-    if (value === 'tenant' || value === 'landlord') return value;
+    if (value === 'tenant' || value === 'landlord' || value === 'agent') return value;
   } catch {
     // ignore
   }

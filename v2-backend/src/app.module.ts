@@ -60,8 +60,49 @@ import { EventsService } from './services/events.service';
 import { StorageService } from './services/storage.service';
 import { StorageController } from './controllers/storage.controller';
 
+// ── Campaign Lead Capture ─────────────────────────────────────────────────────
+import { LeadsModule } from './leads/leads.module';
+
+// ── Rate Limiting (ThrottlerModule) ──────────────────────────────────────────
+import { ThrottlerModule } from '@nestjs/throttler';
+
+// ── Static File Serving (campaign + welcome pages) ───────────────────────────
+import { ServeStaticModule } from '@nestjs/serve-static';
+import * as path from 'path';
+import * as fs from 'fs';
+
+function resolvePublicFolder(folder: string): string {
+  const inDist = path.join(__dirname, 'public', folder);
+  if (fs.existsSync(inDist)) {
+    return inDist;
+  }
+  return path.join(__dirname, '..', 'public', folder);
+}
+
 @Module({
-  imports: [GovDataModule],
+  imports: [
+    GovDataModule,
+    LeadsModule,
+    // Global rate limiter (5 req / 10 min default; per-endpoint overrides via @Throttle)
+    ThrottlerModule.forRoot([{
+      name: 'default',
+      ttl: 600000,
+      limit: 100,
+    }]),
+    // Serve static campaign pages at /campaign/* and /welcome/*
+    ServeStaticModule.forRoot(
+      {
+        rootPath: resolvePublicFolder('campaign'),
+        serveRoot: '/campaign',
+        serveStaticOptions: { index: 'index.html', fallthrough: false },
+      },
+      {
+        rootPath: resolvePublicFolder('welcome'),
+        serveRoot: '/welcome',
+        serveStaticOptions: { index: 'index.html', fallthrough: false },
+      },
+    ),
+  ],
   controllers: [
     HealthController,
     AuthController,

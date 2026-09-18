@@ -1,5 +1,11 @@
 # Redirects for Single Page Apps on Render
 
+# Campaign & Welcome Landing Pages
+/campaign/*  /campaign/index.html  200
+/campaign    /campaign/index.html  200
+/welcome/*   /welcome/index.html   200
+/welcome     /welcome/index.html   200
+
 # Landlord App
 /landlord/*  /landlord/index.html  200
 

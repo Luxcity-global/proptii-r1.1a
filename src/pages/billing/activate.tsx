@@ -10,6 +10,7 @@ import {
   resolveStripePriceId,
   CHECKOUT_NOT_CONFIGURED_MSG,
 } from '../../services/billingService';
+import { useAuth } from '../../contexts/AuthContext';
 import { getPlanById, type PlanId } from '../../config/plans';
 import type { BillingCycle } from '../../components/pricing/PricingBillingToggle';
 import '../../styles/pricing.css';
@@ -17,6 +18,7 @@ import '../../styles/pricing.css';
 /** S3-12–15 — Day-30 billing choice after trial expires. */
 const BillingActivatePage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { plan, pendingPlan, pendingCycle, loading } = useBillingStatus();
   const [selected, setSelected] = useState<'paid' | 'free'>('paid');
   const [busy, setBusy] = useState(false);
@@ -62,7 +64,8 @@ const BillingActivatePage: React.FC = () => {
     setError(null);
     try {
       await downgradeToFreePlan();
-      navigate('/dashboard?downgraded=true', { replace: true });
+      const isLandlord = user?.roles?.includes('landlord') || user?.roles?.includes('agent');
+      navigate(isLandlord ? '/landlord?downgraded=true' : '/dashboard?downgraded=true', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Downgrade failed');
       setBusy(false);

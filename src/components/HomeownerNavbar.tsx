@@ -314,10 +314,10 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
                     )}
                   </div>
                 )}
+                {/* Secondary CTA: Sign In */}
                 <button
                   onClick={handleLogin}
-                  className="text-white px-6 py-2 rounded-full hover:bg-opacity-90 transition-all flex items-center"
-                  style={{ backgroundColor: '#DC5F12' }}
+                  className="text-white/90 hover:text-white px-4 py-2 rounded-full font-medium text-sm transition-all hover:bg-white/10 flex items-center"
                   disabled={isLoading || loginInProgress}
                 >
                   {isLoading || loginInProgress ? (
@@ -330,6 +330,14 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
                     </>
                   ) : 'Sign In'}
                 </button>
+
+                {/* Primary CTA: Sign Up */}
+                <Link
+                  to="/signup"
+                  className="bg-[#DC5F12] hover:bg-[#c24f0c] text-white px-5 py-2 rounded-full font-semibold text-sm transition-all flex items-center shadow-md hover:shadow-lg active:scale-[0.98]"
+                >
+                  Sign Up
+                </Link>
               </div>
             )}
           </div>
@@ -476,16 +484,25 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
               ))}
 
               {!isAuthenticated && (
-                <div className="pt-4 border-t border-gray-600">
+                <div className="pt-3 border-t border-white/10 flex flex-col gap-2.5">
                   {loginError && (
-                    <div className="mx-3 mb-3 bg-red-500 text-white p-2 rounded-md text-sm">
+                    <div className="mx-2 mb-2 bg-red-500 text-white p-2 rounded-lg text-xs">
                       {loginError}
                     </div>
                   )}
+                  {/* Primary CTA */}
+                  <Link
+                    to="/signup"
+                    onClick={closeMobileMenu}
+                    className="w-full bg-[#DC5F12] hover:bg-[#c24f0c] text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center shadow-md active:scale-[0.98]"
+                  >
+                    Sign Up
+                  </Link>
+
+                  {/* Secondary CTA */}
                   <button
                     onClick={handleLogin}
-                    className="mx-3 w-[calc(100%-1.5rem)] text-white px-4 py-2 rounded-full hover:bg-opacity-90 transition-all flex items-center justify-center"
-                    style={{ backgroundColor: '#DC5F12' }}
+                    className="w-full bg-white/10 hover:bg-white/15 text-white border border-white/20 px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center justify-center"
                     disabled={isLoading || loginInProgress}
                   >
                     {isLoading || loginInProgress ? (

@@ -106,6 +106,19 @@ export default defineConfig(({ mode = 'development' }) => {
             route: '',
             handle: (req: any, res: any, next: () => void) => {
               const url: string = req.url ?? '';
+              const [pathname, search] = url.split('?');
+              const query = search ? `?${search}` : '';
+
+              // Route /campaign and /welcome directly to their static HTML entry points
+              if (pathname === '/campaign' || pathname === '/campaign/') {
+                req.url = `/campaign/index.html${query}`;
+                return next();
+              }
+              if (pathname === '/welcome' || pathname === '/welcome/') {
+                req.url = `/welcome/index.html${query}`;
+                return next();
+              }
+
               // Rewrite /landlord/<path> (no dot = not an asset) to the main index.html.
               // Exclude /landlord-app/ (the iframe build) and /landlord/index.html itself.
               if (
@@ -152,7 +165,12 @@ export default defineConfig(({ mode = 'development' }) => {
               }
             });
           },
-        }
+        },
+        '/api': {
+          target: process.env.VITE_NEST_API_ENDPOINT || 'http://127.0.0.1:3002',
+          changeOrigin: true,
+          secure: false,
+        },
       },
       watch: {
         usePolling: true,

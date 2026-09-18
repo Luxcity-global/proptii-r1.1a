@@ -224,6 +224,26 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
               simplified
             />
           </div>
+
+          {/* Quick Sign Up / Sign In Callout When Not Authenticated */}
+          {!isAuthenticated && (
+            <div className="relative z-10 mt-6 flex flex-wrap items-center justify-center gap-3 text-sm">
+              <span className="text-white/80">New to Proptii?</span>
+              <Link
+                to="/signup"
+                className="inline-flex items-center gap-2 font-bold text-white bg-[#F15A22] hover:bg-[#d94e1c] px-5 py-2 rounded-full shadow-md hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <span>Create Free Account</span>
+                <span aria-hidden="true">&rarr;</span>
+              </Link>
+              <Link
+                to="/login"
+                className="inline-flex items-center text-white/80 hover:text-white px-3 py-1.5 rounded-full hover:bg-white/10 transition-all text-xs font-medium"
+              >
+                Sign In
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -245,7 +265,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-start items-center mb-6 md:mb-8">
               <Link
-                to="/pricing?segment=renters"
+                to="/signup?role=tenant"
                 onMouseEnter={() => setCtaHover('tenant')}
                 onMouseLeave={() => setCtaHover('tenant')}
                 className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full font-semibold text-base md:text-lg transition-all duration-200 focus:outline-none focus-visible:outline-none text-white border-2 border-transparent bg-gradient-to-r from-[#DC5F12] to-[#F47A1A] shadow-md -translate-y-0.5 hover:shadow-lg hover:-translate-y-1"
@@ -253,7 +273,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 Join as a Tenant / Buyer
               </Link>
               <Link
-                to="/pricing?segment=agents"
+                to="/signup?role=landlord"
                 onMouseEnter={() => setCtaHover('agent')}
                 onMouseLeave={() => setCtaHover('tenant')}
                 className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-1 focus:outline-none focus-visible:outline-none"

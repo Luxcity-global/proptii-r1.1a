@@ -2,8 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Box, Typography, Button, Container } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
+import { useAuth } from '../contexts/AuthContext';
 
 export const UnauthorizedPage: React.FC = () => {
+  const { user } = useAuth();
+  const isLandlord = user?.roles?.includes('landlord') || user?.roles?.includes('agent');
+  const dashboardTarget = isLandlord ? '/landlord' : '/dashboard';
+
   return (
     <Container maxWidth="sm">
       <Box
@@ -35,7 +40,7 @@ export const UnauthorizedPage: React.FC = () => {
           </Button>
           <Button
             component={Link}
-            to="/dashboard"
+            to={dashboardTarget}
             variant="outlined"
           >
             Go to Dashboard

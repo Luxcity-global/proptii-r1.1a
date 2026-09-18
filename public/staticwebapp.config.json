@@ -1,6 +1,14 @@
 {
   "routes": [
     {
+      "route": "/campaign*",
+      "rewrite": "/campaign/index.html"
+    },
+    {
+      "route": "/welcome*",
+      "rewrite": "/welcome/index.html"
+    },
+    {
       "route": "/landlord*",
       "rewrite": "/landlord/index.html"
     },

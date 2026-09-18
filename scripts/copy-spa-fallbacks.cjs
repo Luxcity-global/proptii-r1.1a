@@ -23,6 +23,8 @@ const SPA_ROUTE_DIRS = [
   'pricing/confirmed',
   'login',
   'dashboard',
+  'admin',
+  'admin/leads',
 ];
 
 function main() {

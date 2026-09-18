@@ -31,7 +31,7 @@ const CreateAccountPage: React.FC = () => {
     }
 
     try {
-      await login('google');
+      await login();
       try {
         await setPendingPlan(planId, cycle);
       } catch (e) {
@@ -50,7 +50,7 @@ const CreateAccountPage: React.FC = () => {
     setFormError(null);
     sessionStorage.setItem('redirectAfterLogin', welcomeUrl(planId, cycle));
     try {
-      await login('google');
+      await login();
       await setPendingPlan(planId, cycle);
       navigate(welcomeUrl(planId, cycle), { replace: true });
     } catch {

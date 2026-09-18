@@ -60,7 +60,21 @@ export const LoginPage: React.FC = () => {
 
       // If new user has no assigned role, direct them to role selection screen
       const hasRole = user?.roles && user.roles.length > 0;
-      const targetPath = hasRole ? from : '/select-role';
+      let targetPath = hasRole ? from : '/select-role';
+
+      if (hasRole) {
+        const isLandlord = user.roles.includes('landlord') || user.roles.includes('agent');
+        const isTenant = user.roles.includes('tenant');
+        const isHomeowner = user.roles.includes('homeowner');
+
+        if (isLandlord && (from === '/' || from === '/dashboard' || from.startsWith('/dashboard/'))) {
+          targetPath = '/landlord';
+        } else if (isTenant && (from === '/' || from === '/landlord' || from.startsWith('/landlord/'))) {
+          targetPath = '/dashboard';
+        } else if (isHomeowner && (from === '/' || from === '/dashboard' || from === '/landlord')) {
+          targetPath = '/homeowner/dashboard';
+        }
+      }
       
       console.log('✅ Already authenticated, redirecting to:', targetPath);
       trackEvent('login_success', {
@@ -159,7 +173,7 @@ export const LoginPage: React.FC = () => {
             <button
               onClick={() => {
                 const search = location.search;
-                navigate(`/pricing${search}`);
+                navigate(`/signup${search}`);
               }}
               className="text-[#DC5F12] font-bold hover:underline transition-all"
             >

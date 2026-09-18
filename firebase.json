@@ -32,6 +32,22 @@
         "destination": "/landlord/index.html"
       },
       {
+        "source": "/campaign/**",
+        "destination": "/campaign/index.html"
+      },
+      {
+        "source": "/campaign",
+        "destination": "/campaign/index.html"
+      },
+      {
+        "source": "/welcome/**",
+        "destination": "/welcome/index.html"
+      },
+      {
+        "source": "/welcome",
+        "destination": "/welcome/index.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

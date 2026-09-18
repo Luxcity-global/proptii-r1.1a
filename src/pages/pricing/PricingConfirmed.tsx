@@ -91,7 +91,11 @@ const PricingConfirmed: React.FC = () => {
             </div>
           </div>
 
-          <Link to="/dashboard" className="pr-btn pr-btn-primary" style={{ padding: '14px 28px' }}>
+          <Link
+            to={user?.roles?.includes('landlord') || user?.roles?.includes('agent') ? '/landlord' : '/dashboard'}
+            className="pr-btn pr-btn-primary"
+            style={{ padding: '14px 28px' }}
+          >
             Go to your dashboard →
           </Link>
 
@@ -100,7 +104,10 @@ const PricingConfirmed: React.FC = () => {
               <>A receipt has been sent to <strong style={{ color: 'var(--pr-navy)' }}>{userEmail}</strong>.<br /></>
             )}
             Manage your billing any time in{' '}
-            <Link to="/dashboard" style={{ color: 'var(--pr-orange)', textDecoration: 'none', fontWeight: 600 }}>
+            <Link
+              to={user?.roles?.includes('landlord') || user?.roles?.includes('agent') ? '/landlord' : '/dashboard'}
+              style={{ color: 'var(--pr-orange)', textDecoration: 'none', fontWeight: 600 }}
+            >
               account settings
             </Link>
             .

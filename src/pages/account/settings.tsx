@@ -159,7 +159,10 @@ const AccountSettingsPage: React.FC = () => {
                 Refresh status
               </button>
               {' · '}
-              <Link to="/dashboard" style={{ color: 'var(--pr-orange)' }}>
+              <Link
+                to={user?.roles?.includes('landlord') || user?.roles?.includes('agent') ? '/landlord' : '/dashboard'}
+                style={{ color: 'var(--pr-orange)' }}
+              >
                 Back to dashboard
               </Link>
             </p>

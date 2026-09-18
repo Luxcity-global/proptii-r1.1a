@@ -148,11 +148,12 @@ export async function createCheckoutSession(
         text || `Checkout failed (${response.status}). Is the API running at ${url}?`,
       );
     }
-    const data = (await response.json()) as { checkoutUrl?: string };
-    if (!data.checkoutUrl) {
+    const data = (await response.json()) as { checkoutUrl?: string; url?: string };
+    const checkoutUrl = data.checkoutUrl || data.url;
+    if (!checkoutUrl) {
       throw new Error('Server did not return a checkout URL');
     }
-    return { checkoutUrl: data.checkoutUrl };
+    return { checkoutUrl };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       throw new Error(

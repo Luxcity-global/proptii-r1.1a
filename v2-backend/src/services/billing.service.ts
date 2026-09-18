@@ -82,6 +82,7 @@ export class BillingService {
     return {
       sessionId: mockSessionId,
       url: `/billing/confirmed?session_id=${mockSessionId}&plan=${planId}`,
+      checkoutUrl: `/billing/confirmed?session_id=${mockSessionId}&plan=${planId}`,
     };
   }
 

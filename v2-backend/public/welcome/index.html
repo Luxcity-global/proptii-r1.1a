@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <base href="/welcome/" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Exclusive 1-Month Free Trial is Ready | Proptii</title>
+  
+  <!-- Favicon using exact Proptii icon -->
+  <link rel="icon" type="image/svg+xml" href="/welcome/assets/proptii-icon.svg" />
+  
+  <!-- Google Fonts: Archivo & Nunito Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Nunito+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/welcome/styles.css" />
+  <style>
+    /* Critical SVG containment guard to prevent unstyled layout jumps */
+    svg {
+      max-width: 100%;
+    }
+    .top-bar-controls svg {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+    }
+    .trust-item svg {
+      width: 16px;
+      height: 16px;
+      display: inline-block;
+    }
+    .form-input-icon svg {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+    }
+    .social-btn svg {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+    }
+    .btn-primary-cta svg {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+    }
+    .slideshow-arrow svg {
+      width: 20px;
+      height: 20px;
+      display: inline-block;
+    }
+    /* Official Proptii Brand Lockup Styling */
+    .brand-lockup-official {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      margin-bottom: 24px;
+    }
+
+    .brand-logo-official-img {
+      height: 42px;
+      width: auto;
+      object-fit: contain;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      display: block;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.04));
+    }
+
+    .box-emblem img {
+      width: 22px;
+      height: 26px;
+      object-fit: contain;
+    }
+
+    /* Slideshow Component Styles */
+    .slideshow-viewport {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border-radius: calc(var(--radius-xl) - 12px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+    }
+
+    .slide-item {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1), visibility 1s ease, transform 6s cubic-bezier(0.25, 1, 0.5, 1);
+      transform: scale(1.05);
+      z-index: 1;
+    }
+
+    .slide-item.active {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
+      z-index: 2;
+    }
+
+    .slide-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 30%;
+      display: block;
+    }
+
+    /* Slideshow Navigation Controls */
+    .slideshow-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 20;
+      transition: all 0.25s ease;
+      opacity: 0;
+    }
+
+    .slideshow-viewport:hover .slideshow-arrow {
+      opacity: 1;
+    }
+
+    .slideshow-arrow:hover {
+      background: rgba(15, 23, 42, 0.85);
+      transform: translateY(-50%) scale(1.08);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .slideshow-arrow.prev {
+      left: 14px;
+    }
+
+    .slideshow-arrow.next {
+      right: 14px;
+    }
+
+    .slideshow-arrow svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Pagination Indicator Dots */
+    .slideshow-indicators {
+      position: absolute;
+      top: 18px;
+      right: 20px;
+      display: flex;
+      gap: 6px;
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .indicator-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .indicator-dot.active {
+      width: 18px;
+      border-radius: 99px;
+      background: #DC5F12;
+      box-shadow: 0 0 8px rgba(220, 95, 18, 0.6);
+    }
+
+    /* Live Property Type Pill on Top Left */
+    .live-property-tag {
+      position: absolute;
+      top: 18px;
+      left: 20px;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .live-pulse-dot {
+      width: 6px;
+      height: 6px;
+      background-color: #22c55e;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #22c55e;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================================================
+       PRELOADER & UNBOXING REVEAL ANIMATION SCREEN
+       ========================================================================= -->
+  <div id="unboxing-overlay" aria-live="polite">
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="unboxing-stage">
+      <!-- Ambient Glow Behind Box -->
+      <div class="box-glow" id="box-glow"></div>
+
+      <!-- 3D Parcel Box -->
+      <div class="gift-box" id="gift-box" role="button" aria-label="Open your survey reward" title="Click to pop open instantly!">
+        <!-- Box Shadow -->
+        <div class="box-shadow" id="box-shadow"></div>
+
+        <!-- Box Lid -->
+        <div class="box-lid">
+          <div class="box-bow">
+            <div class="bow-loop-left"></div>
+            <div class="bow-knot"></div>
+            <div class="bow-loop-right"></div>
+          </div>
+        </div>
+
+        <!-- Box Body -->
+        <div class="box-body">
+          <div class="box-emblem">
+            <!-- Exact Official Proptii Emblem -->
+            <img src="/welcome/assets/proptii-icon.svg" alt="Proptii Logo Icon" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Status Label -->
+    <div class="unboxing-text-container">
+      <div class="unboxing-badge">Survey Completed &bull; Exclusive Access</div>
+      <h2 class="unboxing-title" id="unboxing-title">Unlocking your VIP reward...</h2>
+      <p class="unboxing-subtitle" id="unboxing-subtitle">Thank you for sharing your feedback on UK property management.</p>
+      <button class="unboxing-skip" id="unboxing-skip" type="button">Skip straight to reward &rarr;</button>
+    </div>
+  </div>
+
+
+
+  <!-- =========================================================================
+       MAIN WELCOME LANDING CARD
+       Layout: Rounded white card on light gradient backdrop
+       ========================================================================= -->
+  <main class="welcome-page-wrapper" id="welcome-page">
+    <article class="bespoke-card">
+      
+      <!-- LEFT COLUMN: Content & Reward Unlock -->
+      <section class="card-content-side">
+        <div>
+          <!-- Official Proptii Brand Lockup -->
+          <a href="/" class="brand-lockup-official" title="Back to Proptii Homepage">
+            <img src="/welcome/assets/proptii-logo-crisp.png" alt="proptii" class="brand-logo-official-img" />
+            <span class="brand-tagline-badge">Special VIP Reward</span>
+          </a>
+
+          <!-- Headline Reinforcing the Reward (No em dash) -->
+          <h1 class="hero-headline" id="headline-text">
+            Welcome, your 1-month free trial is ready.
+          </h1>
+
+          <!-- Subhead -->
+          <p class="hero-subhead">
+            <span>No obligation. No card required.</span>
+          </p>
+
+          <!-- Reassurance Box: What happens at the end of the month -->
+          <div class="reassurance-box">
+            <div class="reassurance-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <path d="M9 12l2 2 4-4"></path>
+              </svg>
+            </div>
+            <div class="reassurance-text">
+              <h4>What happens after your 30 days?</h4>
+              <p>
+                Keep all your properties, tenant agreements, and revenue analytics intact. You will simply transition to our free Explorer plan unless you choose to upgrade. <strong>Zero unexpected charges, ever.</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversion Action Area (Single clear action) -->
+        <div>
+          <div class="actions-container">
+            <!-- Primary CTA Button (Warm Vibrant Orange Pill) -->
+            <button type="button" class="btn-primary-cta" id="open-activation-modal">
+              <span>Start free trial</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+
+            <!-- Optional Secondary Link -->
+            <div class="secondary-link-container">
+              <a href="/" class="secondary-explore-link" id="secondary-explore-link">
+                <span>Not ready yet? Explore what Proptii does</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <!-- Trust Signals -->
+          <div class="trust-signals-row">
+            <div class="trust-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>Quick setup</span>
+            </div>
+            <div class="trust-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>UK Tenancy Compliant</span>
+            </div>
+            <div class="trust-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>No credit card needed</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- RIGHT COLUMN: Real UK Real Estate Market Photography Slideshow -->
+      <section class="card-media-side" aria-label="UK Real Estate Portfolio Slideshow">
+        <div class="slideshow-viewport" id="property-slideshow">
+          
+          <!-- Live Category Badge -->
+          <div class="live-property-tag">
+            <span class="live-pulse-dot"></span>
+            <span id="slide-category-text">Prime Victorian Townhouses</span>
+          </div>
+
+          <!-- Slide Pagination Dots -->
+          <div class="slideshow-indicators" id="slideshow-indicators">
+            <span class="indicator-dot active" data-slide="0" title="Slide 1: Victorian Portfolios"></span>
+            <span class="indicator-dot" data-slide="1" title="Slide 2: Modern Thames Developments"></span>
+            <span class="indicator-dot" data-slide="2" title="Slide 3: Georgian Stucco Terraces"></span>
+          </div>
+
+          <!-- Slide 1: Kensington Victorian Townhouses -->
+          <div class="slide-item active" data-index="0" data-category="Prime Victorian Townhouses" data-title="Engineered for UK Portfolios" data-desc="AST contracts &bull; EPC ratings &bull; Automated rent reconciliation">
+            <img src="/welcome/assets/slide-1.jpg" alt="UK Victorian Townhouses in Kensington, London" class="slide-image" />
+          </div>
+
+          <!-- Slide 2: Modern Luxury High-Rise Developments -->
+          <div class="slide-item" data-index="1" data-category="BTR & Waterfront Developments" data-title="High-Yield Portfolio Analytics" data-desc="Multi-unit tenancy tracking &bull; Yield optimization &bull; Real-time P&L">
+            <img src="/welcome/assets/slide-2.jpg" alt="Modern London Riverside Luxury Residential Development at Sunset" class="slide-image" />
+          </div>
+
+          <!-- Slide 3: Classic Georgian Stucco Terraces -->
+          <div class="slide-item" data-index="2" data-category="Georgian Terraces & Flats" data-title="Automated Regulatory Compliance" data-desc="EICR & Gas safety logs &bull; Deposit protection &bull; Digital signing">
+            <img src="/welcome/assets/slide-3.jpg" alt="London White Stucco Georgian Crescent Townhouses in Belgravia" class="slide-image" />
+          </div>
+
+          <!-- Interactive Arrows -->
+          <button type="button" class="slideshow-arrow prev" id="slide-prev" aria-label="Previous property photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <button type="button" class="slideshow-arrow next" id="slide-next" aria-label="Next property photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+          
+          <!-- Floating Editorial Badge on Artwork (Updates dynamically with slide) -->
+          <div class="media-overlay-badge">
+            <div class="badge-headline-area">
+              <h5 id="badge-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC5F12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                <span>Engineered for UK Portfolios</span>
+              </h5>
+              <p id="badge-desc">AST contracts &bull; EPC ratings &bull; Automated rent reconciliation</p>
+            </div>
+            <div class="uk-tag-flag">🇬🇧 UK Edition</div>
+          </div>
+
+        </div>
+      </section>
+
+    </article>
+  </main>
+
+  <!-- =========================================================================
+       MODAL: QUICK ACTIVATION / SIGNUP FLOW
+       ========================================================================= -->
+  <div class="modal-backdrop" id="activation-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <button class="modal-close-btn" id="close-modal-btn" type="button" aria-label="Close modal">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+
+      <div class="modal-header">
+        <div class="modal-reward-badge">1-Month VIP Free Trial</div>
+        <h3 class="modal-title" id="modal-title">Start your free month</h3>
+        <p class="modal-subtitle">Claim your complimentary access in just 30 seconds.</p>
+      </div>
+
+      <!-- 1-Click Google Auth -->
+      <button type="button" class="social-btn" id="social-google-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;">
+          <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+          <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+          <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c0-.4 0-.8 0-1.4z" />
+          <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
+        </svg>
+        <span>Sign up with Google</span>
+      </button>
+
+      <div class="social-auth-divider">or activate with email</div>
+
+      <!-- Quick Form -->
+      <form class="quick-auth-form" id="quick-auth-form">
+        <div class="form-group">
+          <label class="form-label" for="modal-email-input">Work or Personal Email</label>
+          <div class="form-input-wrap">
+            <span class="form-input-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+            </span>
+            <input type="email" id="modal-email-input" class="form-input" placeholder="e.g. alex@propertyuk.co.uk" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="modal-password-input">Choose Password</label>
+          <div class="form-input-wrap">
+            <span class="form-input-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </span>
+            <input type="password" id="modal-password-input" class="form-input" placeholder="Minimum 8 characters" required minlength="6" />
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary-cta" style="margin-top: 8px;">
+          <span>Complete Activation &rarr;</span>
+        </button>
+
+        <p style="font-size: 11.5px; color: var(--text-light); text-align: center; margin-top: 4px; line-height: 1.4;">
+          By activating, you confirm access to the 1-month VIP trial. No credit card required. Free tier transition upon expiry.
+        </p>
+
+        <p style="font-size: 12px; color: var(--text-dark); text-align: center; margin-top: 10px;">
+          Already have an account? <a href="/login" style="color: #DC5F12; font-weight: 700; text-decoration: underline;">Log in here</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/welcome/animation.js"></script>
+</body>
+</html>

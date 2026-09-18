@@ -260,15 +260,16 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                 )}
               </div>
             ) : (
-              <div className="relative">
+              <div className="flex items-center space-x-2">
                 {loginError && (
                   <div className="absolute right-0 -bottom-16 w-64 bg-red-500 text-white p-2 rounded-md text-sm shadow-lg">
                     {loginError}
                   </div>
                 )}
+                {/* Secondary CTA: Sign In */}
                 <button
                   onClick={handleLogin}
-                  className="bg-[#F15A22] hover:bg-[#d94e1c] text-white px-6 py-2 rounded-full font-medium text-sm transition-all flex items-center shadow-md hover:shadow-lg"
+                  className="text-white/90 hover:text-white px-4 py-2 rounded-full font-medium text-sm transition-all hover:bg-white/10 flex items-center"
                   disabled={isLoading || loginInProgress}
                 >
                   {isLoading || loginInProgress ? (
@@ -283,6 +284,14 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     'Sign In'
                   )}
                 </button>
+
+                {/* Primary CTA: Sign Up */}
+                <Link
+                  to="/signup"
+                  className="bg-[#F15A22] hover:bg-[#d94e1c] text-white px-5 py-2 rounded-full font-semibold text-sm transition-all flex items-center shadow-md hover:shadow-lg active:scale-[0.98]"
+                >
+                  Sign Up
+                </Link>
               </div>
             )}
           </div>
@@ -446,15 +455,25 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
               )}
 
               {!isAuthenticated && (
-                <div className="pt-3 border-t border-white/10">
+                <div className="pt-3 border-t border-white/10 flex flex-col gap-2.5">
                   {loginError && (
                     <div className="mx-2 mb-2 bg-red-500 text-white p-2 rounded-lg text-xs">
                       {loginError}
                     </div>
                   )}
+                  {/* Primary CTA: Sign Up */}
+                  <Link
+                    to="/signup"
+                    onClick={closeMobileMenu}
+                    className="w-full bg-[#F15A22] hover:bg-[#d94e1c] text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center shadow-md active:scale-[0.98]"
+                  >
+                    Sign Up
+                  </Link>
+
+                  {/* Secondary CTA: Sign In */}
                   <button
                     onClick={handleLogin}
-                    className="w-full bg-[#F15A22] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[#d94e1c] transition-all flex items-center justify-center shadow-md"
+                    className="w-full bg-white/10 hover:bg-white/15 text-white border border-white/20 px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center justify-center"
                     disabled={isLoading || loginInProgress}
                   >
                     {isLoading || loginInProgress ? (

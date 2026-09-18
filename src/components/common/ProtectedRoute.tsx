@@ -134,6 +134,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           location.pathname.startsWith('/listings/new');
 
         if (actualRole === 'landlord' || actualRole === 'agent') {
+          // If a landlord/agent attempts to navigate to the tenant dashboard, send them to their dashboard
+          if (location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/')) {
+            return <Navigate to="/landlord" replace />;
+          }
+
           if (isTenantRoute) {
             if (!switchDismissed) {
               return (

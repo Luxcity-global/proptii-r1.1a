@@ -58,6 +58,7 @@ const ViewingTracker      = lazy(() => import('./pages/tools/ViewingTracker'));
 const ProcessSimulator    = lazy(() => import('./pages/tools/ProcessSimulator'));
 const TimelineGenerator   = lazy(() => import('./pages/tools/TimelineGenerator'));
 const KnowYourRights      = lazy(() => import('./pages/tools/KnowYourRights'));
+const CampaignLeadsAdmin  = lazy(() => import('./pages/admin/CampaignLeadsAdmin'));
 const ComingSoon          = lazy(() => import('./pages/ComingSoon'));
 const GuestThreadPage     = lazy(() => import('./pages/GuestThreadPage'));
 const ClaimReferencing     = lazy(() => import('./pages/ClaimReferencing'));
@@ -132,7 +133,7 @@ export const App: React.FC = () => {
                 <Route path="/search" element={<SearchResults />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/select-role" element={<RoleSelect />} />
-                <Route path="/register" element={<Navigate to="/pricing" replace />} />
+                <Route path="/register" element={<Navigate to="/signup" replace />} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
                 <Route path="/about-us" element={<AboutUs />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -238,6 +239,10 @@ export const App: React.FC = () => {
                     <NewListingPage />
                   </ProtectedRoute>
                 } />
+
+                {/* Admin Routes */}
+                <Route path="/admin" element={<Navigate to="/admin/leads" replace />} />
+                <Route path="/admin/leads" element={<CampaignLeadsAdmin />} />
 
                 {/* Dashboard Routes */}
                 <Route path="/dashboard" element={

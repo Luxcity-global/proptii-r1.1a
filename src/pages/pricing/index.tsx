@@ -33,7 +33,7 @@ const PricingPage: React.FC<PricingPageProps> = ({
   const [audience, setAudience] = useState<PricingAudience>('renters');
 
   useEffect(() => {
-    const segment = searchParams.get('segment');
+    const segment = searchParams.get('segment') || searchParams.get('audience');
     if (
       segment === 'renters' ||
       segment === 'landlords' ||

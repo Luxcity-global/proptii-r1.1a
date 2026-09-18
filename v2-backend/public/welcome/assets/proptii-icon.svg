@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 52" fill="none">
+  <!-- Proptii Blue House / 'p' Ribbon -->
+  <path d="M 17 4 
+           L 32 19 
+           L 32 35 
+           L 25 35 
+           L 17 21 
+           L 16 24 
+           L 16 36 
+           L 5 46 
+           L 5 24 
+           L 17 12 
+           Z" 
+        fill="#136ea1" />
+  <!-- Orange Folded Corner -->
+  <polygon points="17,35 25,35 25,29" fill="#ec6711" />
+</svg>
