@@ -2,7 +2,6 @@ import {
   Controller,
   Post,
   Get,
-  Delete,
   Param,
   Body,
   Query,
@@ -156,33 +155,5 @@ export class LeadsController {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csv);
-  }
-
-  /**
-   * DELETE /api/leads/:id
-   * Admin-only — delete a specific lead by ID.
-   */
-  @Delete(':id')
-  @UseGuards(FirebaseAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete a single lead (admin only)' })
-  async deleteLead(@Req() req: Request, @Param('id') id: string) {
-    this.assertAdminUser(req);
-    await this.leadsService.deleteLead(id);
-    return { success: true, message: `Lead ${id} deleted` };
-  }
-
-  /**
-   * DELETE /api/leads
-   * Admin-only — clear all campaign leads.
-   */
-  @Delete()
-  @UseGuards(FirebaseAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Clear all campaign leads (admin only)' })
-  async clearAllLeads(@Req() req: Request) {
-    this.assertAdminUser(req);
-    const result = await this.leadsService.clearAllLeads();
-    return { success: true, ...result };
   }
 }
