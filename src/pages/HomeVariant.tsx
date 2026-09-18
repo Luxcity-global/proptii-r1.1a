@@ -109,7 +109,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
       setPrefilledEmail(emailParam || '');
       setTenantEmail(tenantEmailParam || '');
       setIsResponseModalOpen(true);
-      
+
       // Clear query parameters from URL without reloading
       setSearchParams({});
     }
@@ -181,7 +181,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
       />
 
       {/* Hero Section */}
-      <section 
+      <section
         className={`h-[95vh] pt-32 relative flex items-center md:pt-0 z-10`}
         style={{ paddingBottom: `${getDynamicPadding()}px` }}
       >
@@ -226,7 +226,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
           </div>
 
           {/* Quick Sign Up / Sign In Callout When Not Authenticated */}
-          {!isAuthenticated && (
+          {/* {!isAuthenticated && (
             <div className="relative z-10 mt-6 flex flex-wrap items-center justify-center gap-3 text-sm">
               <span className="text-white/80">New to Proptii?</span>
               <Link
@@ -243,7 +243,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 Sign In
               </Link>
             </div>
-          )}
+          )} */}
         </div>
       </section>
 
@@ -258,7 +258,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
           {/* Text / CTAs */}
           <div className="relative z-10 max-w-xl md:-translate-x-4">
             <h2 className="text-2xl md:text-4xl font-bold font-archive mb-4 md:mb-6 text-[#136C9E]">
-            Start free. No credit card. No commitment.
+              Start free. No credit card. No commitment.
             </h2>
             <p className="text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
               Every new user gets <strong>1 month completely free</strong> on paid plans — search, viewings, referencing, and contracts. Tenants and buyers: Explorer is free forever for core search. Landlords and agents: try the full toolkit before you decide.
@@ -296,11 +296,9 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 : '/images/home page join us/tenant bw.png'
             }
             alt=""
-            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-20 max-h-[28rem] lg:max-h-[32rem] w-auto object-contain transition-transform duration-200 ${
-              ctaHover === 'tenant' ? 'translate-y-16' : 'translate-y-24'
-            } ${
-              ctaHover === 'tenant' ? 'scale-110 opacity-100' : 'scale-100 opacity-50'
-            } ${ctaHover === 'agent' ? 'z-0' : 'z-10'}`}
+            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-20 max-h-[28rem] lg:max-h-[32rem] w-auto object-contain transition-transform duration-200 ${ctaHover === 'tenant' ? 'translate-y-16' : 'translate-y-24'
+              } ${ctaHover === 'tenant' ? 'scale-110 opacity-100' : 'scale-100 opacity-50'
+              } ${ctaHover === 'agent' ? 'z-0' : 'z-10'}`}
             loading="lazy"
           />
           <img
@@ -310,9 +308,8 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 : '/images/home page join us/agent bw.png'
             }
             alt=""
-            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-[-320px] max-h-[24rem] lg:max-h-[30rem] w-auto object-contain translate-y-24 transition-transform duration-200 ${
-              ctaHover === 'agent' ? 'scale-110 opacity-100' : 'scale-100 opacity-50'
-            } ${ctaHover === 'agent' ? 'z-10' : 'z-0'}`}
+            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-[-320px] max-h-[24rem] lg:max-h-[30rem] w-auto object-contain translate-y-24 transition-transform duration-200 ${ctaHover === 'agent' ? 'scale-110 opacity-100' : 'scale-100 opacity-50'
+              } ${ctaHover === 'agent' ? 'z-10' : 'z-0'}`}
             loading="lazy"
           />
         </div>
