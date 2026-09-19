@@ -146,7 +146,7 @@
     giftBox.classList.remove('entered', 'shaking', 'bursting');
     boxGlow.classList.remove('active', 'burst');
     boxShadow.classList.remove('shaking');
-    
+
     if (statusTitle) statusTitle.textContent = "Unlocking your VIP reward...";
     if (statusSub) statusSub.textContent = "Thank you for completing our survey!";
 
@@ -310,57 +310,212 @@
     }, { passive: true });
   }
 
+  // --- Personalization Matrix & Config (per specification) ---
+  const PERSONALIZATION_MATRIX = {
+    'estate-agent': {
+      segmentKey: 'estate-agent',
+      roleTitle: 'Estate Agent',
+      roleIntent: 'agent',
+      plan: 'independent',
+      headline: 'Reclaim your pipeline: Automate tenant progression from enquiry to contract.',
+      subheadline: 'Prevent deal drop-off and streamline compliance by allowing tenants to securely submit details and documents directly.',
+      ctaLabel: 'Start 1-Month Agent Trial',
+      badgeText: '1-Month Agent Trial'
+    },
+    'independent-landlord': {
+      segmentKey: 'independent-landlord',
+      roleTitle: 'Independent Landlord',
+      roleIntent: 'landlord',
+      plan: 'starter',
+      headline: 'Self-manage without the stress, paperwork, or compliance panic.',
+      subheadline: 'Simplify tenancy admin with digital referencing while tracking rent and storing digital documents in one place.',
+      ctaLabel: 'Start 1-Month Free Trial',
+      badgeText: '1-Month Landlord Trial'
+    },
+    'property-manager': {
+      segmentKey: 'property-manager',
+      roleTitle: 'Property Manager',
+      roleIntent: 'landlord',
+      plan: 'independent',
+      headline: 'Consolidate secure tenant referencing uploads, details collection, and communications into one central cockpit.',
+      subheadline: 'Stop context-switching between fragmented inbox threads, spreadsheets, and contractor WhatsApp groups.',
+      ctaLabel: 'Start 1-Month Operations Trial',
+      badgeText: '1-Month Operations Trial'
+    },
+    'property-investor': {
+      segmentKey: 'property-investor',
+      roleTitle: 'Property Investor',
+      roleIntent: 'landlord',
+      plan: 'independent',
+      headline: 'Protect asset yields and compliance with hands-off operations.',
+      subheadline: 'Gain portfolio-level visibility, streamline tenancies, and keep asset operating overhead lean.',
+      ctaLabel: 'Start 1-Month Investor Trial',
+      badgeText: '1-Month Investor Trial'
+    },
+    'default': {
+      segmentKey: 'default',
+      roleTitle: 'Property Professional',
+      roleIntent: 'landlord',
+      plan: 'starter',
+      headline: 'Put your property management and tenancy admin on autopilot.',
+      subheadline: 'Digital referencing, tenant communication, and compliance from a single workspace.',
+      ctaLabel: 'Start 1-Month Free Trial',
+      badgeText: '1-Month VIP Free Trial'
+    }
+  };
+
+  /**
+   * Robust URI decoder & segment normalizer
+   * Gracefully handles slashes (e.g., Estate agent / letting agent) and dashes (e.g., 21–50)
+   */
+  function resolveSegmentKey(input) {
+    if (!input || typeof input !== 'string') return 'default';
+    let raw = '';
+    try {
+      raw = decodeURIComponent(input).trim().toLowerCase();
+    } catch {
+      raw = String(input).trim().toLowerCase();
+    }
+    // Normalize slashes, dashes, underscores, and whitespace
+    const normalized = raw.replace(/[\/\\_\-]+/g, ' ');
+
+    if (normalized.includes('estate') || normalized.includes('letting') || normalized.includes('agent')) {
+      return 'estate-agent';
+    }
+    if (normalized.includes('independent') || normalized.includes('landlord') || normalized.includes('self manage') || normalized.includes('homeowner')) {
+      return 'independent-landlord';
+    }
+    if (normalized.includes('manager') || normalized.includes('operations')) {
+      return 'property-manager';
+    }
+    if (normalized.includes('investor') || normalized.includes('investment') || normalized.includes('yield')) {
+      return 'property-investor';
+    }
+    return 'default';
+  }
+
+  /**
+   * Apply Personalized Content & CTAs to the DOM & state
+   */
+  function applyPersonalization(segmentKey, email, rawLeadData) {
+    const config = PERSONALIZATION_MATRIX[segmentKey] || PERSONALIZATION_MATRIX['default'];
+
+    window.__proptii_lead_segment = config.segmentKey;
+    window.__proptii_lead_role = config.roleTitle;
+    window.__proptii_lead_role_intent = config.roleIntent;
+    window.__proptii_lead_plan = config.plan;
+    if (email) window.__proptii_lead_email = email;
+    if (rawLeadData) window.__proptii_lead_data = rawLeadData;
+
+    // 1. Hero Headline
+    const headlineEl = document.getElementById('headline-text');
+    if (headlineEl) {
+      headlineEl.textContent = config.headline;
+    }
+
+    // 2. Hero Subheadline
+    const subheadlineEl = document.getElementById('subheadline-text');
+    if (subheadlineEl) {
+      const span = subheadlineEl.querySelector('span') || subheadlineEl;
+      span.textContent = config.subheadline;
+    }
+
+    // 3. Primary CTA Button Label
+    const ctaBtn = document.getElementById('open-activation-modal');
+    if (ctaBtn) {
+      const ctaSpan = ctaBtn.querySelector('#cta-label-text') || ctaBtn.querySelector('span');
+      if (ctaSpan) {
+        ctaSpan.textContent = config.ctaLabel;
+      }
+    }
+
+    // 4. Modal Badges & Titles
+    document.querySelectorAll('.modal-reward-badge').forEach(badge => {
+      badge.textContent = config.badgeText;
+    });
+
+    const modalTitle = document.getElementById('modal-title');
+    if (modalTitle) {
+      modalTitle.textContent = config.ctaLabel.replace(/^Start\s+/i, 'Claim ');
+    }
+
+    // 5. Pre-populate email in modal input if present
+    if (email) {
+      const emailInput = document.getElementById('modal-email-input');
+      if (emailInput && !emailInput.value) {
+        emailInput.value = email;
+      }
+    }
+
+    // 6. Save in sessionStorage for continuation across registration flow
+    try {
+      sessionStorage.setItem('proptii_signup_role_intent', config.roleIntent);
+      sessionStorage.setItem('proptii_signup_plan', config.plan);
+      sessionStorage.setItem('proptii_signup_segment', config.segmentKey);
+      if (email) sessionStorage.setItem('pending_registration_email', email);
+    } catch { }
+  }
+
   // --- Dynamic Lead Personalisation & Query Params Parser ---
   async function processTypeformParams() {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const token = urlParams.get('token') || sessionStorage.getItem('proptii_lead_token');
+      let detectedSegment = urlParams.get('segment') || urlParams.get('role');
+      let email = urlParams.get('email') || '';
+      const token = urlParams.get('token') || '';
+
+      // Check fallback cached survey lead in sessionStorage
+      let cachedLead = null;
+      try {
+        const cachedRaw = sessionStorage.getItem('proptii_campaign_lead');
+        if (cachedRaw) {
+          cachedLead = JSON.parse(cachedRaw);
+          if (!detectedSegment && cachedLead.role) {
+            detectedSegment = cachedLead.role;
+          }
+          if (!email && cachedLead.email) {
+            email = cachedLead.email;
+          }
+        }
+      } catch { }
+
+      if (!email) {
+        try {
+          email = sessionStorage.getItem('pending_registration_email') || '';
+        } catch { }
+      }
+
+      // Apply initial personalization immediately from URL or cached session
+      const initialSegmentKey = resolveSegmentKey(detectedSegment);
+      applyPersonalization(initialSegmentKey, email, cachedLead);
 
       const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? ''
         : 'https://proptii-r1-1a-1-hcw6.onrender.com';
 
-      if (token) {
+      const leadToken = token || (function() {
+        try { return sessionStorage.getItem('proptii_lead_token'); } catch { return null; }
+      })();
+
+      if (leadToken) {
         try {
-          const res = await fetch(`${apiBase}/api/leads/session?token=` + encodeURIComponent(token));
+          const res = await fetch(`${apiBase}/api/leads/session?token=` + encodeURIComponent(leadToken));
           if (res.ok) {
             const data = await res.json();
             if (data && data.leadId) {
               window.__proptii_lead_id = data.leadId;
-              window.__proptii_lead_role = data.role;
-              window.__proptii_lead_data = data;
-              if (data.email) {
-                window.__proptii_lead_email = data.email;
-                try {
-                  sessionStorage.setItem('pending_registration_email', data.email);
-                } catch {}
-                const emailInput = document.getElementById('modal-email-input');
-                if (emailInput) {
-                  emailInput.value = data.email;
-                }
-              }
               try {
                 sessionStorage.setItem('proptii_lead_id', data.leadId);
                 sessionStorage.setItem('proptii_campaign_lead', JSON.stringify(data));
-              } catch {}
+              } catch { }
 
-              const roleMap = {
-                'Estate agent / letting agent': 'Estate Agent',
-                'Independent landlord': 'Landlord',
-                'Property manager': 'Property Manager',
-                'Property investor': 'Property Investor',
-                'Other': 'Property Professional',
-              };
-              const roleTitle = roleMap[data.role] || data.role || 'Property Professional';
-
-              const headlineEl = document.getElementById('headline-text');
-              if (headlineEl) {
-                headlineEl.innerHTML = `Welcome, <span style="color: var(--primary-orange);">${escapeHtml(roleTitle)}</span> — your 1-month free trial is ready.`;
-              }
+              const fetchedSegmentKey = resolveSegmentKey(data.role || detectedSegment);
+              applyPersonalization(fetchedSegmentKey, data.email || email, data);
 
               const subtitleEl = document.getElementById('unboxing-subtitle');
               if (subtitleEl) {
-                subtitleEl.textContent = `Great insights on your ${data.propertyCount || 'property'} workflow. We've tailored your trial.`;
+                const roleName = PERSONALIZATION_MATRIX[fetchedSegmentKey].roleTitle;
+                subtitleEl.textContent = `Great insights on your ${roleName.toLowerCase()} workflow. We've tailored your trial.`;
               }
               return;
             }
@@ -369,57 +524,9 @@
           console.warn('Lead session fetch notice:', err);
         }
       }
-
-      // Check fallback cached survey in sessionStorage
-      try {
-        const cachedRaw = sessionStorage.getItem('proptii_campaign_lead');
-        if (cachedRaw) {
-          const cached = JSON.parse(cachedRaw);
-          window.__proptii_lead_role = cached.role;
-          window.__proptii_lead_data = cached;
-          if (cached.email) {
-            window.__proptii_lead_email = cached.email;
-            try {
-              sessionStorage.setItem('pending_registration_email', cached.email);
-            } catch {}
-            const emailInput = document.getElementById('modal-email-input');
-            if (emailInput) {
-              emailInput.value = cached.email;
-            }
-          }
-          const roleMap = {
-            'Estate agent / letting agent': 'Estate Agent',
-            'Independent landlord': 'Landlord',
-            'Property manager': 'Property Manager',
-            'Property investor': 'Property Investor',
-            'Other': 'Property Professional',
-          };
-          const roleTitle = roleMap[cached.role] || cached.role || 'Property Professional';
-          const headlineEl = document.getElementById('headline-text');
-          if (headlineEl) {
-            headlineEl.innerHTML = `Welcome, <span style="color: var(--primary-orange);">${escapeHtml(roleTitle)}</span> — your 1-month free trial is ready.`;
-          }
-        }
-      } catch {}
-
-      const name = urlParams.get('name') || urlParams.get('firstname') || urlParams.get('first_name');
-      const email = urlParams.get('email');
-
-      if (name) {
-        const headlineEl = document.getElementById('headline-text');
-        if (headlineEl) {
-          headlineEl.innerHTML = `Welcome, <span style="color: var(--primary-orange);">${escapeHtml(name)}</span>! Your 1-month free trial is ready.`;
-        }
-      }
-
-      if (email) {
-        const emailInput = document.getElementById('modal-email-input');
-        if (emailInput) {
-          emailInput.value = email;
-        }
-      }
     } catch (e) {
       console.warn('URL params parsing notice:', e);
+      applyPersonalization('default');
     }
   }
 
@@ -479,26 +586,27 @@
       `;
       googleBtn.style.pointerEvents = 'none';
 
-      const role = window.__proptii_lead_role || '';
-      const isAgent = role.toLowerCase().includes('agent');
-      const roleIntent = isAgent ? 'agent' : 'landlord';
+      const segmentKey = window.__proptii_lead_segment || 'default';
+      const config = PERSONALIZATION_MATRIX[segmentKey] || PERSONALIZATION_MATRIX['default'];
+      const roleIntent = config.roleIntent;
+      const plan = config.plan;
+      const email = window.__proptii_lead_email || '';
+
       try {
         sessionStorage.setItem('proptii_signup_role_intent', roleIntent);
+        sessionStorage.setItem('proptii_signup_plan', plan);
+        sessionStorage.setItem('proptii_signup_segment', segmentKey);
+        if (email) {
+          sessionStorage.setItem('pending_registration_email', email);
+        }
         if (window.__proptii_lead_data) {
           sessionStorage.setItem('proptii_campaign_lead', JSON.stringify(window.__proptii_lead_data));
         }
-      } catch {}
+      } catch { }
 
-      const plan = isAgent ? 'independent' : 'starter';
-      const email = window.__proptii_lead_email || '';
-      if (email) {
-        try {
-          sessionStorage.setItem('pending_registration_email', email);
-        } catch {}
-      }
       const emailParam = email ? `&email=${encodeURIComponent(email)}` : '';
       setTimeout(() => {
-        window.location.href = `/signup?plan=${plan}&cycle=monthly&role=${roleIntent}${emailParam}&from=campaign&provider=google`;
+        window.location.href = `/signup?plan=${plan}&cycle=monthly&role=${roleIntent}&segment=${segmentKey}${emailParam}&from=campaign&provider=google`;
       }, 350);
     });
   }
@@ -527,7 +635,9 @@
       const submitBtn = modalForm.querySelector('button[type="submit"]');
       const emailInput = document.getElementById('modal-email-input');
       const email = emailInput ? emailInput.value.trim() : '';
-      const leadId = window.__proptii_lead_id || sessionStorage.getItem('proptii_lead_id');
+      const leadId = window.__proptii_lead_id || (function() {
+        try { return sessionStorage.getItem('proptii_lead_id'); } catch { return null; }
+      })();
 
       if (submitBtn) {
         submitBtn.innerHTML = `
@@ -556,14 +666,18 @@
         }
       }
 
-      // Store in sessionStorage for Proptii signup
-      const role = window.__proptii_lead_role || '';
-      const isAgent = role.toLowerCase().includes('agent');
-      const roleIntent = isAgent ? 'agent' : 'landlord';
+      const segmentKey = window.__proptii_lead_segment || 'default';
+      const config = PERSONALIZATION_MATRIX[segmentKey] || PERSONALIZATION_MATRIX['default'];
+      const roleIntent = config.roleIntent;
+      const plan = config.plan;
+
+      // Store in sessionStorage for seamless Proptii onboarding continuation
       try {
         sessionStorage.setItem('proptii_signup_role_intent', roleIntent);
+        sessionStorage.setItem('proptii_signup_plan', plan);
+        sessionStorage.setItem('proptii_signup_segment', segmentKey);
         if (email) sessionStorage.setItem('pending_registration_email', email);
-      } catch {}
+      } catch { }
 
       setTimeout(() => {
         const modalHeader = document.querySelector('.modal-header');
@@ -571,7 +685,7 @@
           modalHeader.innerHTML = `
             <div class="modal-reward-badge" style="background:#22c55e;color:#fff;">✓ Trial Activated</div>
             <h3 class="modal-title" style="margin-top:8px;">Welcome to Proptii!</h3>
-            <p class="modal-subtitle">Your VIP 1-month free access has been activated for <strong>${escapeHtml(email || 'your account')}</strong>. Redirecting to setup your account...</p>
+            <p class="modal-subtitle">Your ${escapeHtml(config.roleTitle)} 1-month trial has been activated for <strong>${escapeHtml(email || 'your account')}</strong>. Redirecting to setup your account...</p>
           `;
         }
         if (modalForm) {
@@ -585,9 +699,8 @@
 
         // Redirect directly to Proptii Sign Up with plan and prefilled details
         setTimeout(() => {
-          const plan = isAgent ? 'independent' : 'starter';
           const emailParam = email ? `&email=${encodeURIComponent(email)}` : '';
-          window.location.href = `/signup?plan=${plan}&cycle=monthly&role=${roleIntent}${emailParam}&from=campaign`;
+          window.location.href = `/signup?plan=${plan}&cycle=monthly&role=${roleIntent}&segment=${segmentKey}${emailParam}&from=campaign`;
         }, 1200);
       }, 800);
     });

@@ -97,6 +97,26 @@ export class CreateLeadDto {
 
   @ApiPropertyOptional({
     type: String,
+    description: 'Full name captured upfront on card 1',
+    example: 'Alex Morgan',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Phone number captured upfront on card 1',
+    example: '+44 7123 456789',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @ApiPropertyOptional({
+    type: String,
     description: 'Email captured upfront on questionnaire card 1',
     example: 'alex@propertyuk.co.uk',
   })

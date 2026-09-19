@@ -5,6 +5,8 @@ import { CreateLeadDto } from './dto/create-lead.dto';
 
 export interface LeadSessionPayload {
   leadId: string;
+  name?: string;
+  phone?: string;
   email?: string;
   role: string;
   propertyCount: string;
@@ -76,15 +78,19 @@ export class LeadsService {
     const token = this.generateToken(leadId, expiresAt);
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
+    const leadName = dto.name ? dto.name.trim() : null;
+    const leadPhone = dto.phone ? dto.phone.trim() : null;
     const leadEmail = dto.email ? dto.email.toLowerCase().trim() : null;
     const lead = {
+      name: leadName,
+      phone: leadPhone,
+      email: leadEmail,
       role: dto.role,
       propertyCount: dto.propertyCount,
       timeSinks: dto.timeSinks,
       adminHours: dto.adminHours,
       biggestGain: dto.biggestGain,
       frustration: dto.frustration ?? null,
-      email: leadEmail,
       activated: leadEmail ? true : false,
       activatedAt: leadEmail ? admin.firestore.FieldValue.serverTimestamp() : null,
       sessionTokenHash: tokenHash,
@@ -94,7 +100,7 @@ export class LeadsService {
     };
 
     await docRef.set(lead);
-    this.logger.log(`Lead created: ${leadId} | role=${dto.role} | email=${leadEmail || 'none'}`);
+    this.logger.log(`Lead created: ${leadId} | name=${leadName || 'none'} | role=${dto.role} | email=${leadEmail || 'none'}`);
     return { token, leadId };
   }
 
@@ -113,6 +119,8 @@ export class LeadsService {
 
     return {
       leadId,
+      name: data.name ?? undefined,
+      phone: data.phone ?? undefined,
       email: data.email ?? undefined,
       role: data.role,
       propertyCount: data.propertyCount,
@@ -171,6 +179,8 @@ export class LeadsService {
     const headers = [
       'id',
       'submittedAt',
+      'name',
+      'phone',
       'email',
       'role',
       'propertyCount',
@@ -185,6 +195,8 @@ export class LeadsService {
       return [
         doc.id,
         d.submittedAt?.toDate?.()?.toISOString() ?? '',
+        d.name ?? '',
+        d.phone ?? '',
         d.email ?? '',
         d.role ?? '',
         d.propertyCount ?? '',

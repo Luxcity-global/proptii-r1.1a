@@ -6,13 +6,15 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export interface CampaignLead {
   id: string;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
   role?: string;
   propertyCount?: string;
   timeSinks?: string[];
   adminHours?: string;
   biggestGain?: string;
   frustration?: string | null;
-  email?: string | null;
   activated?: boolean;
   submittedAt?: string | null;
   activatedAt?: string | null;
@@ -153,19 +155,19 @@ export const CampaignLeadsAdmin: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isAdmin === true) {
+    if (isAdmin) {
       fetchLeads();
+    } else if (isAdmin === false) {
+      setLoading(false);
     }
   }, [isAdmin]);
 
   const handleExportCsv = async () => {
     setExporting(true);
     try {
-      const token = (await getAccessTokenForApiRequest()) || 'mock-admin-token';
+      const token = (await getAccessTokenForApiRequest()) || '';
       const res = await fetch(`${apiBase}/api/leads/export`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (res.ok) {
@@ -193,6 +195,8 @@ export const CampaignLeadsAdmin: React.FC = () => {
     const headers = [
       'id',
       'submittedAt',
+      'name',
+      'phone',
       'email',
       'role',
       'propertyCount',
@@ -206,6 +210,8 @@ export const CampaignLeadsAdmin: React.FC = () => {
     const rows = leads.map((l) => [
       l.id,
       l.submittedAt || '',
+      l.name || '',
+      l.phone || '',
       l.email || '',
       l.role || '',
       l.propertyCount || '',
@@ -247,6 +253,8 @@ export const CampaignLeadsAdmin: React.FC = () => {
     return leads.filter((lead) => {
       const matchesSearch =
         !searchTerm ||
+        (lead.name && lead.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (lead.phone && lead.phone.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (lead.role && lead.role.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (lead.id && lead.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -612,7 +620,7 @@ export const CampaignLeadsAdmin: React.FC = () => {
               <thead className="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-500 tracking-wider">
                 <tr>
                   <th scope="col" className="py-3.5 px-4">Date & ID</th>
-                  <th scope="col" className="py-3.5 px-4">Card 1: Email & Status</th>
+                  <th scope="col" className="py-3.5 px-4">Card 1: Contact & Status</th>
                   <th scope="col" className="py-3.5 px-4">Cards 2 & 3: Role & Portfolio</th>
                   <th scope="col" className="py-3.5 px-4">Card 4: Time Sinks</th>
                   <th scope="col" className="py-3.5 px-4">Card 5: Admin Hrs</th>
@@ -669,22 +677,34 @@ export const CampaignLeadsAdmin: React.FC = () => {
                         </td>
 
                         <td className="py-4 px-4">
-                          {isActivated ? (
-                            <div>
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                Activated
-                              </span>
-                              <div className="text-xs font-semibold text-slate-900 mt-1 font-mono">
-                                {lead.email || 'Email saved'}
+                          <div className="flex flex-col gap-0.5">
+                            {lead.name && (
+                              <div className="font-semibold text-slate-900 text-sm">
+                                {lead.name}
                               </div>
+                            )}
+                            <div className="text-xs text-slate-700 font-mono">
+                              {lead.email || <span className="text-slate-400 italic">No email</span>}
                             </div>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                              Unclaimed Token
-                            </span>
-                          )}
+                            {lead.phone && (
+                              <div className="text-[11px] text-slate-500 font-mono">
+                                📞 {lead.phone}
+                              </div>
+                            )}
+                            <div className="mt-1">
+                              {isActivated ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  Activated
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                  Unclaimed Token
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </td>
 
                         <td className="py-4 px-4 whitespace-nowrap">
@@ -781,7 +801,7 @@ export const CampaignLeadsAdmin: React.FC = () => {
                     )}
                   </div>
                   <h3 className="text-xl font-extrabold text-slate-900 mt-1">
-                    {selectedLead.email || 'Anonymous Lead'}
+                    {selectedLead.name || selectedLead.email || 'Anonymous Lead'}
                   </h3>
                 </div>
                 <button
@@ -799,17 +819,34 @@ export const CampaignLeadsAdmin: React.FC = () => {
                 {/* 7 Questionnaire Cards Mapping */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Card 1 */}
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] font-bold text-[#136C9E] uppercase tracking-wider">Card 01 • Email Address</span>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 col-span-1 md:col-span-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-[#136C9E] uppercase tracking-wider">Card 01 • Contact Information</span>
                       {selectedLead.email ? (
                         <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Captured</span>
                       ) : (
                         <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Missing</span>
                       )}
                     </div>
-                    <div className="text-sm font-bold text-slate-900 break-all font-mono">
-                      {selectedLead.email || 'None provided'}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <span className="text-[11px] text-slate-400 font-medium block">Full Name</span>
+                        <div className="text-sm font-bold text-slate-900">
+                          {selectedLead.name || <span className="text-slate-400 font-normal italic">None provided</span>}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-slate-400 font-medium block">Email Address</span>
+                        <div className="text-sm font-bold text-slate-900 break-all font-mono">
+                          {selectedLead.email || <span className="text-slate-400 font-normal italic">None provided</span>}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-slate-400 font-medium block">Phone Number</span>
+                        <div className="text-sm font-bold text-slate-900 font-mono">
+                          {selectedLead.phone || <span className="text-slate-400 font-normal italic">None provided</span>}
+                        </div>
+                      </div>
                     </div>
                   </div>
 

@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    Proptii Bespoke Welcome Landing Page Styles (Light Mode with Subtle Gradients)
    Brand Palette: Proptii Blue (#136C9E / #136ea1), Orange (#DC5F12 / #ec6711)
    ========================================================================== */
@@ -584,13 +584,12 @@ body::before {
 }
 
 .hero-subhead {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 500;
   color: #475569;
+  line-height: 1.55;
   margin-bottom: 22px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: block;
 }
 
 /* Reassurance Highlight Box */
