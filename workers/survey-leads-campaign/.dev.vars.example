@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local wrangler dev. Do not commit .dev.vars.
+LEAD_HMAC_SECRET=replace-with-a-long-random-local-secret

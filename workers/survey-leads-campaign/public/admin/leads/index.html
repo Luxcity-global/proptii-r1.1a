@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Campaign Leads — D1 Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/campaign/assets/proptii-icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Nunito+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #136C9E;
+      --cta: #DC5F12;
+      --text: #11222e;
+      --muted: #4a6170;
+      --line: #e1ebf2;
+      --bg: #f4f7fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Nunito Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 20px 64px; }
+    h1 { font-family: Archivo, sans-serif; font-size: 28px; margin: 8px 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+    .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .pill { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 4px 10px; }
+    .pill-d1 { background: #dcfce7; color: #166534; }
+    .pill-open { background: #ffedd5; color: #9a3412; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 20px 0; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+    .metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 800; }
+    .metric-value { font-family: Archivo, sans-serif; font-size: 28px; font-weight: 800; margin-top: 8px; }
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    input, select {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font: inherit;
+      background: #f8fafc;
+    }
+    input { min-width: min(100%, 320px); flex: 1; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 12px; border-bottom: 1px solid var(--line); }
+    td { padding: 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    tr:hover td { background: #f8fafc; cursor: pointer; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 800; }
+    .ok { background: #dcfce7; color: #166534; }
+    .wait { background: #fef3c7; color: #92400e; }
+    .chip { display: inline-block; background: #f1f5f9; border-radius: 6px; padding: 2px 6px; margin: 0 4px 4px 0; font-size: 11px; }
+    .empty, .error { text-align: center; padding: 36px 12px; color: var(--muted); }
+    .error { color: #b91c1c; }
+    .drawer {
+      position: fixed; inset: 0; background: rgba(17,34,46,.4); display: none; justify-content: flex-end;
+    }
+    .drawer.open { display: flex; }
+    .panel { width: min(460px, 100%); background: #fff; height: 100%; overflow: auto; padding: 24px; }
+    .note { font-size: 12px; color: var(--muted); margin-top: 16px; }
+    @media (max-width: 720px) {
+      table, thead, tbody, th, td, tr { display: block; }
+      th { display: none; }
+      td { border: 0; padding: 6px 12px; }
+      tr { border-bottom: 1px solid var(--line); padding: 10px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="pills">
+      <span class="pill pill-d1">Cloudflare D1</span>
+      <span class="pill pill-open">Auth open — lock this next</span>
+      <span class="pill" style="background:#eaf3f8;color:#0d4e73;font-family:'JetBrains Mono',monospace;">table: leads</span>
+    </div>
+    <div class="row">
+      <div>
+        <h1>Campaign &amp; Welcome Leads</h1>
+        <p class="sub">Standalone survey store. This is not the Firestore <code>campaign_leads</code> collection.</p>
+      </div>
+      <div class="actions">
+        <a class="btn" href="/campaign" target="_blank" rel="noopener">Preview /campaign</a>
+        <a class="btn" href="/welcome" target="_blank" rel="noopener">Preview /welcome</a>
+        <button class="btn-primary" id="exportBtn" type="button">Export CSV</button>
+        <button id="refreshBtn" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="card"><div class="metric-label">Total submissions</div><div class="metric-value" id="totalCount">0</div></div>
+      <div class="card"><div class="metric-label">Activated / with email</div><div class="metric-value" id="activatedCount">0</div></div>
+      <div class="card"><div class="metric-label">Top persona</div><div class="metric-value" id="topRole" style="font-size:18px;">N/A</div></div>
+      <div class="card"><div class="metric-label">Reward</div><div class="metric-value" style="font-size:16px;color:var(--cta);">1-Month VIP Free Trial</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="filters">
+        <input id="search" placeholder="Search name, email, phone, role, notes, ID..." />
+        <div>
+          <button type="button" data-status="all" class="status-btn">All</button>
+          <button type="button" data-status="activated" class="status-btn">Activated</button>
+          <button type="button" data-status="pending" class="status-btn">Pending</button>
+        </div>
+        <select id="roleFilter"><option value="all">All roles</option></select>
+      </div>
+    </div>
+
+    <div class="card" style="overflow:auto;">
+      <div id="tableWrap"></div>
+    </div>
+    <p class="note">Authentication will be added as a separate task. Do not share this URL publicly until then.</p>
+  </div>
+
+  <div class="drawer" id="drawer">
+    <div class="panel" id="panel"></div>
+  </div>
+
+  <script>
+    const state = { leads: [], search: '', status: 'all', role: 'all', selected: null, error: null, loading: true };
+
+    const $ = (id) => document.getElementById(id);
+
+    function formatGains(lead) {
+      if (Array.isArray(lead.biggestGains) && lead.biggestGains.length) return lead.biggestGains.join(' · ');
+      return lead.biggestGain || '';
+    }
+
+    function isActivated(lead) {
+      return Boolean(lead.activated || lead.email);
+    }
+
+    function filteredLeads() {
+      const q = state.search.trim().toLowerCase();
+      return state.leads.filter((lead) => {
+        const hay = [
+          lead.id, lead.email, lead.fullName, lead.phone, lead.role, lead.roleOther,
+          lead.propertyCount, lead.adminHours, lead.frustration, lead.timeSinksOther,
+          lead.biggestGainOther, formatGains(lead), ...(lead.timeSinks || []),
+        ].join(' ').toLowerCase();
+        const matchesSearch = !q || hay.includes(q);
+        const matchesRole = state.role === 'all' || lead.role === state.role;
+        const matchesStatus = state.status === 'all'
+          || (state.status === 'activated' && isActivated(lead))
+          || (state.status === 'pending' && !isActivated(lead));
+        return matchesSearch && matchesRole && matchesStatus;
+      });
+    }
+
+    function renderMetrics() {
+      const total = state.leads.length;
+      const activated = state.leads.filter(isActivated).length;
+      const roles = {};
+      state.leads.forEach((l) => { const r = l.role || 'Unspecified'; roles[r] = (roles[r] || 0) + 1; });
+      const top = Object.entries(roles).sort((a, b) => b[1] - a[1])[0];
+      $('totalCount').textContent = String(total);
+      $('activatedCount').textContent = total ? `${activated} (${Math.round(activated / total * 100)}%)` : '0';
+      $('topRole').textContent = top ? `${top[0]} (${top[1]})` : 'N/A';
+      const select = $('roleFilter');
+      const current = select.value;
+      select.innerHTML = '<option value="all">All roles</option>' + Object.keys(roles).map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)} (${roles[r]})</option>`).join('');
+      select.value = current;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    function renderTable() {
+      const wrap = $('tableWrap');
+      if (state.loading) {
+        wrap.innerHTML = '<div class="empty">Loading campaign leads...</div>';
+        return;
+      }
+      if (state.error) {
+        wrap.innerHTML = `<div class="error">${escapeHtml(state.error)}</div>`;
+        return;
+      }
+      const rows = filteredLeads();
+      if (!rows.length) {
+        wrap.innerHTML = '<div class="empty">No campaign leads found. Complete the funnel at /campaign to populate D1.</div>';
+        return;
+      }
+      wrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Date &amp; ID</th>
+              <th>Card 1: Name / email / phone</th>
+              <th>Cards 2 &amp; 3: Role &amp; portfolio</th>
+              <th>Card 4: Time sinks</th>
+              <th>Card 5: Admin hrs</th>
+              <th>Cards 6 &amp; 7: Gains / change</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((lead) => {
+              const date = lead.submittedAt ? new Date(lead.submittedAt).toLocaleString('en-GB') : 'Recently';
+              return `<tr data-id="${escapeHtml(lead.id)}">
+                <td><strong>${escapeHtml(date)}</strong><div style="font-family:JetBrains Mono,monospace;font-size:11px;color:#849aa8;">${escapeHtml(lead.id)}</div></td>
+                <td>
+                  <span class="badge ${isActivated(lead) ? 'ok' : 'wait'}">${isActivated(lead) ? 'Activated' : 'Unclaimed'}</span>
+                  <div><strong>${escapeHtml(lead.fullName || lead.email || 'No name')}</strong></div>
+                  <div>${escapeHtml(lead.email || '')}</div>
+                  <div>${escapeHtml(lead.phone || '')}</div>
+                </td>
+                <td>
+                  <div>${escapeHtml(lead.role || 'Not specified')}</div>
+                  ${lead.roleOther ? `<div style="color:#4a6170;font-size:12px;">${escapeHtml(lead.roleOther)}</div>` : ''}
+                  <div style="color:#849aa8;">${escapeHtml(lead.propertyCount || 'N/A')} properties</div>
+                </td>
+                <td>${(lead.timeSinks || []).map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join('')}${lead.timeSinksOther ? `<div style="font-size:12px;color:#4a6170;">${escapeHtml(lead.timeSinksOther)}</div>` : ''}</td>
+                <td>${escapeHtml(lead.adminHours || '—')}</td>
+                <td>
+                  <div>${escapeHtml(formatGains(lead))}</div>
+                  ${lead.biggestGainOther ? `<div style="font-size:12px;color:#4a6170;">${escapeHtml(lead.biggestGainOther)}</div>` : ''}
+                  ${lead.frustration ? `<div style="font-size:12px;margin-top:6px;">${escapeHtml(lead.frustration)}</div>` : ''}
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+      wrap.querySelectorAll('tr[data-id]').forEach((row) => {
+        row.addEventListener('click', () => openLead(row.getAttribute('data-id')));
+      });
+    }
+
+    function openLead(id) {
+      const lead = state.leads.find((item) => item.id === id);
+      if (!lead) return;
+      const panel = $('panel');
+      panel.innerHTML = `
+        <button type="button" id="closePanel">Close</button>
+        <p class="pill ${isActivated(lead) ? 'pill-d1' : 'pill-open'}" style="display:inline-block;margin-top:16px;">${isActivated(lead) ? 'Activated' : 'Pending'}</p>
+        <h2>${escapeHtml(lead.fullName || lead.email || 'Lead')}</h2>
+        <p style="font-family:JetBrains Mono,monospace;font-size:12px;color:#849aa8;">${escapeHtml(lead.id)}</p>
+        ${field('Email', lead.email)}
+        ${field('Phone', lead.phone)}
+        ${field('Role', lead.role)}
+        ${field('Role other', lead.roleOther)}
+        ${field('Portfolio', lead.propertyCount)}
+        ${field('Admin hours', lead.adminHours)}
+        ${field('Time sinks', (lead.timeSinks || []).join(' · '))}
+        ${field('Time sinks other', lead.timeSinksOther)}
+        ${field('Biggest gains', formatGains(lead))}
+        ${field('Something else', lead.biggestGainOther)}
+        ${field('Immediate change', lead.frustration)}
+        ${field('Submitted', lead.submittedAt)}
+        ${field('Activated at', lead.activatedAt)}
+      `;
+      $('drawer').classList.add('open');
+      $('closePanel').onclick = closeDrawer;
+    }
+
+    function field(label, value) {
+      if (!value) return '';
+      return `<div style="margin-top:14px;"><div class="metric-label">${escapeHtml(label)}</div><div>${escapeHtml(value)}</div></div>`;
+    }
+
+    function closeDrawer() {
+      $('drawer').classList.remove('open');
+    }
+
+    async function loadLeads() {
+      state.loading = true;
+      state.error = null;
+      renderTable();
+      try {
+        const res = await fetch('/api/leads?limit=500');
+        if (!res.ok) throw new Error(`Failed to fetch leads (${res.status})`);
+        const data = await res.json();
+        state.leads = Array.isArray(data) ? data : [];
+      } catch (err) {
+        state.error = err.message || 'Could not load leads';
+      } finally {
+        state.loading = false;
+        renderMetrics();
+        renderTable();
+      }
+    }
+
+    $('search').addEventListener('input', (e) => { state.search = e.target.value; renderTable(); });
+    $('roleFilter').addEventListener('change', (e) => { state.role = e.target.value; renderTable(); });
+    document.querySelectorAll('.status-btn').forEach((btn) => {
+      btn.addEventListener('click', () => { state.status = btn.getAttribute('data-status'); renderTable(); });
+    });
+    $('refreshBtn').addEventListener('click', loadLeads);
+    $('exportBtn').addEventListener('click', () => { window.location.href = '/api/leads/export'; });
+    $('drawer').addEventListener('click', (e) => { if (e.target.id === 'drawer') closeDrawer(); });
+    loadLeads();
+  </script>
+</body>
+</html>
