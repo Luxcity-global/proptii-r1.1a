@@ -1,38 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle, 
-  FileText, 
-  User, 
-  Briefcase,
-  Home,
-  PoundSterling,
-  Users,
+import { useNavigate } from 'react-router-dom';
+import {
+  CheckCircle,
+  Clock,
+  AlertTriangle,
   Send,
-  Trash2,
-  Building2,
-  Mail,
-  Phone,
-  MapPin,
-  Plus,
-  ShieldCheck,
-  Edit3,
-  ArrowUpRight,
-  Circle
+  Link2,
+  List,
+  Share2,
+  Shield,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
 import ReferencingModal from '../../ReferencingModalLegacy';
 import SendReferencingModal from '../../referencing/SendReferencingModal';
-import { useIsMobile } from '../ui/use-mobile';
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
 import PlanUpgradeWall from '../PlanUpgradeWall';
+import TenantPageHeader from '../ui/TenantPageHeader';
+import BookViewingModal from '../../viewings/BookViewingModal';
 import { toast } from 'react-hot-toast';
+import '../../../styles/tenantReferencing.css';
+import '../../../styles/tenantModals.css';
 
-// Interface for form data structure - 5 passport sections
 interface FormData {
   identity: {
     firstName: string;
@@ -97,25 +88,54 @@ interface ReferencingShareItem {
   createdAt: string;
 }
 
+function shareInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '??';
+  return ((parts[0][0] || '') + (parts[1]?.[0] || parts[0][1] || '')).toUpperCase();
+}
+
+function formatShareDate(value?: string) {
+  if (!value) return 'Recently';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Recently';
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function escapeHtml(value?: string | null) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function documentStatus(doc: any): string {
+  if (!doc) return 'Not uploaded';
+  if (typeof doc === 'string') return doc.trim() ? 'Uploaded' : 'Not uploaded';
+  if (typeof doc === 'object') {
+    return doc.name || ((doc.url || doc.dataUrl || doc.downloadUrl || doc.storagePath) ? 'Uploaded' : 'Not uploaded');
+  }
+  return 'Not uploaded';
+}
+
 const TenantReferencing: React.FC = () => {
-  // ── All hooks must be called unconditionally before any early returns ──────
   const { plan, status, loading: billingLoading } = useBillingStatus();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData | null>(null);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({});
   const [shares, setShares] = useState<ReferencingShareItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal states
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
+  const [previewPillar, setPreviewPillar] = useState<{ title: string; step: number; complete: boolean; description: string } | null>(null);
   const [referencingStep, setReferencingStep] = useState(1);
   const [singleSectionOnly, setSingleSectionOnly] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'shared'>('details');
 
-  // Load form data and shares from Firestore
   const loadReferencingData = async () => {
     const userId = user?.id || (isAuthenticated ? (user as any)?.uid || 'current_user' : null);
     if (!userId) {
@@ -130,7 +150,7 @@ const TenantReferencing: React.FC = () => {
         firestoreService.getReferencingForm(userId, propertyId),
         firestoreService.getReferencingShares(userId)
       ]);
-      
+
       if (formResult.success && formResult.data) {
         setFormData(formResult.data.formData as any);
         setStepStatus(formResult.data.stepStatus || {});
@@ -179,10 +199,10 @@ const TenantReferencing: React.FC = () => {
     if (typeof document === 'string') return document.trim().length > 0;
     if (typeof document === 'object') {
       return !!(
-        document.url || 
-        document.dataUrl || 
-        document.downloadUrl || 
-        document.storagePath || 
+        document.url ||
+        document.dataUrl ||
+        document.downloadUrl ||
+        document.storagePath ||
         document.name
       );
     }
@@ -194,29 +214,29 @@ const TenantReferencing: React.FC = () => {
     if (stepStatus[step] === 'complete') return true;
 
     switch (step) {
-      case 1: // Identity
+      case 1:
         return !!(
           formData.identity?.firstName &&
           formData.identity?.lastName &&
           formData.identity?.email &&
           (formData.identity?.identityProof || formData.identity?.dateOfBirth)
         );
-      case 2: // Employment
+      case 2:
         return !!(
           formData.employment?.employmentStatus &&
           (['Unemployed', 'Retired', 'Student'].includes(formData.employment?.employmentStatus) ||
             formData.employment?.companyDetails ||
             formData.employment?.jobPosition)
         );
-      case 3: // Residential
+      case 3:
         return !!(formData.residential?.currentAddress && formData.residential?.durationAtCurrentAddress);
-      case 4: // Financial
+      case 4:
         return !!(
           formData.financial?.monthlyIncome ||
           formData.financial?.proofOfIncomeDocument ||
           formData.financial?.useOpenBanking
         );
-      case 5: // Guarantor
+      case 5:
         return (
           (formData as any)?.guarantor?.verifiedViaLink ||
           (formData as any)?.guarantorInvitation?.status === 'completed' ||
@@ -227,14 +247,13 @@ const TenantReferencing: React.FC = () => {
     }
   };
 
-  // Calculate progress statistics across the 5 steps
   const calculateProgress = () => {
     if (!formData) return { overall: 0, completed: 0, pending: 5, documents: 0 };
 
     const steps = [1, 2, 3, 4, 5];
     const completedSteps = steps.filter(step => isSectionCompleted(step)).length;
     const totalSteps = 5;
-    
+
     const documents = [
       formData.identity?.identityProof,
       formData.employment?.proofDocument,
@@ -261,18 +280,16 @@ const TenantReferencing: React.FC = () => {
   const progress = calculateProgress();
   const summaryOverallProgress = isAuthenticated ? progress.overall : 0;
   const summaryCompleted = isAuthenticated ? progress.completed : 0;
-  const summaryPending = isAuthenticated ? progress.pending : 0;
-  const summaryDocuments = isAuthenticated ? progress.documents : 0;
 
   const hasStartedReferencing = () => {
     if (!formData) return false;
-    
+
     const hasEmployment = !!(formData.employment?.employmentStatus || formData.employment?.companyDetails || formData.employment?.jobPosition);
     const hasResidential = !!(formData.residential?.currentAddress || formData.residential?.durationAtCurrentAddress);
     const hasFinancial = !!(formData.financial?.monthlyIncome || formData.financial?.proofOfIncomeType);
     const hasGuarantor = !!(formData.guarantor?.firstName && formData.guarantor.firstName !== '' || (formData as any).guarantorInvitation?.status);
     const hasIdentityDocs = !!(formData.identity?.dateOfBirth || formData.identity?.identityProof || formData.identity?.phoneNumber);
-    
+
     return hasEmployment || hasResidential || hasFinancial || hasGuarantor || hasIdentityDocs || summaryOverallProgress > 0;
   };
 
@@ -287,7 +304,7 @@ const TenantReferencing: React.FC = () => {
     setSingleSectionOnly(false);
     setIsReferencingModalOpen(true);
   };
-  
+
   const closeReferencingModal = () => {
     setIsReferencingModalOpen(false);
     loadReferencingData();
@@ -299,7 +316,7 @@ const TenantReferencing: React.FC = () => {
       toast.error("You must be logged in to start a referencing passport.");
       return;
     }
-    
+
     setLoading(true);
     try {
       const initialData: FormData = {
@@ -355,10 +372,11 @@ const TenantReferencing: React.FC = () => {
         1,
         {}
       );
-      
+
       setFormData(initialData);
       setStepStatus({});
       toast.success("Referencing passport started!");
+      openFullPassportModal(1);
     } catch (err) {
       console.error("Error starting passport:", err);
       toast.error("Failed to start passport. Please try again.");
@@ -383,13 +401,118 @@ const TenantReferencing: React.FC = () => {
     }
   };
 
+  const handleGenerateLink = () => {
+    if (summaryOverallProgress < 75) {
+      toast.error('Your passport must be at least 75% complete before you can share it.');
+      return;
+    }
+    setIsSendModalOpen(true);
+  };
+
+  const handleDownloadReport = () => {
+    const tenantName =
+      user?.name ||
+      [formData?.identity?.firstName, formData?.identity?.lastName].filter(Boolean).join(' ') ||
+      'Tenant';
+    const generatedAt = new Date().toLocaleString('en-GB');
+    const pillarRows = [
+      { title: 'Identity Architecture', complete: isSectionCompleted(1), notes: formData?.identity?.email || formData?.identity?.nationality || '' },
+      { title: 'Employment', complete: isSectionCompleted(2), notes: [formData?.employment?.jobPosition, formData?.employment?.companyDetails].filter(Boolean).join(' at ') },
+      { title: 'Residential History', complete: isSectionCompleted(3), notes: formData?.residential?.currentAddress || '' },
+      { title: 'Financial Integrity', complete: isSectionCompleted(4), notes: formData?.financial?.monthlyIncome ? `Monthly income: ${formData.financial.monthlyIncome}` : '' },
+      { title: 'Guarantor', complete: isSectionCompleted(5), notes: [formData?.guarantor?.firstName, formData?.guarantor?.lastName].filter(Boolean).join(' ') },
+    ];
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Referencing Report — ${escapeHtml(tenantName)}</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; max-width: 760px; margin: 40px auto; padding: 0 24px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .muted { color: #64748b; font-size: 13px; }
+    h2 { font-size: 15px; margin: 28px 0 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    th { color: #64748b; font-weight: 600; }
+    .ok { color: #059669; font-weight: 700; }
+    .wait { color: #d97706; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>Referencing Report</h1>
+  <p class="muted">Generated ${escapeHtml(generatedAt)} · Overall progress ${summaryOverallProgress}%</p>
+  <h2>Applicant</h2>
+  <table>
+    <tr><th>Name</th><td>${escapeHtml(tenantName)}</td></tr>
+    <tr><th>Email</th><td>${escapeHtml(formData?.identity?.email || user?.email || 'Not provided')}</td></tr>
+    <tr><th>Phone</th><td>${escapeHtml(formData?.identity?.phoneNumber || 'Not provided')}</td></tr>
+    <tr><th>Date of birth</th><td>${escapeHtml(formData?.identity?.dateOfBirth || 'Not provided')}</td></tr>
+    <tr><th>Nationality</th><td>${escapeHtml(formData?.identity?.nationality || (formData?.identity?.isBritish ? 'British' : 'Not provided'))}</td></tr>
+  </table>
+  <h2>Verification pillars</h2>
+  <table>
+    <tr><th>Pillar</th><th>Status</th><th>Summary</th></tr>
+    ${pillarRows.map((row) => `<tr><td>${escapeHtml(row.title)}</td><td class="${row.complete ? 'ok' : 'wait'}">${row.complete ? 'Verified' : 'Incomplete'}</td><td>${escapeHtml(row.notes || '—')}</td></tr>`).join('')}
+  </table>
+  <h2>Supporting documents</h2>
+  <table>
+    <tr><th>Identity</th><td>${escapeHtml(documentStatus(formData?.identity?.identityProof))}</td></tr>
+    <tr><th>Employment</th><td>${escapeHtml(documentStatus(formData?.employment?.proofDocument))}</td></tr>
+    <tr><th>Residential</th><td>${escapeHtml(documentStatus(formData?.residential?.proofDocument))}</td></tr>
+    <tr><th>Financial</th><td>${escapeHtml(documentStatus(formData?.financial?.proofOfIncomeDocument))}</td></tr>
+    <tr><th>Guarantor</th><td>${escapeHtml(documentStatus(formData?.guarantor?.identityDocument))}</td></tr>
+  </table>
+  <h2>Shared access</h2>
+  ${shares.length === 0 ? '<p class="muted">No passports shared yet.</p>' : `<table><tr><th>Recipient</th><th>Role</th><th>Shared</th><th>Status</th></tr>${shares.map((share) => `<tr><td>${escapeHtml(share.recipientName)}<br/><span class="muted">${escapeHtml(share.recipientEmail)}</span></td><td>${share.recipientRole === 'agent' ? 'Letting Agent' : 'Landlord'}</td><td>${escapeHtml(formatShareDate(share.createdAt))}</td><td>${escapeHtml(share.status || 'Delivered')}</td></tr>`).join('')}</table>`}
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `referencing-report-${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast.success('Referencing report downloaded');
+  };
+
+  const started = hasStartedReferencing();
+
+  const referencingHeader = (
+    <TenantPageHeader
+      title="Referencing"
+      subtitle="Manage and track your property lease agreements and legal documents."
+      primaryLabel="Request Viewing"
+      primaryIcon={<Eye className="w-4 h-4" />}
+      onPrimary={() => setIsBookViewingOpen(true)}
+    />
+  );
+
+  const viewingModal = (
+    <BookViewingModal
+      open={isBookViewingOpen}
+      onClose={() => setIsBookViewingOpen(false)}
+      onSubmissionComplete={() => setIsBookViewingOpen(false)}
+    />
+  );
+
   if (billingLoading) {
     return (
-      <div className="flex items-center justify-center h-64 font-sans">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your referencing passport...</p>
+      <div className="tn-ref">
+        {referencingHeader}
+        <div className="tn-ref-body">
+          <div className="tn-ref-kpi-grid">
+            <div className="tn-ref-skel" style={{ gridColumn: 'span 1', height: 176 }} />
+            <div className="tn-ref-skel" style={{ height: 176 }} />
+            <div className="tn-ref-skel" style={{ height: 176 }} />
+          </div>
         </div>
+        {viewingModal}
       </div>
     );
   }
@@ -406,481 +529,370 @@ const TenantReferencing: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 font-sans">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your referencing passport...</p>
+      <div className="tn-ref">
+        {referencingHeader}
+        <div className="tn-ref-body">
+          <div className="tn-ref-kpi-grid">
+            <div className="tn-ref-skel" style={{ height: 176 }} />
+            <div className="tn-ref-skel" style={{ height: 176 }} />
+            <div className="tn-ref-skel" style={{ height: 176 }} />
+          </div>
         </div>
+        {viewingModal}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 font-sans">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600">{error}</p>
+      <div className="tn-ref">
+        {referencingHeader}
+        <div className="tn-ref-body">
+          <div className="tn-ref-empty">
+            <div className="tn-ref-empty-icon">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h2>Unable to load referencing</h2>
+            <p>{error}</p>
+          </div>
         </div>
+        {viewingModal}
       </div>
     );
   }
 
+  const healthState = summaryOverallProgress === 100 ? 'verified' : summaryOverallProgress > 0 ? 'partial' : 'empty';
+  const healthLabel = healthState === 'verified' ? 'Fully Verified' : healthState === 'partial' ? 'In Progress' : 'Not Started';
+  const healthDesc = healthState === 'verified'
+    ? 'All 5 architecture pillars have been verified. Your digital passport is ready for deployment.'
+    : healthState === 'partial'
+      ? `${summaryCompleted} of 5 architecture pillars complete. Continue verification to share your passport.`
+      : 'No referencing checks completed yet. Begin identity and employment verification to proceed.';
 
-  return (
-    <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
+  const pillars = [
+    {
+      step: 1,
+      title: 'Identity Architecture',
+      idLabel: 'ID: TR-IDENT',
+      complete: isSectionCompleted(1),
+      description: isDocumentUploaded('identity', 'identityProof')
+        ? 'Identity document uploaded and personal details captured.'
+        : isFieldComplete('identity', 'firstName')
+          ? 'Personal details started. Upload identity proof to complete this pillar.'
+          : 'Biometric passport validation and live session face-match.',
+    },
+    {
+      step: 3,
+      title: 'Residential History',
+      idLabel: 'ID: TR-RESID',
+      complete: isSectionCompleted(3),
+      description: isFieldComplete('residential', 'currentAddress')
+        ? `Current address recorded${isDocumentUploaded('residential', 'proofDocument') ? ' with supporting documents.' : '. Add proof of address to finish.'}`
+        : 'Electoral roll and historical utility records for the last 36 months.',
+    },
+    {
+      step: 4,
+      title: 'Financial Integrity',
+      idLabel: 'ID: TR-FINAN',
+      complete: isSectionCompleted(4),
+      description: isFieldComplete('financial', 'monthlyIncome')
+        ? `Monthly income recorded${formData?.financial?.useOpenBanking ? ' with Open Banking connected.' : '.'}`
+        : 'Income confirmation and Open Banking connection.',
+    },
+    {
+      step: 5,
+      title: 'Guarantor',
+      idLabel: 'ID: TR-GUAR',
+      complete: isSectionCompleted(5),
+      description: (formData as any)?.guarantorInvitation?.status === 'invited'
+        ? `Invite sent to ${(formData as any)?.guarantorInvitation?.guarantorEmail || 'guarantor'}. Awaiting response.`
+        : isSectionCompleted(5)
+          ? 'Guarantor details verified.'
+          : 'Optional. Add guarantor details or send an invitation.',
+    },
+    {
+      step: 2,
+      title: 'Employment',
+      idLabel: 'ID: TR-EMPLOY',
+      complete: isSectionCompleted(2),
+      description: isFieldComplete('employment', 'companyDetails') || isFieldComplete('employment', 'jobPosition')
+        ? `${formData?.employment?.jobPosition || 'Role'} at ${formData?.employment?.companyDetails || 'employer'} recorded.`
+        : 'HR validation and employment contract details.',
+    },
+  ];
+
+  const ledgerShares = shares.slice(0, 3);
+  const avatarTones = ['blue', 'sky', 'orange', 'slate'] as const;
+
+  const sharedAccessSection = (
+    <section className="tn-ref-shared-block">
+      <div className="tn-ref-shared-head">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#374957' }}>
-              Referencing Passport
-            </h1>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-              <ShieldCheck className="w-3.5 h-3.5 mr-1" />
-              5 Sections
-            </span>
+          <h2>Shared Access Management</h2>
+          <p>{shares.length} active share{shares.length === 1 ? '' : 's'} — manage access below</p>
+        </div>
+        <button
+          type="button"
+          className="tn-ref-btn-primary"
+          onClick={handleGenerateLink}
+          disabled={summaryOverallProgress < 75}
+          title={summaryOverallProgress < 75 ? 'Your passport must be at least 75% complete before you can send it' : ''}
+        >
+          + Share with Another Landlord or Letting Agent
+        </button>
+      </div>
+
+      {shares.length === 0 ? (
+        <div className="tn-ref-empty">
+          <div className="tn-ref-empty-icon">
+            <Share2 className="w-6 h-6" />
           </div>
-          <p className="text-sm leading-relaxed text-gray-500">
-            Fill each section once, keep details updated, and share with multiple landlords and letting agents.
+          <h2>No passports shared yet</h2>
+          <p>
+            Share your referencing passport with landlords and letting agencies. You control access duration and can revoke links at any time.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button 
-            className="px-5 py-2.5 text-white rounded-full text-xs md:text-sm font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:-translate-y-0.5"
-            style={{
-              background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-            }}
-            onClick={() => openFullPassportModal(1)}
-          >
-            <Edit3 className="w-4 h-4" />
-            {hasStartedReferencing() ? 'Continue Referencing' : 'Start Referencing'}
-          </button>
-          <button 
-            className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-full text-xs md:text-sm font-medium hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm"
-            onClick={() => setIsSendModalOpen(true)}
-          >
-            <Send className="w-4 h-4 text-[#136C9E]" />
-            Send to Landlord / Agent
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-6 border-b border-gray-200 mt-2">
-        <button
-          onClick={() => setActiveTab('details')}
-          className={`pb-3 text-sm font-semibold transition-colors border-b-2 ${
-            activeTab === 'details' ? 'border-[#136C9E] text-[#136C9E]' : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Your Referencing Details
-        </button>
-        <button
-          onClick={() => setActiveTab('shared')}
-          className={`pb-3 text-sm font-semibold transition-colors border-b-2 ${
-            activeTab === 'shared' ? 'border-[#136C9E] text-[#136C9E]' : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Shared Passports
-        </button>
-      </div>
-
-      {activeTab === 'details' && (
-      <>
-      {/* Progress Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {/* Overall Progress Card */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-2xl border border-gray-100 shadow-sm`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-600`}>Overall Progress</h3>
-            <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-blue-600" />
-            </div>
-          </div>
-          <div className="mb-2">
-            <p className="text-2xl md:text-3xl font-bold" style={{ color: '#374957' }}>{summaryOverallProgress}%</p>
-          </div>
-          <p className="text-xs text-gray-500">{summaryCompleted} of 5 sections complete</p>
-        </div>
-
-        {/* Completed Card */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-2xl border border-gray-100 shadow-sm`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-600`}>Completed</h3>
-            <div className="w-8 h-8 bg-green-100 rounded-xl flex items-center justify-center">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-            </div>
-          </div>
-          <div className="mb-2">
-            <p className="text-2xl md:text-3xl font-bold" style={{ color: '#374957' }}>{summaryCompleted}</p>
-          </div>
-          <p className="text-xs text-gray-500">Verified of 5 sections</p>
-        </div>
-
-        {/* Pending Card */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-2xl border border-gray-100 shadow-sm`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-600`}>Pending</h3>
-            <div className="w-8 h-8 bg-yellow-100 rounded-xl flex items-center justify-center">
-              <Clock className="w-4 h-4 text-yellow-600" />
-            </div>
-          </div>
-          <div className="mb-2">
-            <p className="text-2xl md:text-3xl font-bold" style={{ color: '#374957' }}>{summaryPending}</p>
-          </div>
-          <p className="text-xs text-gray-500">Awaiting completion</p>
-        </div>
-
-        {/* Sent Shares Card */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-2xl border border-gray-100 shadow-sm`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-600`}>Shared Applications</h3>
-            <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center">
-              <Send className="w-4 h-4 text-orange-600" />
-            </div>
-          </div>
-          <div className="mb-2">
-            <p className="text-2xl md:text-3xl font-bold" style={{ color: '#DC5F12' }}>{shares.length}</p>
-          </div>
-          <p className="text-xs text-gray-500">Landlords & agents sent to</p>
-        </div>
-      </div>
-      </>
-      )}
-
-      {(activeTab === 'details' || activeTab === 'shared') && (
-      <>
-      {/* Shared Recipients Manager (Send to Multiple Landlords/Agents) */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Send className="w-5 h-5 text-[#136C9E]" />
-              <h2 className="text-lg font-bold text-gray-800">
-                Shared With Landlords & Agents ({shares.length})
-              </h2>
-            </div>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-              Send your completed referencing passport to multiple recipients. You can revoke access anytime.
-            </p>
-          </div>
-
-          <button
-            onClick={() => setIsSendModalOpen(true)}
-            disabled={summaryOverallProgress < 75}
-            title={summaryOverallProgress < 75 ? "Your passport must be at least 75% complete before you can send it" : ""}
-            className={`px-4 py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm ${summaryOverallProgress < 75 ? 'opacity-50 cursor-not-allowed hover:opacity-50' : 'hover:opacity-95'}`}
-            style={{ backgroundColor: '#DC5F12' }}
-          >
-            <Plus className="w-4 h-4" />
-            Send to Another Landlord/Agent
-          </button>
-        </div>
-
-        {shares.length === 0 ? (
-          <div className="text-center py-8 px-4 bg-gray-50/70 rounded-xl border border-dashed border-gray-200">
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
-              <Send className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-semibold text-gray-800">No Landlords or Agents Added Yet</h3>
-            <p className="text-xs sm:text-sm text-gray-500 max-w-md mx-auto mt-1 mb-4">
-              Once your passport details are filled, you can send your report directly to any prospective landlord or letting agent.
-            </p>
+          <div className="tn-ref-empty-actions">
             <button
-              onClick={() => setIsSendModalOpen(true)}
+              type="button"
+              className="tn-ref-btn-primary"
+              onClick={handleGenerateLink}
               disabled={summaryOverallProgress < 75}
-              title={summaryOverallProgress < 75 ? "Your passport must be at least 75% complete before you can send it" : ""}
-              className={`px-5 py-2.5 rounded-full text-white text-xs sm:text-sm font-semibold transition-all shadow-sm ${summaryOverallProgress < 75 ? 'opacity-50 cursor-not-allowed hover:opacity-50' : 'hover:opacity-95'}`}
-              style={{ backgroundColor: '#136C9E' }}
             >
-              Send Referencing Passport
+              Share Your Passport
+            </button>
+            <button type="button" className="tn-ref-btn-secondary" onClick={() => setActiveTab('details')}>
+              View Verification Details
             </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {shares.map((share) => (
-              <div 
-                key={share.id} 
-                className="p-4 rounded-xl border border-gray-200 hover:border-blue-300 transition-all bg-gray-50/50 flex flex-col justify-between"
-              >
-                <div className="space-y-2.5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-900 text-sm sm:text-base">
-                          {share.recipientName}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider ${
-                          share.recipientRole === 'agent' 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-orange-100 text-orange-800'
-                        }`}>
-                          {share.recipientRole === 'agent' ? 'Agent' : 'Landlord'}
-                        </span>
-                      </div>
-                      {share.agencyName && (
-                        <p className="text-xs text-gray-500 font-medium">{share.agencyName}</p>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() => handleDeleteShare(share.id, share.recipientName)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Revoke and delete share"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="text-xs text-gray-600 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                      <span className="truncate">{share.recipientEmail}</span>
-                    </div>
-                    {share.recipientPhone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span>{share.recipientPhone}</span>
-                      </div>
-                    )}
-                    {share.propertyAddress && (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span className="truncate font-medium">{share.propertyAddress}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-200/70 text-[11px] text-gray-500">
-                  <span>Sent {new Date(share.createdAt).toLocaleDateString('en-GB')}</span>
-                  <span className="inline-flex items-center text-green-700 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1 animate-pulse"></span>
-                    Delivered
+        </div>
+      ) : (
+        <div className="tn-ref-share-grid">
+          {shares.map((share) => (
+            <div key={share.id} className="tn-ref-share-card">
+              <div>
+                <div className="tn-ref-share-title">
+                  <h3>{share.recipientName}</h3>
+                  <span className={`tn-ref-role ${share.recipientRole === 'agent' ? 'agent' : 'landlord'}`}>
+                    {share.recipientRole === 'agent' ? 'Letting Agent' : 'Landlord'}
                   </span>
                 </div>
+                <div className="tn-ref-share-email">{share.recipientEmail}</div>
+                {share.recipientPhone && <div className="tn-ref-share-phone">{share.recipientPhone}</div>}
+                {(share.propertyAddress || share.agencyName) && (
+                  <div className="tn-ref-share-addr">{share.propertyAddress || share.agencyName}</div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-      </>
+              <div className="tn-ref-share-foot">
+                <div className="tn-ref-share-meta">
+                  Shared on: <strong>{formatShareDate(share.createdAt)}</strong>
+                  {' · '}
+                  Status: <strong>{share.status || 'Delivered'}</strong>
+                </div>
+                <div className="tn-ref-share-actions">
+                  <button type="button" className="revoke" onClick={() => handleDeleteShare(share.id, share.recipientName)}>
+                    Revoke Access
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
+    </section>
+  );
 
-      {activeTab === 'details' && (
-      <>
-      {/* Referencing Passport Sections (5 Steps) */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+  return (
+    <div className="tn-ref">
+      {referencingHeader}
+      <div className="tn-ref-body">
+      <section className="tn-ref-kpi-grid">
+        <div className="tn-ref-kpi-health">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Passport Sections (5)</h2>
-            <p className="text-xs sm:text-sm text-gray-500">
-              Click any section below to open and edit its specific details directly.
-            </p>
+            <div className="tn-ref-kpi-kicker">Verification Health</div>
+            <div className="tn-ref-kpi-health-row">
+              <span className="tn-ref-kpi-health-pct">{summaryOverallProgress}%</span>
+              <span className={`tn-ref-badge ${healthState === 'verified' ? 'verified' : healthState === 'partial' ? 'partial' : 'empty'}`}>
+                {healthLabel}
+              </span>
+            </div>
+            <p className="tn-ref-kpi-health-desc">{healthDesc}</p>
+          </div>
+          <div className={`tn-ref-ring ${healthState === 'verified' ? '' : healthState === 'partial' ? 'is-partial' : 'is-empty'}`}>
+            {healthState === 'verified' ? (
+              <CheckCircle className="w-10 h-10" strokeWidth={3} />
+            ) : (
+              <Clock className="w-8 h-8" />
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[
-            {
-              title: "Identity Verification",
-              shortTitle: "Identity",
-              icon: <User className="w-5 h-5" style={{ color: '#374957' }} />,
-              progress: "1",
-              status: isSectionCompleted(1) ? "Complete" : "Incomplete",
-              step: 1,
-              items: [
-                { name: "Full Name", description: "Personal identification", status: isFieldComplete('identity', 'firstName') && isFieldComplete('identity', 'lastName') ? "complete" : "incomplete" },
-                { name: "Email & Phone", description: "Contact details", status: isFieldComplete('identity', 'email') && isFieldComplete('identity', 'phoneNumber') ? "complete" : "incomplete" },
-                { name: "Date of Birth", description: "Personal verification", status: isFieldComplete('identity', 'dateOfBirth') ? "complete" : "incomplete" },
-                { name: "Nationality", description: "Right to rent", status: isFieldComplete('identity', 'nationality') ? "complete" : "incomplete" },
-                { name: "Passport / ID Document", description: "Identity proof upload", status: isDocumentUploaded('identity', 'identityProof') ? "complete" : "incomplete" }
-              ]
-            },
-            {
-              title: "Employment & Income",
-              shortTitle: "Employment",
-              icon: <Briefcase className="w-5 h-5" style={{ color: '#374957' }} />,
-              progress: "2",
-              status: isSectionCompleted(2) ? "Complete" : "Incomplete",
-              step: 2,
-              items: [
-                { name: "Employment Status", description: "Current work status", status: isFieldComplete('employment', 'employmentStatus') ? "complete" : "incomplete" },
-                { name: "Company Details", description: "Employer info", status: isFieldComplete('employment', 'companyDetails') ? "complete" : "incomplete" },
-                { name: "Job Position & Duration", description: "Role & tenure", status: isFieldComplete('employment', 'jobPosition') ? "complete" : "incomplete" },
-                { name: "Referee Contact", description: "Manager / HR contact", status: isFieldComplete('employment', 'referenceFullName') && isFieldComplete('employment', 'referenceEmail') ? "complete" : "incomplete" },
-                { name: "Proof of Employment", description: "Work documentation", status: isDocumentUploaded('employment', 'proofDocument') ? "complete" : "incomplete" }
-              ]
-            },
-            {
-              title: "Residential History",
-              shortTitle: "Residential",
-              icon: <Home className="w-5 h-5" style={{ color: '#374957' }} />,
-              progress: "3",
-              status: isSectionCompleted(3) ? "Complete" : "Incomplete",
-              step: 3,
-              items: [
-                { name: "Current Address", description: "Primary residence", status: isFieldComplete('residential', 'currentAddress') ? "complete" : "incomplete" },
-                { name: "Duration at Address", description: "Time at current address", status: isFieldComplete('residential', 'durationAtCurrentAddress') ? "complete" : "incomplete" },
-                { name: "Proof of Address", description: "Utility bill / Bank statement", status: isDocumentUploaded('residential', 'proofDocument') ? "complete" : "incomplete" }
-              ]
-            },
-            {
-              title: "Financial & Income Proof",
-              shortTitle: "Financial",
-              icon: <PoundSterling className="w-5 h-5" style={{ color: '#374957' }} />,
-              progress: "4",
-              status: isSectionCompleted(4) ? "Complete" : "Incomplete",
-              step: 4,
-              items: [
-                { name: "Monthly Income (£)", description: "Gross monthly earnings", status: isFieldComplete('financial', 'monthlyIncome') ? "complete" : "incomplete" },
-                { name: "Proof of Income", description: "Payslips / Tax return", status: isDocumentUploaded('financial', 'proofOfIncomeDocument') ? "complete" : "incomplete" }
-              ]
-            },
-            {
-              title: "Guarantor Details",
-              shortTitle: "Guarantor",
-              icon: <Users className="w-5 h-5" style={{ color: '#374957' }} />,
-              progress: "5",
-              status: isSectionCompleted(5)
-                ? "Complete" 
-                : (formData as any)?.guarantorInvitation?.status === 'invited'
-                  ? "Invited (Pending)"
-                  : "Optional",
-              step: 5,
-              items: ((formData as any)?.guarantor?.verifiedViaLink || (formData as any)?.guarantorInvitation?.status === 'completed') ? [
-                { name: "Guarantor Details", description: `${(formData as any)?.guarantor?.firstName || ''} ${(formData as any)?.guarantor?.lastName || ''} (${(formData as any)?.guarantor?.email || ''})`, status: "complete" },
-                { name: "Employment & Income", description: `${(formData as any)?.guarantor?.employmentStatus || 'Provided'} ${(formData as any)?.guarantor?.annualIncome ? `· £${(formData as any)?.guarantor?.annualIncome}/yr` : ''}`, status: "complete" },
-                { name: "Guarantor ID & Declaration", description: "Verified by guarantor via direct link", status: "complete" }
-              ] : (formData as any)?.guarantorInvitation?.status === 'invited' ? [
-                { name: "Guarantor Invitation", description: `Invite sent to ${(formData as any)?.guarantorInvitation?.guarantorEmail || (formData as any)?.guarantor?.email || 'Guarantor'}`, status: "incomplete" },
-                { name: "Guarantor Details", description: "Awaiting submission from guarantor", status: "incomplete" },
-                { name: "Guarantor ID Upload", description: "Awaiting document upload", status: "incomplete" }
-              ] : [
-                { name: "Guarantor Name", description: "Optional guarantor info", status: isFieldComplete('guarantor', 'firstName') ? "complete" : "incomplete" },
-                { name: "Guarantor Contact", description: "Email and phone", status: isFieldComplete('guarantor', 'email') ? "complete" : "incomplete" },
-                { name: "Guarantor ID Upload", description: "Guarantor ID document", status: isDocumentUploaded('guarantor', 'identityDocument') ? "complete" : "incomplete" }
-              ]
-            }
-          ].map((card) => {
-            const completedCount = card.items.filter((item) => item.status === 'complete').length;
-            const isComplete = card.status === 'Complete';
-            const asOfDate = new Date().toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            });
+        <div className="tn-ref-kpi-steps">
+          <div className="tn-ref-kpi-mini-icon">
+            <List className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="tn-ref-kpi-big">{summaryCompleted}/5</div>
+            <div className="tn-ref-kpi-sublabel">Steps Cleared</div>
+          </div>
+        </div>
 
-            return (
-            <div
-              key={card.title}
-              onClick={() => openSectionModal(card.step)}
-              className="shadow-sm overflow-hidden cursor-pointer group"
-              style={{
-                background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
-                border: '1px solid #80B2FF',
-                borderRadius: '20px',
-                fontFamily: 'Archivo, sans-serif',
-                height: isMobile ? 'auto' : '320px',
-                minHeight: isMobile ? '280px' : '320px',
-              }}
-            >
-              <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
-                <div
-                  className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px] flex-shrink-0'} flex`}
-                  style={{ background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', color: '#374957' }}
-                >
-                  {isMobile ? (
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
-                        {card.icon}
-                      </div>
-                      <h3 className="text-base font-semibold leading-tight">{card.shortTitle}</h3>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-start gap-3">
-                      <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
-                        {card.icon}
-                      </div>
-                      <h3 className="text-lg font-semibold leading-tight">{card.shortTitle}</h3>
-                    </div>
-                  )}
-                  {!isMobile && <div className="flex-1" />}
-                  <div className={isMobile ? '' : 'mt-auto'}>
-                    <div className="font-bold leading-none mb-1" style={{ fontSize: isMobile ? '24px' : '32px' }}>
-                      {completedCount}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-2">
-                      {isComplete ? (
-                        <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                      ) : (
-                        <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
-                      )}
-                      <p className="text-xs opacity-75">As of {asOfDate}</p>
-                    </div>
-                  </div>
-                </div>
+        <div className="tn-ref-kpi-shares">
+          <div className="tn-ref-kpi-mini-icon">
+            <Share2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="tn-ref-kpi-big">{String(shares.length).padStart(2, '0')}</div>
+            <div className="tn-ref-kpi-sublabel">Active Shares</div>
+          </div>
+        </div>
+      </section>
 
-                <div
-                  className={`flex-1 min-w-0 min-h-0 p-5 bg-white relative z-10 overflow-hidden flex flex-col ${isMobile ? 'rounded-b-[20px]' : ''}`}
-                  style={{
-                    borderRadius: isMobile ? '0 0 20px 20px' : '20px',
-                    boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)',
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-4 flex-shrink-0">
-                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${
-                      isComplete
-                        ? 'bg-green-100 text-green-700'
-                        : card.status === 'Invited (Pending)'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      {card.status}
+      <div className="tn-ref-toolbar">
+        <div className="tn-ref-tabs">
+          <button
+            type="button"
+            className={`tn-ref-tab${activeTab === 'details' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('details')}
+          >
+            Your Referencing Details
+          </button>
+          <button
+            type="button"
+            className={`tn-ref-tab${activeTab === 'shared' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('shared')}
+          >
+            Shared Passports
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'details' && (
+        <>
+        {started ? (
+          <div className="tn-ref-layout">
+            <div>
+              <div className="tn-ref-roadmap-head">
+                <h2>Verification Roadmap</h2>
+                <button type="button" className="tn-ref-download" onClick={handleDownloadReport}>
+                  Download referencing report
+                </button>
+              </div>
+              <div className="tn-ref-pillars">
+                {pillars.map((pillar) => (
+                  <button
+                    key={pillar.step}
+                    type="button"
+                    className="tn-ref-pillar"
+                    onClick={() => openSectionModal(pillar.step)}
+                  >
+                    <span className={`tn-ref-pillar-icon ${pillar.complete ? 'done' : started ? 'wait' : 'off'}`}>
+                      {pillar.complete ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                     </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openSectionModal(card.step);
-                      }}
-                      className="text-xs font-medium text-[#136C9E] hover:underline flex items-center gap-1 whitespace-nowrap flex-shrink-0"
-                    >
-                      Go to Referencing
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                    <div className="tn-ref-pillar-body">
+                      <div className="tn-ref-pillar-title">
+                        <h3>{pillar.title}</h3>
+                        <span className={`tn-ref-pillar-status ${pillar.complete ? 'done' : started ? 'wait' : 'off'}`}>
+                          {pillar.complete ? 'Verified' : 'Incomplete'}
+                        </span>
+                      </div>
+                      <p className="tn-ref-pillar-desc">{pillar.description}</p>
+                      <div className="tn-ref-pillar-foot">
+                        <span
+                          className="tn-ref-pillar-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewPillar(pillar);
+                          }}
+                        >
+                          View Documents →
+                        </span>
+                        <span className="tn-ref-pillar-id">{pillar.idLabel}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                  <div className="flex-1 min-h-0 overflow-y-auto gcard-fields-scroll pr-1">
-                    {card.items.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex items-center justify-between gap-3 py-3 text-sm ${
-                          idx > 0 ? 'border-t border-gray-200' : ''
-                        }`}
-                      >
-                        <span className="text-[#374957] truncate">{item.name}</span>
-                        {item.status === 'complete' ? (
-                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                        ) : (
-                          <Circle className="w-4 h-4 text-orange-400 flex-shrink-0" strokeWidth={2.25} />
-                        )}
+            <div className="tn-ref-side">
+              <div className="tn-ref-send">
+                <div className="tn-ref-send-icon">
+                  <Send className="w-5 h-5" />
+                </div>
+                <h3>Send Passport</h3>
+                <p>Transmit your verified referencing architecture to property agents with one secure, time-limited link.</p>
+                <button
+                  type="button"
+                  onClick={handleGenerateLink}
+                  disabled={summaryOverallProgress < 75}
+                  title={summaryOverallProgress < 75 ? 'Your passport must be at least 75% complete before you can send it' : ''}
+                >
+                  Generate Passport Link
+                  <Link2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="tn-ref-ledger">
+                <h3>Access Ledger</h3>
+                {ledgerShares.length === 0 ? (
+                  <p className="tn-ref-ledger-empty">
+                    No landlords or agents have accessed your passport yet. Share it to start tracking access here.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {ledgerShares.map((share, index) => (
+                      <div key={share.id} className="tn-ref-ledger-row">
+                        <div className="tn-ref-ledger-who">
+                          <span className={`tn-ref-ledger-av ${avatarTones[index % avatarTones.length]}`}>
+                            {shareInitials(share.recipientName)}
+                          </span>
+                          <div>
+                            <div className="tn-ref-ledger-name">{share.recipientName}</div>
+                            <div className="tn-ref-ledger-meta">Shared {formatShareDate(share.createdAt)}</div>
+                          </div>
+                        </div>
+                        <span className="tn-ref-dot" />
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
             </div>
-            );
-          })}
-        </div>
-      </div>
-      </>
+          </div>
+        ) : (
+          <div className="tn-ref-empty">
+            <div className="tn-ref-empty-icon">
+              <Shield className="w-6 h-6" />
+            </div>
+            <h2>No referencing steps completed yet</h2>
+            <p>
+              Once you begin your referencing process, your identity, employment, and residential milestones will update here in real time. Transmit your passport to letting agents with one secure click.
+            </p>
+            <div className="tn-ref-steps">
+              <span className="tn-ref-step"><span className="tn-ref-step-num">1</span>Complete Identity</span>
+              <span className="tn-ref-step-arrow">→</span>
+              <span className="tn-ref-step"><span className="tn-ref-step-num">2</span>Verify Employment</span>
+              <span className="tn-ref-step-arrow">→</span>
+              <span className="tn-ref-step"><span className="tn-ref-step-num">3</span>Credit Check</span>
+              <span className="tn-ref-step-arrow">→</span>
+              <span className="tn-ref-step"><span className="tn-ref-step-num">4</span>Share Passport</span>
+            </div>
+            <div className="tn-ref-empty-actions">
+              <button type="button" className="tn-ref-btn-primary" onClick={handleStartPassport}>
+                Start Verification Process
+              </button>
+              <button type="button" className="tn-ref-btn-secondary" onClick={() => navigate('/dashboard/your-files')}>
+                Upload Verification Documents
+              </button>
+            </div>
+          </div>
+        )}
+        </>
       )}
 
-      {/* Referencing Modal */}
+      {activeTab === 'shared' && sharedAccessSection}
+      </div>
+
       {isReferencingModalOpen && (
         <ReferencingModal
           isOpen={isReferencingModalOpen}
@@ -893,7 +905,6 @@ const TenantReferencing: React.FC = () => {
         />
       )}
 
-      {/* Standalone Send Modal */}
       <SendReferencingModal
         isOpen={isSendModalOpen}
         onClose={() => setIsSendModalOpen(false)}
@@ -905,6 +916,68 @@ const TenantReferencing: React.FC = () => {
           loadReferencingData();
         }}
       />
+      {previewPillar && (
+        <div className="tn-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setPreviewPillar(null); }}>
+          <div className="tn-modal" role="dialog" aria-labelledby="tn-pillar-preview">
+            <div className="tn-modal-head">
+              <div className="tn-drawer-head-main">
+                <span className={`tn-modal-ico ${previewPillar.complete ? 'green' : 'blue'}`}>
+                  {previewPillar.complete ? '✓' : '!'}
+                </span>
+                <div>
+                  <h3 id="tn-pillar-preview">{previewPillar.title}</h3>
+                  <p>Referencing pillar record</p>
+                </div>
+              </div>
+              <button type="button" className="tn-modal-x" onClick={() => setPreviewPillar(null)} aria-label="Close">✕</button>
+            </div>
+            <div className="tn-modal-body">
+              <div className="tn-modal-attest">
+                <div>
+                  <span>Status</span>
+                  <strong>{previewPillar.complete ? 'Verified' : 'Incomplete'}</strong>
+                </div>
+                <div>
+                  <span>Document type</span>
+                  <strong>{previewPillar.title}</strong>
+                </div>
+                <div>
+                  <span>Summary</span>
+                  <strong>{previewPillar.description}</strong>
+                </div>
+              </div>
+              <p style={{ margin: 0, color: '#475569', fontWeight: 400, lineHeight: 1.6 }}>
+                This is the live record for this pillar from your referencing passport. Open the section to edit details, or download the report for a full dossier.
+              </p>
+              <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
+                <button
+                  type="button"
+                  className="tn-modal-blue"
+                  style={{ flex: 1 }}
+                  onClick={() => {
+                    handleDownloadReport();
+                    setPreviewPillar(null);
+                  }}
+                >
+                  Download report
+                </button>
+                <button
+                  type="button"
+                  className="tn-modal-cancel"
+                  onClick={() => {
+                    const step = previewPillar.step;
+                    setPreviewPillar(null);
+                    openSectionModal(step);
+                  }}
+                >
+                  Edit details
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {viewingModal}
     </div>
   );
 };

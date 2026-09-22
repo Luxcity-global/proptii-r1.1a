@@ -1,19 +1,39 @@
-import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Bath, BedDouble, Check, MapPin, Square } from 'lucide-react';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import { useGovDataLayer } from '../contexts/GovDataLayerContext';
 import { useBatchedPropertyFacts } from '../hooks/useBatchedPropertyFacts';
 import { useClassifyQuery } from '../hooks/useClassifyQuery';
-import { FilterPills } from '../components/search/FilterPills';
+import { FilterPills, entitiesToPills } from '../components/search/FilterPills';
+import { FiltersModal } from '../components/search/FiltersModal';
 import { FactsBadgeRow } from '../components/property/FactsBadgeRow';
 import { ProptiiModule } from '../components/property/ProptiiModule';
 import { resolveListingId } from '../utils/listingId';
 import { getPropertyDisplayTitle, getPropertyListingDescription } from '../utils/propertyDisplay';
 import Footer from '../components/Footer';
 import { SearchLoadingAnimation } from '../components/SearchLoadingAnimation';
+import { useAuth } from '../contexts/AuthContext';
+import { LocalStorageService } from '../services/LocalStorageService';
 import type { FactFlag } from '../types/govData';
+import '../styles/searchResults.css';
+
+type SortOption = 'Relevance' | 'Newest' | 'Price (low)' | 'Price (high)';
+
+const extractLocationLabel = (query: string): string => {
+  const locationMatch = query.match(
+    /\b(?:in|at|near)\s+([A-Za-z][A-Za-z\s]*?)(?=\s+(?:under|over|below|above|for|with|to|pcm|pw)\b|\s*£|\s*\d|$)/i
+  );
+  const location = locationMatch ? locationMatch[1].trim().replace(/,+$/, '') : '';
+  return location || 'this area';
+};
+
+const parsePriceValue = (price: string): number => {
+  if (!price) return 0;
+  const match = price.replace(/,/g, '').match(/(\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
+};
 
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
@@ -52,22 +72,18 @@ const cleanPropertyPrice = (price: string): string => {
 
 // Property Skeleton Component for loading state
 const PropertySkeleton = () => (
-  <div className="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
-    <div className="h-48 bg-gray-200"></div>
-    <div className="p-4">
-      <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-      <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-      <div className="flex justify-between items-center">
-        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-      </div>
-      <div className="mt-4 h-10 bg-gray-100 rounded-lg"></div>
+  <div className="sr-skel" aria-hidden>
+    <div className="sr-skel-img" />
+    <div className="sr-skel-body">
+      <div className="sr-skel-line" style={{ width: '40%', height: 20 }} />
+      <div className="sr-skel-line" style={{ width: '75%' }} />
+      <div className="sr-skel-line" style={{ width: '55%' }} />
     </div>
   </div>
 );
 
 // Property Card Component — handoff ListingCard (single main photo)
-const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, factsLoading, factsUnresolved, reportHint, reserveHintSlot }: { 
+const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, factsLoading, factsUnresolved, reportHint, reserveHintSlot, isHighlighted }: { 
   property: Property, 
   onClick: () => void,
   isSaved: boolean,
@@ -77,6 +93,7 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
   factsUnresolved?: boolean,
   reportHint?: string | null,
   reserveHintSlot?: boolean,
+  isHighlighted?: boolean,
 }) => {
   const [imgError, setImgError] = useState(false);
   
@@ -110,118 +127,82 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
 
   return (
     <div
-      className="bg-white rounded-2xl shadow-md overflow-hidden cursor-pointer hover:shadow-xl transition-all border border-gray-100 group flex flex-col justify-between"
+      className={`sr-card${isHighlighted ? ' is-highlighted' : ''}`}
       onClick={onClick}
     >
-      <div>
-        {/* Single full-width main image with inset rounded frame */}
-        <div className="relative w-full h-60 sm:h-64 overflow-hidden p-2">
-          <div className="relative w-full h-full rounded-xl overflow-hidden bg-gray-100">
-            <img
-              src={imageSrc}
-              alt={displayTitle}
-              onError={() => setImgError(true)}
-              className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
-                !hasImage ? 'opacity-50 grayscale' : ''
-              }`}
-            />
+      <div className="sr-card-media">
+        <img
+          src={imageSrc}
+          alt={displayTitle}
+          onError={() => setImgError(true)}
+          className={!hasImage ? 'is-fallback' : undefined}
+        />
 
-            <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#136C9E] text-white shadow-sm">
-                {isRent ? 'To Rent' : 'For Sale'}
-              </span>
-              <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-sm">
-                Available Now
-              </span>
-            </div>
-
-            <div className="absolute top-3 right-3 flex space-x-1 bg-white/90 backdrop-blur-sm rounded-full p-1 shadow-md">
-              <button
-                type="button"
-                onClick={onToggleSave}
-                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-500 hover:text-red-500 transition-colors"
-                aria-label={isSaved ? 'Remove from saved' : 'Save property'}
-              >
-                <svg
-                  className={`w-4 h-4 ${isSaved ? 'text-red-500 fill-red-500' : ''}`}
-                  fill={isSaved ? 'currentColor' : 'none'}
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={handleShare}
-                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-500 hover:text-[#136C9E] transition-colors"
-                aria-label="Share property"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
-              </button>
-            </div>
-          </div>
+        <div className="sr-card-badges">
+          <span className="sr-badge brand">{isRent ? 'To Rent' : 'For Sale'}</span>
+          <span className="sr-badge emerald">Available Now</span>
         </div>
 
-        <div className="p-5">
-          <div className="flex justify-between items-start gap-3 mb-2">
-            <div className="min-w-0">
-              <h3
-                className="text-base font-semibold text-gray-900 group-hover:text-[#136C9E] transition-colors line-clamp-2"
-                style={{ fontFamily: 'Archivo, sans-serif' }}
-              >
-                {displayTitle}
-              </h3>
-              <div className="flex items-center text-gray-500 text-xs mt-0.5">
-                <svg className="w-3.5 h-3.5 mr-1 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="truncate">{property.location}</span>
-              </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-xl font-extrabold text-[#F15A22]">
-                {priceMain}
-                {showPcm && <span className="text-xs text-gray-500 font-normal"> pcm</span>}
-              </p>
-            </div>
-          </div>
+        <div className="sr-card-actions">
+          <button
+            type="button"
+            onClick={onToggleSave}
+            className={isSaved ? 'is-saved' : undefined}
+            aria-label={isSaved ? 'Remove from saved' : 'Save property'}
+          >
+            <svg
+              className="w-4 h-4"
+              fill={isSaved ? '#DC5F12' : 'none'}
+              stroke={isSaved ? '#DC5F12' : 'currentColor'}
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label="Share property"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
-          <div className="flex items-center space-x-4 text-gray-500 text-xs my-3 pb-3 border-b border-gray-100">
-            <div className="flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z" />
-              </svg>
-              <span>{property.bedrooms || '—'} Beds</span>
-            </div>
-            {property.bathrooms && (
-              <div className="flex items-center gap-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M6 12V7a2 2 0 012-2h8a2 2 0 012 2v5M7 17h.01M17 17h.01" />
-                </svg>
-                <span>{property.bathrooms} Baths</span>
-              </div>
-            )}
-            {property.squareFootage && (
-              <div className="flex items-center gap-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
-                </svg>
-                <span>{property.squareFootage} sq ft</span>
-              </div>
-            )}
-            {!property.bathrooms && !property.squareFootage && property.propertyType && (
-              <div className="flex items-center gap-1 truncate">
-                <span className="capitalize">{property.propertyType}</span>
-              </div>
-            )}
+        <div className="sr-card-body">
+          <div className="sr-card-price-row">
+            <p className="sr-card-price">
+              {priceMain}
+              {showPcm ? ' pcm' : ''}
+            </p>
+            <span className="sr-card-type">{property.propertyType || (isRent ? 'To rent' : 'For sale')}</span>
+          </div>
+          <p className="sr-card-address" title={property.location || displayTitle}>
+            {property.location || displayTitle}
+          </p>
+          <div className="sr-card-stats">
+            <span>
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 9V19M22 9v10M2 14h20M7 9V7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v2"></path></svg>
+              {property.bedrooms || '—'} beds
+            </span>
+            {property.bathrooms ? (
+              <span>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12h16v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-4z"></path><path d="M6 12V5a2 2 0 0 1 2-2h1"></path></svg>
+                {property.bathrooms} bath{Number(property.bathrooms) === 1 ? '' : 's'}
+              </span>
+            ) : null}
+            {property.squareFootage ? (
+              <span>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"></rect></svg>
+                {property.squareFootage} ft²
+              </span>
+            ) : null}
           </div>
 
           {(factsLoading || factFlags || factsUnresolved) && (
-            <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+            <div className="sr-card-extra" onClick={(e) => e.stopPropagation()}>
               <FactsBadgeRow
                 flags={factFlags}
                 isLoading={factsLoading}
@@ -233,7 +214,7 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
 
           {reserveHintSlot && (
             <div
-              className="h-7 mb-1"
+              className="sr-card-extra h-7"
               data-testid="report-hint-slot"
               onClick={(e) => e.stopPropagation()}
             >
@@ -249,20 +230,12 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
             </div>
           )}
         </div>
-      </div>
 
-      <div className="p-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between">
-        <div className="text-xs text-gray-500 flex items-center gap-1.5 min-w-0">
-          <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-          <span className="font-semibold text-gray-700 truncate">
-            {property.agent?.company || property.agent?.name || 'Agent'}
-          </span>
-        </div>
-        <span className="text-xs font-bold text-[#136C9E] group-hover:translate-x-0.5 transition-transform flex items-center gap-1 flex-shrink-0">
-          View Property Details →
+      <div className="sr-card-agent">
+        <span className="truncate">
+          <strong>{property.agent?.company || property.agent?.name || 'Agent'}</strong>
         </span>
+        <span className="sr-card-cta">View details →</span>
       </div>
     </div>
   );
@@ -599,334 +572,458 @@ function PropertyDetailsModal({
 function LocationInsights({ searchQuery, propertyCount }: { searchQuery: string; propertyCount: number }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'strengths' | 'recommendations' | 'amenities'>('overview');
 
-  // Extract location from search query
-  const locationMatch = searchQuery.match(/(?:in|at|near)\s+([A-Za-z\s,]+)/i);
-  const location = locationMatch ? locationMatch[1].trim() : searchQuery;
+  const location = extractLocationLabel(searchQuery);
+  const locationLabel = location || 'this area';
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-      <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-[#136C9E] to-[#1a8cc9]">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-          </svg>
-          Location Insights - {location}
-        </h3>
-        <p className="text-sm text-blue-50 mt-1">{propertyCount} properties found in this area</p>
-      </div>
-      
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 bg-gray-50">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-all ${
-            activeTab === 'overview'
-              ? 'text-[#E65D24] bg-white border-b-2 border-[#E65D24]'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span className="flex items-center justify-center gap-2">
-            <span>📊</span>
-            Overview
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('strengths')}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-all ${
-            activeTab === 'strengths'
-              ? 'text-[#E65D24] bg-white border-b-2 border-[#E65D24]'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span className="flex items-center justify-center gap-2">
-            <span>💪</span>
-            Strengths
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('recommendations')}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-all ${
-            activeTab === 'recommendations'
-              ? 'text-[#E65D24] bg-white border-b-2 border-[#E65D24]'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span className="flex items-center justify-center gap-2">
-            <span>💡</span>
-            Tips
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('amenities')}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-all ${
-            activeTab === 'amenities'
-              ? 'text-[#E65D24] bg-white border-b-2 border-[#E65D24]'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span className="flex items-center justify-center gap-2">
-            <span>🏪</span>
-            Amenities
-          </span>
-        </button>
+    <div className="sr-intel">
+      <div className="sr-intel-head">
+        <div className="sr-intel-title-row">
+          <div className="sr-intel-title">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"></path>
+            </svg>
+            <span>Local Area Intelligence — {locationLabel}</span>
+          </div>
+          <span className="sr-intel-chip">{propertyCount} listings</span>
+        </div>
+        <div className="sr-intel-tabs">
+          <button type="button" className={`sr-intel-tab${activeTab === 'overview' ? ' is-active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</button>
+          <button type="button" className={`sr-intel-tab${activeTab === 'strengths' ? ' is-active' : ''}`} onClick={() => setActiveTab('strengths')}>Strengths</button>
+          <button type="button" className={`sr-intel-tab${activeTab === 'recommendations' ? ' is-active' : ''}`} onClick={() => setActiveTab('recommendations')}>Tips</button>
+          <button type="button" className={`sr-intel-tab${activeTab === 'amenities' ? ' is-active' : ''}`} onClick={() => setActiveTab('amenities')}>Amenities</button>
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="p-4 max-h-96 overflow-y-auto">
+      <div className="sr-intel-body">
         {activeTab === 'overview' && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">🏘️</span>
+            <div className="sr-gauge-card" title="Area snapshot based on connectivity and local amenities">
+              <div className="sr-gauge">
+                <svg className="w-20 h-20 -rotate-90" viewBox="0 0 72 72" aria-hidden>
+                  <circle cx="36" cy="36" r="28" fill="none" stroke="#E2E8F0" strokeWidth="5.5"></circle>
+                  <circle cx="36" cy="36" r="28" fill="none" stroke="#22C55E" strokeWidth="5.5" strokeDasharray="175.9" strokeDashoffset="35" strokeLinecap="round"></circle>
+                </svg>
+                <div className="sr-gauge-center">
+                  <span className="sr-gauge-score">{propertyCount}</span>
+                  <span className="sr-gauge-denom">listings</span>
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 mb-2">Area Assessment</h4>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {location} is a well-connected residential area with good access to public transport 
-                    and local amenities. The neighborhood offers a balanced mix of residential properties 
-                    and essential services, making it suitable for both families and professionals.
-                  </p>
-                </div>
+              </div>
+              <div className="sr-gauge-copy">
+                <h3>
+                  Area snapshot
+                  <span className="sr-live-dot" />
+                </h3>
+                <p>
+                  {locationLabel} is a well-connected residential area with good access to public transport
+                  and local amenities, suitable for both families and professionals.
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="font-semibold text-green-900">Transport Links</span>
+            <div className="space-y-2 pt-1">
+              <div className="sr-metric-row" title="Excellent access to public transport networks and major routes">
+                <div className="sr-metric-left">
+                  <div className="sr-metric-icon emerald">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="3" width="16" height="16" rx="2"></rect><path d="M4 11h16"></path><path d="M12 3v8"></path></svg>
+                  </div>
+                  <div>
+                    <span className="sr-metric-name">Public Transport</span>
+                    <div className="sr-metric-bars">
+                      <span className="on emerald" /><span className="on emerald" /><span className="on emerald" /><span className="on emerald" /><span className="on emerald" />
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-green-700">Excellent access to public transport networks and major routes</p>
+                <div className="sr-metric-right">
+                  <span className="sr-metric-label emerald">Excellent</span>
+                </div>
               </div>
-              
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                  <span className="font-semibold text-purple-900">Education</span>
+              <div className="sr-metric-row" title="Multiple schools and educational facilities in the vicinity">
+                <div className="sr-metric-left">
+                  <div className="sr-metric-icon blue">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3z"></path></svg>
+                  </div>
+                  <div>
+                    <span className="sr-metric-name">Schools & Universities</span>
+                    <div className="sr-metric-bars">
+                      <span className="on blue" /><span className="on blue" /><span className="on blue" /><span className="on blue" /><span />
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-purple-700">Multiple schools and educational facilities in the vicinity</p>
+                <div className="sr-metric-right">
+                  <span className="sr-metric-label blue">Strong</span>
+                </div>
               </div>
-              
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  <span className="font-semibold text-orange-900">Shopping</span>
+              <div className="sr-metric-row" title="Convenient access to supermarkets and retail outlets">
+                <div className="sr-metric-left">
+                  <div className="sr-metric-icon orange">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line></svg>
+                  </div>
+                  <div>
+                    <span className="sr-metric-name">Shopping</span>
+                    <div className="sr-metric-bars">
+                      <span className="on orange" /><span className="on orange" /><span className="on orange" /><span className="on orange" /><span />
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-orange-700">Convenient access to supermarkets and retail outlets</p>
+                <div className="sr-metric-right">
+                  <span className="sr-metric-label orange">Convenient</span>
+                </div>
               </div>
-              
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  <span className="font-semibold text-blue-900">Healthcare</span>
+              <div className="sr-metric-row" title="Medical facilities and pharmacies readily available">
+                <div className="sr-metric-left">
+                  <div className="sr-metric-icon teal">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                  </div>
+                  <div>
+                    <span className="sr-metric-name">Healthcare</span>
+                    <div className="sr-metric-bars">
+                      <span className="on teal" /><span className="on teal" /><span className="on teal" /><span /><span />
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-blue-700">Medical facilities and pharmacies readily available</p>
+                <div className="sr-metric-right">
+                  <span className="sr-metric-label teal">Available</span>
+                </div>
               </div>
             </div>
           </div>
         )}
 
         {activeTab === 'strengths' && (
-          <div className="space-y-4">
-            <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl">🎯</span>
-                <h4 className="font-semibold text-gray-900">Property Availability</h4>
-                <span className="ml-auto px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">High</span>
+          <div className="space-y-3">
+            <div className="sr-insight-card">
+              <span className="sr-insight-mark check">✓</span>
+              <div>
+                <h4>Property availability</h4>
+                <p>{propertyCount} properties currently available, with a diverse range of types and price points.</p>
               </div>
-              <p className="text-sm text-gray-700 mb-2">
-                <strong>Impact:</strong> Excellent selection of properties
-              </p>
-              <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
-                <li>{propertyCount} properties currently available in this area</li>
-                <li>Diverse range of property types and price points</li>
-                <li>Multiple landlords offering competitive pricing</li>
-              </ul>
             </div>
-
-            <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl">🚉</span>
-                <h4 className="font-semibold text-gray-900">Connectivity</h4>
-                <span className="ml-auto px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">Excellent</span>
+            <div className="sr-insight-card">
+              <span className="sr-insight-mark check">✓</span>
+              <div>
+                <h4>Connectivity</h4>
+                <p>Well-served by public transport, close to major road networks, and a good walkability score.</p>
               </div>
-              <p className="text-sm text-gray-700 mb-2">
-                <strong>Impact:</strong> Easy commuting and accessibility
-              </p>
-              <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
-                <li>Well-served by public transport</li>
-                <li>Close to major road networks</li>
-                <li>Good walkability score</li>
-              </ul>
             </div>
-
-            <div className="border-l-4 border-purple-500 bg-purple-50 p-4 rounded">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl">🏪</span>
-                <h4 className="font-semibold text-gray-900">Local Amenities</h4>
-                <span className="ml-auto px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full">Good</span>
+            <div className="sr-insight-card">
+              <span className="sr-insight-mark check">✓</span>
+              <div>
+                <h4>Local amenities</h4>
+                <p>Supermarkets, restaurants, cafes, parks and recreational facilities within easy reach.</p>
               </div>
-              <p className="text-sm text-gray-700 mb-2">
-                <strong>Impact:</strong> Convenient daily living
-              </p>
-              <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
-                <li>Multiple supermarkets and shops nearby</li>
-                <li>Restaurants and cafes in walking distance</li>
-                <li>Parks and recreational facilities available</li>
-              </ul>
             </div>
           </div>
         )}
 
         {activeTab === 'recommendations' && (
-          <div className="space-y-4">
-            <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">💡</span>
-                <h4 className="font-semibold text-gray-900">Viewing Tips</h4>
-                <span className="ml-auto px-2 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded">High Priority</span>
+          <div className="space-y-3">
+            <div className="sr-insight-card tip">
+              <span className="sr-insight-mark warn">!</span>
+              <div>
+                <h4>Viewing tips</h4>
+                <p>Schedule viewings at different times of day, check water pressure and heating, and ask about council tax and extra fees.</p>
               </div>
-              <ul className="text-sm text-gray-700 space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span>Schedule viewings during different times of day to assess noise levels and lighting</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span>Check water pressure, heating systems, and inspect for any dampness</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
-                  <span>Ask about council tax band, utility costs, and any additional fees</span>
-                </li>
-              </ul>
             </div>
-
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">📍</span>
-                <h4 className="font-semibold text-gray-900">Location Research</h4>
-                <span className="ml-auto px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">Medium Priority</span>
+            <div className="sr-insight-card tip">
+              <span className="sr-insight-mark warn">!</span>
+              <div>
+                <h4>Location research</h4>
+                <p>Visit the area at different times, review local community feedback, and look into nearby development plans.</p>
               </div>
-              <ul className="text-sm text-gray-700 space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">→</span>
-                  <span>Visit the area at different times to get a feel for the neighborhood</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">→</span>
-                  <span>Check local crime statistics and community reviews</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">→</span>
-                  <span>Research future development plans that might affect the area</span>
-                </li>
-              </ul>
             </div>
-
-            <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">⚡</span>
-                <h4 className="font-semibold text-gray-900">Quick Actions</h4>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
-                  <span className="text-gray-700">Compare prices with similar properties</span>
-                  <span className="text-xs text-green-600 font-medium">Important</span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
-                  <span className="text-gray-700">Read landlord reviews if available</span>
-                  <span className="text-xs text-green-600 font-medium">Recommended</span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
-                  <span className="text-gray-700">Prepare questions about tenancy terms</span>
-                  <span className="text-xs text-green-600 font-medium">Essential</span>
-                </div>
+            <div className="sr-insight-card tip">
+              <span className="sr-insight-mark warn">!</span>
+              <div>
+                <h4>Quick actions</h4>
+                <p>Compare prices with similar properties, read landlord reviews if available, and prepare tenancy questions in advance.</p>
               </div>
             </div>
           </div>
         )}
 
         {activeTab === 'amenities' && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-2">
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🏫</span>
-                  <span className="font-medium text-gray-900">Schools & Education</span>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Nearby</span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🏥</span>
-                  <span className="font-medium text-gray-900">Hospitals & Clinics</span>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Accessible</span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🛒</span>
-                  <span className="font-medium text-gray-900">Shopping Centers</span>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Within 1km</span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🍽️</span>
-                  <span className="font-medium text-gray-900">Restaurants & Cafes</span>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Nearby</span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🌳</span>
-                  <span className="font-medium text-gray-900">Parks & Recreation</span>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Available</span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg border border-indigo-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🚇</span>
-                  <span className="font-medium text-gray-900">Public Transport</span>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Excellent</span>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">💪</span>
-                  <span className="font-medium text-gray-900">Gyms & Fitness</span>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Available</span>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-pink-100 rounded-lg border border-pink-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🎬</span>
-                  <span className="font-medium text-gray-900">Entertainment</span>
-                </div>
-                <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">Moderate</span>
-              </div>
+          <div>
+            <div className="sr-amenity-group">
+              <h4>Nearby</h4>
+              <ul>
+                <li>Schools & education</li>
+                <li>Hospitals & clinics</li>
+                <li>Shopping centres</li>
+                <li>Restaurants & cafes</li>
+                <li>Parks & recreation</li>
+                <li>Public transport</li>
+                <li>Gyms & fitness</li>
+                <li>Entertainment</li>
+              </ul>
             </div>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+interface SearchPageHeaderProps {
+  searchQuery: string;
+  draftQuery: string;
+  onDraftQueryChange: (value: string) => void;
+  onSubmitSearch: () => void;
+  onSaveSearch: () => void;
+  searchSaved?: boolean;
+  resultsCount: number;
+  locationLabel: string;
+  isCached?: boolean;
+  isLoading?: boolean;
+  onRefresh?: () => void;
+  showMap: boolean;
+  onToggleMap: () => void;
+  sortOption: SortOption;
+  onSortChange: (option: SortOption) => void;
+  classificationEntities?: import('../types/govData').ClassifyEntities | null;
+  isClassifying?: boolean;
+  showMeta?: boolean;
+  results?: import('../types/property').Property[];
+  onApplyFilters?: (query: string, matchCount: number) => void;
+}
+
+function SearchPageHeader({
+  searchQuery,
+  draftQuery,
+  onDraftQueryChange,
+  onSubmitSearch,
+  onSaveSearch,
+  searchSaved = false,
+  resultsCount,
+  locationLabel,
+  isCached = false,
+  isLoading = false,
+  onRefresh,
+  showMap,
+  onToggleMap,
+  sortOption,
+  onSortChange,
+  classificationEntities,
+  isClassifying = false,
+  showMeta = true,
+  results = [],
+  onApplyFilters,
+}: SearchPageHeaderProps) {
+  const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
+  const [sortOpen, setSortOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
+  const pillCount = entitiesToPills(classificationEntities).length;
+
+  useEffect(() => {
+    if (!sortOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
+        setSortOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [sortOpen]);
+
+  const dashboardRoute = user?.roles?.includes('landlord') || user?.roles?.includes('agent')
+    ? '/landlord'
+    : user?.roles?.includes('homeowner')
+      ? '/homeowner/dashboard'
+      : '/dashboard';
+
+  return (
+    <>
+    <header className="sr-header">
+      <div className="sr-inner sr-header-top">
+        <div className="sr-brand">
+          <Link to="/" className="sr-logo" aria-label="Proptii home">
+            <img src="/images/proptii-logo.png" alt="Proptii" />
+          </Link>
+          <div className="sr-crumb">
+            <span className="sr-crumb-sep">/</span>
+            <span className="sr-crumb-mid">Rent</span>
+            <span className="sr-crumb-sep">/</span>
+            <span className="sr-crumb-current">Search Results</span>
+          </div>
+        </div>
+        <div className="sr-header-actions">
+          {isAuthenticated ? (
+            <Link to={dashboardRoute} className="sr-user-chip">
+              {user?.name || user?.givenName || 'Dashboard'}
+            </Link>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="sr-btn-ghost"
+                onClick={() => navigate(`/login?redirect=${encodeURIComponent('/search?q=' + searchQuery)}`)}
+              >
+                Sign in
+              </button>
+              <button type="button" className="sr-btn-register" onClick={() => navigate('/pricing')}>
+                Register
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="sr-controls">
+        <div className="sr-inner sr-controls-inner">
+          <div className="sr-search-row">
+            <form
+              className="sr-search-field"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onSubmitSearch();
+              }}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+              </svg>
+              <input
+                type="text"
+                value={draftQuery}
+                onChange={(e) => onDraftQueryChange(e.target.value)}
+                placeholder="Search by city, postcode, station or features..."
+                aria-label="Search properties"
+              />
+              {draftQuery ? (
+                <button
+                  type="button"
+                  className="sr-search-clear"
+                  title="Clear input"
+                  onClick={() => onDraftQueryChange('')}
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              ) : null}
+            </form>
+            <button
+              type="button"
+              className={`sr-icon-btn${searchSaved ? ' is-saved' : ''}`}
+              title="Save this search"
+              onClick={onSaveSearch}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill={searchSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="sr-filters-btn"
+              onClick={() => setFiltersOpen(true)}
+              aria-haspopup="dialog"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <line x1="4" y1="6" x2="20" y2="6"></line>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+                <line x1="11" y1="18" x2="13" y2="18"></line>
+              </svg>
+              <span>Filters</span>
+              {pillCount > 0 ? <span className="sr-filters-badge">{pillCount}</span> : null}
+            </button>
+          </div>
+
+          <div className="sr-chips-row">
+            <FilterPills
+              entities={classificationEntities}
+              isClassifying={isClassifying}
+              variant="chip"
+              maxVisible={8}
+              showClearAll
+            />
+          </div>
+
+          {showMeta && (
+            <div className="sr-meta">
+              <div className="sr-meta-left">
+                <p className="sr-count">
+                  <strong>{resultsCount}</strong>{' '}
+                  <span className="sr-count-rest">properties to rent in {locationLabel}</span>
+                </p>
+                {isCached && <span className="sr-cached">cached</span>}
+                {onRefresh && (
+                  <button
+                    type="button"
+                    className={`sr-refresh${isLoading ? ' is-loading' : ''}`}
+                    onClick={onRefresh}
+                    disabled={isLoading}
+                    title="Refresh search results"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"></path>
+                    </svg>
+                    <span>Refresh results</span>
+                  </button>
+                )}
+              </div>
+              <div className="sr-meta-right">
+                <button
+                  type="button"
+                  className={`sr-map-toggle${showMap ? ' is-open' : ''}`}
+                  onClick={onToggleMap}
+                >
+                  <svg className="w-4 h-4 sr-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                    <line x1="8" y1="2" x2="8" y2="18"></line>
+                    <line x1="16" y1="6" x2="16" y2="22"></line>
+                  </svg>
+                  <span>{showMap ? 'Hide map' : 'Show map'}</span>
+                  <svg className="w-3.5 h-3.5 sr-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div className="sr-meta-divider" />
+                <div className="sr-sort-wrap" ref={sortRef}>
+                  <button type="button" className="sr-sort-btn" onClick={() => setSortOpen((open) => !open)}>
+                    <span>{sortOption === 'Price (low)' ? 'Price (low)' : sortOption === 'Price (high)' ? 'Price (high)' : sortOption}</span>
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <line x1="3" y1="6" x2="21" y2="6"></line>
+                      <line x1="6" y1="12" x2="18" y2="12"></line>
+                      <line x1="9" y1="18" x2="15" y2="18"></line>
+                    </svg>
+                  </button>
+                  {sortOpen && (
+                    <div className="sr-sort-menu">
+                      {(['Relevance', 'Newest', 'Price (low)', 'Price (high)'] as SortOption[]).map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={sortOption === option ? 'is-active' : undefined}
+                          onClick={() => {
+                            onSortChange(option);
+                            setSortOpen(false);
+                          }}
+                        >
+                          {option === 'Price (low)' ? 'Price (low to high)' : option === 'Price (high)' ? 'Price (high to low)' : option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+    <FiltersModal
+      isOpen={filtersOpen}
+      onClose={() => setFiltersOpen(false)}
+      searchQuery={searchQuery}
+      locationLabel={locationLabel}
+      entities={classificationEntities}
+      results={results}
+      onApply={(query, matchCount) => {
+        setFiltersOpen(false);
+        onApplyFilters?.(query, matchCount);
+      }}
+    />
+    </>
   );
 }
 
@@ -958,6 +1055,9 @@ const SearchResults = () => {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showMap, setShowMap] = useState(false);
+  const [sortOption, setSortOption] = useState<SortOption>('Relevance');
+  const [draftQuery, setDraftQuery] = useState(searchQuery);
+  const [searchSaved, setSearchSaved] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   // Use state for map node to detect DOM updates/remounts
   const [mapNode, setMapNode] = useState<HTMLDivElement | null>(null);
@@ -1500,11 +1600,6 @@ const SearchResults = () => {
     setSelectedProperty(null);
   };
 
-  const handleNewSearch = () => {
-    clearCache(); // Clear cached results when starting a new search
-    navigate('/');
-  };
-
   const handleMessageClick = async (property: Property) => {
     setIsNavigatingToBooking(true);
     
@@ -1543,31 +1638,121 @@ const SearchResults = () => {
     navigate('/bookviewing');
   };
 
-  const goToHome = () => {
-    navigate('/');
+  useEffect(() => {
+    setDraftQuery(searchQuery);
+  }, [searchQuery]);
+
+  const locationLabel = extractLocationLabel(searchQuery);
+  const isCached = Boolean(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('searchResults'));
+
+  const displayedResults = useMemo(() => {
+    const list = [...results];
+    if (sortOption === 'Price (low)') {
+      list.sort((a, b) => parsePriceValue(a.price) - parsePriceValue(b.price));
+    } else if (sortOption === 'Price (high)') {
+      list.sort((a, b) => parsePriceValue(b.price) - parsePriceValue(a.price));
+    }
+    return list;
+  }, [results, sortOption]);
+
+  const notify = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2600);
   };
+
+  const handleSubmitSearch = () => {
+    const nextQuery = draftQuery.trim();
+    if (!nextQuery) return;
+    clearCache();
+    navigate(`/search?q=${encodeURIComponent(nextQuery)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
+  };
+
+  const handleApplyFilters = useCallback((nextQuery: string, matchCount: number) => {
+    setDraftQuery(nextQuery);
+    clearCache();
+    navigate(`/search?q=${encodeURIComponent(nextQuery)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
+    setToastMessage(`Showing ${matchCount} ${matchCount === 1 ? 'property' : 'properties'} matching all filters`);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2600);
+  }, [clearCache, navigate, searchTypeParam]);
+
+  const handleSaveSearch = () => {
+    if (!searchQuery.trim()) return;
+    const localStorageService = LocalStorageService.getInstance();
+    const historyKey = 'search_history';
+    const history = localStorageService.get<string[]>(historyKey) || [];
+    const nextHistory = [searchQuery, ...history.filter((q) => q !== searchQuery)].slice(0, 10);
+    localStorageService.set(historyKey, nextHistory);
+    setSearchSaved(true);
+    notify('Saved search to your proptii account');
+  };
+
+  const headerProps: SearchPageHeaderProps = {
+    searchQuery,
+    draftQuery,
+    onDraftQueryChange: setDraftQuery,
+    onSubmitSearch: handleSubmitSearch,
+    onSaveSearch: handleSaveSearch,
+    searchSaved,
+    resultsCount: results.length,
+    locationLabel,
+    isCached,
+    isLoading,
+    onRefresh: () => searchProperties(searchQuery, searchType),
+    showMap,
+    onToggleMap: () => {
+      setShowMap((prev) => {
+        const next = !prev;
+        if (next) {
+          setTimeout(() => {
+            document.getElementById('map-container')?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+        return next;
+      });
+    },
+    sortOption,
+    onSortChange: setSortOption,
+    classificationEntities: classification?.entities,
+    isClassifying,
+    results,
+    onApplyFilters: handleApplyFilters,
+  };
+
+  const renderPropertyCard = (property: Property, index: number) => (
+    <PropertyCard
+      key={index}
+      property={property}
+      onClick={() => openModal(property)}
+      isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
+      onToggleSave={(e) => {
+        e.stopPropagation();
+        const propertyId = `${property.title}-${property.location}-${property.price}`;
+        const wasSaved = isPropertySaved(propertyId);
+        toggleSaveProperty(property);
+        notify(wasSaved ? 'Property removed from saved' : 'Saved to your favourites');
+      }}
+      factFlags={govDataEnabled ? getFlagsFor(property) : undefined}
+      factsLoading={govDataEnabled && isFactsLoading}
+      factsUnresolved={govDataEnabled && isUnresolved(property)}
+      reserveHintSlot={govDataEnabled}
+      reportHint={govDataEnabled ? getHintFor(property) : null}
+      isHighlighted={
+        Boolean(
+          selectedProperty &&
+            selectedProperty.title === property.title &&
+            selectedProperty.location === property.location &&
+            selectedProperty.price === property.price
+        )
+      }
+    />
+  );
 
   if (isLoading && results.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col font-nunito">
-        {/* Custom Header with navigation */}
-        <header className="bg-white shadow-lg border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            {/* Left side: Back to Home */}
-            <button
-              onClick={goToHome}
-              className="flex items-center px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-            >
-              <img src="/images/Proptii-logo-icon.png" alt="Proptii Logo" className="h-6 w-6 mr-2" />
-              <span>Back to Home</span>
-            </button>
-
-            {/* Right side: Search Results title */}
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">Search Results</h1>
-            </div>
-          </div>
-        </header>
+      <div className="sr-page">
+        <SearchPageHeader {...headerProps} showMeta={false} />
         <div className="flex-1 flex">
           <SearchLoadingAnimation query={searchQuery} />
         </div>
@@ -1587,27 +1772,10 @@ const SearchResults = () => {
     const isFormatError = !isNetworkError;
 
     return (
-      <div className="min-h-screen flex flex-col font-nunito">
-        {/* Custom Header with navigation */}
-        <header className="bg-white shadow-lg border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            {/* Left side: Back to Home */}
-            <button
-              onClick={goToHome}
-              className="flex items-center px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-            >
-              <img src="/images/Proptii-logo-icon.png" alt="Proptii Logo" className="h-6 w-6 mr-2" />
-              <span>Back to Home</span>
-            </button>
-
-            {/* Right side: Search Results title */}
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">Search Results</h1>
-            </div>
-          </div>
-        </header>
-        <div className="flex-1 bg-gray-50 pt-8">
-          <div className="max-w-5xl mx-auto px-4 py-16 sm:py-20">
+      <div className="sr-page">
+        <SearchPageHeader {...headerProps} showMeta={false} />
+        <div className="flex-1 sr-main">
+          <div className="sr-inner sr-empty">
             <div className="flex flex-col items-center text-center">
               <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-b from-[#136C9E]/10 to-[#E65D24]/10 flex items-center justify-center shadow-sm">
                 <svg className="w-12 h-12 sm:w-14 sm:h-14 text-[#136C9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1794,104 +1962,11 @@ const SearchResults = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-nunito">
-      {/* Custom Header with navigation */}
-      <header className="bg-white shadow-lg border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          {/* Left side: Back to Home */}
-          <button
-            onClick={goToHome}
-            className="flex items-center px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-          >
-            <img src="/images/Proptii-logo-icon.png" alt="Proptii Logo" className="h-6 w-6 mr-2" />
-            <span>Back to Home</span>
-          </button>
-
-          {/* Right side: Search Results title */}
-          <div className="flex items-center">
-            <h1 className="text-xl font-bold text-gray-900">Search Results</h1>
-          </div>
-        </div>
-      </header>
+    <div className="sr-page">
+      <SearchPageHeader {...headerProps} />
       
-      <div className="flex-1 bg-gray-50 pt-8">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Enhanced Header Section */}
-          <div className="mb-8">
-            {/* Top Row: Buttons and Search Summary */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 bg-white rounded-xl shadow-lg p-4 md:p-6 border border-gray-100">
-              {/* Left Side: Search Summary */}
-              <div className="flex-1">
-                <div className="flex items-center mb-3">
-                  <div className="w-2 h-8 bg-gradient-to-b from-[#136C9E] to-[#0F5A8A] rounded-full mr-4"></div>
-                  <h2 className="text-xl font-bold text-gray-900">Search Summary</h2>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-gray-500 font-medium">Query:</span>
-                    <span className="text-gray-900 font-semibold break-words">{searchQuery}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-gray-500 font-medium w-16 md:w-20">Results:</span>
-                    <span className="text-gray-900 font-semibold">{results.length} properties found</span>
-                    {sessionStorage.getItem('searchResults') && (
-                      <span className="ml-2 px-2 py-1 bg-[#136C9E]/10 text-[#136C9E] text-xs font-medium rounded-full">cached</span>
-                    )}
-                  </div>
-                  {/* Search Intent / Classification Filter Pills */}
-                  <div className="pt-2">
-                    <FilterPills
-                      entities={classification?.entities}
-                      isClassifying={isClassifying}
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Right Side: Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-5 md:mt-0 md:ml-8">
-                <button
-                  onClick={() => {
-                    setShowMap(!showMap);
-                    // Scroll to map if showing
-                    if (!showMap) {
-                      setTimeout(() => {
-                        document.getElementById('map-container')?.scrollIntoView({ behavior: 'smooth' });
-                      }, 100);
-                    }
-                  }}
-                  className={`flex items-center px-6 py-3 ${
-                    showMap 
-                      ? 'bg-gradient-to-r from-[#E65D24] to-[#D54D14]' 
-                      : 'bg-gradient-to-r from-[#136C9E] to-[#0F5A8A]'
-                  } text-white rounded-lg hover:opacity-90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5`}
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                  </svg>
-                  {showMap ? 'Hide Map' : 'Show Map'}
-                </button>
-                <button
-                  onClick={() => searchProperties(searchQuery, searchType)}
-                  className="flex items-center px-6 py-3 bg-gradient-to-r from-[#136C9E] to-[#0F5A8A] text-white rounded-lg hover:from-[#0F5A8A] hover:to-[#0D4A7A] transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh Results
-                </button>
-                <button
-                  onClick={handleNewSearch}
-                  className="flex items-center px-6 py-3 bg-gradient-to-r from-[#E65D24] to-[#D54D14] text-white rounded-lg hover:from-[#D54D14] hover:to-[#C43D04] transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  New Search
-                </button>
-              </div>
-            </div>
-          </div>
+      <div className="sr-main">
+        <div className="sr-inner">
 
           {/* Results */}
           {results.length === 0 ? (
@@ -2021,100 +2096,42 @@ const SearchResults = () => {
               </div>
             </div>
           ) : (
-            <div className={showMap ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : ""}>
-              {/* Property Listings */}
-              <div className={showMap ? "" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"}>
-                {showMap ? (
-                  // When map is shown, display in single column
-                  <div className="grid grid-cols-1 gap-6">
-                    <>
-                      {results.map((property, index) => (
-                        <PropertyCard 
-                          key={index} 
-                          property={property} 
-                          onClick={() => openModal(property)}
-                          isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
-                          onToggleSave={(e) => {
-                            e.stopPropagation();
-                            const propertyId = `${property.title}-${property.location}-${property.price}`;
-                            const wasSaved = isPropertySaved(propertyId);
-                            toggleSaveProperty(property);
-                            setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
-                            setShowToast(true);
-                            setTimeout(() => setShowToast(false), 3000);
-                          }}
-                          factFlags={govDataEnabled ? getFlagsFor(property) : undefined}
-                          factsLoading={govDataEnabled && isFactsLoading}
-                          factsUnresolved={govDataEnabled && isUnresolved(property)}
-                          reserveHintSlot={govDataEnabled}
-                          reportHint={govDataEnabled ? getHintFor(property) : null}
-                        />
-                      ))}
-                      {isLoading && [1, 2, 3].map(i => (
-                        <PropertySkeleton key={`skeleton-list-${i}`} />
-                      ))}
-                    </>
-                  </div>
-                ) : (
-                  // When map is hidden, display in grid
-                  <>
-                    {results.map((property, index) => (
-                      <PropertyCard 
-                        key={index} 
-                        property={property} 
-                        onClick={() => openModal(property)}
-                        isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
-                        onToggleSave={(e) => {
-                          e.stopPropagation();
-                          const propertyId = `${property.title}-${property.location}-${property.price}`;
-                          const wasSaved = isPropertySaved(propertyId);
-                          toggleSaveProperty(property);
-                          setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
-                          setShowToast(true);
-                          setTimeout(() => setShowToast(false), 3000);
-                        }}
-                        factFlags={govDataEnabled ? getFlagsFor(property) : undefined}
-                        factsLoading={govDataEnabled && isFactsLoading}
-                        factsUnresolved={govDataEnabled && isUnresolved(property)}
-                        reserveHintSlot={govDataEnabled}
-                        reportHint={govDataEnabled ? getHintFor(property) : null}
-                      />
-                    ))}
-                    {isLoading && [1, 2, 3].map(i => (
-                      <PropertySkeleton key={`skeleton-grid-${i}`} />
-                    ))}
-                  </>
-                )}
-              </div>
-
-              {/* Map Container */}
+            <>
               {showMap && (
-                <div className="space-y-6">
-                  <div id="map-container" className="bg-white rounded-xl shadow-lg overflow-hidden">
-                    {!isMapLoaded ? (
-                      <div 
-                        className="w-full flex items-center justify-center bg-gray-50"
-                        style={{ height: 'calc(100vh - 300px)', minHeight: '600px' }}
-                      >
-                        <div className="text-center">
-                          <div className="w-16 h-16 border-4 border-[#136C9E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                          <p className="text-gray-600">Loading map...</p>
+                <div className="sr-map-collapse">
+                  <div className="sr-map-intel">
+                    <div id="map-container" className="sr-map-frame">
+                      {!isMapLoaded ? (
+                        <div className="sr-map-loading">
+                          <div className="text-center">
+                            <div className="w-16 h-16 border-4 border-[#136C9E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-gray-600">Loading map...</p>
+                          </div>
                         </div>
+                      ) : (
+                        <div
+                          ref={setMapNode}
+                          className="sr-map-canvas"
+                          style={{ height: '100%', minHeight: 360 }}
+                        ></div>
+                      )}
+                      <div className="sr-map-pill">
+                        <span className="sr-dot" />
+                        <span>Showing active properties in {locationLabel}</span>
                       </div>
-                    ) : (
-                      <div 
-                        ref={setMapNode}
-                        className="w-full"
-                        style={{ height: 'calc(100vh - 300px)', minHeight: '600px' }}
-                      ></div>
-                    )}
+                    </div>
+                    <LocationInsights searchQuery={searchQuery} propertyCount={results.length} />
                   </div>
-
-                  {/* Location Insights Section - Below Map */}
-                  <LocationInsights searchQuery={searchQuery} propertyCount={results.length} />
                 </div>
               )}
-            </div>
+
+              <div className="sr-grid">
+                {displayedResults.map((property, index) => renderPropertyCard(property, index))}
+                {isLoading && [1, 2, 3].map((i) => (
+                  <PropertySkeleton key={`skeleton-grid-${i}`} />
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -2133,13 +2150,10 @@ const SearchResults = () => {
 
       {/* Toast Notification */}
       {showToast && (
-        <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-6 py-4 flex items-center gap-3 animate-in slide-in-from-right">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          <span className="text-gray-900 font-medium">{toastMessage}</span>
-          <button
-            onClick={() => setShowToast(false)}
-            className="ml-2 text-gray-400 hover:text-gray-600"
-          >
+        <div className="sr-toast">
+          <span className="sr-toast-dot" />
+          <span>{toastMessage}</span>
+          <button type="button" onClick={() => setShowToast(false)} aria-label="Dismiss notification">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

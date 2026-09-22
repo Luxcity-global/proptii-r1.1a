@@ -523,7 +523,7 @@ export class AdminDashboardService {
         registeredToPaidPct: registered ? Math.round((paid / registered) * 100) : 0,
       },
       trialConversion: {
-        trialStarted: trial + trialConverted,
+        trialStarted: trial + paid,
         converted: paid,
         ratePct: trial + paid ? Math.round((paid / (trial + paid)) * 100) : 0,
       },

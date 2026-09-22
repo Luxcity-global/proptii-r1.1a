@@ -77,7 +77,8 @@ export class FirebaseAuthGuard implements CanActivate {
     // Support local dev mock tokens
     if (token.startsWith('mock-') || token.startsWith('mock_')) {
       const mockId = token.replace('mock-token-', '').replace('mock-', '');
-      const mockRole = mockId.includes('landlord') ? 'landlord' : 'tenant';
+      const id = (mockId || '').toLowerCase();
+      const mockRole = id.includes('agent') ? 'agent' : id.includes('landlord') ? 'landlord' : 'tenant';
       request.user = {
         uid: mockId || 'dev-user-id',
         sub: mockId || 'dev-user-id',

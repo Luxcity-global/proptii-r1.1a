@@ -2,6 +2,10 @@
 @import "./styles/dashboardOverview.css";
 @import "./styles/sidebarOverview.css";
 @import "./styles/propertiesPage.css";
+@import "./styles/contractsPage.css";
+@import "./styles/clientsPage.css";
+@import "./styles/clientDetails.css";
+@import "./styles/referencingPage.css";
 
 @tailwind base;
 @tailwind components;

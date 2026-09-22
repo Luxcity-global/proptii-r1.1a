@@ -1,60 +1,113 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Building2,
-  Eye,
+import React, { useMemo, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Search,
+  ChevronRight,
+  ExternalLink,
+  Image as ImageIcon,
   FileText,
-  Users,
-  AlertTriangle,
-  TrendingUp,
-  Plus,
-  PoundSterling,
-  Calendar,
   Home,
-  BarChart3,
-  X,
-  MapPin,
-  Image,
-  Phone,
-  Mail,
-  CheckCircle,
-  CircleDot,
-  File,
-  FileUp,
-  FileTextIcon,
-  Heart
+  User,
 } from 'lucide-react';
 import ReferencingModal from '../../ReferencingModalLegacy';
 import { firestoreService } from '../../../services/firestoreService';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useSavedProperties } from '../../../contexts/SavedPropertiesContext';
+import { useSavedProperties, SavedProperty } from '../../../contexts/SavedPropertiesContext';
 import { fileService, FileItem } from '../../../services/fileService';
 import { contractService } from '../../../services/contractService';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
-import { viewingService, ViewingStats } from '../../../services/viewingService';
+import { viewingService, ViewingStats, ViewingBooking } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
-import { useIsMobile } from '../ui/use-mobile';
 import { trackEvent } from '../../../utils/analytics';
 import AgentQuotaWidget from '../AgentQuotaWidget';
+import TenantPageHeader from '../ui/TenantPageHeader';
+import '../../../styles/tenantDashboard.css';
 
-/**
- * Main dashboard home page component following the style guide
- */
+const REF_PILLARS = [
+  { key: 'identity', step: 1, label: 'IDENTITY', nextLabel: 'Fill in your identity details' },
+  { key: 'employment', step: 2, label: 'WORK', nextLabel: 'Fill in your employment details' },
+  { key: 'residential', step: 3, label: 'ADDRESS', nextLabel: 'Fill in your address details' },
+  { key: 'financial', step: 4, label: 'FINANCE', nextLabel: 'Fill in your financial details' },
+  { key: 'guarantor', step: 5, label: 'GUARANTOR', nextLabel: 'Fill in your guarantor details' },
+] as const;
+
+type PropertyFilter = 'all' | 'latest' | 'highest' | 'lowest';
+
+function displayName(user: { name?: string; givenName?: string; familyName?: string; email?: string } | null): string {
+  if (!user) return 'there';
+  if (user.name?.trim()) return user.name.trim();
+  const joined = [user.givenName, user.familyName].filter(Boolean).join(' ').trim();
+  if (joined) return joined;
+  return user.email?.split('@')[0] || 'there';
+}
+
+function parseLeaseAmount(price: string): number {
+  const n = Number(String(price || '').replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatLeasePrice(price: string): string {
+  const amount = parseLeaseAmount(price);
+  if (amount > 0) return `£${amount.toLocaleString()}`;
+  const raw = String(price || '').trim();
+  return raw || '—';
+}
+
+function timeAgo(iso?: string): string {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const days = Math.floor((Date.now() - t) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  if (days < 30) return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+  const months = Math.floor(days / 30);
+  return `${months} month${months === 1 ? '' : 's'} ago`;
+}
+
+function formatViewingDateTime(date: string, time: string): string {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return time ? `${date} at ${time}` : date;
+  const stamped = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return time ? `${stamped} at ${time}` : stamped;
+}
+
+function viewingAddress(booking: ViewingBooking): string {
+  return [booking.property?.street, booking.property?.town, booking.property?.city, booking.property?.postcode]
+    .filter(Boolean)
+    .join(', ') || 'Property viewing';
+}
+
+function fileExtLabel(file: FileItem): { label: string; tone: 'blue' | 'orange' | 'red' | 'green' } {
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  if (file.type === 'application/pdf' || extension === 'pdf') return { label: 'PDF', tone: 'red' };
+  if (['xls', 'xlsx', 'csv'].includes(extension)) return { label: 'XLS', tone: 'green' };
+  if (['doc', 'docx'].includes(extension)) return { label: 'DOC', tone: 'blue' };
+  if (['txt', 'rtf'].includes(extension)) return { label: 'TXT', tone: 'orange' };
+  if (file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
+    return { label: 'IMG', tone: 'blue' };
+  }
+  return { label: (extension || 'FILE').slice(0, 4).toUpperCase(), tone: 'orange' };
+}
+
+function truncateName(name: string, max = 14): string {
+  if (name.length <= max) return name;
+  return `${name.slice(0, max - 1)}…`;
+}
+
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { savedProperties } = useSavedProperties();
   const { signedContracts } = useSignedContracts();
-  const isMobile = useIsMobile();
-  
-  // State for referencing modal
+
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [referencingStep, setReferencingStep] = useState(1);
-  // Referencing is scoped to the user (no specific property selected from dashboard)
-  // The actual propertyId is derived from user.id so data is never shared across tenants.
   const selectedPropertyId = user?.id ? `general_${user.id}` : null;
-  
-  // State for files
+
   const [files, setFiles] = useState<FileItem[]>([]);
   const [referencingFiles, setReferencingFiles] = useState<FileItem[]>([]);
   const [contractFiles, setContractFiles] = useState<FileItem[]>([]);
@@ -65,38 +118,45 @@ const DashboardHome: React.FC = () => {
     upcoming: 0,
     completed: 0,
     rescheduled: 0,
-    total: 0
+    total: 0,
   });
-  
-  // Get the user ID from auth context
-  const userId = user?.id ?? null;
+  const [upcomingViewings, setUpcomingViewings] = useState<ViewingBooking[]>([]);
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
   const [referencingStartedAt, setReferencingStartedAt] = useState<string | null>(null);
+  const [propertyFilter, setPropertyFilter] = useState<PropertyFilter>('all');
+  const [docOffset, setDocOffset] = useState(0);
+  const [imageIndexById, setImageIndexById] = useState<Record<string, number>>({});
+  const [donutHover, setDonutHover] = useState<'completed' | 'upcoming' | null>(null);
+
+  const userId = user?.id ?? null;
+  const welcomeName = displayName(user);
 
   React.useEffect(() => {
     trackEvent('tenant_dashboard_home_view', {
       user_id_present: Boolean(userId),
     });
   }, [userId]);
-  
-  // Load files on component mount
+
+  React.useEffect(() => {
+    if (location.hash !== '#tenant-insights') return;
+    const el = document.getElementById('tenant-insights');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location.hash]);
+
   React.useEffect(() => {
     loadFiles();
     loadViewingStats();
+    loadUpcomingViewings();
   }, [user?.id]);
-  
+
   const loadFiles = async () => {
     try {
       setFilesLoading(true);
-      
-      // Set current user in fileService
       fileService.setCurrentUser(user?.id || null);
-      
-      // Load regular files from fileService
       const loadedFiles = await fileService.getFiles();
       setFiles(loadedFiles);
-      
-      // Load referencing files from Firestore
       if (user?.id) {
         await loadReferencingFiles();
         await loadContractFiles();
@@ -107,45 +167,39 @@ const DashboardHome: React.FC = () => {
       setFilesLoading(false);
     }
   };
-  
+
   const loadReferencingFiles = async () => {
     try {
       if (!user?.id) return;
-      
       const propertyId = `general_${user.id}`;
       const result = await firestoreService.getReferencingForm(user.id, propertyId);
-      
       if (result.success && result.data) {
         const referencingFilesList: FileItem[] = [];
         const formData = result.data.formData;
-        
-        // Extract files from each section
         const sections = [
           { section: 'identity', field: 'identityProof', category: 'Identity' },
           { section: 'employment', field: 'proofDocument', category: 'Employment' },
           { section: 'residential', field: 'proofDocument', category: 'Residential' },
           { section: 'financial', field: 'proofOfIncomeDocument', category: 'Financial' },
-          { section: 'guarantor', field: 'identityDocument', category: 'Guarantor' }
+          { section: 'guarantor', field: 'identityDocument', category: 'Guarantor' },
         ];
-        
         sections.forEach(({ section, field, category }) => {
           const sectionData = (formData as Record<string, any>)[section];
           if (sectionData && sectionData[field]) {
             const document = sectionData[field];
             if (document && (document.name || document.url || document.dataUrl) && (document.dataUrl || document.url)) {
               referencingFilesList.push({
-                id: Date.now() + Math.random(), // Generate unique ID
+                id: Date.now() + Math.random(),
                 name: document.name || `${category} Document`,
                 category,
                 type: document.type || 'application/pdf',
                 size: document.size || 0,
                 uploadDate: new Date(document.lastModified || Date.now()).toLocaleDateString(),
-                url: document.dataUrl || document.url // Use dataUrl or Firebase Storage url
+                url: document.dataUrl || document.url,
               });
             }
           }
         });
-        
         setReferencingFiles(referencingFilesList);
       }
     } catch (error) {
@@ -156,55 +210,61 @@ const DashboardHome: React.FC = () => {
   const loadContractFiles = async () => {
     try {
       if (!user?.id) return;
-      
-      console.log('Loading contract files for dashboard');
       const result = await contractService.getUserContractTemplates(user.id);
-      
       if (result.success && result.templates) {
         const contractFilesList: FileItem[] = result.templates.map((contract, index) => ({
-          id: Date.now() + Math.random() + index as number, // Generate numeric ID
+          id: Date.now() + Math.random() + index as number,
           name: contract.name,
           category: 'Contracts',
           type: contract.fileType,
           size: contract.fileSize,
           uploadDate: contract.uploadDate,
           url: contract.fileUrl || `data:${contract.fileType};base64,${contract.fileData}`,
-          firestoreId: contract.id
+          firestoreId: contract.id,
         }));
-        
         setContractFiles(contractFilesList);
-        console.log(`Loaded ${contractFilesList.length} contract files for dashboard`);
       }
     } catch (error) {
       console.error('Error loading contract files:', error);
     }
   };
 
-
-
   const loadViewingStats = async () => {
     try {
       if (!user?.id) return;
-      
-      console.log('Loading viewing stats for dashboard');
       const result = await viewingService.getViewingStats(user.id);
-      
       if (result.success && result.stats) {
         setViewingStats(result.stats);
-        console.log(`Loaded viewing stats:`, result.stats);
       }
     } catch (error) {
       console.error('Error loading viewing stats:', error);
     }
   };
-  
-  // Handle file viewing
+
+  const loadUpcomingViewings = async () => {
+    try {
+      if (!user?.id) return;
+      const result = await viewingService.getUserViewingBookings(user.id);
+      if (result.success && result.bookings) {
+        const upcoming = result.bookings
+          .filter((b) => b.status === 'pending' || b.status === 'confirmed' || b.status === 'rescheduled')
+          .sort((a, b) => {
+            const da = new Date(`${a.viewingDetails?.date || ''} ${a.viewingDetails?.time || ''}`).getTime();
+            const db = new Date(`${b.viewingDetails?.date || ''} ${b.viewingDetails?.time || ''}`).getTime();
+            return (Number.isNaN(da) ? 0 : da) - (Number.isNaN(db) ? 0 : db);
+          });
+        setUpcomingViewings(upcoming);
+      }
+    } catch (error) {
+      console.error('Error loading viewings:', error);
+    }
+  };
+
   const handleView = (file: FileItem) => {
     setSelectedFile(file);
     setIsPreviewModalOpen(true);
   };
-  
-  // Handle file download
+
   const handleDownload = async (file: FileItem) => {
     try {
       await fileService.downloadFile(file);
@@ -212,16 +272,14 @@ const DashboardHome: React.FC = () => {
       console.error('Download error:', err);
     }
   };
-  
-  // Calculate remaining forms and alert status
-  // 5 passport sections: Identity (1), Employment (2), Residential (3), Financial (4), Guarantor (5)
+
   const REFERENCING_STEPS = [1, 2, 3, 4, 5] as const;
   const totalSections = REFERENCING_STEPS.length;
   const completedCount = completedSections.size;
-  const remainingCount = totalSections - completedCount;
   const allCompleted = completedCount === totalSections;
-  
-  // Load referencing completion status from the backend (scoped to this user)
+  const referencingPercent = Math.round((completedCount / totalSections) * 100);
+  const referencingStarted = Boolean(referencingStartedAt) || completedCount > 0;
+
   React.useEffect(() => {
     const loadFormStatus = async () => {
       if (!userId || !selectedPropertyId) return;
@@ -229,7 +287,6 @@ const DashboardHome: React.FC = () => {
         const firestoreResult = await firestoreService.getReferencingForm(userId, selectedPropertyId);
         if (firestoreResult.success && firestoreResult.data) {
           const formData = firestoreResult.data.formData;
-          // Capture when the form was first started for due-date computation
           const createdAt = (firestoreResult.data as any).createdAt;
           if (createdAt) {
             const ts = createdAt?.toDate?.() ?? createdAt?._seconds
@@ -239,7 +296,6 @@ const DashboardHome: React.FC = () => {
           }
 
           const completed = new Set<string>();
-
           if (formData.identity?.firstName && formData.identity?.lastName && formData.identity?.email) {
             completed.add('identity');
           }
@@ -268,1083 +324,717 @@ const DashboardHome: React.FC = () => {
 
     loadFormStatus();
   }, [userId, selectedPropertyId, isReferencingModalOpen]);
-  
-  // Function to open referencing modal at a specific step
+
   const openReferencingModal = (step: number) => {
     setReferencingStep(step);
     setIsReferencingModalOpen(true);
-    trackEvent('tenant_dashboard_referencing_step_opened', {
-      step,
-    });
+    trackEvent('tenant_dashboard_referencing_step_opened', { step });
   };
-  
+
   const closeReferencingModal = () => {
     setIsReferencingModalOpen(false);
   };
 
-  /**
-   * P3-1: Compute a human-readable due-date string based on when the form was started.
-   * Each section is due 7 days after the form was first opened.
-   * Returns null when the section is already complete or no start date is known.
-   */
-  const getDueDateLabel = (sectionKey: string): string | null => {
-    if (completedSections.has(sectionKey)) return null;
-    if (!referencingStartedAt) return 'Due date unknown';
-    const startMs = new Date(referencingStartedAt).getTime();
-    const dueMs = startMs + 7 * 24 * 60 * 60 * 1000; // 7 days
-    const diffDays = Math.floor((Date.now() - dueMs) / (24 * 60 * 60 * 1000));
-    if (diffDays <= 0) {
-      const remaining = Math.abs(diffDays);
-      return remaining === 0 ? 'Due today' : `Due in ${remaining} day${remaining === 1 ? '' : 's'}`;
-    }
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} past due date`;
-  };
+  const nextPillar = REF_PILLARS.find((p) => !completedSections.has(p.key));
 
-  
-  // Add CSS animation for pie chart and custom scrollbar
-  React.useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes drawSegment {
-        0% {
-          transform: scale(0);
-          opacity: 0;
-        }
-        100% {
-          transform: scale(1);
-          opacity: 1;
-        }
-      }
-      
-      /* Custom thin scrollbar for webkit browsers */
-      .thin-scrollbar::-webkit-scrollbar {
-        width: 4px;
-      }
-      
-      .thin-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      
-      .thin-scrollbar::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 2px;
-      }
-      
-      .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      if (document.head.contains(style)) {
-        document.head.removeChild(style);
-      }
-    };
-  }, []);
-
-  // Use real saved properties from context instead of mock data
-  const savedSearches = savedProperties.map((property, index) => ({
-    id: property.id,
-    address: property.title,
-    propertyType: property.propertyType,
-    bedrooms: property.bedrooms,
-    price: property.price,
-    features: [property.propertyType, `${property.bedrooms} Bedrooms`],
-    image: property.imageUrls?.[0] || '/images/detached-house.jpg'
-  }));
-
-  // Mock data for now since we removed the hook dependency
-  const dashboardSummary = {
-    savedSearches: { count: savedProperties.length }, // Use real count from SavedPropertiesContext
-    viewings: { upcoming: 5, total: 8 }, // 5 upcoming from Viewings page
-    referencing: { completedSteps: completedCount, totalSteps: 6 }, // Dynamic count based on actual completion
-    contracts: { pending: 0, total: signedContracts.length, requested: 0 }, // Use actual signed contracts count
-    portfolioValue: '2,400',
-    occupancyRate: 95,
-    averageRent: 2400,
-    upcomingRenewals: 2,
-    priorityAlerts: {
-      count: 2,
-      alerts: [
-        {
-          message: 'Employment Reference - Fill in your employment details',
-          propertyAddress: '123 Regent Street, London'
-        },
-        {
-          message: 'Guarantor Information - Additional steps required',
-          propertyAddress: '456 Oxford Street, London'
-        }
-      ]
-    }
-  };
-
-  const mockSavedProperties = [
-    {
-      id: 1,
-      address: '123 Regent Street, London W1B 4EA',
-      city: 'London',
-      bedrooms: 2,
-      price: 2400
-    },
-    {
-      id: 2,
-      address: '456 Oxford Street, London W1C 1AP',
-      city: 'London',
-      bedrooms: 1,
-      price: 1800
-    },
-    {
-      id: 3,
-      address: '789 Bond Street, London W1S 1DH',
-      city: 'London',
-      bedrooms: 3,
-      price: 3200
-    }
-  ];
-
-  const upcomingViewings = [
-    {
-      id: 1,
-      propertyAddress: '123 Regent Street, London',
-      date: '2024-11-28',
-      time: '2:00 PM'
-    },
-    {
-      id: 2,
-      propertyAddress: '456 Oxford Street, London',
-      date: '2024-11-29',
-      time: '10:00 AM'
-    }
-  ];
-
-  // Combine regular files, referencing files, and contract files, then get the last 2
   const allFiles = [...files, ...referencingFiles, ...contractFiles];
-  const recentFiles = allFiles
-    .sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime())
-    .slice(0, 2);
+  const recentFiles = useMemo(
+    () =>
+      [...allFiles]
+        .sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()),
+    [files, referencingFiles, contractFiles]
+  );
 
-  const formatCurrency = (amount: number) => `£${amount.toLocaleString()}`;
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
-  const formatFileSize = (bytes: number) => {
-    return fileService.formatFileSize(bytes);
-  };
-  
-  // Get file type icon based on file extension
-  const getFileTypeIcon = (fileName: string, fileType: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    
-    if (fileType === 'application/pdf' || extension === 'pdf') {
-      return <FileTextIcon className="w-5 h-5 text-red-600" />;
-    } else if (fileType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif'].includes(extension || '')) {
-      return <FileTextIcon className="w-5 h-5 text-blue-600" />;
-    } else if (['doc', 'docx'].includes(extension || '')) {
-      return <FileTextIcon className="w-5 h-5 text-blue-500" />;
-    } else {
-      return <File className="w-5 h-5 text-gray-600" />;
+  const visibleDocs = recentFiles.length
+    ? Array.from({ length: Math.min(4, recentFiles.length) }, (_, i) => recentFiles[(docOffset + i) % recentFiles.length])
+    : [];
+
+  const filteredProperties = useMemo(() => {
+    const list = [...savedProperties];
+    if (propertyFilter === 'latest') {
+      list.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+    } else if (propertyFilter === 'highest') {
+      list.sort((a, b) => parseLeaseAmount(b.price) - parseLeaseAmount(a.price));
+    } else if (propertyFilter === 'lowest') {
+      list.sort((a, b) => parseLeaseAmount(a.price) - parseLeaseAmount(b.price));
     }
-  };
+    return list.slice(0, 3);
+  }, [savedProperties, propertyFilter]);
 
-  const referencingProgress = dashboardSummary?.referencing.completedSteps || 0;
-  const totalReferencingSteps = dashboardSummary?.referencing.totalSteps || 1;
+  const latestSavedId = useMemo(() => {
+    if (!savedProperties.length) return null;
+    return [...savedProperties].sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())[0]?.id;
+  }, [savedProperties]);
 
-  const getFileColorByType = (type: string): string => {
-    if (type.includes('pdf')) {
-      return 'bg-red-100';
-    } else if (type.includes('image')) {
-      return 'bg-blue-100';
-    } else {
-      return 'bg-gray-100';
+  const highestLeaseId = useMemo(() => {
+    if (!savedProperties.length) return null;
+    return [...savedProperties].sort((a, b) => parseLeaseAmount(b.price) - parseLeaseAmount(a.price))[0]?.id;
+  }, [savedProperties]);
+
+  const openSavedProperty = (property: SavedProperty) => {
+    if (property.id) {
+      navigate(`/search?propertyId=${encodeURIComponent(property.id)}`);
+      return;
     }
+    navigate('/dashboard/saved-searches');
   };
 
-  const getFileIconByType = (type: string) => {
-    if (type.includes('pdf')) {
-      return <FileTextIcon className="w-6 h-6 text-red-500" />;
-    } else if (type.includes('image')) {
-      return <Image className="w-6 h-6 text-blue-500" />;
-    } else {
-      return <File className="w-6 h-6 text-gray-500" />;
-    }
+  const cyclePropertyImage = (property: SavedProperty) => {
+    const count = property.imageUrls?.length || 0;
+    if (count < 2) return;
+    setImageIndexById((prev) => ({
+      ...prev,
+      [property.id]: ((prev[property.id] || 0) + 1) % count,
+    }));
   };
 
-  // Helper function to generate arc path for pie chart
-  const createArcPath = (startAngle: number, endAngle: number, radius: number = 60): string => {
-    // Handle full circle case
-    if (Math.abs(endAngle - startAngle) >= 360) {
-      return `M 100 100 m -${radius} 0 a ${radius} ${radius} 0 1 1 ${radius * 2} 0 a ${radius} ${radius} 0 1 1 -${radius * 2} 0 Z`;
-    }
-    
-    const startAngleRad = (startAngle * Math.PI) / 180;
-    const endAngleRad = (endAngle * Math.PI) / 180;
-    const x1 = 100 + radius * Math.cos(startAngleRad);
-    const y1 = 100 + radius * Math.sin(startAngleRad);
-    const x2 = 100 + radius * Math.cos(endAngleRad);
-    const y2 = 100 + radius * Math.sin(endAngleRad);
-    const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
-    return `M 100 100 L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+  const viewingTotal = viewingStats.total || 0;
+  const viewingCompleted = viewingStats.completed || 0;
+  const viewingUpcoming = viewingStats.upcoming || 0;
+  const completedPct = viewingTotal ? viewingCompleted / viewingTotal : 0;
+  const circ = 2 * Math.PI * 72;
+  const completedLen = circ * completedPct;
+  const upcomingLen = circ - completedLen;
+
+  const listedViewings = upcomingViewings.slice(0, 2);
+  const contractAlerts = signedContracts.slice(0, 3);
+
+  const isGloballyEmpty =
+    savedProperties.length === 0 &&
+    allFiles.length === 0 &&
+    viewingTotal === 0 &&
+    signedContracts.length === 0 &&
+    !referencingStarted &&
+    !filesLoading;
+
+  const scrollToInsights = () => {
+    const el = document.getElementById('tenant-insights');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-
-  // Helper function to calculate pie chart angles
-  const calculatePieChartSegments = () => {
-    const total = viewingStats.total || 0;
-    const upcoming = viewingStats.upcoming || 0;
-    const completed = viewingStats.completed || 0;
-    const rescheduled = viewingStats.rescheduled || 0;
-
-    if (total === 0) {
-      return {
-        upcomingPercentage: 0,
-        completedPercentage: 0,
-        upcomingStartAngle: -90,
-        upcomingEndAngle: -90,
-        completedStartAngle: -90,
-        completedEndAngle: -90,
-        rescheduledStartAngle: -90,
-        rescheduledEndAngle: -90
-      };
-    }
-
-    const upcomingPercentage = (upcoming / total) * 100;
-    const completedPercentage = (completed / total) * 100;
-    const rescheduledPercentage = (rescheduled / total) * 100;
-    
-    // Start from top (-90 degrees)
-    const upcomingStartAngle = -90;
-    const upcomingEndAngle = -90 + (upcoming / total) * 360;
-    const completedStartAngle = upcomingEndAngle;
-    const completedEndAngle = completedStartAngle + (completed / total) * 360;
-    const rescheduledStartAngle = completedEndAngle;
-    const rescheduledEndAngle = rescheduledStartAngle + (rescheduled / total) * 360;
-
-    return {
-      upcomingPercentage: Math.round(upcomingPercentage),
-      completedPercentage: Math.round(completedPercentage),
-      rescheduledPercentage: Math.round(rescheduledPercentage),
-      upcomingStartAngle,
-      upcomingEndAngle,
-      completedStartAngle,
-      completedEndAngle,
-      rescheduledStartAngle,
-      rescheduledEndAngle
-    };
-  };
-
-  const pieSegments = calculatePieChartSegments();
 
   return (
-    <div className={`space-y-6 ${isMobile ? 'pb-4 px-4' : 'pb-8'}`} style={{ fontFamily: 'Archivo, sans-serif' }}>
-      {/* Overview Section */}
-      <div className={isMobile ? 'mt-4' : 'mt-8'}>
-        <h2 
-          className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold mb-6`}
-          style={{ color: '#374957' }}
-        >
-          Overview
-        </h2>
+    <div className="tn-dash">
+      <TenantPageHeader
+        title={<>Welcome, <span>{welcomeName}</span></>}
+        subtitle="Here's the latest update on your portfolio today."
+        primaryLabel="Find Listing"
+        primaryIcon={<Search size={16} strokeWidth={2.5} />}
+        onPrimary={() => navigate('/search')}
+        onInsights={isGloballyEmpty ? () => navigate('/dashboard/tenant-referencing') : scrollToInsights}
+      />
 
-        <div className="mb-6">
+      <div className="tn-dash-body">
+        <div className="tn-dash-quota">
           <AgentQuotaWidget />
         </div>
-        
-        {/* Summary Cards Grid */}
-        <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-4 md:gap-6`}>
-        {/* Saved Listings Card */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
-          {/* Row 1: Title and Icon */}
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Saved Listings</h3>
-            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-orange-100 rounded-lg flex items-center justify-center`}>
-              <Building2 className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-orange-600`} />
+
+        {isGloballyEmpty ? (
+          <div className="tn-dash-empty-global">
+            <div className="tn-dash-empty-global-icon">
+              <Home size={36} />
             </div>
-          </div>
-          
-          {/* Row 2: Number */}
-          <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {savedProperties.length}
+            <h2>Welcome to your Tenant Portfolio!</h2>
+            <p>
+              You don't have any active tenancies or saved listings yet. Explore available listings or complete your
+              referencing profile to start managing your tenancies.
             </p>
-          </div>
-          
-          {/* Row 3: Subtitle */}
-          <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>
-              {savedProperties.length === 1 ? 'Saved property' : 'Saved properties'}
-            </p>
-          </div>
-        </div>
-
-      {/* Viewings Card */}
-        <Link to="/dashboard/viewings" className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow cursor-pointer`}>
-          {/* Row 1: Title and Icon */}
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Viewings</h3>
-            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center`}>
-              <Eye className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
+            <div className="tn-dash-empty-global-actions">
+              <button type="button" className="tn-dash-empty-btn primary" onClick={() => navigate('/search')}>
+                Explore Properties
+              </button>
+              <button type="button" className="tn-dash-empty-btn" onClick={() => openReferencingModal(1)}>
+                Resume Referencing
+              </button>
             </div>
           </div>
-          
-          {/* Row 2: Number */}
-          <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {viewingStats.total || 0}
-            </p>
-          </div>
-          
-          {/* Row 3: Subtitle */}
-          <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Total booked</p>
-          </div>
-        </Link>
-
-      {/* Referencing Card */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
-          {/* Row 1: Title and Icon */}
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Referencing</h3>
-            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center`}>
-              <FileText className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
-            </div>
-          </div>
-          
-          {/* Row 2: Number */}
-          <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {dashboardSummary?.referencing.completedSteps || completedCount}/{dashboardSummary?.referencing.totalSteps || totalSections}
-            </p>
-          </div>
-          
-          {/* Row 3: Subtitle */}
-          <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Complete</p>
-          </div>
-        </div>
-
-        {/* Contracts Card */}
-        <Link to="/dashboard/tenant-contracts" className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow cursor-pointer`}>
-          {/* Row 1: Title and Icon */}
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Contracts</h3>
-            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-yellow-100 rounded-lg flex items-center justify-center`}>
-              <Users className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-yellow-600`} />
-            </div>
-          </div>
-          
-          {/* Row 2: Number */}
-          <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {signedContracts.length || 0}
-            </p>
-          </div>
-          
-          {/* Row 3: Subtitle */}
-          <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Signed Contracts</p>
-          </div>
-        </Link>
-        </div>
-      </div>
-
-      {/* Tenant Insights Section */}
-      <div>
-        <div className={`flex items-center gap-2 ${isMobile ? 'mb-4' : 'mb-6'}`}>
-          <TrendingUp className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'}`} style={{ color: '#374957' }} />
-          <h2 
-            className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}
-            style={{ color: '#374957' }}
-          >
-            Tenant Insights
-          </h2>
-        </div>
-        
-        <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} ${isMobile ? 'gap-4' : 'gap-8'} ${isMobile ? 'mb-6' : 'mb-8'}`}>
-        {/* Referencing Card */}
-        <div
-          className="shadow-sm overflow-hidden"
-          style={{
-            background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
-            border: '1px solid #80B2FF',
-            height: isMobile ? 'auto' : '320px',
-            minHeight: isMobile ? '280px' : '320px',
-            borderRadius: '20px'
-          }}
-        >
-          <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
-            {/* Left Blue Panel */}
-            <div
-              className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px]'} flex`}
-              style={{
-                background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
-                color: '#374957'
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-white rounded-full flex items-center justify-center`}>
-                  <FileText className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
-                </div>
-                <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>
-                  {isMobile ? 'Referencing' : 'Referencing'}
-                </h2>
-              </div>
-              {!isMobile && <div className="mt-auto"></div>}
-              <div className={isMobile ? '' : 'mt-auto'}>
-                <div className={`${isMobile ? 'text-2xl' : 'text-4xl'} font-bold text-blue-800`}>
-                  {allCompleted ? 6 : remainingCount}
-                </div>
-                <div className={`${isMobile ? 'text-xs' : 'text-sm'} opacity-90`}>
-                  {allCompleted ? 'Success' : 'Alerts'}
-                </div>
-                <div className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-75`}>
-                  {allCompleted 
-                    ? 'All forms completed!' 
-                    : 'Between 25 Nov - 2 Dec 2024'
-                  }
-                </div>
-              </div>
-            </div>
-
-            {/* Right White Panel */}
-            <div
-              className={`flex-1 p-4 bg-white ${isMobile ? 'rounded-b-xl' : ''}`}
-              style={{
-                borderRadius: isMobile ? '0 0 20px 20px' : '20px',
-                boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)',
-                overflow: 'hidden'
-              }}
-            >
-              <div className={`flex justify-end ${isMobile ? 'mb-3' : 'mb-4'}`}>
-                <Link to="/dashboard/tenant-referencing" className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline`}>
-                  {isMobile ? 'Go to Referencing →' : 'Go to Referencing →'}
-                </Link>
-              </div>
-              <div 
-                className={`space-y-3 ${isMobile ? 'max-h-64' : 'max-h-56'} overflow-y-auto thin-scrollbar pb-4`}
-                style={{
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: '#cbd5e1 transparent'
-                }}
-              >
-                {/* Identity */}
-                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
-                  <div className="flex items-start justify-between">
-                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
-                      {completedSections.has('identity') ? (
-                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
-                      ) : (
-                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-orange-600 mt-1`} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
-                          completedSections.has('identity') ? 'text-green-600' : 'text-orange-600'
-                        }`}>
-                          Identity
-                        </h4>
-                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                          {completedSections.has('identity') 
-                            ? 'Identity verification completed' 
-                            : 'Upload your identity documents'}
-                        </p>
-                        {!completedSections.has('identity') && (
-                          <div className="flex items-baseline space-x-3">
-                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-orange-600`}>
-                              {getDueDateLabel('identity') ?? ''}
-                            </span>
-                          </div>
-                        )}
+        ) : (
+          <>
+            <div className="tn-dash-top">
+              <div className="tn-dash-stat tn-dash-profile">
+                {user ? (
+                  <>
+                    <div className="tn-dash-profile-info">
+                      <div className="tn-dash-avatar-wrap">
+                        <div className="tn-dash-avatar">
+                          <User size={28} />
+                        </div>
+                        <div className="tn-dash-avatar-badge">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </div>
                       </div>
+                      <h3>{welcomeName}</h3>
+                      {user.email && <div className="tn-dash-profile-email">{user.email}</div>}
+                      {user.phone && <div className="tn-dash-profile-phone">{user.phone}</div>}
                     </div>
-                    <button 
-                      onClick={() => openReferencingModal(1)}
-                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
-                        completedSections.has('identity')
-                          ? 'border-green-300 hover:bg-green-50'
-                          : 'border-orange-300 hover:bg-orange-50'
-                      }`}
-                    >
-                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
-                        completedSections.has('identity') ? 'text-green-600' : 'text-orange-600'
-                      }`}>
-                        {isMobile ? (completedSections.has('identity') ? 'Edit' : 'View') : (completedSections.has('identity') ? 'Edit' : 'View More')}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Employment Reference */}
-                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
-                  <div className="flex items-start justify-between">
-                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
-                      {completedSections.has('employment') ? (
-                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
-                      ) : (
-                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-orange-600 mt-1`} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
-                          completedSections.has('employment') ? 'text-green-600' : 'text-orange-600'
-                        }`}>
-                          Employment
-                        </h4>
-                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                          {completedSections.has('employment') 
-                            ? 'Employment details completed' 
-                            : 'Fill in your employment details'}
-                        </p>
-                        {!completedSections.has('employment') && (
-                          <div className="flex items-baseline space-x-3">
-                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-orange-600`}>
-                              {getDueDateLabel('employment') ?? ''}
-                            </span>
-                          </div>
-                        )}
+                    <div className="tn-dash-pills">
+                      <div className="tn-dash-pill">
+                        <span className="tn-dash-pill-icon">
+                          <Home size={20} />
+                        </span>
+                        <div>
+                          <div className="tn-dash-pill-label">Saved Listings</div>
+                          <div className="tn-dash-pill-val">{savedProperties.length}</div>
+                        </div>
                       </div>
-                    </div>
-                    <button 
-                      onClick={() => openReferencingModal(2)}
-                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
-                        completedSections.has('employment')
-                          ? 'border-green-300 hover:bg-green-50'
-                          : 'border-orange-300 hover:bg-orange-50'
-                      }`}
-                    >
-                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
-                        completedSections.has('employment') ? 'text-green-600' : 'text-orange-600'
-                      }`}>
-                        {isMobile ? (completedSections.has('employment') ? 'Edit' : 'View') : (completedSections.has('employment') ? 'Edit' : 'View More')}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Guarantor Information */}
-                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
-                  <div className="flex items-start justify-between">
-                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
-                      {completedSections.has('guarantor') ? (
-                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
-                      ) : (
-                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-red-600 mt-1`} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
-                          completedSections.has('guarantor') ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          Guarantor
-                        </h4>
-                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                          {completedSections.has('guarantor') 
-                            ? 'Guarantor information completed' 
-                            : 'Additional steps required'}
-                        </p>
-                        {!completedSections.has('guarantor') && (
-                          <div className="flex items-baseline space-x-3">
-                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-red-600`}>
-                              {getDueDateLabel('guarantor') ?? ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => openReferencingModal(5)}
-                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
-                        completedSections.has('guarantor')
-                          ? 'border-green-300 hover:bg-green-50'
-                          : 'border-red-300 hover:bg-red-50'
-                      }`}
-                    >
-                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
-                        completedSections.has('guarantor') ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {isMobile ? (completedSections.has('guarantor') ? 'Edit' : 'View') : (completedSections.has('guarantor') ? 'Edit' : 'View More')}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Residential */}
-                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
-                  <div className="flex items-start justify-between">
-                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
-                      {completedSections.has('residential') ? (
-                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
-                      ) : (
-                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-yellow-600 mt-1`} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
-                          completedSections.has('residential') ? 'text-green-600' : 'text-yellow-600'
-                        }`}>
-                          Residential
-                        </h4>
-                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                          {completedSections.has('residential') 
-                            ? 'Residential history completed' 
-                            : 'Provide residential history'}
-                        </p>
-                        {!completedSections.has('residential') && (
-                          <div className="flex items-baseline space-x-3">
-                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-yellow-600`}>
-                              {getDueDateLabel('residential') ?? ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => openReferencingModal(3)}
-                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
-                        completedSections.has('residential')
-                          ? 'border-green-300 hover:bg-green-50'
-                          : 'border-yellow-300 hover:bg-yellow-50'
-                      }`}
-                    >
-                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
-                        completedSections.has('residential') ? 'text-green-600' : 'text-yellow-600'
-                      }`}>
-                        {isMobile ? (completedSections.has('residential') ? 'Edit' : 'View') : (completedSections.has('residential') ? 'Edit' : 'View More')}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Financial */}
-                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
-                  <div className="flex items-start justify-between">
-                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
-                      {completedSections.has('financial') ? (
-                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
-                      ) : (
-                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-blue-600 mt-1`} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
-                          completedSections.has('financial') ? 'text-green-600' : 'text-blue-600'
-                        }`}>
-                          Financial
-                        </h4>
-                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                          {completedSections.has('financial') 
-                            ? 'Financial documents completed' 
-                            : 'Submit financial documents'}
-                        </p>
-                        {!completedSections.has('financial') && (
-                          <div className="flex items-baseline space-x-3">
-                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-blue-600`}>
-                              {getDueDateLabel('financial') ?? ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => openReferencingModal(4)}
-                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
-                        completedSections.has('financial')
-                          ? 'border-green-300 hover:bg-green-50'
-                          : 'border-blue-300 hover:bg-blue-50'
-                      }`}
-                    >
-                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
-                        completedSections.has('financial') ? 'text-green-600' : 'text-blue-600'
-                      }`}>
-                        {isMobile ? (completedSections.has('financial') ? 'Edit' : 'View') : (completedSections.has('financial') ? 'Edit' : 'View More')}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Viewing Card */}
-        <div
-          className="shadow-sm overflow-hidden"
-          style={{
-            background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
-            border: '1px solid #80B2FF',
-            height: isMobile ? 'auto' : '320px',
-            minHeight: isMobile ? '280px' : '320px',
-            borderRadius: '20px'
-          }}
-        >
-          <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
-            {/* Left Blue Panel */}
-            <div
-              className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px]'} flex`}
-              style={{
-                background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
-                color: '#374957'
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-white rounded-full flex items-center justify-center`}>
-                  <Eye className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
-                </div>
-                <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>Viewing</h2>
-              </div>
-              {!isMobile && <div className="mt-auto"></div>}
-              <div className={isMobile ? '' : 'mt-auto'}>
-                <div className={`${isMobile ? 'text-2xl' : 'text-4xl'} font-bold text-blue-800`}>{viewingStats.total || 0}</div>
-                <div className={`${isMobile ? 'text-xs' : 'text-sm'} opacity-90`}>Summary</div>
-                <div className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-75`}>{viewingStats.upcoming || 0} upcoming, {viewingStats.completed || 0} completed</div>
-              </div>
-            </div>
-
-            {/* Right White Panel */}
-            <div
-              className={`flex-1 p-4 bg-white relative ${isMobile ? 'rounded-b-xl' : ''}`}
-              style={{
-                borderRadius: isMobile ? '0 0 20px 20px' : '20px',
-                boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)'
-              }}
-            >
-              <div className={`absolute ${isMobile ? 'top-3 right-3' : 'top-4 right-4'} z-10`}>
-                <Link 
-                  to="/dashboard/viewings" 
-                  className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline cursor-pointer`}
-                >
-                  {isMobile ? 'Go to viewings →' : 'Go to viewings →'}
-                </Link>
-              </div>
-                    <div className={`flex items-center justify-center ${isMobile ? 'h-48' : 'h-full'}`}>
-                      <div className="relative w-full h-full flex items-center justify-center">
-                        {/* Animated Pie Chart */}
-                        <div className={`relative ${isMobile ? 'w-32 h-32' : 'w-40 h-40'}`}>
-                          <div className={`relative ${isMobile ? 'w-40 h-40' : 'w-48 h-48'}`} style={{ zIndex: 10 }}>
-                            {viewingStats.total > 0 ? (
-                              <svg className={`${isMobile ? 'w-40 h-40' : 'w-48 h-48'}`} viewBox="0 0 200 200" style={{ zIndex: 10 }}>
-                                {/* Pie chart segments - Upcoming viewings */}
-                                {viewingStats.upcoming > 0 && (
-                                  <path
-                                    d={createArcPath(pieSegments.upcomingStartAngle, pieSegments.upcomingEndAngle)}
-                                    fill="#3b82f6"
-                                    style={{
-                                      animation: 'drawSegment 2s ease-in-out forwards',
-                                      transformOrigin: '100px 100px'
-                                    }}
-                                  />
-                                )}
-                                {/* Completed viewings */}
-                                {viewingStats.completed > 0 && (
-                                  <path
-                                    d={createArcPath(pieSegments.completedStartAngle, pieSegments.completedEndAngle)}
-                                    fill="#10b981"
-                                    style={{
-                                      animation: 'drawSegment 2s ease-in-out 0.5s forwards',
-                                      transformOrigin: '100px 100px'
-                                    }}
-                                  />
-                                )}
-                                {/* Rescheduled viewings */}
-                                {viewingStats.rescheduled > 0 && (
-                                  <path
-                                    d={createArcPath(pieSegments.rescheduledStartAngle, pieSegments.rescheduledEndAngle)}
-                                    fill="#f59e0b"
-                                    style={{
-                                      animation: 'drawSegment 2s ease-in-out 0.75s forwards',
-                                      transformOrigin: '100px 100px'
-                                    }}
-                                  />
-                                )}
-                              </svg>
-                            ) : (
-                              <svg className={`${isMobile ? 'w-40 h-40' : 'w-48 h-48'}`} viewBox="0 0 200 200">
-                                <circle cx="100" cy="100" r="60" fill="#e5e7eb" />
-                                <text x="100" y="110" textAnchor="middle" className={`${isMobile ? 'text-xs' : 'text-sm'} fill-gray-500`}>No data</text>
-                              </svg>
-                            )}
-                            
-                            {/* Labels positioned outside the SVG */}
-                            {!isMobile && (
-                              <>
-                                <div className="absolute top-2 right-2" style={{ zIndex: 20 }}>
-                                  <span className="text-xs font-medium text-blue-600">
-                                    Upcoming: {viewingStats.upcoming || 0} ←
-                                  </span>
-                                </div>
-                                <div className="absolute bottom-2 left-2" style={{ zIndex: 20 }}>
-                                  <span className="text-xs font-medium text-green-600">
-                                    Completed: {viewingStats.completed || 0} →
-                                  </span>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                      <div className="tn-dash-pill">
+                        <span className="tn-dash-pill-icon is-pink">
+                          <FileText size={20} />
+                        </span>
+                        <div>
+                          <div className="tn-dash-pill-label">Contracts</div>
+                          <div className="tn-dash-pill-val">{signedContracts.length}</div>
                         </div>
                       </div>
                     </div>
-            </div>
-          </div>
-        </div>
-        </div>
-      </div>
-
-      {/* Saved Searches Section */}
-      <div className={isMobile ? 'p-4' : 'p-6'}>
-        <div className={`flex items-center justify-between ${isMobile ? 'mb-4' : 'mb-6'}`}>
-          <h2 
-            className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}
-            style={{ color: '#374957' }}
-          >
-            Saved Searches
-          </h2>
-          <Link 
-            to="/dashboard/saved-searches" 
-            className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline`}
-          >
-            {isMobile ? 'View all →' : 'Go to saved searches →'}
-          </Link>
-        </div>
-        
-        <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} ${isMobile ? 'gap-4' : 'gap-6'}`}>
-          {savedSearches.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Heart className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Saved Properties</h3>
-              <p className="text-gray-600 mb-4">Start saving properties you like from your search results.</p>
-              <button 
-                className="px-6 py-3 text-white rounded-lg font-medium transition-colors"
-                style={{ backgroundColor: '#E65D24' }}
-                onClick={() => window.location.href = '/'}
-              >
-                Browse Properties
-              </button>
-            </div>
-          ) : (
-            savedSearches.slice(0, 3).map((search) => (
-              <div key={search.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
-                {/* Property Image */}
-                <div className="relative aspect-video overflow-hidden">
-                  <img 
-                    src={search.image} 
-                    alt={search.address} 
-                    className="w-full h-full object-cover" 
-                  />
-                  {/* Heart Icon */}
-                  <div className="absolute top-3 right-3">
-                    <div className="bg-white bg-opacity-80 rounded-full p-1">
-                      <Heart className="w-4 h-4 text-red-500 fill-red-500" />
+                  </>
+                ) : (
+                  <div className="tn-dash-empty">
+                    <div className="tn-dash-empty-icon">
+                      <User size={22} />
                     </div>
+                    <div className="tn-dash-empty-title">No Active Tenant</div>
+                    <div className="tn-dash-empty-desc">Sign in to view your profile and saved listings.</div>
                   </div>
-                </div>
-                
-                {/* Property Details */}
-                <div className="p-4">
-                  {/* Address */}
-                  <h3 className="text-base font-bold text-gray-800 mb-1 truncate">
-                    {search.address}
-                  </h3>
-                  
-                  {/* Property Type */}
-                  <p className="text-xs text-gray-600 mb-3 flex items-center">
-                    <MapPin className="w-3 h-3 mr-1" />
-                    London · {search.propertyType}
-                  </p>
-                  
-                  {/* Price */}
-                  <div className="flex items-center text-lg font-bold text-gray-900 mb-3">
-                    {search.price}
-                    <span className="text-sm text-gray-500 ml-1">/month</span>
+                )}
+              </div>
+
+              <div className="tn-dash-stat tn-dash-ref" id="tenant-insights" style={{ scrollMarginTop: 96 }}>
+                {referencingStarted ? (
+                  <>
+                    <div>
+                      <div className="tn-dash-ref-head">
+                        <div className="label">REFERENCING SUMMARY</div>
+                        <div className="tn-dash-ref-badge" title="Referencing Status">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="4" y1="6" x2="20" y2="6" />
+                            <line x1="4" y1="12" x2="14" y2="12" />
+                            <line x1="4" y1="18" x2="18" y2="18" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="tn-dash-ref-score">
+                        <div className="tn-dash-ref-pct">
+                          {referencingPercent}<span>%</span>
+                        </div>
+                        <div className="tn-dash-ref-sub">{completedCount} out of {totalSections} completed</div>
+                      </div>
+                      <div className="tn-dash-ref-track">
+                        <div className="tn-dash-ref-fill" style={{ width: `${referencingPercent}%` }} />
+                      </div>
+                      <div className="tn-dash-ref-pills">
+                        {REF_PILLARS.map((pillar) => {
+                          const complete = completedSections.has(pillar.key);
+                          const isNext = nextPillar?.key === pillar.key;
+                          const state = complete ? 'completed' : isNext ? 'active' : 'pending';
+                          return (
+                            <button
+                              key={pillar.key}
+                              type="button"
+                              className={`tn-dash-ref-pill ${state}`}
+                              onClick={() => openReferencingModal(pillar.step)}
+                            >
+                              <span>
+                                {complete ? (
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3.5">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                ) : isNext ? (
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="3">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <circle cx="12" cy="12" r="3" fill="#2563eb" />
+                                  </svg>
+                                ) : (
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5">
+                                    <circle cx="12" cy="12" r="9" />
+                                  </svg>
+                                )}
+                              </span>
+                              {pillar.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="tn-dash-ref-cta"
+                      onClick={() => (allCompleted ? navigate('/dashboard/tenant-referencing') : openReferencingModal(nextPillar?.step || 1))}
+                    >
+                      <span>
+                        {allCompleted
+                          ? 'View referencing passport'
+                          : `Next: ${nextPillar?.nextLabel || 'Continue referencing'}`}
+                      </span>
+                      <ChevronRight size={14} strokeWidth={2.5} />
+                    </button>
+                  </>
+                ) : (
+                  <div className="tn-dash-empty">
+                    <div className="tn-dash-empty-icon">
+                      <FileText size={22} />
+                    </div>
+                    <div className="tn-dash-empty-title">No Referencing Underway</div>
+                    <div className="tn-dash-empty-desc">You haven't begun referencing yet. Start your application to qualify for tenancies.</div>
+                    <button type="button" className="tn-dash-empty-btn" onClick={() => openReferencingModal(1)}>
+                      Start Referencing
+                    </button>
                   </div>
-                  
-                  {/* Features */}
-                  <div className="flex flex-wrap gap-1 mb-4">
-                    {search.features.slice(0, 3).map((feature, index) => (
-                      <span 
-                        key={index}
-                        className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-600 hover:bg-orange-200 cursor-pointer transition-colors"
+                )}
+              </div>
+
+              <div className="tn-dash-stat tn-dash-viewings-card">
+                {viewingTotal > 0 ? (
+                  <>
+                    <div>
+                      <div className="tn-dash-occ-head">
+                        <span className="label">VIEWINGS</span>
+                        <div className="tn-dash-occ-badge" title="Viewings Overview">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="tn-dash-occ-body">
+                        <div
+                          className="tn-dash-donut"
+                          onClick={() => navigate('/dashboard/viewings')}
+                          onMouseEnter={() => setDonutHover('completed')}
+                          onMouseLeave={() => setDonutHover(null)}
+                        >
+                          <div className="tn-dash-donut-tip">
+                            {donutHover === 'upcoming'
+                              ? `Upcoming: ${viewingUpcoming} viewings`
+                              : `Completed: ${viewingCompleted} viewings`}
+                          </div>
+                          <svg viewBox="0 0 200 200">
+                            <circle
+                              cx="100"
+                              cy="100"
+                              r="72"
+                              fill="none"
+                              stroke="#165c40"
+                              strokeWidth="38"
+                              strokeLinecap="round"
+                              strokeDasharray={`${completedLen} ${circ}`}
+                              transform="rotate(-90 100 100)"
+                            />
+                            <circle
+                              cx="100"
+                              cy="100"
+                              r="72"
+                              fill="none"
+                              stroke="#f2fbf7"
+                              strokeWidth="38"
+                              strokeLinecap="round"
+                              strokeDasharray={`${upcomingLen} ${circ}`}
+                              strokeDashoffset={-completedLen}
+                              transform="rotate(-90 100 100)"
+                            />
+                          </svg>
+                        </div>
+                        <div className="tn-dash-occ-meta">
+                          <span className="meta-label">Total Viewings</span>
+                          <span className="meta-val">{viewingTotal}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="tn-dash-occ-legend">
+                      <div className="tn-dash-legend-item">
+                        <span className="tn-dash-legend-box completed" />
+                        <span>Completed - {viewingCompleted}</span>
+                      </div>
+                      <div
+                        className="tn-dash-legend-item"
+                        onMouseEnter={() => setDonutHover('upcoming')}
+                        onMouseLeave={() => setDonutHover(null)}
                       >
-                        {feature}
-                      </span>
-                    ))}
-                    {search.features.length > 3 && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-600 hover:bg-orange-200 cursor-pointer transition-colors">
-                        +{search.features.length - 3} more
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2">
-                    <button className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </button>
-                    <button className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
-                      <FileText className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
-                      <Calendar className="w-4 h-4" />
+                        <span className="tn-dash-legend-box upcoming" />
+                        <span>Upcoming - {viewingUpcoming}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="tn-dash-empty">
+                    <div className="tn-dash-empty-icon">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                    </div>
+                    <div className="tn-dash-empty-title">No Viewings Recorded</div>
+                    <div className="tn-dash-empty-desc">Book your first property viewing to see scheduling metrics.</div>
+                    <button type="button" className="tn-dash-empty-btn" onClick={() => navigate('/search')}>
+                      Book a Viewing
                     </button>
                   </div>
+                )}
+              </div>
+            </div>
+
+            <div className="tn-dash-mid">
+              <div className="tn-dash-mid-left">
+                <div className="tn-dash-box">
+                  {recentFiles.length > 0 ? (
+                    <>
+                      <div className="tn-dash-box-head">
+                        <h3 className="tn-dash-box-title">Your Documents</h3>
+                        <button type="button" className="tn-dash-link" onClick={() => navigate('/dashboard/your-files')}>
+                          View all
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                      <div className="tn-dash-docs">
+                        {visibleDocs.map((file) => {
+                          const kind = fileExtLabel(file);
+                          return (
+                            <button
+                              key={file.id}
+                              type="button"
+                              className="tn-dash-doc"
+                              onClick={() => handleView(file)}
+                            >
+                              <div className={`tn-dash-doc-icon ${kind.tone}`}>{kind.label}</div>
+                              <div className="tn-dash-doc-info">
+                                <div className="tn-dash-doc-name">{truncateName(file.name)}</div>
+                                <div className="tn-dash-doc-meta">
+                                  {kind.label} · {fileService.formatFileSize(file.size || 0)}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                        {recentFiles.length > 4 && (
+                          <button
+                            type="button"
+                            className="tn-dash-carousel-btn"
+                            title="Next Document"
+                            onClick={() => setDocOffset((prev) => (prev + 1) % recentFiles.length)}
+                          >
+                            <ChevronRight size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="tn-dash-box-head">
+                        <h3 className="tn-dash-box-title">Your Documents</h3>
+                      </div>
+                      <div className="tn-dash-empty" style={{ padding: '24px 16px', minHeight: 140 }}>
+                        <div className="tn-dash-empty-icon">
+                          <FileText size={22} />
+                        </div>
+                        <div className="tn-dash-empty-title">No documents uploaded yet</div>
+                        <div className="tn-dash-empty-desc">Upload identity papers, agreements, or referencing receipts.</div>
+                        <button type="button" className="tn-dash-empty-btn primary" onClick={() => navigate('/dashboard/your-files')}>
+                          + Upload Document
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="tn-dash-box">
+                  {savedProperties.length > 0 ? (
+                    <>
+                      <div className="tn-dash-props-head">
+                        <h2>Properties</h2>
+                        <button type="button" className="tn-dash-link" onClick={() => navigate('/dashboard/saved-searches')}>
+                          View Saved Listings
+                          <ExternalLink size={14} />
+                        </button>
+                      </div>
+                      <div className="tn-dash-filters">
+                        {([
+                          ['all', 'All listings'],
+                          ['latest', 'Latest Save'],
+                          ['highest', 'Highest Lease'],
+                          ['lowest', 'Lowest Lease'],
+                        ] as const).map(([id, label]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            className={`tn-dash-filter${propertyFilter === id ? ' active' : ''}`}
+                            onClick={() => setPropertyFilter(id)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="tn-dash-prop-grid">
+                        {filteredProperties.map((property) => {
+                          const imgIndex = imageIndexById[property.id] || 0;
+                          const images = property.imageUrls?.length ? property.imageUrls : [];
+                          const src = images[imgIndex] || images[0];
+                          const badge =
+                            property.id === latestSavedId
+                              ? { cls: 'latest', label: 'Latest' }
+                              : property.id === highestLeaseId
+                                ? { cls: 'highest', label: 'Highest Lease' }
+                                : null;
+                          return (
+                            <article key={property.id} className="tn-dash-prop">
+                              <div className="tn-dash-prop-img">
+                                {src ? (
+                                  <img src={src} alt={property.title} />
+                                ) : (
+                                  <div className="tn-dash-prop-placeholder">
+                                    <Home size={28} />
+                                  </div>
+                                )}
+                                {badge && (
+                                  <div className={`tn-dash-badge ${badge.cls}`}>
+                                    <span className="tn-dash-badge-dot" />
+                                    {badge.label}
+                                  </div>
+                                )}
+                                {images.length > 1 && (
+                                  <div className="tn-dash-dots">
+                                    {images.slice(0, 4).map((_, i) => (
+                                      <button
+                                        key={i}
+                                        type="button"
+                                        className={`tn-dash-dot${i === imgIndex ? ' active' : ''}`}
+                                        onClick={() => setImageIndexById((prev) => ({ ...prev, [property.id]: i }))}
+                                        aria-label={`Photo ${i + 1}`}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="tn-dash-prop-body">
+                                <div className="tn-dash-price-row">
+                                  <div className="tn-dash-price">
+                                    {formatLeasePrice(property.price)} <span>/ month</span>
+                                  </div>
+                                  <div className="tn-dash-ago">{timeAgo(property.savedAt)}</div>
+                                </div>
+                                <div className="tn-dash-prop-name">{property.title}</div>
+                                <div className="tn-dash-prop-addr">{property.location}</div>
+                                <div className="tn-dash-specs">
+                                  {property.bedrooms && (
+                                    <div className="tn-dash-spec">
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M3 20v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8" />
+                                        <path d="M5 10V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4" />
+                                        <line x1="2" y1="20" x2="22" y2="20" />
+                                      </svg>
+                                      {String(property.bedrooms).toLowerCase().includes('bed')
+                                        ? property.bedrooms
+                                        : `${property.bedrooms} Bedrooms`}
+                                    </div>
+                                  )}
+                                  {property.propertyType && (
+                                    <div className="tn-dash-spec">
+                                      <Home size={14} />
+                                      {property.propertyType}
+                                    </div>
+                                  )}
+                                </div>
+                                {property.propertyType && (
+                                  <div className="tn-dash-tags">
+                                    <span className="tn-dash-tag">{property.propertyType}</span>
+                                  </div>
+                                )}
+                                <div className="tn-dash-prop-actions">
+                                  <button type="button" className="tn-dash-view-btn" onClick={() => openSavedProperty(property)}>
+                                    View Details
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="tn-dash-icon-sq"
+                                    title="Photos"
+                                    onClick={() => cyclePropertyImage(property)}
+                                  >
+                                    <ImageIcon size={15} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="tn-dash-icon-sq"
+                                    title="Documents"
+                                    onClick={() => navigate('/dashboard/your-files')}
+                                  >
+                                    <FileText size={15} />
+                                  </button>
+                                </div>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="tn-dash-props-head">
+                        <h2>Properties</h2>
+                      </div>
+                      <div className="tn-dash-empty" style={{ padding: '40px 16px' }}>
+                        <div className="tn-dash-empty-icon">
+                          <Home size={22} />
+                        </div>
+                        <div className="tn-dash-empty-title">No saved properties found</div>
+                        <div className="tn-dash-empty-desc">You haven't bookmarked any listings yet. Browse available homes to save them here.</div>
+                        <button type="button" className="tn-dash-empty-btn primary" onClick={() => navigate('/search')}>
+                          Find Properties
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </div>
 
-
-      {/* Upcoming Viewings Section */}
-      {/* <div className="bg-white p-6 rounded-xl border border-gray-100">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Upcoming Viewings</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {upcomingViewings.slice(0, 2).map((viewing) => (
-            <div key={viewing.id} className="flex items-center p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-              <Calendar className="w-6 h-6 text-blue-500 mr-4" />
-              <div>
-                <p className="text-md font-medium text-gray-800">{viewing.propertyAddress}</p>
-                <p className="text-sm text-gray-600">{formatDate(viewing.date)} at {viewing.time}</p>
-              </div>
-              <Link to={`/viewings/${viewing.id}`} className="ml-auto px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors">
-                Details
-              </Link>
-            </div>
-          ))}
-          {upcomingViewings.length === 0 && (
-            <div className="col-span-full text-center py-8">
-              <p className="text-gray-500">No upcoming viewings scheduled.</p>
-            </div>
-          )}
-        </div>
-      </div> */}
-
-      {/* Contracts and Documents Section */}
-      <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} ${isMobile ? 'gap-4' : 'gap-8'}`}>
-        {/* Contracts Overview */}
-        <div className={`${isMobile ? 'p-4' : 'p-6'} border border-gray-200 rounded-xl`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-4' : 'mb-6'}`}>
-            <h2 
-              className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}
-              style={{ color: '#374957' }}
-            >
-              Contracts
-            </h2>
-            <Link 
-              to="/dashboard/contracts" 
-              className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline`}
-            >
-              {isMobile ? 'View all →' : 'Go to Contracts →'}
-            </Link>
-          </div>
-          
-          <div className={`grid grid-cols-2 ${isMobile ? 'gap-3' : 'gap-4'}`}>
-            {/* Requested Contracts */}
-            <div className={`${isMobile ? 'p-3' : 'p-4'} bg-white rounded-lg border border-gray-200`}>
-              <div className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-800 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                {dashboardSummary?.contracts.requested || 0}
-              </div>
-              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 ${isMobile ? 'mb-2' : 'mb-3'}`}>
-                Requested Contracts
-              </div>
-              <Link 
-                to="/dashboard/tenant-contracts?status=requested" 
-                className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 hover:text-gray-800 transition-colors`}
-              >
-                View Requested
-              </Link>
-            </div>
-            
-            {/* Signed Contracts */}
-            <div className={`${isMobile ? 'p-3' : 'p-4'} bg-blue-50 rounded-lg border border-blue-200`}>
-              <div className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-800 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                 {signedContracts.length || 0}
-              </div>
-              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 ${isMobile ? 'mb-2' : 'mb-3'}`}>
-                Signed Contracts
-              </div>
-              <Link 
-                to="/dashboard/tenant-contracts" 
-                className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-600 hover:text-blue-800 transition-colors`}
-              >
-                View Signed
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Documents */}
-        <div className={`${isMobile ? 'p-4' : 'p-6'} border border-gray-200 rounded-xl`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-4' : 'mb-6'}`}>
-            <h2 
-              className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}
-              style={{ color: '#374957' }}
-            >
-              Documents
-            </h2>
-            <Link 
-              to="/dashboard/your-files" 
-              className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline`}
-            >
-              {isMobile ? 'View all →' : 'Go to Documents →'}
-            </Link>
-          </div>
-          
-          <div className={`grid grid-cols-2 ${isMobile ? 'gap-3' : 'gap-4'}`}>
-            {filesLoading ? (
-              <div className="col-span-2 text-center py-8">
-                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                <p className="text-gray-600">Loading documents...</p>
-              </div>
-            ) : recentFiles.length === 0 ? (
-              <div className="col-span-2 text-center py-8">
-                <FileTextIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No documents found</p>
-                <p className="text-sm text-gray-500 mt-1">Upload your first document to get started</p>
-              </div>
-            ) : (
-              recentFiles.map((file) => (
-                <div
-                  key={file.id}
-                  className={`${isMobile ? 'p-3' : 'p-4'} bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow`}
-                >
-                  <div className={`flex items-start space-x-3 ${isMobile ? 'mb-2' : 'mb-3'}`}>
-                    <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-gray-100 rounded-md flex items-center justify-center`}>
-                      {getFileTypeIcon(file.name, file.type)}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-800 ${isMobile ? 'mb-1' : 'mb-1'} truncate`}>
-                        {file.name}
-                      </h3>
-                      <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-orange-600 font-medium ${isMobile ? 'mb-1' : 'mb-1'}`}>
-                        {formatFileSize(file.size)}
-                      </p>
-                      <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500`}>
-                        Uploaded {file.uploadDate}
-                      </p>
-                    </div>
-                  </div>
-                  <button 
-                    className={`w-full flex items-center justify-center ${isMobile ? 'px-2 py-1.5' : 'px-3 py-2'} border border-gray-300 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700 hover:bg-gray-50 transition-colors`}
-                    onClick={() => handleView(file)}
-                  >
-                    <Eye className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} ${isMobile ? '' : 'mr-2'}`} />
-                    {!isMobile && <span>View</span>}
-                  </button>
+              <div className="tn-dash-mid-right">
+                <div className="tn-dash-box">
+                  {listedViewings.length > 0 ? (
+                    <>
+                      <div className="tn-dash-box-head">
+                        <h3 className="tn-dash-box-title">Viewings</h3>
+                        <button type="button" className="tn-dash-link" onClick={() => navigate('/dashboard/viewings')}>
+                          See all
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                      <div className="tn-dash-viewings-list">
+                        {listedViewings.map((booking) => (
+                          <div key={booking.id} className="tn-dash-viewing">
+                            <div className="tn-dash-viewing-thumb">
+                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                              </svg>
+                            </div>
+                            <div className="tn-dash-viewing-details">
+                              <div className="tn-dash-viewing-dt">
+                                {formatViewingDateTime(booking.viewingDetails?.date, booking.viewingDetails?.time)}
+                              </div>
+                              <div className="tn-dash-viewing-addr">{viewingAddress(booking)}</div>
+                              <div className="tn-dash-viewing-actions">
+                                <button type="button" className="tn-dash-pill-btn" onClick={() => navigate('/dashboard/viewings')}>
+                                  Reschedule
+                                </button>
+                                <button type="button" className="tn-dash-pill-btn cancel" onClick={() => navigate('/dashboard/viewings')}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="tn-dash-box-head">
+                        <h3 className="tn-dash-box-title">Viewings</h3>
+                      </div>
+                      <div className="tn-dash-empty" style={{ padding: '24px 16px', minHeight: 140 }}>
+                        <div className="tn-dash-empty-icon">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                          </svg>
+                        </div>
+                        <div className="tn-dash-empty-title">No viewings booked</div>
+                        <div className="tn-dash-empty-desc">Schedule a visit to see homes in person.</div>
+                        <button type="button" className="tn-dash-empty-btn primary" onClick={() => navigate('/search')}>
+                          Book a Viewing
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+
+                <div className="tn-dash-box">
+                  {contractAlerts.length > 0 ? (
+                    <>
+                      <div className="tn-dash-box-head">
+                        <h3 className="tn-dash-box-title">Contract Alerts</h3>
+                        <button type="button" className="tn-dash-link" onClick={() => navigate('/dashboard/tenant-contracts')}>
+                          See all
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                      <div className="tn-dash-alerts">
+                        {contractAlerts.map((contract: any) => {
+                          const status = String(contract.status || 'signed').toLowerCase();
+                          const theme = status === 'signed' ? 'green' : status === 'sent' || status === 'delivered' ? 'yellow' : 'green';
+                          const title = status === 'signed' ? 'Signed' : status === 'sent' ? 'Sent' : status === 'delivered' ? 'Delivered' : 'Contract';
+                          return (
+                            <div key={contract.id} className={`tn-dash-alert ${theme}`}>
+                              <div className="tn-dash-alert-icon">
+                                {theme === 'green' ? (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                    <polyline points="9 12 11 14 15 10" />
+                                  </svg>
+                                ) : (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="tn-dash-alert-body">
+                                <div className="tn-dash-alert-title">{title}</div>
+                                <div className="tn-dash-alert-desc">
+                                  {contract.documentName || contract.propertyName || contract.propertyAddress || 'Tenancy agreement'}
+                                </div>
+                                <div className="tn-dash-alert-time">
+                                  {contract.signedDate ? timeAgo(contract.signedDate) : ''}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="tn-dash-alert-link"
+                                onClick={() => navigate('/dashboard/tenant-contracts')}
+                              >
+                                View
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="tn-dash-box-head">
+                        <h3 className="tn-dash-box-title">Contract Alerts</h3>
+                      </div>
+                      <div className="tn-dash-empty" style={{ padding: '24px 16px', minHeight: 140 }}>
+                        <div className="tn-dash-empty-icon">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                          </svg>
+                        </div>
+                        <div className="tn-dash-empty-title">No Contract Alerts</div>
+                        <div className="tn-dash-empty-desc">All tenancies, payments, and contract signatures are up to date.</div>
+                        <button type="button" className="tn-dash-empty-btn" onClick={() => navigate('/dashboard/tenant-contracts')}>
+                          View Contracts
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Referencing Modal */}
-      {isReferencingModalOpen && selectedPropertyId && (
-        <ReferencingModal
-          isOpen={isReferencingModalOpen}
-          onClose={closeReferencingModal}
-          initialStep={referencingStep}
-          singleSectionOnly={true}
-          onSubmissionComplete={() => {
-            // refresh data
-          }}
-        />
-      )}
+      <ReferencingModal
+        isOpen={isReferencingModalOpen}
+        onClose={closeReferencingModal}
+        initialStep={referencingStep}
+      />
 
-      {/* File Preview Modal */}
       <FilePreviewModal
         isOpen={isPreviewModalOpen}
         onClose={() => {
@@ -1358,5 +1048,4 @@ const DashboardHome: React.FC = () => {
   );
 };
 
-
-export default DashboardHome; 
+export default DashboardHome;

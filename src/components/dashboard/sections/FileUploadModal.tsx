@@ -1,5 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { X, Upload, File, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
+import '../../../styles/tenantModals.css';
 
 interface FileUploadModalProps {
   isOpen: boolean;
@@ -7,174 +9,81 @@ interface FileUploadModalProps {
   onUpload: (files: File[], category: string) => Promise<void>;
 }
 
+const CATEGORIES = [
+  { value: 'Identity', label: 'Identity (Passports, National ID, Driving Licence)' },
+  { value: 'Employment', label: 'Employment (Payslips, P60, Employment Contracts)' },
+  { value: 'Financial', label: 'Financial (Bank Statements, Proof of Funds)' },
+  { value: 'Residential', label: 'Residential (Utility Bills, Landlord References, Council Tax)' },
+  { value: 'Guarantor', label: 'Guarantor (Deed of Guarantee, Guarantor Proofs)' },
+  { value: 'Contracts', label: 'Contracts (AST, Lease, Signed Agreements)' },
+];
+
 const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUpload }) => {
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('Identity');
+  const [notes, setNotes] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [uploadStatus, setUploadStatus] = useState<Record<string, 'pending' | 'uploading' | 'success' | 'error'>>({});
   const [errors, setErrors] = useState<string[]>([]);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const categories = [
-    'Identity',
-    'Employment', 
-    'Residential',
-    'Financial',
-    'Guarantor',
-    'Contracts'
-  ];
+  const ownerLabel = user?.name
+    ? `${user.name}${user.email ? ` (${user.email})` : ''}`
+    : user?.email || 'Current tenant';
 
-  const acceptedFileTypes = {
-    'application/pdf': ['.pdf'],
-    'image/jpeg': ['.jpg', '.jpeg'],
-    'image/png': ['.png'],
-    'image/gif': ['.gif'],
-    'application/msword': ['.doc'],
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
-  };
-
-  const maxFileSize = 10 * 1024 * 1024; // 10MB
-  const maxFiles = 5;
+  const maxFileSize = 25 * 1024 * 1024;
 
   const validateFile = (file: File): string | null => {
     if (file.size > maxFileSize) {
-      return `File ${file.name} is too large. Maximum size is 10MB.`;
+      return `${file.name} is too large. Maximum size is 25 MB.`;
     }
-    
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-    const isValidType = Object.values(acceptedFileTypes).some(extensions => 
-      extensions.includes(fileExtension)
-    );
-    
-    if (!isValidType) {
-      return `File ${file.name} has an unsupported format.`;
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+    if (!allowed.includes(fileExtension)) {
+      return `${file.name} must be a PDF, PNG, or JPG.`;
     }
-    
     return null;
   };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFiles(Array.from(e.dataTransfer.files));
-    }
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
+    else if (e.type === 'dragleave') setDragActive(false);
   }, []);
 
   const handleFiles = (files: File[]) => {
     const newFiles: File[] = [];
     const newErrors: string[] = [];
-    
-    // Check total file limit
-    if (selectedFiles.length + files.length > maxFiles) {
-      newErrors.push(`Maximum ${maxFiles} files allowed.`);
-      setErrors(newErrors);
-      return;
-    }
-    
-    files.forEach(file => {
+    files.forEach((file) => {
       const error = validateFile(file);
-      if (error) {
-        newErrors.push(error);
-      } else {
-        newFiles.push(file);
-      }
+      if (error) newErrors.push(error);
+      else newFiles.push(file);
     });
-    
-    if (newErrors.length > 0) {
-      setErrors(newErrors);
-    }
-    
-    if (newFiles.length > 0) {
-      setSelectedFiles(prev => [...prev, ...newFiles]);
-      setErrors([]);
-    }
+    setErrors(newErrors);
+    if (newFiles.length > 0) setSelectedFiles((prev) => [...prev, ...newFiles]);
   };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files?.[0]) handleFiles(Array.from(e.dataTransfer.files));
+  }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      handleFiles(Array.from(e.target.files));
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    setErrors([]);
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const handleUpload = async () => {
-    if (selectedFiles.length === 0) return;
-    
-    setUploading(true);
-    setErrors([]);
-    
-    // Initialize upload status for all files
-    const initialStatus: Record<string, 'pending' | 'uploading' | 'success' | 'error'> = {};
-    const initialProgress: Record<string, number> = {};
-    
-    selectedFiles.forEach(file => {
-      initialStatus[file.name] = 'pending';
-      initialProgress[file.name] = 0;
-    });
-    
-    setUploadStatus(initialStatus);
-    setUploadProgress(initialProgress);
-    
-    try {
-      await onUpload(selectedFiles, selectedCategory);
-      
-      // Mark all files as success
-      const successStatus: Record<string, 'success'> = {};
-      selectedFiles.forEach(file => {
-        successStatus[file.name] = 'success';
-      });
-      setUploadStatus(successStatus);
-      
-      // Reset form after successful upload
-      setTimeout(() => {
-        setSelectedFiles([]);
-        setUploadStatus({});
-        setUploadProgress({});
-        onClose();
-      }, 1500);
-      
-    } catch (error) {
-      console.error('Upload error:', error);
-      setErrors([`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`]);
-    } finally {
-      setUploading(false);
-    }
+    if (e.target.files) handleFiles(Array.from(e.target.files));
   };
 
   const resetModal = () => {
     setSelectedFiles([]);
     setErrors([]);
     setUploadStatus({});
-    setUploadProgress({});
     setUploading(false);
+    setNotes('');
+    setSelectedCategory('Identity');
   };
 
   const handleClose = () => {
@@ -182,197 +91,140 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
     onClose();
   };
 
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) return;
+    setUploading(true);
+    setErrors([]);
+    const nextStatus: Record<string, 'pending' | 'uploading' | 'success' | 'error'> = {};
+    selectedFiles.forEach((file) => { nextStatus[file.name] = 'uploading'; });
+    setUploadStatus(nextStatus);
+    try {
+      await onUpload(selectedFiles, selectedCategory);
+      const successStatus: Record<string, 'success'> = {};
+      selectedFiles.forEach((file) => { successStatus[file.name] = 'success'; });
+      setUploadStatus(successStatus);
+      setTimeout(() => {
+        resetModal();
+        onClose();
+      }, 800);
+    } catch (error) {
+      setErrors([`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`]);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Upload Files</h2>
-          <button
-            onClick={handleClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+    <div className="tn-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+      <div className="tn-modal tn-modal-lg" role="dialog" aria-labelledby="tn-upload-title">
+        <div className="tn-modal-head">
+          <div>
+            <h3 id="tn-upload-title">Upload Document</h3>
+            <p>Add documents directly to your secure file vault.</p>
+          </div>
+          <button type="button" className="tn-modal-x" onClick={handleClose} aria-label="Close">✕</button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Category Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category
-            </label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-              style={{ 
-                '--tw-ring-color': '#136C9E'
-              } as React.CSSProperties}
-              onFocus={(e) => {
-                e.target.style.boxShadow = '0 0 0 2px #136C9E';
-              }}
-              onBlur={(e) => {
-                e.target.style.boxShadow = '';
-              }}
-            >
-              {categories.map(category => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
+        <div className="tn-modal-body">
+          <label className="tn-modal-label">
+            Associated Client / Tenant
+            <input type="text" value={ownerLabel} readOnly />
+          </label>
+
+          <label className="tn-modal-label">
+            Category
+            <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+              {CATEGORIES.map((category) => (
+                <option key={category.value} value={category.value}>{category.label}</option>
               ))}
             </select>
-          </div>
+          </label>
 
-          {/* File Upload Area */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Files
-            </label>
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragActive 
-                  ? 'border-gray-300 hover:border-gray-400' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-              style={{
-                backgroundColor: dragActive ? '#E7F2FF' : 'transparent',
-                borderColor: dragActive ? '#136C9E' : undefined
-              }}
+          <div className="tn-modal-label">
+            <span>Select File (PDF, PNG, JPG)</span>
+            <button
+              type="button"
+              className={`tn-modal-drop${dragActive ? ' is-over' : ''}`}
+              onClick={() => fileInputRef.current?.click()}
               onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
               onDragOver={handleDrag}
+              onDragLeave={handleDrag}
               onDrop={handleDrop}
             >
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-lg font-medium text-gray-900 mb-2">
-                Drop files here or click to browse
-              </p>
-              <p className="text-sm text-gray-500 mb-4">
-                Supports PDF, DOC, DOCX, JPG, PNG, GIF (max 10MB each)
-              </p>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 text-white rounded-lg transition-colors"
-                style={{
-                  backgroundColor: '#136C9E'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0F5A8A';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#136C9E';
-                }}
-                disabled={uploading}
-              >
-                Choose Files
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
-                onChange={handleFileInput}
-                className="hidden"
-              />
-            </div>
+              <Upload className="w-8 h-8" />
+              <strong>Click to choose a file or drag here</strong>
+              <span>Maximum file size: 25 MB</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileInput}
+              className="hidden"
+            />
           </div>
 
-          {/* Selected Files */}
           {selectedFiles.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">
-                Selected Files ({selectedFiles.length}/{maxFiles})
-              </h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {selectedFiles.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <File className="w-4 h-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                        <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {uploadStatus[file.name] === 'uploading' && (
-                        <div className="flex items-center space-x-2">
-                          <Loader className="w-4 h-4 animate-spin" style={{ color: '#136C9E' }} />
-                          <span className="text-xs text-gray-500">
-                            {uploadProgress[file.name]}%
-                          </span>
-                        </div>
-                      )}
-                      {uploadStatus[file.name] === 'success' && (
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      )}
-                      {uploadStatus[file.name] === 'error' && (
-                        <AlertCircle className="w-4 h-4 text-red-600" />
-                      )}
-                      {!uploading && (
-                        <button
-                          onClick={() => removeFile(index)}
-                          className="p-1 hover:bg-gray-200 rounded transition-colors"
-                        >
-                          <X className="w-4 h-4 text-gray-500" />
-                        </button>
-                      )}
-                    </div>
+            <ul className="tn-modal-files">
+              {selectedFiles.map((file, index) => (
+                <li key={`${file.name}-${index}`}>
+                  <File className="w-4 h-4" />
+                  <div>
+                    <p>{file.name}</p>
+                    <span>{formatFileSize(file.size)}</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  {uploadStatus[file.name] === 'uploading' && <Loader className="w-4 h-4 animate-spin" />}
+                  {uploadStatus[file.name] === 'success' && <CheckCircle className="w-4 h-4 tn-ok" />}
+                  {!uploading && (
+                    <button type="button" className="tn-modal-x sm" onClick={() => setSelectedFiles((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove file">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
 
-          {/* Error Messages */}
+          <label className="tn-modal-label">
+            Notes / Remarks (Optional)
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Verified against payroll records"
+            />
+          </label>
+
           {errors.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-start space-x-2">
-                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                <div>
-                  <h3 className="text-sm font-medium text-red-800">Upload Errors</h3>
-                  <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
-                    {errors.map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+            <div className="tn-modal-errors">
+              <AlertCircle className="w-4 h-4" />
+              <ul>
+                {errors.map((error) => <li key={error}>{error}</li>)}
+              </ul>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+        <div className="tn-modal-foot">
+          <button type="button" className="tn-modal-cancel" onClick={handleClose} disabled={uploading}>Cancel</button>
           <button
-            onClick={handleClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            disabled={uploading}
-          >
-            Cancel
-          </button>
-          <button
+            type="button"
+            className="tn-modal-primary"
             onClick={handleUpload}
             disabled={selectedFiles.length === 0 || uploading}
-            className="px-6 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            style={{
-              backgroundColor: '#136C9E'
-            }}
-            onMouseEnter={(e) => {
-              if (!uploading) {
-                e.currentTarget.style.backgroundColor = '#0F5A8A';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!uploading) {
-                e.currentTarget.style.backgroundColor = '#136C9E';
-              }
-            }}
           >
-            {uploading ? 'Uploading...' : 'Upload Files'}
+            {uploading ? 'Uploading...' : 'Upload & Secure'}
           </button>
         </div>
       </div>

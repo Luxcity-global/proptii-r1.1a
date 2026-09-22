@@ -5,6 +5,7 @@ import SessionManager from '../services/SessionManager';
 import { notifyAuthReady } from '../services/authReady';
 import userService from '../services/userService';
 import EditProfileModal from '../components/profile/EditProfileModal';
+import { resolveMockTestUser } from '../data/mockTestUsers';
 
 
 
@@ -87,15 +88,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const mockToken = localStorage.getItem('mock_token');
         if (mockToken && mockToken.startsWith('mock-token-')) {
           const id = mockToken.replace('mock-token-', '');
-          const role = id.startsWith('landlord-') ? 'landlord' : 'tenant';
+          const mockUser = resolveMockTestUser(id);
           if (!cancelled) {
             setUser({
-              id,
-              name: `Test ${role}`,
-              givenName: 'Test',
-              familyName: role,
-              email: `${role}@test.proptii.co`,
-              roles: [role],
+              id: mockUser.id,
+              name: mockUser.name,
+              givenName: mockUser.givenName,
+              familyName: mockUser.familyName,
+              email: mockUser.email,
+              phone: mockUser.phone,
+              roles: [mockUser.role],
               roleResolved: true,
             });
             setIsAuthenticated(true);
@@ -239,18 +241,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginAsMockUser = (id: string, role: string) => {
-    const names: Record<string, { name: string; givenName: string; familyName: string; email: string }> = {
-      'tenant-test-001':   { name: 'Sarah Jones', givenName: 'Sarah', familyName: 'Jones',  email: 'tenant@test.proptii.co' },
-      'tenant-test-002':   { name: 'Emily Davis', givenName: 'Emily', familyName: 'Davis',  email: 'tenant-two@test.proptii.co' },
-      'landlord-test-001': { name: 'John Smith',  givenName: 'John',  familyName: 'Smith',  email: 'landlord@test.proptii.co' },
-      'landlord-test-002': { name: 'Jack Smith',  givenName: 'Jack',  familyName: 'Smith',  email: 'landlord-two@test.proptii.co' },
-    };
-    const defaults = { name: `Test ${role}`, givenName: 'Test', familyName: role, email: `${role}@test.proptii.co` };
-    const info = names[id] ?? defaults;
+    const mockUser = resolveMockTestUser(id);
+    const resolvedRole = mockUser.role || role;
     localStorage.setItem('mock_token', `mock-token-${id}`);
-    setUser({ id, ...info, roles: [role], roleResolved: true });
+    setUser({
+      id: mockUser.id,
+      name: mockUser.name,
+      givenName: mockUser.givenName,
+      familyName: mockUser.familyName,
+      email: mockUser.email,
+      phone: mockUser.phone,
+      roles: [resolvedRole],
+      roleResolved: true,
+    });
     setIsAuthenticated(true);
     setIsLoading(false);
+    notifyAuthReady();
+    window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: true } }));
   };
 
   const updateUserProfile = async (data: { name: string; phone?: string }): Promise<void> => {

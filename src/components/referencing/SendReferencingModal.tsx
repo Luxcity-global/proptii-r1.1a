@@ -12,7 +12,6 @@ import {
   ShieldCheck, 
   Edit3, 
   Plus,
-  ArrowRight,
   Copy,
   Check,
   ExternalLink,
@@ -135,26 +134,26 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
         onClick={handleClose}
       />
 
-      <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden z-10 border border-slate-200">
         {/* Header */}
-        <div 
-          className="px-6 py-5 text-white flex items-center justify-between"
-          style={{ background: 'linear-gradient(135deg, #136C9E 0%, #0D4E73 100%)' }}
+        <div
+          className="px-6 py-5 flex items-center justify-between bg-slate-50/50 border-b border-slate-100"
         >
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-md">
-              <Send className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-orange-100 text-[#DC5F12] flex items-center justify-center">
+              <Send className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-bold">Send Referencing Passport</h2>
-              <p className="text-xs sm:text-sm text-blue-100/90">
-                Share your verified referencing report with any landlord or agent
+              <h2 className="text-base font-bold text-slate-900">Share Verified Passport</h2>
+              <p className="text-xs text-slate-500">
+                Provide secure, time-limited referencing access
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white"
+            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-white"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -452,22 +451,21 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="flex-1 sm:flex-initial px-4 py-2.5 text-sm border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                    className="flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting || !hasAgreed}
-                    className="flex-1 sm:flex-initial px-6 py-2.5 text-sm font-semibold text-white rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 sm:flex-initial px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: '#DC5F12' }}
                   >
                     {isSubmitting ? (
                       <span>Sending...</span>
                     ) : (
                       <>
-                        <span>Send Referencing</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <span>Send Encrypted Passport</span>
                       </>
                     )}
                   </button>

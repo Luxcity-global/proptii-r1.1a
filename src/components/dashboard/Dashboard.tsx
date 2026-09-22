@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import DashboardSidebar, { getUnreadBadgeLabel } from './ui/DashboardSidebar';
-import DashboardHeader from './ui/DashboardHeader';
+import DashboardHeader, { TenantPreviewBanner } from './ui/DashboardHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import { useIsMobile } from './ui/use-mobile';
 import { Menu, X, Home, User } from 'lucide-react';
@@ -272,6 +272,21 @@ const DashboardInner: React.FC = () => {
     window.location.href = '/';
   };
 
+  const hideLegacyHeader =
+    location.pathname === '/dashboard' ||
+    location.pathname === '/dashboard/' ||
+    location.pathname === '/dashboard/saved-searches' ||
+    location.pathname === '/dashboard/viewings' ||
+    location.pathname === '/dashboard/tenant-contracts' ||
+    location.pathname === '/dashboard/tenant-referencing' ||
+    location.pathname === '/dashboard/your-files' ||
+    location.pathname === '/dashboard/messages';
+  const isTenantPreview =
+    user?.role === 'landlord' ||
+    user?.role === 'agent' ||
+    user?.roles?.includes('landlord') ||
+    user?.roles?.includes('agent');
+
   return (
     <div
       className="flex min-h-screen w-full"
@@ -449,19 +464,33 @@ const DashboardInner: React.FC = () => {
         style={{ backgroundColor: '#F7F7F7' }}
       >
         {isMobile && <div className="h-16" />} {/* Spacer for mobile header */}
-        <div className={`${isMobile ? 'mt-4 px-4' : 'mt-6 px-5 lg:px-6'} w-full max-w-6xl mx-auto`}>
-          <DashboardHeader
-            userName={
-              isLoading
-                ? 'Loading...'
-                : user?.name || user?.givenName || 'User'
-            }
-            userEmail={user?.email}
-            userPhone={user?.phone}
-          />
-        </div>
+        {hideLegacyHeader ? (
+          isTenantPreview ? (
+            <div className={`${isMobile ? 'mt-4 px-4' : 'mt-4 px-5 lg:px-6'} w-full max-w-6xl mx-auto`}>
+              <TenantPreviewBanner />
+            </div>
+          ) : null
+        ) : (
+          <div className={`${isMobile ? 'mt-4 px-4' : 'mt-6 px-5 lg:px-6'} w-full max-w-6xl mx-auto`}>
+            <DashboardHeader
+              userName={
+                isLoading
+                  ? 'Loading...'
+                  : user?.name || user?.givenName || 'User'
+              }
+              userEmail={user?.email}
+              userPhone={user?.phone}
+            />
+          </div>
+        )}
 
-        <div className={`${isMobile ? 'px-4 pb-4' : 'px-5 lg:px-6 pb-8'} w-full max-w-6xl mx-auto`}>
+        <div
+          className={
+            hideLegacyHeader
+              ? 'w-full'
+              : `${isMobile ? 'px-4 pb-4' : 'px-5 lg:px-6 pb-8'} w-full max-w-6xl mx-auto`
+          }
+        >
           <Outlet />
         </div>
       </main>

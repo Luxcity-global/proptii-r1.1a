@@ -332,13 +332,27 @@ export function MainLayout({
             backgroundColor:
               currentScreen === 'dashboard'
                 ? '#f4f6fb'
-                : currentScreen === 'properties'
+                : currentScreen === 'properties' ||
+                    currentScreen === 'clients' ||
+                    currentScreen === 'referencing' ||
+                    currentScreen === 'insights' ||
+                    currentScreen === 'messages' ||
+                    currentScreen === 'inbox'
                   ? '#f8fafc'
-                  : '#F7F7F7',
+                  : currentScreen === 'contracts'
+                    ? '#fbfbfe'
+                    : '#F7F7F7',
           }}
         >
           {isMobile && <div className="h-16" />}
-          {currentScreen !== 'dashboard' && currentScreen !== 'properties' && (
+          {currentScreen !== 'dashboard' &&
+            currentScreen !== 'properties' &&
+            currentScreen !== 'contracts' &&
+            currentScreen !== 'clients' &&
+            currentScreen !== 'referencing' &&
+            currentScreen !== 'insights' &&
+            currentScreen !== 'messages' &&
+            currentScreen !== 'inbox' && (
             <div className={`${isMobile ? 'mt-4 px-4' : 'mt-6 px-5 lg:px-6'} w-full max-w-7xl mx-auto`}>
               <LandlordDashboardHeader
                 userProfile={userProfile}

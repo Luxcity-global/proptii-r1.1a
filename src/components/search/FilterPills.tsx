@@ -52,10 +52,19 @@ interface FilterPillsProps {
   className?: string;
   /** Lighter styling for dark hero backgrounds (in-flight label contrast) */
   onDark?: boolean;
+  /** Visual style. `chip` is used on the search results page; default keeps existing hero pills. */
+  variant?: 'default' | 'chip';
+  /** How many pills to show before +N overflow. Defaults to 3. */
+  maxVisible?: number;
+  showClearAll?: boolean;
 }
 
 function pillShellClass(extra = '') {
   return `inline-flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm font-normal shadow-lg border backdrop-blur-md transition-all search-filter-pill ${extra}`;
+}
+
+function chipShellClass(extra = '') {
+  return `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-xs font-semibold text-slate-700 bg-white shadow-xs select-none search-filter-pill sr-chip ${extra}`;
 }
 
 const pillShellStyle: React.CSSProperties = {
@@ -68,6 +77,9 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
   isClassifying = false,
   className = '',
   onDark = false,
+  variant = 'default',
+  maxVisible = VISIBLE_PILL_LIMIT,
+  showClearAll = false,
 }) => {
   const pills = useMemo(() => entitiesToPills(entities), [entities]);
   const pillKeySignature = useMemo(() => pills.map((p) => p.key).join('|'), [pills]);
@@ -107,8 +119,10 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
     [pills, dismissedKeys]
   );
 
-  const primaryPills = visiblePills.slice(0, VISIBLE_PILL_LIMIT);
-  const overflowPills = visiblePills.slice(VISIBLE_PILL_LIMIT);
+  const limit = maxVisible ?? VISIBLE_PILL_LIMIT;
+  const isChip = variant === 'chip';
+  const primaryPills = visiblePills.slice(0, limit);
+  const overflowPills = visiblePills.slice(limit);
 
   const dismissPill = (key: string) => {
     setDismissedKeys((prev) => {
@@ -118,9 +132,20 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
     });
   };
 
+  const clearAllPills = () => {
+    setDismissedKeys(new Set(pills.map((pill) => pill.key)));
+    setOverflowOpen(false);
+  };
+
   if (!isClassifying && visiblePills.length === 0) {
     return null;
   }
+
+  const shellClass = isChip ? chipShellClass : pillShellClass;
+  const shellStyle = isChip ? undefined : pillShellStyle;
+  const dismissClass = isChip
+    ? 'ml-0.5 text-slate-400 hover:text-slate-700 leading-none text-base p-0'
+    : 'text-white/70 hover:text-white ml-0.5 font-bold text-xs p-0.5 rounded-full hover:bg-white/20 leading-none';
 
   return (
     <div
@@ -149,8 +174,8 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
       {primaryPills.map((pill) => (
         <span
           key={pill.key}
-          className={pillShellClass()}
-          style={pillShellStyle}
+          className={shellClass()}
+          style={shellStyle}
           data-testid={`filter-pill-${pill.key}`}
         >
           <span>{pill.label}</span>
@@ -158,9 +183,9 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
             type="button"
             aria-label={`Hide ${pill.label} filter`}
             onClick={() => dismissPill(pill.key)}
-            className="text-white/70 hover:text-white ml-0.5 font-bold text-xs p-0.5 rounded-full hover:bg-white/20 leading-none"
+            className={dismissClass}
           >
-            ✕
+            {isChip ? '×' : '✕'}
           </button>
         </span>
       ))}
@@ -172,8 +197,8 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
             aria-expanded={overflowOpen}
             aria-haspopup="listbox"
             onClick={() => setOverflowOpen((open) => !open)}
-            className={pillShellClass('font-medium gap-1.5')}
-            style={pillShellStyle}
+            className={shellClass('font-medium gap-1.5')}
+            style={shellStyle}
           >
             <span>+{overflowPills.length} more</span>
             <svg
@@ -191,20 +216,28 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
 
           {overflowOpen && (
             <div
-              className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-2xl shadow-2xl border p-2 z-50 text-left"
-              style={{ backgroundColor: PILL_BLUE, borderColor: PILL_BORDER }}
+              className={`absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-2xl shadow-2xl border p-2 z-50 text-left ${
+                isChip ? 'bg-white border-slate-100' : ''
+              }`}
+              style={isChip ? undefined : { backgroundColor: PILL_BLUE, borderColor: PILL_BORDER }}
               role="listbox"
               aria-label="Additional filters"
               data-testid="filter-pills-overflow-menu"
             >
-              <div className="px-3 py-1.5 text-[11px] font-bold text-white/60 uppercase tracking-wider border-b border-white/10 mb-1">
+              <div
+                className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider border-b mb-1 ${
+                  isChip ? 'text-slate-400 border-slate-100' : 'text-white/60 border-white/10'
+                }`}
+              >
                 Additional Filters
               </div>
               <div className="space-y-1 text-sm">
                 {overflowPills.map((pill) => (
                   <div
                     key={pill.key}
-                    className="flex items-center justify-between px-3 py-1.5 rounded-xl text-white hover:bg-white/10"
+                    className={`flex items-center justify-between px-3 py-1.5 rounded-xl ${
+                      isChip ? 'text-slate-700 hover:bg-slate-50' : 'text-white hover:bg-white/10'
+                    }`}
                     role="option"
                     aria-selected={false}
                   >
@@ -213,9 +246,9 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
                       type="button"
                       aria-label={`Hide ${pill.label} filter`}
                       onClick={() => dismissPill(pill.key)}
-                      className="text-white/70 hover:text-red-400 font-bold leading-none"
+                      className={isChip ? 'text-slate-400 hover:text-slate-700 font-bold leading-none' : 'text-white/70 hover:text-red-400 font-bold leading-none'}
                     >
-                      ✕
+                      {isChip ? '×' : '✕'}
                     </button>
                   </div>
                 ))}
@@ -223,6 +256,12 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {showClearAll && visiblePills.length > 0 && (
+        <button type="button" className="sr-clear-all" onClick={clearAllPills}>
+          Clear all ×
+        </button>
       )}
     </div>
   );

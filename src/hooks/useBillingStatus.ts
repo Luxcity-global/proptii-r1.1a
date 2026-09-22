@@ -5,9 +5,28 @@ import {
   type BillingStatus,
 } from '../services/billingService';
 import type { BillingDashboard } from '../config/plans';
+import { isMockTestUserId } from '../data/mockTestUsers';
+
+function mockBillingStatus(role?: string | null): BillingStatus {
+  const plan =
+    role === 'agent' ? 'agent_pro' : role === 'landlord' ? 'landlord_pro' : 'renter_pro';
+  return {
+    plan,
+    status: 'active',
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    fitChecksUsed: 0,
+    fitChecksQuota: null,
+    pendingPlan: null,
+    pendingCycle: null,
+    billingCadence: 'monthly',
+    hasStripeCustomer: false,
+  };
+}
 
 export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [data, setData] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +34,12 @@ export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
   const refresh = useCallback(async () => {
     if (!isAuthenticated) {
       setData(null);
+      setLoading(false);
+      return;
+    }
+    if (import.meta.env.DEV && isMockTestUserId(user?.id)) {
+      setData(mockBillingStatus(user?.roles?.[0]));
+      setError(null);
       setLoading(false);
       return;
     }
@@ -29,7 +54,7 @@ export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, dashboard]);
+  }, [isAuthenticated, dashboard, user?.id, user?.roles]);
 
   useEffect(() => {
     if (authLoading) return;

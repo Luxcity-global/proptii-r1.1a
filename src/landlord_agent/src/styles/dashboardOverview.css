@@ -154,6 +154,7 @@
 .ll-card-occupancy {
   background: linear-gradient(180deg, #6ee7b7 0%, #34d399 55%, #10b981 100%);
   color: #064e3b;
+  overflow: visible;
 }
 
 .ll-profile-avatar-wrap {
@@ -332,21 +333,27 @@
 .ll-occupancy-body {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex: 1;
-}
-
-.ll-donut-wrap {
-  width: 110px;
-  height: 110px;
-  position: relative;
+  gap: 14px;
+  margin: auto 0;
+  min-height: 155px;
   flex-shrink: 0;
 }
 
-.ll-donut-wrap svg {
-  width: 100%;
-  height: 100%;
+.ll-donut-wrap {
+  position: relative;
+  width: 155px;
+  height: 155px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.ll-donut-svg {
+  width: 155px !important;
+  height: 155px !important;
+  overflow: visible;
+  display: block;
   transform: rotate(-90deg);
+  transform-origin: center;
 }
 
 .ll-occ-meta {

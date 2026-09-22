@@ -5,329 +5,361 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bell, Download, MessageSquare, Plus, Search, Settings, Sparkles } from 'lucide-react';
 import { useMessagingContext } from '../../../contexts/MessagingContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import communicationService from '../../../services/communicationService';
-import { useMessagingPoller } from '../../../hooks/useMessagingPoller';
-import ConversationListItem from '../../../components/messaging/ConversationListItem';
 import MessageThread from '../../../components/messaging/MessageThread';
 import ComposeBox from '../../../components/messaging/ComposeBox';
 import AttachmentPill from '../../../components/messaging/AttachmentPill';
 import type { Conversation, Message } from '../../../types/messaging';
+import type { UserProfile } from '../App';
+import '../styles/messagesPage.css';
 
-// ---------------------------------------------------------------------------
-// Types & helpers
-// ---------------------------------------------------------------------------
-
-type TabId = 'inbox' | 'read' | 'draft';
+type TabId = 'inbox' | 'unread' | 'draft';
 
 function getInitials(name: string): string {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '?';
-    if (parts.length === 1) return parts[0][0].toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function avatarTone(name: string): 'sky' | 'orange' | 'green' | 'rose' | 'violet' {
+  const tones = ['sky', 'orange', 'green', 'rose', 'violet'] as const;
+  const sum = (name || '').split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return tones[sum % tones.length];
 }
 
 function isUnread(conv: Conversation, cursor: string | null): boolean {
-    return conv.lastMessageAt !== null &&
-        (cursor === null || new Date(conv.lastMessageAt) > new Date(cursor));
+  return conv.lastMessageAt !== null && (cursor === null || new Date(conv.lastMessageAt) > new Date(cursor));
 }
 
-// ---------------------------------------------------------------------------
-// Icons
-// ---------------------------------------------------------------------------
-const BackIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="15 18 9 12 15 6" />
-    </svg>
-);
-
-// ---------------------------------------------------------------------------
-// Tab bar
-// ---------------------------------------------------------------------------
-interface TabBarProps {
-    activeTab: TabId;
-    onTabChange: (t: TabId) => void;
-    counts: Record<TabId, number>;
+function formatTime(iso: string | null): { label: string; fresh: boolean } {
+  if (!iso) return { label: '', fresh: false };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { label: '', fresh: false };
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  if (diffMs < 60_000) return { label: 'Just now', fresh: true };
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  if (diffDays === 0) {
+    return {
+      label: d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }),
+      fresh: false,
+    };
+  }
+  if (diffDays === 1) return { label: 'Yesterday', fresh: false };
+  if (diffDays < 7) return { label: d.toLocaleDateString('en-GB', { weekday: 'short' }), fresh: false };
+  return { label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), fresh: false };
 }
 
-const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange, counts }) => {
-    const tabs: { id: TabId; label: string }[] = [
-        { id: 'inbox', label: 'Inbox' },
-        { id: 'read', label: 'Read' },
-        { id: 'draft', label: 'Draft' },
-    ];
-    return (
-        <div style={{
-            display: 'flex', borderBottom: '1px solid #e5e7eb',
-            padding: '0 16px', gap: '4px', flexShrink: 0, background: '#ffffff',
-        }}>
-            {tabs.map(({ id, label }) => {
-                const active = activeTab === id;
-                const count = counts[id];
-                return (
-                    <button key={id} type="button" onClick={() => onTabChange(id)}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: '6px',
-                            padding: '10px 4px', background: 'none', border: 'none',
-                            borderBottom: active ? '2px solid #136C9E' : '2px solid transparent',
-                            marginBottom: '-1px', cursor: 'pointer',
-                            fontSize: '0.8125rem', fontWeight: active ? 700 : 500,
-                            color: active ? '#136C9E' : '#6b7280',
-                            transition: 'color 0.15s, border-color 0.15s', whiteSpace: 'nowrap',
-                        }}>
-                        {label}
-                        {count > 0 && (
-                            <span style={{
-                                minWidth: '18px', height: '18px', borderRadius: '9px',
-                                background: active ? '#136C9E' : '#e5e7eb',
-                                color: active ? '#ffffff' : '#6b7280',
-                                fontSize: '0.65rem', fontWeight: 700,
-                                display: 'inline-flex', alignItems: 'center',
-                                justifyContent: 'center', padding: '0 5px',
-                                transition: 'background 0.15s, color 0.15s',
-                            }}>
-                                {count > 99 ? '99+' : count}
-                            </span>
-                        )}
-                    </button>
-                );
-            })}
-        </div>
-    );
-};
+interface TenantInboxProps {
+  userProfile?: UserProfile | null;
+  onViewInsights?: () => void;
+  onViewSettings?: () => void;
+  onViewNotifications?: () => void;
+  onAddTenant?: () => void;
+}
 
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
 const EmptyState: React.FC<{ message: string; sub: string }> = ({ message, sub }) => (
-    <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        padding: '40px 24px', gap: '12px', textAlign: 'center',
-    }}>
-        <div style={{
-            width: '64px', height: '64px', borderRadius: '50%',
-            background: '#E6F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-                stroke="#136C9E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-        </div>
-        <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{message}</p>
-        <p style={{ margin: 0, fontSize: '0.8125rem', color: '#6b7280', maxWidth: '220px' }}>{sub}</p>
+  <div className="ll-msg-empty">
+    <div className="ll-msg-empty-icon">
+      <MessageSquare size={28} />
     </div>
+    <h3>{message}</h3>
+    <p>{sub}</p>
+  </div>
 );
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+export const TenantInbox: React.FC<TenantInboxProps> = ({
+  userProfile,
+  onViewInsights,
+  onViewSettings,
+  onViewNotifications,
+  onAddTenant,
+}) => {
+  const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount } =
+    useMessagingContext();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-export const TenantInbox: React.FC = () => {
-    const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount } = useMessagingContext();
-    const { user } = useAuth();
-    const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<TabId>('inbox');
+  const [search, setSearch] = useState('');
+  const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>(
+    {},
+  );
+  const [readCursors, setReadCursors] = useState<Record<string, string | null>>({});
 
-    // Poller is already started by LandlordDemoInner — do not start a second one here.
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const optimisticBottomRef = useRef<HTMLDivElement>(null);
 
-    const [activeTab, setActiveTab] = useState<TabId>('inbox');
-    const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>({});
-    const [readCursors, setReadCursors] = useState<Record<string, string | null>>({});
+  const scrollToBottom = useCallback(() => {
+    optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const optimisticBottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (conversations.length === 0) {
+      communicationService
+        .getConversations()
+        .then((convs) => {
+          if (convs.length > 0) _setConversations(convs);
+        })
+        .catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const scrollToBottom = useCallback(() => {
-        optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, []);
+  const handleSelect = useCallback(
+    (id: string) => {
+      setActiveConversationId(id);
+      setOptimisticMessages((prev) => ({ ...prev, [id]: [] }));
+      const conv = conversations.find((c) => c.id === id);
+      const prevCursor = readCursors[id] ?? null;
+      if (conv && isUnread(conv, prevCursor)) decrementUnreadCount(1);
+      setReadCursors((prev) => ({ ...prev, [id]: new Date().toISOString() }));
+    },
+    [setActiveConversationId, conversations, readCursors, decrementUnreadCount],
+  );
 
-    useEffect(() => {
-        if (conversations.length === 0) {
-            communicationService.getConversations()
-                .then((convs) => { if (convs.length > 0) _setConversations(convs); })
-                .catch(() => { });
-        }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleSend = useCallback(
+    (message: Message, file?: File) => {
+      if (!activeConversationId) return;
+      setOptimisticMessages((prev) => ({
+        ...prev,
+        [activeConversationId]: [...(prev[activeConversationId] ?? []), { message, file }],
+      }));
+      setTimeout(scrollToBottom, 0);
+    },
+    [activeConversationId, scrollToBottom],
+  );
 
-    const handleSelect = useCallback((id: string) => {
-        setActiveConversationId(id);
-        setOptimisticMessages((prev) => ({ ...prev, [id]: [] }));
-        const conv = conversations.find((c) => c.id === id);
-        const prevCursor = readCursors[id] ?? null;
-        if (conv && isUnread(conv, prevCursor)) decrementUnreadCount(1);
-        setReadCursors((prev) => ({ ...prev, [id]: new Date().toISOString() }));
-    }, [setActiveConversationId, conversations, readCursors, decrementUnreadCount]);
+  const currentUserId = user?.id ?? '';
+  const userName = userProfile?.name || (user as { name?: string; displayName?: string } | null)?.name || (user as { displayName?: string } | null)?.displayName || 'Landlord';
+  const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
-    const handleSend = useCallback((message: Message, file?: File) => {
-        if (!activeConversationId) return;
-        setOptimisticMessages((prev) => ({
-            ...prev,
-            [activeConversationId]: [...(prev[activeConversationId] ?? []), { message, file }],
-        }));
-        setTimeout(scrollToBottom, 0);
-    }, [activeConversationId, scrollToBottom]);
+  const unreadConvs = conversations.filter((c) => isUnread(c, readCursors[c.id] ?? null));
+  const draftConvs = conversations.filter((c) => !c.lastMessageAt);
 
-    const currentUserId = user?.id ?? '';
-    const userName = (user as any)?.name ?? (user as any)?.displayName ?? 'Landlord';
-    const activeConversation = conversations.find((c) => c.id === activeConversationId);
+  const tabCounts: Record<TabId, number> = {
+    inbox: conversations.length,
+    unread: unreadConvs.length,
+    draft: draftConvs.length,
+  };
 
-    // Bucket into tabs
-    const inboxConvs = conversations.filter((c) => isUnread(c, readCursors[c.id] ?? null));
-    const readConvs = conversations.filter((c) => c.lastMessageAt && !isUnread(c, readCursors[c.id] ?? null));
-    const draftConvs = conversations.filter((c) => !c.lastMessageAt);
+  const byTime = (a: Conversation, b: Conversation) =>
+    new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
 
-    const tabCounts: Record<TabId, number> = {
-        inbox: inboxConvs.length,
-        read: readConvs.length,
-        draft: draftConvs.length,
-    };
+  const visibleConvs: Conversation[] =
+    activeTab === 'unread' ? [...unreadConvs].sort(byTime) : activeTab === 'draft' ? draftConvs : [...conversations].sort(byTime);
 
-    const byTime = (a: Conversation, b: Conversation) =>
-        new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
+  const filteredConvs = visibleConvs.filter((conv) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const name = (conv.tenantName || '').toLowerCase();
+    const property = (conv.propertyTitle || conv.propertyId || '').toLowerCase();
+    return name.includes(q) || property.includes(q);
+  });
 
-    const visibleConvs: Conversation[] =
-        activeTab === 'inbox' ? [...inboxConvs].sort(byTime) :
-            activeTab === 'read' ? [...readConvs].sort(byTime) :
-                draftConvs;
+  const emptyMessages: Record<TabId, { message: string; sub: string }> = {
+    inbox: { message: 'No conversations', sub: 'Messages from tenants and applicants will appear here.' },
+    unread: { message: 'No unread messages', sub: 'New messages from tenants will appear here.' },
+    draft: { message: 'No drafts', sub: 'Conversations without messages will appear here.' },
+  };
 
-    const emptyMessages: Record<TabId, { message: string; sub: string }> = {
-        inbox: { message: 'No unread messages', sub: 'New messages from tenants will appear here.' },
-        read: { message: 'No read messages', sub: 'Messages you have read will appear here.' },
-        draft: { message: 'No drafts', sub: 'Conversations without messages will appear here.' },
-    };
+  const exportConversations = () => {
+    const rows = [
+      ['Name', 'Property', 'Last message', 'Tab'],
+      ...filteredConvs.map((conv) => [
+        conv.tenantName || 'Tenant',
+        conv.propertyTitle || conv.propertyId || '',
+        conv.lastMessageAt || '',
+        activeTab,
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = `proptii-messages-${activeTab}.csv`;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
-    return (
-        <>
-            <style>{`
-                .msg-back-btn-ll:hover { background: #E6F3FF !important; color: #0F5A82 !important; border-color: #80B2FF !important; }
-            `}</style>
+  return (
+    <div className="ll-msg" data-testid="landlord-messages-page">
+      <header className="ll-msg-header">
+        <div className="ll-msg-inner ll-msg-header-inner">
+          <div>
+            <h1>Messages</h1>
+            <p>
+              Messages and communication for <strong>{userName}</strong>
+            </p>
+          </div>
+          <div className="ll-msg-header-actions">
+            {onViewSettings ? (
+              <button type="button" className="ll-msg-header-icon" title="Messaging settings" onClick={onViewSettings}>
+                <Settings size={18} />
+              </button>
+            ) : null}
+            {onViewNotifications ? (
+              <button type="button" className="ll-msg-header-icon" title="Notifications" onClick={onViewNotifications}>
+                <Bell size={18} />
+                {unreadConvs.length > 0 ? <span className="ll-msg-header-dot" /> : null}
+              </button>
+            ) : null}
+            {onViewInsights ? (
+              <button type="button" className="ll-msg-btn-insights" onClick={onViewInsights}>
+                <span className="ll-msg-insights-icon">
+                  <Sparkles size={12} />
+                </span>
+                Portfolio Insights
+              </button>
+            ) : null}
+            {onAddTenant ? (
+              <button type="button" className="ll-msg-btn-add" onClick={onAddTenant}>
+                <Plus size={16} strokeWidth={2.5} />
+                Add Tenant
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </header>
 
-            <div className="w-full max-w-7xl mx-auto px-4 md:px-5 lg:px-6 mt-4 md:mt-6 pb-6">
-                <div
-                    data-testid="landlord-messages-page"
-                    style={{
-                        display: 'flex', flex: 1,
-                        borderRadius: '16px', overflow: 'hidden',
-                        border: '1px solid #e5e7eb', background: '#ffffff',
-                        boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
-                        minHeight: 'calc(100vh - 280px)',
-                    }}
-                >
-                    {/* ── Left sidebar ─────────────────────────────────────── */}
-                    <aside aria-label="Conversations" style={{
-                        width: '300px', flexShrink: 0, borderRight: '1px solid #e5e7eb',
-                        display: 'flex', flexDirection: 'column', background: '#ffffff',
-                    }}>
-                        {/* Header */}
-                        <div style={{
-                            padding: '16px 16px 14px', borderBottom: '1px solid #f3f4f6',
-                            display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0,
-                        }}>
-                            <div style={{
-                                width: '36px', height: '36px', borderRadius: '50%',
-                                background: '#136C9E', color: '#fff',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.8125rem', fontWeight: 700, flexShrink: 0,
-                            }}>
-                                {getInitials(userName)}
-                            </div>
-                            <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>
-                                Messages
-                            </p>
-                        </div>
+      <div className="ll-msg-inner ll-msg-body">
+        <div className="ll-msg-toolbar">
+          <div className="ll-msg-tabs">
+            {(
+              [
+                { id: 'inbox', label: 'Inbox' },
+                { id: 'unread', label: 'Unread' },
+                { id: 'draft', label: 'Drafts' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`ll-msg-tab${activeTab === tab.id ? ' is-active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+                {tabCounts[tab.id] > 0 ? <span className="ll-msg-tab-count">{tabCounts[tab.id]}</span> : null}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="ll-msg-export"
+            onClick={exportConversations}
+            disabled={filteredConvs.length === 0}
+          >
+            <Download size={14} />
+            Export
+          </button>
+        </div>
 
-                        {/* Tabs */}
-                        <TabBar activeTab={activeTab} onTabChange={setActiveTab} counts={tabCounts} />
-
-                        {/* List */}
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            {visibleConvs.length === 0 ? (
-                                <EmptyState {...emptyMessages[activeTab]} />
-                            ) : (
-                                visibleConvs.map((conv) => (
-                                        <ConversationListItem
-                                            key={conv.id}
-                                            conversation={conv}
-                                            isActive={conv.id === activeConversationId}
-                                            onClick={handleSelect}
-                                            participantName={!conv.tenantId ? `${conv.tenantName || 'Guest'} (Guest)` : (conv.tenantName || 'Tenant')}
-                                            propertyAddress={conv.propertyTitle || conv.propertyId}
-                                            lastReadAt={readCursors[conv.id] ?? null}
-                                        />
-                                    ))
-                                )}
-                            </div>
-
-                            {/* Back button */}
-                            <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6', flexShrink: 0 }}>
-                                <button type="button" className="msg-back-btn-ll" onClick={() => navigate('/landlord/dashboard')}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
-                                        padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
-                                        background: '#ffffff', color: '#374151', cursor: 'pointer',
-                                        fontSize: '0.8125rem', fontWeight: 500, transition: 'all 0.15s', justifyContent: 'center',
-                                    }}>
-                                    <BackIcon />
-                                    Back to Dashboard
-                                </button>
-                            </div>
-                        </aside>
-
-                        {/* ── Right panel ──────────────────────────────────────── */}
-                        <main aria-label="Message thread"
-                            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fafbff' }}>
-                            {activeConversationId ? (
-                                <>
-                                    <div style={{
-                                        padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
-                                        display: 'flex', alignItems: 'center', gap: '12px',
-                                        background: '#ffffff', flexShrink: 0,
-                                    }}>
-                                        <div style={{
-                                            width: '38px', height: '38px', borderRadius: '50%',
-                                            background: '#136C9E', color: '#fff',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontSize: '0.8125rem', fontWeight: 700, flexShrink: 0,
-                                        }}>
-                                            {getInitials(activeConversation?.tenantName || 'Tenant')}
-                                        </div>
-                                        <div>
-                                            <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{activeConversation?.tenantName || 'Tenant'}</p>
-                                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
-                                        </div>
-                                    </div>
-
-                                    <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto' }}>
-                                    <MessageThread conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} />
-                                    {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
-                                        <div key={msg.id} data-testid="optimistic-message"
-                                            style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 20px' }}>
-                                            <div style={{
-                                                maxWidth: '70%', padding: '10px 14px',
-                                                borderRadius: '16px 16px 4px 16px',
-                                                background: '#136C9E', color: '#fff', opacity: 0.88,
-                                                display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px',
-                                            }}>
-                                                {msg.body ? <p style={{ margin: 0, wordBreak: 'break-word' }}>{msg.body}</p> : null}
-                                                {file && <AttachmentPill url={URL.createObjectURL(file)} fileName={file.name} sizeBytes={file.size} isSent />}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <div ref={optimisticBottomRef} />
-                                </div>
-
-                                <ComposeBox conversationId={activeConversationId} onSend={handleSend} senderRole="landlord" recipientId={activeConversation?.tenantId} />
-                            </>
-                        ) : (
-                            <EmptyState message="Select a conversation" sub="Choose a conversation from the list to start messaging." />
-                        )}
-                    </main>
-                </div>
+        <div className="ll-msg-split">
+          <aside className="ll-msg-list" aria-label="Conversations">
+            <div className="ll-msg-search">
+              <Search size={16} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search conversations..."
+              />
             </div>
-        </>
-    );
+
+            <div className="ll-msg-convs">
+              {filteredConvs.length === 0 ? (
+                <EmptyState {...emptyMessages[activeTab]} />
+              ) : (
+                filteredConvs.map((conv) => {
+                  const name = !conv.tenantId
+                    ? `${conv.tenantName || 'Guest'} (Guest)`
+                    : conv.tenantName || 'Tenant';
+                  const property = conv.propertyTitle || conv.propertyId || '';
+                  const time = formatTime(conv.lastMessageAt);
+                  return (
+                    <button
+                      key={conv.id}
+                      type="button"
+                      data-testid="conversation-list-item"
+                      data-conversation-id={conv.id}
+                      className={`ll-msg-conv${conv.id === activeConversationId ? ' is-active' : ''}`}
+                      onClick={() => handleSelect(conv.id)}
+                      aria-pressed={conv.id === activeConversationId}
+                      aria-label={`Conversation with ${name} about ${property || 'a property'}`}
+                    >
+                      <span className={`ll-msg-avatar ${avatarTone(name)}`}>{getInitials(name)}</span>
+                      <div className="ll-msg-conv-main">
+                        <div className="ll-msg-conv-top">
+                          <h4>{name}</h4>
+                          {time.label ? (
+                            <span className={`ll-msg-conv-time${time.fresh ? ' is-now' : ''}`}>{time.label}</span>
+                          ) : null}
+                        </div>
+                        {property ? <div className="ll-msg-conv-sub">{property}</div> : null}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="ll-msg-back">
+              <button type="button" onClick={() => navigate('/landlord/dashboard')}>
+                Back to Dashboard
+              </button>
+            </div>
+          </aside>
+
+          <main className="ll-msg-thread" aria-label="Message thread">
+            {activeConversationId ? (
+              <>
+                <div className="ll-msg-thread-head">
+                  <span className={`ll-msg-avatar ${avatarTone(activeConversation?.tenantName || 'Tenant')}`}>
+                    {getInitials(activeConversation?.tenantName || 'Tenant')}
+                  </span>
+                  <div>
+                    <h3>{activeConversation?.tenantName || 'Tenant'}</h3>
+                    <p>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
+                  </div>
+                </div>
+
+                <div ref={scrollContainerRef} className="ll-msg-feed">
+                  <MessageThread
+                    conversationId={activeConversationId}
+                    currentUserId={currentUserId}
+                    onScrollRequest={scrollToBottom}
+                  />
+                  {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
+                    <div key={msg.id} data-testid="optimistic-message" className="ll-msg-optimistic">
+                      <div className="ll-msg-optimistic-bubble">
+                        {msg.body ? <p style={{ margin: 0, wordBreak: 'break-word' }}>{msg.body}</p> : null}
+                        {file ? (
+                          <AttachmentPill url={URL.createObjectURL(file)} fileName={file.name} sizeBytes={file.size} isSent />
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={optimisticBottomRef} />
+                </div>
+
+                <ComposeBox
+                  conversationId={activeConversationId}
+                  onSend={handleSend}
+                  senderRole="landlord"
+                  recipientId={activeConversation?.tenantId}
+                />
+              </>
+            ) : (
+              <EmptyState message="Select a conversation" sub="Choose a conversation from the list to start messaging." />
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
 };
-
-

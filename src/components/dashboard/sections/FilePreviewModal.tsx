@@ -1,6 +1,9 @@
 import React from 'react';
-import { X, Download, FileText, File, AlertTriangle } from 'lucide-react';
+import { Download, FileText, File, AlertTriangle, Share2, Eye } from 'lucide-react';
 import { FileItem } from '../../../services/fileService';
+import { fileService } from '../../../services/fileService';
+import { toast } from 'react-hot-toast';
+import '../../../styles/tenantModals.css';
 
 interface FilePreviewModalProps {
   isOpen: boolean;
@@ -25,6 +28,12 @@ function isPdf(type: string, url: string): boolean {
   return ext === 'pdf';
 }
 
+function fileKindLabel(file: FileItem): string {
+  if (isPdf(file.type, file.url || '')) return 'PDF Document';
+  if (isImage(file.type, file.url || '')) return 'Image';
+  return file.type || 'Document';
+}
+
 const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ isOpen, onClose, file, onDownload }) => {
   if (!isOpen || !file) return null;
 
@@ -33,125 +42,110 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ isOpen, onClose, fi
   const canPreview = isDataUrl(url);
   const isImg = isImage(type, url);
   const isPdfFile = isPdf(type, url);
+  const ready = Boolean(url);
 
-  const renderContent = () => {
-    // ── Base64 data URL — always safe to display inline ─────────────────────
-    if (canPreview) {
-      if (isImg) {
-        return (
-          <div className="flex items-center justify-center p-4 bg-gray-50 rounded-xl min-h-[300px]">
-            <img
-              src={url}
-              alt={file.name}
-              className="max-w-full max-h-[60vh] object-contain rounded shadow"
-            />
-          </div>
-        );
+  const handleShare = async () => {
+    if (url && url.startsWith('http')) {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success('Document link copied to clipboard');
+      } catch {
+        toast.error('Could not copy a share link for this file');
       }
-
-      if (isPdfFile) {
-        return (
-          <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: '65vh' }}>
-            <embed
-              src={url}
-              type="application/pdf"
-              width="100%"
-              height="100%"
-              title={file.name}
-            />
-          </div>
-        );
-      }
-
-      // Other file types with a dataUrl — offer download, can't render inline
-      return (
-        <div className="flex flex-col items-center justify-center gap-4 p-8 bg-gray-50 rounded-xl min-h-[200px]">
-          <File className="w-16 h-16 text-gray-400" />
-          <p className="text-gray-600 text-sm text-center">
-            This file type can't be previewed inline.
-          </p>
-          <button
-            onClick={() => onDownload(file)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#136C9E] text-white rounded-xl text-sm font-medium hover:bg-[#0F5A82] transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Download to view
-          </button>
-        </div>
-      );
+      return;
     }
+    toast.error('This file can be downloaded, but it does not have a shareable link.');
+  };
 
-    // ── External / Azure URL — do NOT fetch it (would cause the public access error)
-    // Show a friendly message with a download option instead
+  const renderPreview = () => {
+    if (canPreview && isImg) {
+      return <img src={url} alt={file.name} className="tn-drawer-preview-img" />;
+    }
+    if (canPreview && isPdfFile) {
+      return <embed src={url} type="application/pdf" className="tn-drawer-preview-embed" title={file.name} />;
+    }
     if (url.startsWith('http')) {
       return (
-        <div className="flex flex-col items-center justify-center gap-4 p-8 bg-amber-50 rounded-xl border border-amber-200 min-h-[200px]">
-          <AlertTriangle className="w-12 h-12 text-amber-500" />
-          <div className="text-center">
-            <p className="font-semibold text-gray-800 mb-1">Preview unavailable</p>
-            <p className="text-sm text-gray-500 max-w-xs">
-              This file was uploaded to cloud storage and can't be previewed directly.
-              Download the file to view it.
-            </p>
-          </div>
-          <button
-            onClick={() => onDownload(file)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#136C9E] text-white rounded-xl text-sm font-medium hover:bg-[#0F5A82] transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Download file
-          </button>
+        <div className="tn-drawer-preview-empty">
+          <AlertTriangle className="w-10 h-10" />
+          <p>Secure Document Preview Available</p>
+          <span>This file is stored in the vault. Download it to inspect the original.</span>
         </div>
       );
     }
-
-    // ── No URL at all
     return (
-      <div className="flex flex-col items-center justify-center gap-3 p-8 bg-gray-50 rounded-xl min-h-[200px]">
-        <FileText className="w-12 h-12 text-gray-300" />
-        <p className="text-gray-500 text-sm">No preview available for this file.</p>
+      <div className="tn-drawer-preview-empty">
+        <FileText className="w-10 h-10" />
+        <p>Secure Document Preview Available</p>
+        <span>Encrypted vault copy. Use download to view the original file.</span>
       </div>
     );
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <FileText className="w-5 h-5 text-[#136C9E] flex-shrink-0" />
-            <div className="min-w-0">
-              <h3 className="font-semibold text-gray-900 truncate text-sm">{file.name}</h3>
-              <p className="text-xs text-gray-400 mt-0.5">{file.category} · {file.uploadDate}</p>
+    <div className="tn-drawer-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <aside className="tn-drawer" role="dialog" aria-labelledby="tn-drawer-title">
+        <div className="tn-drawer-head">
+          <div className="tn-drawer-head-main">
+            <span className={`tn-drawer-icon ${isImg ? 'img' : isPdfFile ? 'pdf' : 'doc'}`}>
+              {isImg ? <File className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+            </span>
+            <div>
+              <h2 id="tn-drawer-title">{file.name}</h2>
+              <p>{fileKindLabel(file)} · {fileService.formatFileSize(file.size)} · Uploaded {file.uploadDate}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-            <button
-              onClick={() => onDownload(file)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#136C9E] border border-[#136C9E] rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Download
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-              aria-label="Close preview"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
+          <button type="button" className="tn-modal-x" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+
+        <div className="tn-drawer-body">
+          <div className={`tn-drawer-status ${ready ? 'ok' : 'wait'}`}>
+            <div>
+              <p>{ready ? 'Document stored in vault' : 'Preview unavailable'}</p>
+              <span>{ready ? 'Ready to download or inspect from this record.' : 'No file payload is attached to this record.'}</span>
+            </div>
+            <em>{ready ? 'On file' : 'Incomplete'}</em>
+          </div>
+
+          <div className="tn-drawer-preview">
+            {renderPreview()}
+            {ready && (
+              <button type="button" className="tn-drawer-inspect" onClick={() => onDownload(file)}>
+                <Eye className="w-3.5 h-3.5" />
+                Inspect Full Screen
+              </button>
+            )}
+          </div>
+
+          <h4>Document details</h4>
+          <div className="tn-drawer-meta">
+            <div><span>File name</span><strong>{file.name}</strong></div>
+            <div><span>Category</span><strong>{file.category}</strong></div>
+            <div><span>Type</span><strong>{fileKindLabel(file)}</strong></div>
+            <div><span>Size</span><strong>{fileService.formatFileSize(file.size)}</strong></div>
+            <div><span>Uploaded</span><strong>{file.uploadDate}</strong></div>
+          </div>
+
+          <h4>Document audit trail</h4>
+          <div className="tn-drawer-trail">
+            <div>
+              <p>Document Uploaded</p>
+              <span>{file.uploadDate} · File vault</span>
+            </div>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
-          {renderContent()}
+        <div className="tn-drawer-foot">
+          <button type="button" className="tn-drawer-secondary" onClick={() => onDownload(file)}>
+            <Download className="w-4 h-4" />
+            Download File
+          </button>
+          <button type="button" className="tn-drawer-primary" onClick={handleShare}>
+            <Share2 className="w-4 h-4" />
+            Share Document
+          </button>
         </div>
-      </div>
+      </aside>
     </div>
   );
 };

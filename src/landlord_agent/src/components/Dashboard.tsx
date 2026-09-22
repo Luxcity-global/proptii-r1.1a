@@ -132,34 +132,34 @@ function OccupancyDonut({
   total: number;
 }) {
   const pct = total > 0 ? occupied / total : 0;
-  const r = 42;
+  const r = 72;
   const c = 2 * Math.PI * r;
   const occupiedLen = c * pct;
-  const vacantLen = c - occupiedLen;
+  const vacantLen = Math.max(0, c - occupiedLen);
 
   return (
     <div className="ll-donut-wrap" aria-label={`Occupancy ${Math.round(pct * 100)}%`}>
-      <svg viewBox="0 0 110 110">
+      <svg className="ll-donut-svg" viewBox="0 0 200 200" width="155" height="155" aria-hidden="true">
         <circle
-          cx="55"
-          cy="55"
+          cx="100"
+          cy="100"
           r={r}
           fill="none"
           stroke="#165c40"
-          strokeWidth="14"
-          strokeDasharray={`${occupiedLen} ${vacantLen}`}
-          strokeLinecap="butt"
+          strokeWidth="38"
+          strokeDasharray={`${occupiedLen} ${c}`}
+          strokeLinecap={pct > 0 && pct < 1 ? "round" : "butt"}
         />
         <circle
-          cx="55"
-          cy="55"
+          cx="100"
+          cy="100"
           r={r}
           fill="none"
           stroke="#f2fbf7"
-          strokeWidth="14"
-          strokeDasharray={`${vacantLen} ${occupiedLen}`}
+          strokeWidth="38"
+          strokeDasharray={`${vacantLen} ${c}`}
           strokeDashoffset={-occupiedLen}
-          strokeLinecap="butt"
+          strokeLinecap={pct > 0 && pct < 1 ? "round" : "butt"}
         />
       </svg>
     </div>
@@ -550,7 +550,6 @@ export function Dashboard({
     return list.slice(0, 8);
   }, [properties, propertyPill]);
 
-  const occupancyPct = totalProperties > 0 ? Math.round((occupiedProperties / totalProperties) * 100) : 0;
   const userName = userProfile?.name || "there";
   const maxRent = Math.max(...properties.map((p) => p.rent || 0), 0);
 
@@ -684,20 +683,15 @@ export function Dashboard({
               />
             ) : (
               <>
-                <div>
-                  <div className="ll-occupancy-body">
-                    <OccupancyDonut
-                      occupied={occupiedProperties}
-                      vacant={vacantProperties}
-                      total={totalProperties}
-                    />
-                    <div className="ll-occ-meta">
-                      <span className="ll-meta-label">Total Properties</span>
-                      <span className="ll-meta-val">{totalProperties}</span>
-                      <span className="ll-meta-label" style={{ marginTop: 6 }}>
-                        {occupancyPct}% occupied
-                      </span>
-                    </div>
+                <div className="ll-occupancy-body">
+                  <OccupancyDonut
+                    occupied={occupiedProperties}
+                    vacant={vacantProperties}
+                    total={totalProperties}
+                  />
+                  <div className="ll-occ-meta">
+                    <span className="ll-meta-label">Total Properties</span>
+                    <span className="ll-meta-val">{totalProperties}</span>
                   </div>
                 </div>
                 <div className="ll-occ-legend">

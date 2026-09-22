@@ -649,7 +649,7 @@ export function PropertiesPage({
   }
 
   if (!isPortfolioLoading && isNewPortfolioUser(properties)) {
-    return (
+  return (
       <LandlordPageEmptyShell
         page="properties"
         variant="new-user"
@@ -663,12 +663,12 @@ export function PropertiesPage({
     <div className="ll-props">
       <header className="ll-props-header">
         <div className="ll-props-inner ll-props-header-inner">
-          <div>
+        <div>
             <h1>Properties</h1>
             <p>
               {isPortfolioLoading ? 'Loading portfolio…' : `${properties.length} ${properties.length === 1 ? 'property' : 'properties'} · Portfolio overview`}
-            </p>
-          </div>
+          </p>
+        </div>
           <div className="ll-props-header-actions">
             <button
               type="button"
@@ -704,11 +704,11 @@ export function PropertiesPage({
               </button>
             )}
             <button type="button" className="ll-props-btn-add" onClick={onAddProperty}>
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
+          <Plus className="w-4 h-4" strokeWidth={2.5} />
               Add Property
             </button>
-          </div>
-        </div>
+      </div>
+              </div>
       </header>
 
       <div className="ll-props-inner ll-props-body">
@@ -719,10 +719,10 @@ export function PropertiesPage({
                 <div className="ll-props-kpi-top">
                   <div className="ll-props-sk" style={{ width: 110, height: 14 }} />
                   <div className="ll-props-sk" style={{ width: 36, height: 36, borderRadius: 12 }} />
-                </div>
+              </div>
                 <div className="ll-props-sk" style={{ width: 90, height: 32, marginBottom: 16 }} />
                 <div className="ll-props-sk" style={{ width: '100%', height: 10, borderRadius: 999 }} />
-              </div>
+            </div>
             ))
           ) : (
             <>
@@ -732,18 +732,18 @@ export function PropertiesPage({
                     <span className="ll-props-kpi-label">Occupancy Rate</span>
                     <div className="ll-props-kpi-icon green">
                       <Home size={18} />
-                    </div>
-                  </div>
+            </div>
+          </div>
                   <div className="ll-props-kpi-value">{occupancyPct}%</div>
                   <div className="ll-props-kpi-meta">
                     <strong>{occupiedCount} Occupied</strong>
                     <span>{vacantCount} Vacant</span>
-                  </div>
+            </div>
                   <div className="ll-props-seg-bar">
                     <div className="ll-props-seg-fill occ" style={{ width: `${occupancyPct}%` }} />
                     <div className="ll-props-seg-fill vac" style={{ width: `${Math.max(0, 100 - occupancyPct)}%` }} />
-                  </div>
-                </div>
+            </div>
+          </div>
                 <div className="ll-props-kpi-foot">
                   <span className={`ll-props-health${healthy ? '' : ' warn'}`}>
                     <span className="ll-props-dot" />
@@ -753,13 +753,13 @@ export function PropertiesPage({
               </article>
 
               <article className="ll-props-kpi">
-                <div>
+            <div>
                   <div className="ll-props-kpi-top">
                     <span className="ll-props-kpi-label">Average Rent</span>
                     <div className="ll-props-kpi-icon blue">
                       <PoundSterling size={18} />
-                    </div>
-                  </div>
+            </div>
+            </div>
                   <div className="ll-props-kpi-value">£{averageRent.toLocaleString()}</div>
                   <div className="ll-props-rent-chart">
                     {rentSeries.map((bar) => (
@@ -772,7 +772,7 @@ export function PropertiesPage({
                             opacity: 0.35 + 0.65 * (bar.value / maxRentBar),
                           }}
                         />
-                      </div>
+          </div>
                     ))}
                   </div>
                 </div>
@@ -785,13 +785,13 @@ export function PropertiesPage({
               </article>
 
               <article className="ll-props-kpi">
-                <div>
+            <div>
                   <div className="ll-props-kpi-top">
                     <span className="ll-props-kpi-label">Tenancies Ending</span>
                     <div className="ll-props-kpi-icon orange">
                       <Calendar size={18} />
-                    </div>
-                  </div>
+            </div>
+            </div>
                   <div className="ll-props-kpi-value">{endingSoonCount}</div>
                   <div className="ll-props-sub">Within 90 days</div>
                   <div className="ll-props-tenancy-rows">
@@ -804,9 +804,9 @@ export function PropertiesPage({
                         <span className="lbl">{row.lbl}</span>
                         <div className="track">
                           <div className="fill" style={{ width: `${Math.round((row.n / maxEnding) * 100)}%`, background: row.color }} />
-                        </div>
+          </div>
                         <span className="n">{row.n}</span>
-                      </div>
+      </div>
                     ))}
                   </div>
                 </div>
@@ -818,18 +818,18 @@ export function PropertiesPage({
                     <span className="ll-props-kpi-label">Overdue Rent</span>
                     <div className="ll-props-kpi-icon rose">
                       <AlertTriangle size={18} />
-                    </div>
-                  </div>
+            </div>
+            </div>
                   <div className="ll-props-kpi-value rose">£{overdueAmount.toLocaleString()}</div>
                   <div className="ll-props-kpi-meta">
                     <strong>
                       {overdueCount} {overdueCount === 1 ? 'Tenant' : 'Tenants'}
                     </strong>
                     <span className="rose">{avgDaysLate > 0 ? `Avg ${avgDaysLate} days late` : 'No late days'}</span>
-                  </div>
+          </div>
                   <div className="ll-props-overdue-bar">
                     <div style={{ width: `${overdueBarPct}%` }} />
-                  </div>
+        </div>
                 </div>
                 <div className="ll-props-kpi-foot">
                   <span className="ll-props-outstanding">Outstanding</span>
@@ -870,7 +870,7 @@ export function PropertiesPage({
               </button>
             ))}
           </div>
-
+          
           <div className="ll-props-toolbar-right">
             <FilterDropdown
               label="Location"
@@ -925,9 +925,9 @@ export function PropertiesPage({
                 <List size={14} />
                 Table
               </button>
-            </div>
           </div>
         </div>
+          </div>
 
         <div className="ll-props-count-row">
           <div>
@@ -937,7 +937,7 @@ export function PropertiesPage({
             {isAllSelected ? <CheckSquare size={14} /> : isPartiallySelected ? <CheckSquare size={14} style={{ opacity: 0.5 }} /> : <Square size={14} />}
             {isAllSelected ? 'Deselect All' : 'Select All'}
           </button>
-        </div>
+          </div>
 
         {showBulkActions && (
           <div className="ll-props-bulk">
@@ -946,7 +946,7 @@ export function PropertiesPage({
               <button type="button" className="ll-props-ghost" onClick={clearSelection}>
                 Clear selection
               </button>
-            </div>
+          </div>
             <div className="ll-props-bulk-actions">
               <button type="button" className="ll-props-bulk-btn" onClick={handleBulkDuplicate} disabled={!onDuplicateProperty}>
                 <Copy size={14} /> Duplicate
@@ -970,8 +970,8 @@ export function PropertiesPage({
               <button type="button" className="ll-props-bulk-btn danger" onClick={handleBulkDelete} disabled={!onDeleteProperty}>
                 <Trash2 size={14} /> Delete
               </button>
-            </div>
-          </div>
+        </div>
+      </div>
         )}
 
         {isPortfolioLoading ? (
@@ -1014,8 +1014,8 @@ export function PropertiesPage({
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
+                    </div>
+                    </div>
         ) : filteredProperties.length === 0 ? (
           <div className="ll-props-empty">
             <div className={`ll-props-empty-icon ${emptyCopy.tone === 'default' ? '' : emptyCopy.tone}`.trim()}>
@@ -1113,14 +1113,14 @@ export function PropertiesPage({
                               View →
                             </button>
                             {renderActionsMenu(property, tenant)}
-                          </div>
+                      </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-            </div>
+                    </div>
             <div className="ll-props-pager">
               <div className="ll-props-pager-left">
                 <span>Show</span>
@@ -1135,7 +1135,7 @@ export function PropertiesPage({
                     </option>
                   ))}
                 </select>
-              </div>
+                  </div>
               <div className="ll-props-pages">
                 <button
                   type="button"
@@ -1163,7 +1163,7 @@ export function PropertiesPage({
                 >
                   ›
                 </button>
-              </div>
+                      </div>
             </div>
           </div>
         ) : (
@@ -1182,8 +1182,8 @@ export function PropertiesPage({
                     ) : (
                       <div className="ll-props-card-img-empty">
                         <Building2 size={36} />
-                      </div>
-                    )}
+                        </div>
+                      )}
                     {badge && <div className={`ll-props-badge ${badge.className}`}>{badge.label}</div>}
                     {status === 'vacant' && <div className="ll-props-vacant-overlay">Vacant</div>}
                     <button
@@ -1194,7 +1194,7 @@ export function PropertiesPage({
                     >
                       {selectedProperties.has(property.id) ? <CheckSquare size={16} /> : <Square size={16} />}
                     </button>
-                  </div>
+                        </div>
                   <div className="ll-props-card-body">
                     <div className="ll-props-card-price-row">
                       <div className="ll-props-card-price">
@@ -1213,7 +1213,7 @@ export function PropertiesPage({
                           <Bath size={14} /> {property.bathrooms} {property.bathrooms === 1 ? 'Bath' : 'Baths'}
                         </span>
                       )}
-                    </div>
+                      </div>
                     {(property.amenities || []).length > 0 && (
                       <div className="ll-props-card-tags">
                         {property.amenities.slice(0, 3).map((tag) => (
@@ -1221,7 +1221,7 @@ export function PropertiesPage({
                             {tag}
                           </span>
                         ))}
-                      </div>
+                    </div>
                     )}
                     <div className={`ll-props-tenant-box ${status === 'renovation' ? 'vacant' : status}`}>
                       {status === 'vacant' || status === 'renovation' ? (
@@ -1229,7 +1229,7 @@ export function PropertiesPage({
                           <div className="ll-props-tenant-label">
                             <span className="dot" style={{ width: 6, height: 6, borderRadius: 99, background: '#94a3b8', display: 'inline-block' }} />
                             {status === 'renovation' ? 'Under renovation' : 'Vacant'}
-                          </div>
+                    </div>
                           <div style={{ color: '#64748b', marginTop: 4 }}>
                             {status === 'renovation' ? 'Property is currently being renovated.' : 'No current tenant'}
                           </div>
@@ -1240,9 +1240,9 @@ export function PropertiesPage({
                             <div className="ll-props-tenant-label">
                               <span className="dot" style={{ width: 6, height: 6, borderRadius: 99, background: status === 'expiring' ? '#f43f5e' : '#10b981', display: 'inline-block' }} />
                               {status === 'expiring' ? 'Lease expiring' : 'Occupied'}
-                            </div>
+                        </div>
                             {status === 'expiring' && <span className="ll-props-action-needed">Action Needed</span>}
-                          </div>
+                        </div>
                           <div className="ll-props-tenant-name">
                             <User size={14} />
                             {tenant?.name}
@@ -1251,10 +1251,10 @@ export function PropertiesPage({
                           <div className="ll-props-tenant-dates">
                             <span>Since {formatLeaseDate(tenant?.leaseStart)}</span>
                             <span className={status === 'expiring' ? 'end-warn' : ''}>Ends {formatLeaseDate(tenant?.leaseEnd)}</span>
-                          </div>
+                      </div>
                         </>
-                      )}
-                    </div>
+                    )}
+                  </div>
                     <div className="ll-props-card-actions">
                       <button type="button" className="ll-props-card-view" onClick={() => onViewProperty(property)}>
                         View Details
@@ -1266,17 +1266,17 @@ export function PropertiesPage({
                         <FileText size={16} />
                       </button>
                       {renderActionsMenu(property, tenant)}
-                    </div>
+                  </div>
                   </div>
                 </article>
-              );
-            })}
-          </div>
-        )}
+            );
+          })}
+        </div>
+      )}
       </div>
 
       {/* Import Properties Dialog - Hidden for now */}
-      {/*
+      {/* 
       <ImportPropertiesDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
