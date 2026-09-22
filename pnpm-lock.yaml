@@ -587,9 +587,6 @@ importers:
       '@types/express':
         specifier: ^4.17.17
         version: 4.17.25
-      '@types/ioredis':
-        specifier: ^5.0.0
-        version: 5.0.0(supports-color@8.1.1)
       '@types/multer':
         specifier: ^1.4.12
         version: 1.4.13
