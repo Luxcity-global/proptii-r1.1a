@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Upload, FileText, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -88,7 +89,7 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload }: DocumentUploa
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed',
       top: 0,
@@ -99,7 +100,7 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload }: DocumentUploa
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 50,
+      zIndex: 120,
       padding: '1rem'
     }}>
       <div style={{
@@ -231,7 +232,7 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload }: DocumentUploa
               }}>
                 <SelectValue placeholder="Select document type" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[130]">
                 {documentTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
                     {type.label}
@@ -300,7 +301,8 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload }: DocumentUploa
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

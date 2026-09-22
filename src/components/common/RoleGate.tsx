@@ -14,6 +14,11 @@ import { useAuth } from '../../contexts/AuthContext';
 const EXEMPT_PATHS = ['/select-role', '/claim', '/login', '/register', '/unauthorized'];
 const SETTLE_DELAY_MS = 400;
 
+function isAdminDashboardPath(pathname: string) {
+  const p = pathname.toLowerCase();
+  return p === '/proptiiadmin' || p.startsWith('/proptiiadmin/');
+}
+
 const RoleGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const navigate      = useNavigate();
@@ -42,7 +47,7 @@ const RoleGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const isExempt = EXEMPT_PATHS.some(
       (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
     );
-    if (isExempt) return;
+    if (isExempt || isAdminDashboardPath(location.pathname)) return;
 
     // Only redirect to /select-role when role resolution has finished (roleResolved === true) AND user has no roles assigned.
     // Do NOT redirect when user.roleResolved === false (still resolving).

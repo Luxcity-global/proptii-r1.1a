@@ -25,6 +25,7 @@ const SPA_ROUTE_DIRS = [
   'dashboard',
   'admin',
   'admin/leads',
+  'ProptiiAdmin',
 ];
 
 function main() {

@@ -1,17 +1,125 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2, ChevronLeft, ChevronRight, Edit3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { FileText, Download, Eye, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Search, Filter, Star, Trash2, Upload } from 'lucide-react';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 
 import { useAuth } from '../../../contexts/AuthContext';
-import { useIsMobile } from '../ui/use-mobile';
+import TenantPageHeader from '../ui/TenantPageHeader';
+import BookViewingModal from '../../viewings/BookViewingModal';
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
 import PlanUpgradeWall from '../PlanUpgradeWall';
+import '../../../styles/tenantContracts.css';
+import '../../../styles/tenantModals.css';
+
+type ContractTab = 'all' | 'signed' | 'pending' | 'drafts';
+
+function agentInitials(name?: string | null): string {
+  const parts = (name || 'Agent').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'AG';
+  return ((parts[0][0] || '') + (parts[1]?.[0] || '')).toUpperCase();
+}
 
 const TenantContracts: React.FC = () => {
+  const navigate = useNavigate();
   const { plan, status } = useBillingStatus();
+  const { signedContracts, isLoading, removeSignedContract } = useSignedContracts();
+  const { isAuthenticated, user } = useAuth();
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
+  const [issueTemplate, setIssueTemplate] = useState('Standard Assured Shorthold Tenancy (AST) — 12 Months');
+  const [issueProperty, setIssueProperty] = useState('');
+  const [issueTenant, setIssueTenant] = useState('');
+  const [issueEmail, setIssueEmail] = useState('');
+  const [issueStart, setIssueStart] = useState('');
+  const [issueExpiry, setIssueExpiry] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [activeTab, setActiveTab] = useState<ContractTab>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortNewestFirst, setSortNewestFirst] = useState(true);
+  const ITEMS_PER_PAGE = 10;
+
+  const displaySignedContracts = useMemo(() => {
+    return signedContracts.map((c: any) => {
+      const normalizedContract = {
+        id: c.id,
+        documentName: c.documentName || c.name || null,
+        propertyName: c.propertyName || null,
+        propertyAddress: c.propertyAddress || null,
+        agentName: c.agentName || c.agent || null,
+        agentEmail: c.agentEmail || null,
+        tenantEmail: c.tenantEmail || null,
+        email: c.email || c.tenantEmail || c.agentEmail || null,
+        signedDate: c.signedDate || null,
+        documentUrl: c.documentUrl || null,
+        status: c.status || null,
+        emailSent: c.emailSent || false
+      };
+
+      return normalizedContract;
+    });
+  }, [signedContracts]);
+
+  const contractStats = {
+    total: displaySignedContracts.length,
+    signed: displaySignedContracts.length,
+    requested: 0,
+    expiring: 0
+  };
+  const summaryTotalContracts = isAuthenticated ? contractStats.total : 0;
+  const summarySignedContracts = isAuthenticated ? contractStats.signed : 0;
+  const summaryExpiringContracts = isAuthenticated ? contractStats.expiring : 0;
+  const summaryPendingContracts = isAuthenticated ? contractStats.requested : 0;
+
+  const filteredContracts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    let list = displaySignedContracts;
+
+    if (activeTab === 'pending' || activeTab === 'drafts') {
+      list = [];
+    }
+
+    if (query) {
+      list = list.filter((contract) => {
+        const haystack = [
+          contract.documentName,
+          contract.propertyName,
+          contract.propertyAddress,
+          contract.agentName,
+          contract.email,
+          contract.agentEmail,
+          contract.tenantEmail,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(query);
+      });
+    }
+
+    return [...list].sort((a, b) => {
+      const aTime = a.signedDate ? new Date(a.signedDate).getTime() : 0;
+      const bTime = b.signedDate ? new Date(b.signedDate).getTime() : 0;
+      return sortNewestFirst ? bTime - aTime : aTime - bTime;
+    });
+  }, [displaySignedContracts, activeTab, searchQuery, sortNewestFirst]);
+
+  const currentContracts = filteredContracts;
+
+  const totalPages = Math.max(1, Math.ceil(currentContracts.length / ITEMS_PER_PAGE));
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedContracts = useMemo(() => {
+    return currentContracts.slice(startIndex, endIndex);
+  }, [currentContracts, startIndex, endIndex]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentContracts.length, activeTab, searchQuery]);
+
   if (!canAccessSection('tenant-contracts', plan, status)) {
     return (
       <PlanUpgradeWall
@@ -21,79 +129,22 @@ const TenantContracts: React.FC = () => {
       />
     );
   }
-  const { signedContracts, isLoading, clearAllContracts, addSignedContract, removeSignedContract } = useSignedContracts();
-  const { user, isAuthenticated } = useAuth();
-  const isMobile = useIsMobile();
-  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const ITEMS_PER_PAGE = 10;
 
-  // Use SignedContractsContext directly to support real-time updates and remove reload flickers
-  const displaySignedContracts = useMemo(() => {
-    return signedContracts.map((c: any) => {
-      // Normalize the contract structure to ensure all fields are properly mapped
-      const normalizedContract = {
-        id: c.id,
-        documentName: c.documentName || c.name || null, // Contract file name
-        propertyName: c.propertyName || null,
-        propertyAddress: c.propertyAddress || null,
-        agentName: c.agentName || c.agent || null, // Agent name, NOT document name
-        agentEmail: c.agentEmail || null,
-        tenantEmail: c.tenantEmail || null,
-        email: c.email || c.tenantEmail || c.agentEmail || null,
-        signedDate: c.signedDate || null,
-        documentUrl: c.documentUrl || null,
-        status: c.status || null,
-        emailSent: c.emailSent || false
-      };
-      
-      return normalizedContract;
-    });
-  }, [signedContracts]);
-
-  // Contract statistics
-  const contractStats = {
-    total: displaySignedContracts.length, // Use display contracts for stats
-    signed: displaySignedContracts.length, // Use display contracts for stats
-    requested: 0, // No requested contracts
-    expiring: 0 // No expiring contracts (since we removed mock data)
-  };
-  const summaryTotalContracts = isAuthenticated ? contractStats.total : 0;
-  const summarySignedContracts = isAuthenticated ? contractStats.signed : 0;
-  const summaryExpiringContracts = isAuthenticated ? contractStats.expiring : 0;
-
-  // Default to signed tab since requested is disabled
-  const [activeTab, setActiveTab] = useState('signed');
-
-  // Always show signed contracts
-  const currentContracts = displaySignedContracts;
-
-  // Pagination logic
-  const totalPages = Math.ceil(currentContracts.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedContracts = useMemo(() => {
-    return currentContracts.slice(startIndex, endIndex);
-  }, [currentContracts, startIndex, endIndex]);
-
-  // Reset pagination when contracts change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [currentContracts.length]);
-
-  // Get contract date based on tab
   const getContractDate = (contract: any) => {
-    return contract.signedDate; // Always return signedDate
+    return contract.signedDate;
   };
 
-  // Handle contract viewing
+  const formatDate = (value?: string | null) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
   const handleViewContract = async (contract: any) => {
     console.log('🔍 View button clicked for contract:', contract.id);
     let viewContract = contract;
 
-    // Fetch the full contract if we don't have the document URL
     if (!viewContract.documentUrl) {
       console.log('🔍 Fetching full contract to get document URL...');
       const result = await signedContractsFirestoreService.getSignedContractById(contract.id);
@@ -119,12 +170,10 @@ const TenantContracts: React.FC = () => {
     }
   };
 
-  // Handle contract downloading
   const handleDownloadContract = async (contract: any) => {
     console.log('🔍 Download button clicked for contract:', contract.id);
     let downloadContract = contract;
 
-    // Fetch the full contract if we don't have the document URL
     if (!downloadContract.documentUrl) {
       console.log('🔍 Fetching full contract to get document URL...');
       const result = await signedContractsFirestoreService.getSignedContractById(contract.id);
@@ -164,78 +213,12 @@ const TenantContracts: React.FC = () => {
     }
   };
 
-  // Pagination component
-  const PaginationControls = () => {
-    if (totalPages <= 1) return null;
-
-    return (
-      <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} items-center justify-between gap-4 bg-white border border-gray-200 rounded-lg ${isMobile ? 'p-3' : 'p-4'} mt-4`}>
-        <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600`}>
-          Showing {startIndex + 1} to {Math.min(endIndex, currentContracts.length)} of {currentContracts.length} contracts
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className={`flex items-center gap-1 ${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'} transition-colors`}
-          >
-            <ChevronLeft className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
-            <span className={isMobile ? '' : 'hidden sm:inline'}>Previous</span>
-          </button>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-              // Show first page, last page, current page, and pages around current
-              if (
-                page === 1 ||
-                page === totalPages ||
-                (page >= currentPage - 1 && page <= currentPage + 1)
-              ) {
-                return (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`${isMobile ? 'min-w-[32px] h-8 text-xs' : 'min-w-[40px] h-9 text-sm'} px-2 border rounded-lg transition-colors ${
-                      currentPage === page
-                        ? 'bg-orange-600 text-white border-orange-600'
-                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                );
-              } else if (
-                page === currentPage - 2 ||
-                page === currentPage + 2
-              ) {
-                return (
-                  <span key={page} className={`${isMobile ? 'px-1' : 'px-2'} text-gray-500`}>
-                    ...
-                  </span>
-                );
-              }
-              return null;
-            })}
-          </div>
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-            className={`flex items-center gap-1 ${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'} transition-colors`}
-          >
-            <span className={isMobile ? '' : 'hidden sm:inline'}>Next</span>
-            <ChevronRight className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Handle contract deletion
   const handleDeleteContract = async (contractId: string) => {
     try {
       console.log('🔍 Delete button clicked for contract:', contractId);
       if (window.confirm('Are you sure you want to delete this contract? This action cannot be undone.')) {
         const result = await removeSignedContract(contractId);
-        
+
         if (result.success) {
           console.log('✅ Contract deleted successfully:', contractId);
         } else {
@@ -249,318 +232,409 @@ const TenantContracts: React.FC = () => {
     }
   };
 
+  const tabCounts = {
+    all: summaryTotalContracts,
+    signed: summarySignedContracts,
+    pending: summaryPendingContracts,
+    drafts: 0,
+  };
+
+  const renderActions = (contract: any) => (
+    <>
+      <button
+        type="button"
+        onClick={() => void handleViewContract(contract)}
+        className="tn-ct-btn-view"
+      >
+        View PDF
+      </button>
+      <button
+        type="button"
+        onClick={() => void handleDownloadContract(contract)}
+        className="tn-ct-icon-btn"
+        aria-label="Download"
+        title="Download"
+      >
+        <Download className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => contract.id && handleDeleteContract(String(contract.id))}
+        className="tn-ct-icon-btn danger"
+        aria-label="Delete"
+        title="Delete"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </>
+  );
+
+  const contractsHeader = (
+    <TenantPageHeader
+      title="Contracts"
+      subtitle="Manage and track your property lease agreements and legal documents."
+      primaryLabel="Request Viewing"
+      primaryIcon={<Eye className="w-4 h-4" />}
+      onPrimary={() => setIsBookViewingOpen(true)}
+    />
+  );
+
+  const viewingModal = (
+    <BookViewingModal
+      open={isBookViewingOpen}
+      onClose={() => setIsBookViewingOpen(false)}
+      onSubmissionComplete={() => setIsBookViewingOpen(false)}
+    />
+  );
+
   if (isLoading) {
     return (
-      <div className={`flex items-center justify-center ${isMobile ? 'h-48' : 'h-64'}`}>
-        <div className={`animate-spin rounded-full ${isMobile ? 'h-6 w-6' : 'h-8 w-8'} border-b-2 border-gray-900`}></div>
-        <span className={`${isMobile ? 'ml-2 text-sm' : 'ml-2'} text-gray-600`}>
-          Loading...
-        </span>
+      <div className="tn-ct">
+        {contractsHeader}
+        <div className="tn-ct-body">
+          <div className="tn-ct-kpi-grid">
+            <div className="tn-ct-skel" />
+            <div className="tn-ct-skel" />
+            <div className="tn-ct-skel" />
+            <div className="tn-ct-skel" />
+          </div>
+          <div className="tn-ct-skel tn-ct-skel-table" />
+        </div>
+        {viewingModal}
       </div>
     );
   }
 
+  const showEmpty = currentContracts.length === 0;
+
   return (
-    <div className={`space-y-6 ${isMobile ? 'pb-4 px-4' : 'pb-8'}`}>
-      {/* Header */}
-      <div className={`flex items-start ${isMobile ? 'gap-3' : 'justify-between'} ${isMobile ? 'pt-4' : 'pt-6'}`}>
-        <div className={`${isMobile ? 'flex-1 min-w-0' : ''}`}>
-          <h2 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-gray-900`}>Contracts</h2>
-          <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 ${isMobile ? 'mt-1 break-words' : ''}`}>Manage your property contracts and agreements</p>
+    <div className="tn-ct">
+      {contractsHeader}
+      <div className="tn-ct-body">
+      <section className="tn-ct-kpi-grid">
+        <div className="tn-ct-kpi">
+          <div className="tn-ct-kpi-top">
+            <span className="tn-ct-kpi-label">Total Contracts</span>
+            <span className="tn-ct-kpi-icon blue"><FileText className="w-3.5 h-3.5" /></span>
+          </div>
+          <div className="tn-ct-kpi-value">{summaryTotalContracts}</div>
         </div>
-        <button
-          onClick={() => setIsContractModalOpen(true)}
-          className="px-5 py-2.5 text-white rounded-full text-xs md:text-sm font-medium transition-all duration-300 shadow-md hover:-translate-y-0.5 whitespace-nowrap flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)' }}
-        >
-          {isMobile ? 'Go To Contract' : 'Go To Contract Page'}
-        </button>
-      </div>
+        <div className="tn-ct-kpi">
+          <div className="tn-ct-kpi-top">
+            <span className="tn-ct-kpi-label">Signed &amp; Active</span>
+            <span className="tn-ct-kpi-icon emerald"><CheckCircle className="w-3.5 h-3.5" /></span>
+          </div>
+          <div className="tn-ct-kpi-value">{summarySignedContracts}</div>
+        </div>
+        <div className="tn-ct-kpi">
+          <div className="tn-ct-kpi-top">
+            <span className="tn-ct-kpi-label">Pending Signature</span>
+            <span className="tn-ct-kpi-icon amber"><Clock className="w-3.5 h-3.5" /></span>
+          </div>
+          <div className="tn-ct-kpi-value">{summaryPendingContracts}</div>
+        </div>
+        <div className="tn-ct-kpi">
+          <div className="tn-ct-kpi-top">
+            <span className="tn-ct-kpi-label">Expiring Soon (30d)</span>
+            <span className="tn-ct-kpi-icon rose"><AlertTriangle className="w-3.5 h-3.5" /></span>
+          </div>
+          <div className="tn-ct-kpi-value">{summaryExpiringContracts}</div>
+        </div>
+      </section>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {/* Total Contracts */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Total Contracts</h3>
-            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center`}>
-              <FileText className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
-            </div>
-          </div>
-          <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {summaryTotalContracts}
-            </p>
-          </div>
-          <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>All contracts</p>
-          </div>
+      <div className="tn-ct-toolbar">
+        <div className="tn-ct-tabs">
+          {([
+            { id: 'all', label: 'All' },
+            { id: 'signed', label: 'Signed' },
+            { id: 'pending', label: 'Pending' },
+            { id: 'drafts', label: 'Drafts' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`tn-ct-tab${activeTab === tab.id ? ' is-active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span>{tab.label}</span>
+              <span className="tn-ct-tab-count">{tabCounts[tab.id]}</span>
+            </button>
+          ))}
         </div>
 
-        {/* Signed Contracts */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Signed</h3>
-            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-green-100 rounded-lg flex items-center justify-center`}>
-              <CheckCircle className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-green-600`} />
-            </div>
+        <div className="tn-ct-toolbar-actions">
+          <div className="tn-ct-search">
+            <Search className="w-4 h-4" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search Contracts..."
+            />
           </div>
-          <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {summarySignedContracts}
-            </p>
-          </div>
-          <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Completed</p>
-          </div>
-        </div>
-
-        {/* Requested Contracts - disabled */}
-        {false && (
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Requested</h3>
-            <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-yellow-600" />
-            </div>
-          </div>
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
-              {contractStats.requested}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Awaiting signature</p>
-          </div>
-        </div>
-        )}
-
-        {/* Expiring Soon */}
-        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Expiring Soon</h3>
-            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-red-100 rounded-lg flex items-center justify-center`}>
-              <AlertTriangle className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-red-600`} />
-            </div>
-          </div>
-          <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {summaryExpiringContracts}
-            </p>
-          </div>
-          <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Within 30 days</p>
-          </div>
+          <button
+            type="button"
+            className={`tn-ct-ghost${searchQuery ? ' is-active' : ''}`}
+            onClick={() => setSearchQuery('')}
+            title="Clear search"
+          >
+            <Filter className="w-3.5 h-3.5" />
+            Filter
+          </button>
+          <button
+            type="button"
+            className={`tn-ct-ghost${!sortNewestFirst ? ' is-active' : ''}`}
+            onClick={() => setSortNewestFirst((prev) => !prev)}
+            title={sortNewestFirst ? 'Sorted newest first' : 'Sorted oldest first'}
+          >
+            <Star className="w-3.5 h-3.5" />
+            Sort
+          </button>
         </div>
       </div>
 
-      {/* Alert Message - disabled for requested feature */}
-      {false && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-orange-600" />
-            </div>
-            <p className="text-sm font-medium text-orange-800">
-              3 contracts are awaiting your signature and should be reviewed.
-            </p>
+      {showEmpty ? (
+        <div className="tn-ct-empty">
+          <div className="tn-ct-empty-icon">
+            <Eye className="w-6 h-6" />
           </div>
+          <h2>No contracts or agreements yet</h2>
+          <p>
+            {activeTab === 'pending' || activeTab === 'drafts'
+              ? 'There are no contracts in this view yet. Signed agreements will appear under All and Signed.'
+              : searchQuery
+                ? 'No contracts match your search. Try a different name, agent, or email.'
+                : 'Once you generate or receive an agreement, it will appear here. Track e-signatures, download PDF copies, and receive automated renewal reminders.'}
+          </p>
+          {!searchQuery && activeTab !== 'pending' && activeTab !== 'drafts' && (
+            <>
+              <div className="tn-ct-steps">
+                <span className="tn-ct-step"><span className="tn-ct-step-num">1</span>Select Template</span>
+                <span className="tn-ct-step-arrow">→</span>
+                <span className="tn-ct-step"><span className="tn-ct-step-num">2</span>Add Parties</span>
+                <span className="tn-ct-step-arrow">→</span>
+                <span className="tn-ct-step"><span className="tn-ct-step-num">3</span>E Sign Digitally</span>
+                <span className="tn-ct-step-arrow">→</span>
+                <span className="tn-ct-step"><span className="tn-ct-step-num">4</span>Manage &amp; Renew</span>
+              </div>
+              <div className="tn-ct-empty-actions">
+                <button type="button" className="tn-ct-btn-primary" onClick={() => {
+                  setIssueTenant(user?.name || '');
+                  setIssueEmail(user?.email || '');
+                  setIsIssueModalOpen(true);
+                }}>
+                  <Upload className="w-4 h-4" />
+                  Upload First File
+                </button>
+                <button
+                  type="button"
+                  className="tn-ct-btn-outline"
+                  onClick={() => navigate('/dashboard/tenant-referencing')}
+                >
+                  <span>View Referencing Passport</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="tn-ct-table-wrap">
+          <div className="tn-ct-table-scroll">
+            <table className="tn-ct-table">
+              <thead>
+                <tr>
+                  <th>Property / Lease Name</th>
+                  <th>Counterparty / Agent</th>
+                  <th>Status</th>
+                  <th>Start Date</th>
+                  <th>Expiry Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedContracts.map((contract, index) => (
+                  <tr key={contract.id || index}>
+                    <td className="tn-ct-name">
+                      {contract.documentName || contract.propertyName || 'Contract Document'}
+                    </td>
+                    <td>
+                      <div className="tn-ct-party">
+                        <span className="tn-ct-avatar">{agentInitials(contract.agentName)}</span>
+                        <span className="tn-ct-party-name">{contract.agentName || 'Agent Name'}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="tn-ct-status is-signed">
+                        <span className="dot" />
+                        Signed
+                      </span>
+                    </td>
+                    <td className="tn-ct-date">{formatDate(getContractDate(contract))}</td>
+                    <td className="tn-ct-date">N/A</td>
+                    <td>
+                      <div className="tn-ct-actions">{renderActions(contract)}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="tn-ct-cards">
+            {paginatedContracts.map((contract, index) => (
+              <div key={contract.id || `m-${index}`} className="tn-ct-card">
+                <div className="tn-ct-card-top">
+                  <div className="tn-ct-avatar">{agentInitials(contract.agentName)}</div>
+                  <div>
+                    <h3>{contract.documentName || contract.propertyName || 'Contract Document'}</h3>
+                    <div className="tn-ct-card-meta">{contract.agentName || 'Agent Name'}</div>
+                  </div>
+                </div>
+                <span className="tn-ct-status is-signed"><span className="dot" />Signed</span>
+                <div className="tn-ct-card-meta" style={{ marginTop: 10 }}>
+                  Signed {formatDate(getContractDate(contract))}
+                </div>
+                <div className="tn-ct-card-actions">{renderActions(contract)}</div>
+              </div>
+            ))}
+          </div>
+
+          {currentContracts.length > ITEMS_PER_PAGE && (
+            <div className="tn-ct-footer">
+              <div>
+                Showing {startIndex + 1} to {Math.min(endIndex, currentContracts.length)} of {currentContracts.length} contracts
+              </div>
+              <div className="tn-ct-pager">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  Previous
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        type="button"
+                        className={currentPage === page ? 'is-current' : ''}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </button>
+                    );
+                  }
+                  if (page === currentPage - 2 || page === currentPage + 2) {
+                    return <span key={page}>...</span>;
+                  }
+                  return null;
+                })}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
-
-      {/* Contract Modal */}
-      <ContractModal 
+      </div>
+      <ContractModal
         isOpen={isContractModalOpen}
         onClose={() => setIsContractModalOpen(false)}
       />
-
-      {/* Tabs Section - requested tab disabled */}
-      <div>
-        <div className={isMobile ? 'mb-4' : 'mb-6'}>
-          <div className={`bg-gray-100 rounded-full border border-gray-200/60 p-1 ${isMobile ? 'w-full' : 'inline-flex'}`}>
-            <button
-              className={`${isMobile ? 'w-full px-3 py-2 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-full bg-white text-[#DC5F12] shadow-sm flex items-center justify-center gap-1`}
-              disabled
-            >
-              Signed Contracts ({displaySignedContracts.length})
-              {signedContracts.length > 0 ? <FileText className="w-4 h-4 ml-0.5" /> : <Edit3 className="w-4 h-4 ml-0.5" />}
-            </button>
+      {isIssueModalOpen && (
+        <div className="tn-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setIsIssueModalOpen(false); }}>
+          <div className="tn-modal tn-modal-lg" role="dialog" aria-labelledby="tn-issue-title">
+            <div className="tn-modal-head">
+              <div className="tn-drawer-head-main">
+                <span className="tn-modal-ico orange">
+                  <FileText className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 id="tn-issue-title">Issue Property Agreement</h3>
+                  <p>Draft AST or commercial tenancy with e-signature relay</p>
+                </div>
+              </div>
+              <button type="button" className="tn-modal-x" onClick={() => setIsIssueModalOpen(false)} aria-label="Close">✕</button>
+            </div>
+            <div className="tn-modal-body">
+              <label className="tn-modal-label">
+                Contract Template
+                <select value={issueTemplate} onChange={(e) => setIssueTemplate(e.target.value)}>
+                  <option>Standard Assured Shorthold Tenancy (AST) — 12 Months</option>
+                  <option>Commercial Lease Agreement — 3 Years</option>
+                  <option>Guarantor Deed & Surety Agreement</option>
+                </select>
+              </label>
+              <label className="tn-modal-label">
+                Property Name / Unit
+                <input
+                  type="text"
+                  value={issueProperty}
+                  onChange={(e) => setIssueProperty(e.target.value)}
+                  placeholder="e.g. Flat 4B, 22 Meadow Lane"
+                />
+              </label>
+              <div className="tn-modal-grid2">
+                <label className="tn-modal-label">
+                  Counterparty Tenant
+                  <input
+                    type="text"
+                    value={issueTenant}
+                    onChange={(e) => setIssueTenant(e.target.value)}
+                    placeholder="e.g. Sarah Jones"
+                  />
+                </label>
+                <label className="tn-modal-label">
+                  Tenant Email
+                  <input
+                    type="email"
+                    value={issueEmail}
+                    onChange={(e) => setIssueEmail(e.target.value)}
+                    placeholder="e.g. sarah.j@gmail.com"
+                  />
+                </label>
+              </div>
+              <div className="tn-modal-grid2">
+                <label className="tn-modal-label">
+                  Start Date
+                  <input type="date" value={issueStart} onChange={(e) => setIssueStart(e.target.value)} />
+                </label>
+                <label className="tn-modal-label">
+                  Expiry Date
+                  <input type="date" value={issueExpiry} onChange={(e) => setIssueExpiry(e.target.value)} />
+                </label>
+              </div>
+            </div>
+            <div className="tn-modal-foot">
+              <button type="button" className="tn-modal-cancel" onClick={() => setIsIssueModalOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                className="tn-modal-primary"
+                onClick={() => {
+                  setIsIssueModalOpen(false);
+                  setIsContractModalOpen(true);
+                }}
+              >
+                Generate &amp; Dispatch Contract
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Desktop Table View */}
-        {!isMobile && (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            {/* Table Header */}
-            <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: '#E7F2FF' }}>
-              <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-600">
-                <div>Name</div>
-                <div>Agent</div>
-                <div>Email</div>
-                <div>Signed Date</div>
-                <div>Actions</div>
-              </div>
-            </div>
-
-            {/* Table Body */}
-            <div className="divide-y divide-gray-100">
-              {paginatedContracts.map((contract, index) => (
-                <div key={contract.id || index} className="grid grid-cols-5 gap-4 items-start px-6 py-4 hover:bg-gray-50 transition-colors">
-                  {/* Name (Contract File Name) */}
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 break-words overflow-wrap-anywhere">
-                        {contract.documentName || contract.propertyName || 'Contract Document'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Agent */}
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {contract.agentName || 'Agent Name'}
-                    </p>
-                  </div>
-
-                  {/* Email */}
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">{contract.email || contract.tenantEmail || contract.agentEmail || 'No email'}</span>
-                  </div>
-
-                  {/* Signed Date */}
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">
-                      {getContractDate(contract) ? new Date(getContractDate(contract)).toLocaleDateString() : 'N/A'}
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => void handleViewContract(contract)}
-                      className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                      aria-label="View"
-                      title="View"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => void handleDownloadContract(contract)}
-                      className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                      aria-label="Download"
-                      title="Download"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => contract.id && handleDeleteContract(String(contract.id))}
-                      className="inline-flex items-center p-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                      aria-label="Delete"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Pagination Controls for Desktop */}
-        {!isMobile && <PaginationControls />}
-
-        {/* Mobile Card View */}
-        {isMobile && (
-          <div className="space-y-4">
-            {paginatedContracts.length === 0 ? (
-              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-base font-semibold text-gray-900 mb-2">No Contracts</h3>
-                <p className="text-sm text-gray-600">You don't have any signed contracts yet.</p>
-              </div>
-            ) : (
-              paginatedContracts.map((contract, index) => (
-                <div 
-                  key={contract.id || index} 
-                  className="bg-white border border-gray-200 rounded-lg p-4"
-                >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
-                        {contract.documentName || contract.propertyName || 'Contract Document'}
-                      </h3>
-                      <div className="flex items-center gap-1 mb-2">
-                        <User className="w-3 h-3 text-gray-400" />
-                        <p className="text-xs text-gray-600 truncate">
-                          {contract.agentName || 'Agent Name'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 mb-3 text-sm">
-                    <div>
-                      <span className="text-xs text-gray-500">Email:</span>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Mail className="h-3 w-3 text-gray-400" />
-                        <p className="text-xs text-gray-700 truncate">
-                          {contract.email || contract.tenantEmail || contract.agentEmail || 'No email'}
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-500">Signed Date:</span>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Calendar className="h-3 w-3 text-gray-400" />
-                        <p className="text-xs font-medium text-gray-900">
-                          {getContractDate(contract) ? new Date(getContractDate(contract)).toLocaleDateString() : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-3 border-t">
-                    <button
-                      onClick={() => void handleViewContract(contract)}
-                      className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                    </button>
-                    <button
-                      onClick={() => void handleDownloadContract(contract)}
-                      className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </button>
-                    <button
-                      onClick={() => contract.id && handleDeleteContract(String(contract.id))}
-                      className="inline-flex items-center justify-center p-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                      aria-label="Delete"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* Pagination Controls for Mobile */}
-        {isMobile && <PaginationControls />}
-      </div>
+      )}
+      {viewingModal}
     </div>
   );
 };

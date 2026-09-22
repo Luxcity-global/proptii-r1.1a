@@ -1,41 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Separator } from './ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { DocumentUploadModal } from './DocumentUploadModal';
-import { 
-  ArrowLeft, 
-  Edit3, 
-  MapPin, 
-  Mail,
-  Phone,
-  PoundSterling,
-  Calendar,
-  User,
-  Home,
+import {
   AlertTriangle,
-  CheckCircle,
-  Clock,
+  Download,
   FileText,
-  UserCheck,
-  Shield,
-  CreditCard,
-  MoreHorizontal,
+  Loader2,
   Trash2,
-  Loader2
 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 import { Tenant } from '../App';
 import { referencingService, ReferencingDocument } from '../services/referencingService';
 import { paymentScheduleService, RentPaymentPeriod } from '../services/paymentScheduleService';
 import { tenantService } from '../services/tenantService';
 import { useTenantDetails } from '../hooks/useTenantDetails';
+import { ClientDetailsDrawer, clientInitials, type ClientStatusTone } from './ClientDetailsDrawer';
 
 interface TenantReference {
   id: string;
@@ -86,10 +66,11 @@ interface TenantDetailsProps {
   onBack: () => void;
   onEdit?: (tenant: Tenant) => void;
   onTenantUpdate?: (tenant: Tenant) => void;
+  initialTab?: string;
 }
 
-export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: TenantDetailsProps) {
-  const [activeTab, setActiveTab] = useState('overview');
+export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate, initialTab = 'overview' }: TenantDetailsProps) {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [referencingStatus, setReferencingStatus] = useState<'not-started' | 'in-progress' | 'complete'>('not-started');
   const [referencingData, setReferencingData] = useState<ReferencingDocument | null>(null);
@@ -104,21 +85,14 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
 
   const { tenantDetails: liveTenant, isLoading: isLoadingTenant } = useTenantDetails(tenant?.id);
 
-  if (!tenant) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="mb-4">Tenant not found</h2>
-          <Button onClick={onBack}>Back to Clients</Button>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    setActiveTab(initialTab || 'overview');
+  }, [initialTab, tenant?.id]);
 
   // Fetch real referencing data from Firestore
   useEffect(() => {
     const fetchReferencingStatus = async () => {
-      if (!tenant.email) {
+      if (!tenant?.email) {
         console.warn('[TenantDetails] No email found for tenant, skipping referencing check');
         setIsLoadingReferencing(false);
         return;
@@ -137,7 +111,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     };
 
     fetchReferencingStatus();
-  }, [tenant.email]);
+  }, [tenant?.email]);
 
   // Extract referencing documents from Firestore data
   useEffect(() => {
@@ -226,7 +200,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
   // Fetch referee and guarantor responses from Firestore (no backend needed)
   useEffect(() => {
     const fetchRefereeGuarantorResponses = async () => {
-      if (!tenant.email) {
+      if (!tenant?.email) {
         console.warn('[TenantDetails] No email found for tenant, skipping response fetch');
         setIsLoadingResponses(false);
         return;
@@ -254,7 +228,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     };
 
     fetchRefereeGuarantorResponses();
-  }, [tenant.email]);
+  }, [tenant?.email]);
 
   // Subscribe to payment periods in real-time
   useEffect(() => {
@@ -379,6 +353,27 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     }
   };
 
+  if (!tenant) {
+    return (
+      <ClientDetailsDrawer
+        initials="?"
+        name="Tenant not found"
+        statusLabel="—"
+        statusTone="idle"
+        subtitle="This record is no longer available"
+        tabs={[{ id: 'overview', label: 'Overview' }]}
+        activeTab="overview"
+        onTabChange={() => undefined}
+        onClose={onBack}
+      >
+        <div className="ll-cd-empty">
+          <p className="ll-cd-empty-title">Tenant not found</p>
+          <p>Go back to Clients to pick another record.</p>
+        </div>
+      </ClientDetailsDrawer>
+    );
+  }
+
   // Merge real tenant data with live updates
   const displayTenant: any = {
     ...tenant,
@@ -387,18 +382,18 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     phone: liveTenant?.phone || tenant.phone,
     avatar: liveTenant?.avatar || tenant.avatar,
     status: liveTenant?.status || tenant.status,
-    propertyAddress: liveTenant?.propertyAddress || 'Not assigned',
-    depositAmount: liveTenant?.depositAmount || tenant.rentAmount * 1.5,
+    propertyAddress: liveTenant?.propertyAddress || tenant.propertyAddress || 'Not assigned',
+    depositAmount: liveTenant?.depositAmount,
     monthlyRent: liveTenant?.rentAmount || tenant.rentAmount,
     rentAmount: liveTenant?.rentAmount || tenant.rentAmount,
     tenancyType: 'assured-shorthold',
     moveInDate: liveTenant?.leaseStart || tenant.leaseStart,
     leaseStart: liveTenant?.leaseStart || tenant.leaseStart,
     leaseEnd: liveTenant?.leaseEnd || tenant.leaseEnd,
-    emergencyContact: liveTenant?.emergencyContact || undefined,
-    notes: liveTenant?.notes || 'No notes available.',
+    emergencyContact: liveTenant?.emergencyContact || tenant.emergencyContact,
+    notes: liveTenant?.notes || (tenant as Tenant & { notes?: string }).notes || '',
     maintenanceRequests: [],
-    documents: liveTenant?.documents || tenant.documents || []
+    documents: liveTenant?.documents || (tenant as Tenant & { documents?: TenantDocument[] }).documents || []
   };
 
   // Convert payment periods to display format
@@ -410,17 +405,6 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     status: period.status === 'paid' ? 'paid' : period.status === 'overdue' ? 'overdue' : 'pending',
     paymentMethod: period.notes || undefined
   }));
-
-  const upcomingPayments = paymentPeriods
-    .filter((period) => {
-      if (!period.dueDate) return false;
-      if (period.status === 'paid') return false;
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      return period.dueDate.getTime() >= now.getTime();
-    })
-    .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0))
-    .slice(0, 3);
 
   const handleTogglePaymentStatus = async (periodId: string, currentStatus: string) => {
     if (updatingPayments[periodId]) {
@@ -524,42 +508,6 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     // In a real app, you would call an API to save the document
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-      case 'satisfactory':
-      case 'paid':
-      case 'completed':
-      case 'valid':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-      case 'in-progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'overdue':
-      case 'urgent':
-      case 'expired':
-        return 'bg-red-100 text-red-800';
-      case 'ended':
-      case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getReferencingStatusColor = (status: 'not-started' | 'in-progress' | 'complete') => {
-    switch (status) {
-      case 'complete':
-        return 'bg-green-100 text-green-800';
-      case 'in-progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'not-started':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const getReferencingStatusLabel = (status: 'not-started' | 'in-progress' | 'complete') => {
     switch (status) {
       case 'not-started':
@@ -569,21 +517,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
       case 'complete':
         return 'Complete';
       default:
-        return 'Unknown';
-    }
-  };
-
-  const getPriorityIcon = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-      case 'high':
-        return <AlertTriangle className="w-4 h-4 text-red-600" />;
-      case 'medium':
-        return <Clock className="w-4 h-4 text-yellow-600" />;
-      case 'low':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      default:
-        return <Clock className="w-4 h-4 text-gray-600" />;
+        return 'Not yet started';
     }
   };
 
@@ -609,24 +543,20 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  const handleDownloadDocument = (document: TenantDocument) => {
-    if (!document.downloadUrl) {
-      console.warn('No download URL available for document:', document.name);
+  const handleDownloadDocument = (file: TenantDocument) => {
+    if (!file.downloadUrl) {
+      console.warn('No download URL available for document:', file.name);
       return;
     }
 
     try {
-      // Create a temporary link element
-      const link = document.createElement('a');
-      link.href = document.downloadUrl;
-      link.download = document.name || 'document';
-      
-      // Trigger download
-      document.body.appendChild(link);
+      const link = window.document.createElement('a');
+      link.href = file.downloadUrl;
+      link.download = file.name || 'document';
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      
-      console.log('Document download initiated:', document.name);
+      window.document.body.removeChild(link);
+      console.log('Document download initiated:', file.name);
     } catch (error) {
       console.error('Error downloading document:', error);
     }
@@ -650,699 +580,526 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
   // Combine display documents with referencing documents
   const allDocuments = [...(displayTenant.documents || []), ...referencingDocuments];
 
-  if (isLoadingTenant) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-[#1776B6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading tenant details...</p>
-        </div>
-      </div>
-    );
-  }
+const asDate = (value: unknown): Date | null => {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value as string | number);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const formatDateSafe = (value: unknown) => {
+    const date = asDate(value);
+    return date ? formatDate(date) : '—';
+  };
+
+  const termLabel = (start: unknown, end: unknown) => {
+    const from = asDate(start);
+    const to = asDate(end);
+    if (!from || !to) return '—';
+    const months = Math.max(1, Math.round((to.getTime() - from.getTime()) / (30.44 * 86400000)));
+    return `${months} Month${months === 1 ? '' : 's'}`;
+  };
+
+  const paymentTone = (): { tone: ClientStatusTone; label: string } => {
+    if (tenant.paymentStatus === 'overdue') return { tone: 'overdue', label: 'Overdue' };
+    if (tenant.paymentStatus === 'payment-plan') return { tone: 'due', label: 'Payment Plan' };
+    return { tone: 'paid', label: 'Paid' };
+  };
+
+  const kycTone = (): { tone: ClientStatusTone; label: string } => {
+    if (isLoadingReferencing) return { tone: 'pending', label: 'Checking…' };
+    if (referencingStatus === 'complete') return { tone: 'complete', label: '✓ Verified' };
+    if (referencingStatus === 'in-progress') return { tone: 'progress', label: 'In progress' };
+    return { tone: 'idle', label: 'Not started' };
+  };
+
+  const status = paymentTone();
+  const kyc = kycTone();
+  const formData = referencingData?.formData;
+  const monthlyIncomeRaw = formData?.financial?.monthlyIncome;
+  const monthlyIncome = monthlyIncomeRaw
+    ? parseFloat(String(monthlyIncomeRaw).replace(/[^\d.]/g, ''))
+    : NaN;
+  const hasIncome = Number.isFinite(monthlyIncome) && monthlyIncome > 0;
+  const rentToIncome = hasIncome && displayTenant.rentAmount
+    ? ((displayTenant.rentAmount / monthlyIncome) * 100).toFixed(1)
+    : null;
+  const identityDoc = formData?.identity?.identityProof;
+  const tenancyDocs = allDocuments.filter((doc: TenantDocument) => doc.type === 'tenancy-agreement');
+  const depositDocs = allDocuments.filter((doc: TenantDocument) => doc.type === 'deposit-certificate');
+  const primaryAgreement = tenancyDocs[0] || allDocuments.find((doc: TenantDocument) => !String(doc.id).startsWith('ref-'));
+  const drawerTabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'agreement', label: 'Tenancy Agreement' },
+    { id: 'payment', label: 'Payment History' },
+    { id: 'referencing', label: 'Referencing' },
+    { id: 'notes', label: 'Notes & Activity' },
+  ];
+
+  const paymentStatusTone = (value: string): ClientStatusTone => {
+    if (value === 'paid') return 'paid';
+    if (value === 'overdue') return 'overdue';
+    return 'due';
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card/50">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={onBack} className="p-2">
-                <ArrowLeft className="w-4 h-4" style={{ color: '#DC5F12' }} />
-              </Button>
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-16 w-16">
-                  {displayTenant.avatar && <AvatarImage src={displayTenant.avatar} alt={displayTenant.name} />}
-                  <AvatarFallback>
-                    <User className="h-8 w-8" style={{ color: '#DC5F12' }} />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h1 className="mb-1">{displayTenant.name}</h1>
-                  <div className="flex items-center space-x-3 flex-wrap gap-2">
-                    <Badge className={getStatusColor(displayTenant.status)}>
-                      {displayTenant.status}
-                    </Badge>
-                    {isLoadingReferencing ? (
-                      <Badge className="bg-gray-100 text-gray-800">
-                        <Clock className="w-3 h-3 mr-1 animate-spin" />
-                        Checking referencing...
-                      </Badge>
-                    ) : (
-                      <Badge className={getReferencingStatusColor(referencingStatus)}>
-                        Referencing: {getReferencingStatusLabel(referencingStatus)}
-                      </Badge>
-                    )}
-                  </div>
+    <>
+      <ClientDetailsDrawer
+        initials={clientInitials(displayTenant.name)}
+        name={displayTenant.name}
+        statusLabel={status.label}
+        statusTone={status.tone}
+        subtitle={displayTenant.propertyAddress}
+        phone={displayTenant.phone}
+        email={displayTenant.email}
+        tabs={drawerTabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onClose={onBack}
+        loading={isLoadingTenant}
+        actions={
+          onEdit ? (
+            <button type="button" className="ll-cd-comm" onClick={() => onEdit(displayTenant)}>
+              Edit
+            </button>
+          ) : null
+        }
+      >
+        {activeTab === 'overview' && (
+          <>
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Primary contact information</h4>
+              <div className="ll-cd-grid">
+                <div className="ll-cd-field">
+                  <span>Email Address</span>
+                  <strong className="is-mono">{displayTenant.email || '—'}</strong>
+                </div>
+                <div className="ll-cd-field">
+                  <span>Direct Phone (UK)</span>
+                  <strong className="is-mono">{displayTenant.phone || '—'}</strong>
                 </div>
               </div>
-            </div>
+              <div className="ll-cd-field">
+                <span>Right to Rent / KYC Verification</span>
+                <span className={`ll-cd-pill is-${kyc.tone}`}>{kyc.label}</span>
+              </div>
+            </section>
 
-            <div className="flex items-center space-x-2">
-              {onEdit && (
-                <Button variant="outline" onClick={() => onEdit(displayTenant)}>
-                  <Edit3 className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
-                  Edit
-                </Button>
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Emergency &amp; legal contact</h4>
+              {displayTenant.emergencyContact ? (
+                <>
+                  <div className="ll-cd-grid">
+                    <div className="ll-cd-field">
+                      <span>Contact Name</span>
+                      <strong>{displayTenant.emergencyContact.name || '—'}</strong>
+                    </div>
+                    <div className="ll-cd-field">
+                      <span>Relationship</span>
+                      <strong>{displayTenant.emergencyContact.relationship || '—'}</strong>
+                    </div>
+                  </div>
+                  <div className="ll-cd-field">
+                    <span>Emergency Phone (UK)</span>
+                    <strong className="is-mono">{displayTenant.emergencyContact.phone || '—'}</strong>
+                  </div>
+                </>
+              ) : (
+                <p className="ll-cd-empty" style={{ padding: 0, textAlign: 'left' }}>No emergency contact on file.</p>
               )}
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="p-2">
-                    <MoreHorizontal className="w-4 h-4" style={{ color: '#DC5F12' }} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    <Mail className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
-                    Send Email
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Phone className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
-                    Call Tenant
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <FileText className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
-                    Generate Report
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-      </div>
+            </section>
 
-      {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="references">References</TabsTrigger>
-          </TabsList>
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Occupancy schedule</h4>
+              <div className="ll-cd-grid">
+                <div className="ll-cd-field">
+                  <span>Move-In Date</span>
+                  <strong>{formatDateSafe(displayTenant.leaseStart)}</strong>
+                </div>
+                <div className="ll-cd-field">
+                  <span>Tenancy Duration</span>
+                  <strong>{termLabel(displayTenant.leaseStart, displayTenant.leaseEnd)}</strong>
+                </div>
+              </div>
+              <div className="ll-cd-grid">
+                <div className="ll-cd-field">
+                  <span>Security Deposit Held</span>
+                  <strong className="is-green">
+                    {displayTenant.depositAmount ? formatCurrency(displayTenant.depositAmount) : '—'}
+                  </strong>
+                </div>
+                <div className="ll-cd-field">
+                  <span>Lease end</span>
+                  <strong>{formatDateSafe(displayTenant.leaseEnd)}</strong>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Contact Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <User className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                    Contact Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center">
-                    <Mail className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span>{displayTenant.email}</span>
+        {activeTab === 'agreement' && (
+          <>
+            <section className="ll-cd-navy">
+              <div className="ll-cd-navy-top">
+                <div className="ll-cd-navy-doc">
+                  <div className="ll-cd-navy-icon">
+                    <FileText size={20} />
                   </div>
-                  <div className="flex items-center">
-                    <Phone className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span>{displayTenant.phone}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span>{displayTenant.propertyAddress}</span>
-                  </div>
-                  {displayTenant.emergencyContact && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="font-medium mb-2">Emergency Contact</p>
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          <p>{displayTenant.emergencyContact.name} ({displayTenant.emergencyContact.relationship})</p>
-                          <p>{displayTenant.emergencyContact.phone}</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Tenancy Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Home className="w-5 h-5 mr-2 text-muted-foreground" />
-                    Tenancy Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Monthly Rent</p>
-                      <p>{formatCurrency(displayTenant.monthlyRent || displayTenant.rentAmount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Deposit</p>
-                      <p>{formatCurrency(displayTenant.depositAmount || displayTenant.rentAmount * 1.5)}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Lease Start</p>
-                      <p>{formatDate(displayTenant.leaseStart)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Lease End</p>
-                      <p>{formatDate(displayTenant.leaseEnd)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Employment Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CreditCard className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                    Employment & Income
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {referencingData?.formData?.employment || referencingData?.formData?.financial || referencingData?.formData?.residential ? (
-                    <>
-                      {referencingData.formData.employment?.companyDetails && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Employer</p>
-                          <p>{referencingData.formData.employment.companyDetails}</p>
-                        </div>
-                      )}
-                      {referencingData.formData.employment?.jobPosition && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Job Position</p>
-                          <p>{referencingData.formData.employment.jobPosition}</p>
-                        </div>
-                      )}
-                      {referencingData.formData.financial?.monthlyIncome && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Monthly Income</p>
-                          <p>{formatCurrency(parseFloat(referencingData.formData.financial.monthlyIncome.replace(/[^\d.]/g, '')) || 0)}</p>
-                          {referencingData.formData.financial.monthlyIncome && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Annual: {formatCurrency(parseFloat(referencingData.formData.financial.monthlyIncome.replace(/[^\d.]/g, '')) * 12 || 0)}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      {referencingData.formData.residential?.previousAddress && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Previous Address</p>
-                          <p className="text-sm">{referencingData.formData.residential.previousAddress}</p>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <CreditCard className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                      <p className="text-muted-foreground font-medium">No employment information available</p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Employment and income details will appear here once the tenant completes the referencing process.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Payment Status */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <PoundSterling className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                    Payment Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Payment Status</p>
-                      <Badge className={tenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
-                                       tenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
-                                       'bg-orange-100 text-orange-800'}>
-                        {tenant.paymentStatus === 'current' ? 'Payment Up-to-Date' : 
-                         tenant.paymentStatus === 'overdue' ? 'Payment Overdue' : 'Payment Plan'}
-                      </Badge>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Last Payment</p>
-                      <p>{tenant.lastPaymentDate ? formatDate(tenant.lastPaymentDate) : 'No record'}</p>
-                    </div>
-                  </div>
-                  
-                  {tenant.paymentStatus === 'overdue' && tenant.overdueAmount && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-center justify-between">
-                      <div className="flex items-center text-red-800">
-                        <AlertTriangle className="h-4 w-4 mr-2" style={{ color: '#DC5F12' }} />
-                        <span className="font-medium">Rent Arrears</span>
-                      </div>
-                        <span className="font-semibold text-red-800">
-                          £{tenant.overdueAmount.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  
                   <div>
-                    <p className="text-sm text-muted-foreground mb-2">Next 3 Payment Dates</p>
-                    {upcomingPayments.length > 0 ? (
-                      <div className="space-y-1 text-sm">
-                        {upcomingPayments.map((period) => (
-                          <div key={period.id} className="flex items-center justify-between">
-                            <span>{formatDate(period.dueDate)}</span>
-                            <span className="font-medium">{formatCurrency(period.amountDue)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No upcoming payments scheduled.</p>
-                    )}
+                    <h3>Residential Tenancy Agreement</h3>
+                    <p className="ll-cd-doc-ref">{primaryAgreement?.name || 'No agreement uploaded'}</p>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Notes */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {displayTenant.notes || 'No additional notes'}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="payments" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <PoundSterling className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                  Rent Payment History
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingPayments ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
-                    <p className="text-muted-foreground">Loading payment history...</p>
-                  </div>
-                ) : rentPayments.length === 0 ? (
-                  <div className="text-center py-8">
-                    <PoundSterling className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-muted-foreground font-medium">No payment history yet</p>
-                    <p className="text-sm text-muted-foreground mt-2 mb-4">
-                      Payment periods will appear here once the schedule is generated.
-                    </p>
-                    <div className="mt-4 space-y-2">
-                      <p className="text-xs text-muted-foreground">
-                        Tenant data: {tenant.paymentFrequency || 'missing'} frequency, 
-                        Rent: £{tenant.rentAmount || 0}, 
-                        First payment: {tenant.firstPaymentDate ? formatDate(tenant.firstPaymentDate) : 'not set'}
-                      </p>
-                      <Button
-                        onClick={async () => {
-                          console.log('🔧 [TenantDetails] Manual schedule generation triggered');
-                          setIsLoadingPayments(true);
-                          try {
-                            await paymentScheduleService.generateScheduleForTenant(tenant, {
-                              historyPeriods: 6,
-                              futurePeriods: 12,
-                              managerId: (tenant as any)?.userId
-                            });
-                            console.log('✅ [TenantDetails] Manual generation completed');
-                            // Refresh periods
-                            const periods = await paymentScheduleService.getTenantPeriods(tenant.id);
-                            setPaymentPeriods(periods);
-                          } catch (error) {
-                            console.error('❌ [TenantDetails] Manual generation failed:', error);
-                            alert('Failed to generate schedule: ' + (error instanceof Error ? error.message : 'Unknown error'));
-                          } finally {
-                            setIsLoadingPayments(false);
-                          }
-                        }}
-                        disabled={isLoadingPayments || !tenant.paymentFrequency || !tenant.rentAmount}
-                        variant="outline"
-                      >
-                        {isLoadingPayments ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          'Generate Payment Schedule'
-                        )}
-                      </Button>
-                      {(!tenant.paymentFrequency || !tenant.rentAmount) && (
-                        <p className="text-xs text-red-600 mt-2">
-                          Missing required data: {!tenant.paymentFrequency && 'Payment Frequency '}
-                          {!tenant.rentAmount && 'Rent Amount'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                </div>
+                {primaryAgreement?.downloadUrl ? (
+                  <button type="button" className="ll-cd-btn is-ghost-dark" onClick={() => handleDownloadDocument(primaryAgreement)}>
+                    <Download size={14} />
+                    Download
+                  </button>
                 ) : (
-                  <div className="space-y-4">
+                  <button type="button" className="ll-cd-btn is-ghost-dark" onClick={() => setIsUploadModalOpen(true)}>
+                    Upload
+                  </button>
+                )}
+              </div>
+              <div className="ll-cd-navy-metrics">
+                <div>
+                  <span>Start Date</span>
+                  <strong>{formatDateSafe(displayTenant.leaseStart)}</strong>
+                </div>
+                <div>
+                  <span>Expiry Date</span>
+                  <strong>{formatDateSafe(displayTenant.leaseEnd)}</strong>
+                </div>
+                <div>
+                  <span>Term Duration</span>
+                  <strong>{termLabel(displayTenant.leaseStart, displayTenant.leaseEnd)}</strong>
+                </div>
+              </div>
+            </section>
+
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Documents on file</h4>
+              {allDocuments.length === 0 ? (
+                <div className="ll-cd-empty" style={{ padding: '12px 0' }}>
+                  <p className="ll-cd-empty-title">No documents uploaded yet</p>
+                  <p>Tenancy files and referencing uploads will appear here.</p>
+                </div>
+              ) : (
+                allDocuments.map((doc: TenantDocument) => (
+                  <div key={doc.id} className="ll-cd-audit-row">
+                    <span>{doc.name}</span>
+                    <strong>
+                      {doc.status}
+                      {doc.downloadUrl ? (
+                        <>
+                          {' · '}
+                          <button type="button" className="ll-cd-btn is-ghost" onClick={() => handleViewDocument(doc)}>
+                            View
+                          </button>
+                        </>
+                      ) : null}
+                    </strong>
+                  </div>
+                ))
+              )}
+              {depositDocs.length > 0 && (
+                <div className="ll-cd-audit-row">
+                  <span>Deposit protection certificate</span>
+                  <strong className="is-ok">On file</strong>
+                </div>
+              )}
+              <div style={{ marginTop: 12 }}>
+                <button type="button" className="ll-cd-btn is-orange" onClick={() => setIsUploadModalOpen(true)}>
+                  Upload document
+                </button>
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === 'payment' && (
+          <>
+            <div className="ll-cd-ledger-head">
+              <h3 className="ll-cd-heading">Financial Ledger &amp; Invoices</h3>
+            </div>
+            {tenant.paymentStatus === 'overdue' && tenant.overdueAmount ? (
+              <div className="ll-cd-warn">
+                <span>
+                  <AlertTriangle size={14} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle' }} />
+                  Rent arrears
+                </span>
+                <strong>{formatCurrency(tenant.overdueAmount)}</strong>
+              </div>
+            ) : null}
+            {isLoadingPayments ? (
+              <div className="ll-cd-loading">
+                <div className="ll-cd-spinner" />
+                <p>Loading payment history…</p>
+              </div>
+            ) : rentPayments.length === 0 ? (
+              <section className="ll-cd-card">
+                <div className="ll-cd-empty">
+                  <p className="ll-cd-empty-title">No payment history yet</p>
+                  <p>Payment periods appear here once the schedule is generated.</p>
+                  <button
+                    type="button"
+                    className="ll-cd-btn is-orange"
+                    style={{ marginTop: 12 }}
+                    disabled={isLoadingPayments || !tenant.paymentFrequency || !tenant.rentAmount}
+                    onClick={async () => {
+                      setIsLoadingPayments(true);
+                      try {
+                        await paymentScheduleService.generateScheduleForTenant(tenant, {
+                          historyPeriods: 6,
+                          futurePeriods: 12,
+                          managerId: (tenant as Tenant & { userId?: string }).userId,
+                        });
+                        const periods = await paymentScheduleService.getTenantPeriods(tenant.id);
+                        setPaymentPeriods(periods);
+                      } catch (error) {
+                        alert('Failed to generate schedule: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                      } finally {
+                        setIsLoadingPayments(false);
+                      }
+                    }}
+                  >
+                    Generate payment schedule
+                  </button>
+                </div>
+              </section>
+            ) : (
+              <div className="ll-cd-ledger">
+                <table className="ll-cd-table">
+                  <thead>
+                    <tr>
+                      <th>Ref #</th>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {rentPayments.map((payment) => {
                       const isMarking = Boolean(updatingPayments[payment.id]);
                       const isPaid = payment.status === 'paid';
                       return (
-                        <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg gap-4 flex-wrap">
-                          <div className="flex items-center space-x-4">
-                            <div>
-                              <p className="font-medium">{formatCurrency(payment.amount)}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Due: {formatDate(payment.dueDate)}
-                                {payment.paidDate && ` • Paid: ${formatDate(payment.paidDate)}`}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <Badge className={getStatusColor(payment.status)}>
-                              {payment.status}
-                            </Badge>
-                            <div className="flex items-center gap-2">
-                              <Label htmlFor={`payment-switch-${payment.id}`} className="text-sm text-muted-foreground">
-                                {isPaid ? 'Paid' : 'Unpaid'}
-                              </Label>
+                        <tr key={payment.id}>
+                          <td className="is-ref">{String(payment.id).slice(0, 10)}</td>
+                          <td className="is-muted">{formatDateSafe(payment.dueDate)}</td>
+                          <td>
+                            Monthly rent
+                            {payment.paidDate ? ` · Paid ${formatDateSafe(payment.paidDate)}` : ''}
+                          </td>
+                          <td className="is-amt">{formatCurrency(payment.amount)}</td>
+                          <td>
+                            <div className="ll-cd-pay-actions">
+                              <span className={`ll-cd-pill is-${paymentStatusTone(payment.status)}`}>
+                                {payment.status === 'paid' ? 'Paid' : payment.status === 'overdue' ? 'Overdue' : 'Due'}
+                              </span>
                               {isMarking ? (
-                                <div className="flex items-center justify-center w-10 h-6">
-                                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                                </div>
+                                <Loader2 size={14} className="animate-spin" />
                               ) : (
-                                <Switch
-                                  id={`payment-switch-${payment.id}`}
-                                  checked={isPaid}
-                                  onCheckedChange={() => handleTogglePaymentStatus(payment.id, payment.status)}
-                                  disabled={isMarking}
-                                />
+                                <>
+                                  <Label htmlFor={`payment-switch-${payment.id}`} className="sr-only">
+                                    {isPaid ? 'Paid' : 'Unpaid'}
+                                  </Label>
+                                  <Switch
+                                    id={`payment-switch-${payment.id}`}
+                                    checked={isPaid}
+                                    onCheckedChange={() => handleTogglePaymentStatus(payment.id, payment.status)}
+                                    disabled={isMarking}
+                                  />
+                                </>
                               )}
                             </div>
-                          </div>
-                        </div>
+                          </td>
+                        </tr>
                       );
                     })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
 
-          <TabsContent value="documents" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <CardTitle className="flex items-center">
-                    <FileText className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                    Documents
-                    {referencingDocuments.length > 0 && (
-                      <Badge className="ml-3 bg-blue-100 text-blue-800">
-                        {referencingDocuments.length} from referencing
-                      </Badge>
-                    )}
-                  </CardTitle>
-                  <Button
-                    onClick={() => setIsUploadModalOpen(true)}
-                    style={{
-                      backgroundColor: '#DC5F12',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      padding: '0.5rem 1rem',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#FF6B1A';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#DC5F12';
-                    }}
-                  >
-                    <FileText size={16} />
-                    Upload Document
-                  </Button>
+        {activeTab === 'referencing' && (
+          <>
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Primary identity &amp; right to rent</h4>
+              <div className="ll-cd-grid">
+                <div className="ll-cd-field">
+                  <span>Document Type</span>
+                  <strong>
+                    {identityDoc?.name || identityDoc?.type || (referencingStatus === 'complete' ? 'Identity document on file' : '—')}
+                  </strong>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {isLoadingReferencing ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
-                    <p className="text-muted-foreground">Loading documents...</p>
-                  </div>
-                ) : allDocuments.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-muted-foreground font-medium">No documents uploaded yet</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Uploaded files and referencing documents will appear here once available.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {allDocuments.map((document) => {
-                      const isReferencingDoc = document.id.startsWith('ref-');
-                      
-                      return (
-                        <div key={document.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start space-x-4 flex-1">
-                              <FileText className="w-5 h-5 mt-1" style={{ color: '#DC5F12' }} />
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="font-medium">{document.name}</p>
-                                  {isReferencingDoc && (
-                                    <Badge className="bg-blue-100 text-blue-800 text-xs">
-                                      Referencing
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="text-sm text-muted-foreground space-y-1">
-                                  <p>
-                                    Uploaded: {formatDate(document.dateUploaded)}
-                                    {document.expiryDate && ` • Expires: ${formatDate(document.expiryDate)}`}
-                                  </p>
-                                  {document.fileSize && (
-                                    <p className="flex items-center gap-4">
-                                      <span>Size: {formatFileSize(document.fileSize)}</span>
-                                      {document.fileType && <span>Type: {document.fileType}</span>}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 ml-4">
-                              <Badge className={getStatusColor(document.status)}>
-                                {document.status}
-                              </Badge>
-                              {document.downloadUrl && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="p-2">
-                                      <MoreHorizontal className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleViewDocument(document)}>
-                                      <FileText className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
-                                      View Document
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleDownloadDocument(document)}>
-                                      <FileText className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
-                                      Download
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                <div className="ll-cd-field">
+                  <span>Referencing status</span>
+                  <strong>{getReferencingStatusLabel(referencingStatus)}</strong>
+                </div>
+              </div>
+              <div className="ll-cd-field">
+                <span>UK Right to Rent Status</span>
+                <span className={`ll-cd-pill is-${kyc.tone}`}>{kyc.label}</span>
+              </div>
+            </section>
 
-          <TabsContent value="references" className="space-y-6">
-            {/* Referee Responses */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <UserCheck className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                  Employment Referee Responses
-                  {refereeResponses.length > 0 && (
-                    <Badge className="ml-3 bg-blue-100 text-blue-800">
-                      {refereeResponses.length} response{refereeResponses.length !== 1 ? 's' : ''}
-                    </Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingResponses ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
-                    <p className="text-muted-foreground">Loading referee responses...</p>
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Employment &amp; income affordability</h4>
+              {formData?.employment || formData?.financial ? (
+                <>
+                  <div className="ll-cd-grid">
+                    <div className="ll-cd-field">
+                      <span>Verified Employer</span>
+                      <strong>{formData.employment?.companyDetails || '—'}</strong>
+                    </div>
+                    <div className="ll-cd-field">
+                      <span>Position &amp; Role</span>
+                      <strong>{formData.employment?.jobPosition || '—'}</strong>
+                    </div>
                   </div>
-                ) : refereeResponses.length === 0 ? (
-                  <div className="text-center py-8">
-                    <UserCheck className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-muted-foreground">No referee responses yet</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Responses will appear here once the referee completes the form
-                    </p>
+                  <div className="ll-cd-grid">
+                    <div className="ll-cd-field">
+                      <span>Verified monthly income</span>
+                      <strong className="is-green">{hasIncome ? formatCurrency(monthlyIncome) : '—'}</strong>
+                    </div>
+                    <div className="ll-cd-field">
+                      <span>Rent-to-income</span>
+                      <strong>{rentToIncome ? `${rentToIncome}%` : '—'}</strong>
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {refereeResponses.map((response, index) => (
-                      <div key={response.id || index} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h4 className="font-medium">{response.firstName} {response.lastName}</h4>
-                            <p className="text-sm text-muted-foreground">Employment Referee</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge className={response.consent === 'agree' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                              {response.consent === 'agree' ? '✓ Agreed' : '✗ Declined'}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                              onClick={() => handleDeleteResponse(response.id, 'referee')}
-                              title="Delete response"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Email: </span>
-                            <span>{response.email}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Submitted: </span>
-                            <span>{new Date(response.submittedAt || response.createdAt).toLocaleDateString('en-GB', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}</span>
-                          </div>
-                          {response.reason && (
-                            <div className="mt-3 p-3 bg-muted/50 rounded-md">
-                              <p className="text-muted-foreground font-medium mb-1">Comments:</p>
-                              <p className="text-foreground">{response.reason}</p>
-                            </div>
-                          )}
-                        </div>
+                </>
+              ) : (
+                <p className="ll-cd-empty" style={{ padding: 0, textAlign: 'left' }}>
+                  Employment and income details appear once the tenant completes referencing.
+                </p>
+              )}
+            </section>
+
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Residential history</h4>
+              {formData?.residential ? (
+                <div className="ll-cd-grid">
+                  <div className="ll-cd-field">
+                    <span>Current address</span>
+                    <strong>{formData.residential.currentAddress || '—'}</strong>
+                  </div>
+                  <div className="ll-cd-field">
+                    <span>Previous address</span>
+                    <strong>{formData.residential.previousAddress || '—'}</strong>
+                  </div>
+                </div>
+              ) : (
+                <p className="ll-cd-empty" style={{ padding: 0, textAlign: 'left' }}>No residential history submitted yet.</p>
+              )}
+            </section>
+
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Employment referee responses</h4>
+              {isLoadingResponses ? (
+                <p>Loading referee responses…</p>
+              ) : refereeResponses.length === 0 ? (
+                <p className="ll-cd-empty" style={{ padding: 0, textAlign: 'left' }}>No referee responses yet.</p>
+              ) : (
+                refereeResponses.map((response, index) => (
+                  <div key={response.id || index} className="ll-cd-response">
+                    <div className="ll-cd-response-top">
+                      <div>
+                        <h4>{response.firstName} {response.lastName}</h4>
+                        <p className="ll-cd-role">Employment referee</p>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Guarantor Responses */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Shield className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                  Guarantor Responses
-                  {guarantorResponses.length > 0 && (
-                    <Badge className="ml-3 bg-blue-100 text-blue-800">
-                      {guarantorResponses.length} response{guarantorResponses.length !== 1 ? 's' : ''}
-                    </Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingResponses ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
-                    <p className="text-muted-foreground">Loading guarantor responses...</p>
-                  </div>
-                ) : guarantorResponses.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Shield className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-muted-foreground">No guarantor responses yet</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Responses will appear here once the guarantor completes the form
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {guarantorResponses.map((response, index) => (
-                      <div key={response.id || index} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h4 className="font-medium">{response.firstName} {response.lastName}</h4>
-                            <p className="text-sm text-muted-foreground">Guarantor</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge className={response.consent === 'agree' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                              {response.consent === 'agree' ? '✓ Agreed' : '✗ Declined'}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                              onClick={() => handleDeleteResponse(response.id, 'guarantor')}
-                              title="Delete response"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Email: </span>
-                            <span>{response.email}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Submitted: </span>
-                            <span>{new Date(response.submittedAt || response.createdAt).toLocaleDateString('en-GB', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}</span>
-                          </div>
-                          {response.reason && (
-                            <div className="mt-3 p-3 bg-muted/50 rounded-md">
-                              <p className="text-muted-foreground font-medium mb-1">Comments:</p>
-                              <p className="text-foreground">{response.reason}</p>
-                            </div>
-                          )}
-                        </div>
+                      <div className="ll-cd-pay-actions">
+                        <span className={`ll-cd-pill ${response.consent === 'agree' ? 'is-complete' : 'is-overdue'}`}>
+                          {response.consent === 'agree' ? '✓ Agreed' : 'Declined'}
+                        </span>
+                        <button type="button" className="ll-cd-icon-btn" onClick={() => handleDeleteResponse(response.id, 'referee')} aria-label="Delete response">
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                    ))}
+                    </div>
+                    <div className="ll-cd-field">
+                      <span>Email</span>
+                      <strong className="is-mono">{response.email}</strong>
+                    </div>
+                    {response.reason && <p className="ll-cd-note" style={{ marginTop: 10 }}>{response.reason}</p>}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+                ))
+              )}
+            </section>
 
-      {/* Document Upload Modal */}
+            <section className="ll-cd-card">
+              <h4 className="ll-cd-card-title">Guarantor responses</h4>
+              {isLoadingResponses ? (
+                <p>Loading guarantor responses…</p>
+              ) : guarantorResponses.length === 0 ? (
+                <p className="ll-cd-empty" style={{ padding: 0, textAlign: 'left' }}>No guarantor responses yet.</p>
+              ) : (
+                guarantorResponses.map((response, index) => (
+                  <div key={response.id || index} className="ll-cd-response">
+                    <div className="ll-cd-response-top">
+                      <div>
+                        <h4>{response.firstName} {response.lastName}</h4>
+                        <p className="ll-cd-role">Guarantor</p>
+                      </div>
+                      <div className="ll-cd-pay-actions">
+                        <span className={`ll-cd-pill ${response.consent === 'agree' ? 'is-complete' : 'is-overdue'}`}>
+                          {response.consent === 'agree' ? '✓ Agreed' : 'Declined'}
+                        </span>
+                        <button type="button" className="ll-cd-icon-btn" onClick={() => handleDeleteResponse(response.id, 'guarantor')} aria-label="Delete response">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="ll-cd-field">
+                      <span>Email</span>
+                      <strong className="is-mono">{response.email}</strong>
+                    </div>
+                    {response.reason && <p className="ll-cd-note" style={{ marginTop: 10 }}>{response.reason}</p>}
+                  </div>
+                ))
+              )}
+            </section>
+
+            {referencingDocuments.length > 0 && (
+              <section className="ll-cd-card ll-cd-report">
+                <div className="ll-cd-report-main">
+                  <div className="ll-cd-report-icon">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h5>Referencing documents</h5>
+                    <p>{referencingDocuments.length} file{referencingDocuments.length === 1 ? '' : 's'} from the referencing pack</p>
+                  </div>
+                </div>
+                {referencingDocuments[0]?.downloadUrl && (
+                  <button type="button" className="ll-cd-btn is-ghost" onClick={() => handleDownloadDocument(referencingDocuments[0])}>
+                    <Download size={14} />
+                    Download
+                  </button>
+                )}
+              </section>
+            )}
+          </>
+        )}
+
+        {activeTab === 'notes' && (
+          <section className="ll-cd-card">
+            <h4 className="ll-cd-card-title">Internal management notes</h4>
+            {displayTenant.notes ? (
+              <div className="ll-cd-note">{displayTenant.notes}</div>
+            ) : (
+              <p className="ll-cd-empty" style={{ padding: 0, textAlign: 'left' }}>No notes on file for this tenant.</p>
+            )}
+          </section>
+        )}
+      </ClientDetailsDrawer>
+
       <DocumentUploadModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUpload={handleDocumentUpload}
       />
-    </div>
+    </>
   );
 }

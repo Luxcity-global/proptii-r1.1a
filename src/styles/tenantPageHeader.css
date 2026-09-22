@@ -1,0 +1,217 @@
+/* Shared tenant page header matching the HTML mockups. */
+
+.tn-ph {
+  background: #fff;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.tn-ph.is-mobile {
+  top: 64px;
+}
+
+.tn-ph-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 16px 20px;
+}
+
+@media (min-width: 640px) {
+  .tn-ph-inner {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tn-ph-inner {
+    padding: 20px 40px;
+  }
+}
+
+.tn-ph h1 {
+  margin: 0;
+  font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.tn-ph h1 span {
+  color: #136c9e;
+}
+
+@media (min-width: 1024px) {
+  .tn-ph h1 {
+    font-size: 28px;
+  }
+}
+
+.tn-ph p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 400;
+  font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.tn-ph-crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.tn-ph-crumb span {
+  color: #136c9e;
+}
+
+.tn-ph-inner > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.tn-ph-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+.tn-ph-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tn-ph-icon:hover {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.tn-ph-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: #dc5f12;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.tn-ph-insights {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid #c7d2fe;
+  background: #fff;
+  color: #136c9e;
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  white-space: nowrap;
+}
+
+.tn-ph-insights:hover {
+  background: rgba(238, 242, 255, 0.5);
+}
+
+.tn-ph-insights-icon {
+  color: #6366f1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tn-ph-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 12px;
+  background: #dc5f12;
+  color: #fff;
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(220, 95, 18, 0.25);
+  white-space: nowrap;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.tn-ph-primary:hover {
+  background: #ba4e0b;
+}
+
+.tn-ph-primary:active {
+  transform: scale(0.97);
+}
+
+.tn-ph-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.tn-ph-preview {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 12px 20px 0;
+}
+
+@media (min-width: 1024px) {
+  .tn-ph-preview {
+    padding: 16px 40px 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .tn-ph h1 {
+    font-size: 22px;
+  }
+
+  .tn-ph-inner {
+    padding: 16px;
+  }
+
+  .tn-ph-actions {
+    flex-wrap: wrap;
+  }
+}

@@ -50,6 +50,14 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import AuthContext, { useAuth } from '../../contexts/AuthContext';
 import { MessagingProvider } from '../../contexts/MessagingContext';
 import { trackEvent } from '../../utils/analytics';
+import {
+  AGENT_TEST_COMPANY,
+  AGENT_TEST_COMPANY_PROFILE,
+  getAgentDummyProperties,
+  getAgentDummyTenants,
+  isAgentTestAccount,
+  mergeById,
+} from './data/agentTestPersona';
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -165,6 +173,7 @@ export interface Tenant {
   firstPaymentDate?: Date;
   paymentIntervalDays?: number;
   avatar?: string;
+  notes?: string;
   emergencyContact?: {
     name: string;
     phone: string;
@@ -403,6 +412,8 @@ export function AppContent() {
   const [userRole, setUserRole] = useState<UserRole>('landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [isPortfolioLoading, setIsPortfolioLoading] = useState(true);
+  const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   // Stable ref to `properties` so loadScopedTenants can read the latest list
   // without needing `properties` in its useCallback dependency array.
@@ -412,6 +423,7 @@ export function AppContent() {
   React.useEffect(() => { propertiesRef.current = properties; }, [properties]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [clientDetailsTab, setClientDetailsTab] = useState('overview');
   const editingTenantRef = React.useRef<Tenant | null>(null);
   const [selectedLandlord, setSelectedLandlord] = useState<any | null>(null);
   const [selectedVacancyAlert, setSelectedVacancyAlert] = useState<VacancyRiskAlert | null>(null);
@@ -492,25 +504,61 @@ export function AppContent() {
   React.useEffect(() => {
     setIsAuthLoading(hostIsLoading);
     setIsAuthenticated(hostIsAuthenticated);
+
+    // While host auth is still resolving, do not wipe portfolio state or force
+    // loading off — that caused a skeleton → empty flash on first paint.
+    if (hostIsLoading) {
+      return;
+    }
+
     if (hostIsAuthenticated && hostUser) {
       if (hostUser.roles?.includes('agent')) {
         setUserRole('agent');
       } else if (hostUser.roles?.includes('landlord')) {
         setUserRole('landlord');
       }
-      
-      setUserProfile(prev => {
-        const existingCompanyProfile = prev?.companyProfile;
+
+      const agentPersona = isAgentTestAccount(hostUser.id, hostUser.email);
+      const nextName =
+        hostUser.name ||
+        `${hostUser.givenName || ''} ${hostUser.familyName || ''}`.trim() ||
+        (hostUser.roles?.includes('agent') ? 'Agent' : 'Landlord');
+      const nextPhone = hostUser.phone || '';
+
+      setUserProfile((prev) => {
+        const nextCompany = agentPersona
+          ? AGENT_TEST_COMPANY
+          : prev?.companyName || 'Proptii';
+        const nextProfile = agentPersona
+          ? AGENT_TEST_COMPANY_PROFILE
+          : prev?.companyProfile;
+
+        if (
+          prev &&
+          (prev as any).id === hostUser.id &&
+          prev.email === hostUser.email &&
+          prev.name === nextName &&
+          (prev.phone || '') === nextPhone &&
+          (prev.companyName || '') === nextCompany
+        ) {
+          return prev;
+        }
         return {
           id: hostUser.id,
-          name: hostUser.name || `${hostUser.givenName || ''} ${hostUser.familyName || ''}`.trim() || 'Landlord',
+          name: nextName,
           email: hostUser.email,
-          phone: hostUser.phone || '',
-          companyProfile: existingCompanyProfile,
-          companyName: prev?.companyName || 'Proptii',
-          logo: prev?.logo
+          phone: nextPhone,
+          companyProfile: nextProfile,
+          companyName: nextCompany,
+          logo: prev?.logo,
         } as any;
       });
+
+      if (agentPersona) {
+        setProperties((prev) => (prev.length === 0 ? getAgentDummyProperties() : prev));
+        setTenants((prev) => (prev.length === 0 ? getAgentDummyTenants() : prev));
+        setIsPortfolioLoading(false);
+      }
     } else {
       setUserProfile(null);
       setProperties([]);
@@ -519,8 +567,8 @@ export function AppContent() {
       setArrearsAlerts([]);
       setAlerts([]);
       setMarketInsights([]);
-      setIsAuthLoading(false);
-    };
+      setIsPortfolioLoading(false);
+    }
 
     // Authentication state changes are now handled by the parent SPA bridging (AUTH_STATE message listener below)
   }, [hostIsAuthenticated, hostIsLoading, hostUser, clearSignInQueryParam, getCachedAuthUser]);
@@ -885,7 +933,7 @@ export function AppContent() {
         // Initial unscoped load to avoid blocking UI; will be refined in the effect below
         const initialTenants = await tenantService.getTenants();
         console.log('[Init] Tenants initially loaded (unscoped):', initialTenants.length);
-        setTenants(initialTenants);
+        setTenants((prev) => (prev.length > 0 ? prev : initialTenants));
       } catch (e) {
         console.warn('Failed initial tenant load, leaving empty list', e);
         setTenants([]);
@@ -917,9 +965,15 @@ export function AppContent() {
       let list = await tenantService.getTenants(userId || undefined, ownedPropertyIds);
 
       // The fallback filtering is now done directly inside tenantService.getTenants
+      if (isAgentTestAccount(userId, userProfile?.email)) {
+        list = mergeById(getAgentDummyTenants(), list);
+      }
       setTenants(list);
     } catch (e) {
       console.error('Failed to load tenants:', e);
+      if (isAgentTestAccount(resolveManagerId(), userProfile?.email)) {
+        setTenants(getAgentDummyTenants());
+      }
     }
   }, [userProfile]); // removed `properties` — use propertiesRef instead to keep stable identity
 
@@ -958,30 +1012,70 @@ export function AppContent() {
     setNavigationScreen('dashboard');
   };
 
-  // Load properties from Firebase on mount (scoped to current user)
+  // Load properties from Firebase when the signed-in identity is known.
+  // Avoid depending on `userProfile` object identity / `loadScopedTenants` —
+  // those recreated often and re-flashed the dashboard skeleton.
   React.useEffect(() => {
+    let cancelled = false;
+
     const loadProperties = async () => {
-      try {
-        const currentUserId = resolveManagerId();
-        const userEmail = userProfile?.email;
+      const currentUserId = resolveManagerId();
+      const userEmail = userProfile?.email;
 
-        if (!currentUserId && !userEmail) {
-          console.warn('⚠️ No userId or userEmail found');
+      if (!currentUserId && !userEmail) {
+        if (!hostIsAuthenticated && !hostIsLoading) {
+          setIsPortfolioLoading(false);
         }
+        return;
+      }
 
+      // Only show the full-page skeleton when we have nothing to display yet.
+      // Background refetches keep the current overview mounted.
+      // Agent test persona already has dummy stock, so skip the empty skeleton.
+      if (propertiesRef.current.length === 0 && !isAgentTestAccount(currentUserId, userEmail)) {
+        setIsPortfolioLoading(true);
+      }
+
+      try {
         const fetchedProperties = await propertyService.getProperties({
           ...(currentUserId ? { userId: currentUserId } : {}),
-          ...(userEmail ? { email: userEmail } : {})
+          ...(userEmail ? { email: userEmail } : {}),
         });
-        setProperties(fetchedProperties);
+        if (!cancelled) {
+          setProperties(
+            isAgentTestAccount(currentUserId, userEmail)
+              ? mergeById(getAgentDummyProperties(), fetchedProperties)
+              : fetchedProperties
+          );
+        }
       } catch (error) {
         console.error('Error loading properties:', error);
-        // Don't set mock data - keep empty array if Firebase fails
-        setProperties([]);
+        if (!cancelled) {
+          setProperties(
+            isAgentTestAccount(currentUserId, userEmail)
+              ? getAgentDummyProperties()
+              : []
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsPortfolioLoading(false);
+        }
       }
     };
+
     loadProperties();
-  }, [userProfile, loadScopedTenants]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hostIsAuthenticated,
+    hostIsLoading,
+    hostUser?.id,
+    userProfile?.email,
+    resolveManagerId,
+    portfolioRefreshKey,
+  ]);
 
   // Helper function to get current user ID — delegates to resolveManagerId
   const getCurrentUserId = (): string | null => resolveManagerId();
@@ -1600,6 +1694,7 @@ export function AppContent() {
             tenants={tenants}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
+            isPortfolioLoading={isPortfolioLoading}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -1618,6 +1713,9 @@ export function AppContent() {
               navigateToScreen('photo-management');
             }}
             onViewInsights={() => handleNavigation('insights')}
+            onViewAllProperties={() => handleNavigation('properties')}
+            onViewViewings={() => handleNavigation('viewings')}
+            onViewClients={() => handleNavigation('clients')}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -1644,6 +1742,11 @@ export function AppContent() {
             properties={properties}
             tenants={tenants}
             arrearsAlerts={arrearsAlerts}
+            isPortfolioLoading={isPortfolioLoading}
+            onViewInsights={() => handleNavigation('insights')}
+            onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -1686,6 +1789,7 @@ export function AppContent() {
             }}
             onViewTenant={(tenant) => {
               selectTenant(tenant);
+              setClientDetailsTab('overview');
               navigateToScreen('tenant-details');
             }}
             onDeleteProperty={deleteProperty}
@@ -1969,6 +2073,9 @@ export function AppContent() {
             tenants={tenants}
             userProfile={userProfile}
             properties={properties}
+            onViewInsights={() => handleNavigation('insights')}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -1984,12 +2091,16 @@ export function AppContent() {
             properties={properties}
             arrearsAlerts={arrearsAlerts}
             userRole={userRole}
+            onViewInsights={() => handleNavigation('insights')}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
             }}
-            onViewTenant={(tenant) => {
+            onViewTenant={(tenant, options) => {
               selectTenant(tenant);
+              setClientDetailsTab(options?.tab || 'overview');
               navigateToScreen('tenant-details');
             }}
             onViewProperty={(property) => {
@@ -2056,7 +2167,17 @@ export function AppContent() {
       case 'messages':
       case 'inbox':
         return (
-          <TenantInbox />
+          <TenantInbox
+            userProfile={userProfile}
+            onViewInsights={() => handleNavigation('insights')}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
+            onAddTenant={() => {
+              editingTenantRef.current = null;
+              setSelectedTenant(null);
+              navigateToScreen('tenant-selection');
+            }}
+          />
         );
 
       case 'insights':
@@ -2071,6 +2192,15 @@ export function AppContent() {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
             }}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
+            onAddTenant={() => {
+              editingTenantRef.current = null;
+              setSelectedTenant(null);
+              navigateToScreen('tenant-selection');
+            }}
+            onViewClients={() => handleNavigation('clients')}
+            onViewProperties={() => handleNavigation('properties')}
           />
         );
 
@@ -2090,9 +2220,13 @@ export function AppContent() {
             userProfile={userProfile}
             onViewTenant={(tenant) => {
               selectTenant(tenant);
+              setClientDetailsTab('overview');
               navigateToScreen('tenant-details');
             }}
             onOpenMessages={() => handleNavigation('messages')}
+            onViewInsights={() => handleNavigation('insights')}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
           />
         );
 
@@ -2102,6 +2236,7 @@ export function AppContent() {
             properties={properties}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
+            isPortfolioLoading={isPortfolioLoading}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -2121,6 +2256,9 @@ export function AppContent() {
             }}
             // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
             onViewInsights={() => {/* navigateToScreen('portfolio-insights') */ }}
+            onViewAllProperties={() => handleNavigation('properties')}
+            onViewViewings={() => handleNavigation('viewings')}
+            onViewClients={() => handleNavigation('clients')}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -2327,17 +2465,93 @@ export function AppContent() {
         );
 
       case 'main-app':
+      case 'tenant-details':
+      case 'landlord-details': {
+        if (currentScreen === 'landlord-details' && userRole !== 'agent') {
+          navigateToScreen('main-app');
+          setNavigationScreen('clients');
+          return null;
+        }
         return (
-          <MainLayout
-            currentScreen={navigationScreen}
-            onNavigate={handleNavigation}
-            userProfile={userProfile}
-            userRole={userRole}
-            isAuthenticated={isAuthenticated}
-          >
-            {renderMainAppScreen()}
-          </MainLayout>
+          <>
+            <MainLayout
+              currentScreen={navigationScreen}
+              onNavigate={handleNavigation}
+              userProfile={userProfile}
+              userRole={userRole}
+              isAuthenticated={isAuthenticated}
+            >
+              {renderMainAppScreen()}
+            </MainLayout>
+            {currentScreen === 'tenant-details' && (
+              <TenantDetails
+                tenant={selectedTenant}
+                initialTab={clientDetailsTab}
+                onBack={() => {
+                  setClientDetailsTab('overview');
+                  navigateToScreen('main-app');
+                }}
+                onEdit={(tenant) => {
+                  console.log('🔍 Edit button clicked, tenant:', tenant);
+                  setSelectedTenant(tenant);
+                  editingTenantRef.current = tenant;
+                  console.log('🔍 selectedTenant set to:', tenant);
+                  navigateToScreen('add-tenant');
+                }}
+                onTenantUpdate={(updatedTenant) => {
+                  setSelectedTenant(updatedTenant);
+                  setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
+                  setProperties(prev => prev.map(property => {
+                    if (property.tenant?.id === updatedTenant.id) {
+                      return {
+                        ...property,
+                        tenant: {
+                          ...property.tenant,
+                          ...updatedTenant
+                        }
+                      };
+                    }
+                    return property;
+                  }));
+                  setArrearsAlerts(prev => {
+                    const remainingAlerts = prev.filter(alert => alert.tenantId !== updatedTenant.id);
+                    if (updatedTenant.paymentStatus === 'overdue') {
+                      const nextAlert = {
+                        id: `local-${updatedTenant.id}`,
+                        tenantId: updatedTenant.id,
+                        tenantName: updatedTenant.name,
+                        propertyAddress: updatedTenant.propertyAddress,
+                        overdueAmount: updatedTenant.overdueAmount || 0,
+                        daysPastDue: 0,
+                        defaultRiskScore: updatedTenant.defaultRiskScore || 65,
+                        lastPaymentDate: updatedTenant.lastPaymentDate || new Date(),
+                        status: 'new' as const
+                      };
+                      return [...remainingAlerts, nextAlert];
+                    }
+                    return remainingAlerts;
+                  });
+                  const currentUserId = resolveManagerId();
+                  if (currentUserId) {
+                    alertService.generateAlerts(currentUserId).catch(error => {
+                      console.warn('⚠️ Failed to regenerate alerts after tenant payment update:', error);
+                    });
+                  }
+                }}
+              />
+            )}
+            {currentScreen === 'landlord-details' && userRole === 'agent' && (
+              <LandlordDetails
+                landlord={selectedLandlord}
+                onBack={() => navigateToScreen('main-app')}
+                onEdit={(landlord) => {
+                  setSelectedLandlord(landlord);
+                }}
+              />
+            )}
+          </>
         );
+      }
 
       case 'property-details':
         return (
@@ -2376,6 +2590,7 @@ export function AppContent() {
               const tenant = tenants.find(t => t.id === tenantId);
               if (tenant) {
                 selectTenant(tenant);
+                setClientDetailsTab('overview');
                 navigateToScreen('tenant-details');
               }
             }}
@@ -2591,79 +2806,6 @@ export function AppContent() {
       //       onBack={() => navigateToScreen('property-details')}
       //     />
       //   );
-
-      case 'tenant-details':
-        return (
-          <TenantDetails
-            tenant={selectedTenant}
-            onBack={() => navigateToScreen('main-app')}
-            onEdit={(tenant) => {
-              console.log('🔍 Edit button clicked, tenant:', tenant);
-              setSelectedTenant(tenant);
-              editingTenantRef.current = tenant; // Store in ref for immediate access
-              console.log('🔍 selectedTenant set to:', tenant);
-              navigateToScreen('add-tenant');
-            }}
-            onTenantUpdate={(updatedTenant) => {
-              setSelectedTenant(updatedTenant);
-              setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
-              setProperties(prev => prev.map(property => {
-                if (property.tenant?.id === updatedTenant.id) {
-                  return {
-                    ...property,
-                    tenant: {
-                      ...property.tenant,
-                      ...updatedTenant
-                    }
-                  };
-                }
-                return property;
-              }));
-              setArrearsAlerts(prev => {
-                const remainingAlerts = prev.filter(alert => alert.tenantId !== updatedTenant.id);
-                if (updatedTenant.paymentStatus === 'overdue') {
-                  const nextAlert = {
-                    id: `local-${updatedTenant.id}`,
-                    tenantId: updatedTenant.id,
-                    tenantName: updatedTenant.name,
-                    propertyAddress: updatedTenant.propertyAddress,
-                    overdueAmount: updatedTenant.overdueAmount || 0,
-                    daysPastDue: 0,
-                    defaultRiskScore: updatedTenant.defaultRiskScore || 65,
-                    lastPaymentDate: updatedTenant.lastPaymentDate || new Date(),
-                    status: 'new' as const
-                  };
-                  return [...remainingAlerts, nextAlert];
-                }
-                return remainingAlerts;
-              });
-              const currentUserId = resolveManagerId();
-              if (currentUserId) {
-                alertService.generateAlerts(currentUserId).catch(error => {
-                  console.warn('⚠️ Failed to regenerate alerts after tenant payment update:', error);
-                });
-              }
-            }}
-          />
-        );
-
-      case 'landlord-details':
-        // Only agents can view landlord details
-        if (userRole !== 'agent') {
-          navigateToScreen('main-app');
-          setNavigationScreen('clients');
-          return null;
-        }
-        return (
-          <LandlordDetails
-            landlord={selectedLandlord}
-            onBack={() => navigateToScreen('main-app')}
-            onEdit={(landlord) => {
-              setSelectedLandlord(landlord);
-              // Could add landlord editing functionality here
-            }}
-          />
-        );
 
       case 'vacancy-prevention':
         return (
@@ -3125,9 +3267,9 @@ export function AppContent() {
     <AuthContext.Provider value={authContextValue as any}>
       <div className="min-h-screen bg-background">
         <div
-          className={`transition-all duration-[4ms] ease-out ${isTransitioning
+            className={`transition-all duration-[4ms] ease-out ${isTransitioning
               ? 'opacity-0 transform scale-75'
-              : 'opacity-100 transform scale-100'
+              : 'opacity-100'
             }`}
         >
           {renderScreen()}

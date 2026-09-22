@@ -1,8 +1,8 @@
 /**
  * DevAuthToolbar — only rendered in development builds (import.meta.env.DEV).
  *
- * Provides one-click mock login as landlord or tenant so you can test the
- * communication module without going through MSAL / Azure B2C.
+ * Provides one-click mock login as landlord, agent, or tenant so you can test
+ * the apps without going through MSAL / Azure B2C.
  *
  * How it works:
  *  1. Calls `loginAsMockUser(id, role)` from AuthContext, which sets
@@ -17,10 +17,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getResolvedApiBaseUrl } from '../../config/apiBaseUrl';
+import { isMockTestUserId } from '../../data/mockTestUsers';
 
 const MOCK_USERS = [
     { id: 'landlord-test-001', role: 'landlord', label: 'John Smith (Landlord 1)', color: '#1d4ed8' },
     { id: 'landlord-test-002', role: 'landlord', label: 'Jack Smith (Landlord 2)', color: '#6366f1' },
+    { id: 'agent-test-001', role: 'agent', label: 'Olivia Bennett (Agent)', color: '#c2410c' },
     { id: 'tenant-test-001', role: 'tenant', label: 'Sarah Jones (Tenant 1)', color: '#15803d' },
     { id: 'tenant-test-002', role: 'tenant', label: 'Emily Davis (Tenant 2)', color: '#0f766e' },
 ] as const;
@@ -33,7 +35,7 @@ const DevAuthToolbar: React.FC = () => {
     // Only render in dev
     if (!import.meta.env.DEV) return null;
 
-    const isMock = user?.id.startsWith('landlord-test-') || user?.id.startsWith('tenant-test-');
+    const isMock = isMockTestUserId(user?.id);
 
     return (
         <div
@@ -90,7 +92,7 @@ const DevAuthToolbar: React.FC = () => {
                                     onClick={() => {
                                         loginAsMockUser(id, role);
                                         setOpen(false);
-                                        if (role === 'landlord') {
+                                        if (role === 'landlord' || role === 'agent') {
                                             navigate('/landlord');
                                         } else {
                                             navigate('/dashboard');

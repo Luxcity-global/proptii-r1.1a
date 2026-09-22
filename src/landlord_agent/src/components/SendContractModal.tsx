@@ -226,9 +226,13 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
-        className="bg-white max-w-[800px] w-[calc(100vw-2rem)] max-h-[80vh] flex flex-col p-0 gap-0"
+        className="bg-white max-w-[800px] w-[calc(100vw-2rem)] p-0 gap-0"
         style={{
-          fontFamily: 'Archivo, sans-serif'
+          fontFamily: 'Archivo, sans-serif',
+          maxHeight: '85vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         {/* Header - Fixed */}
@@ -240,7 +244,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
         </DialogHeader>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4">
           <div className="space-y-6">
             {/* Recipient Selection */}
             <Card className="border border-gray-200">
@@ -555,7 +559,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
         </div>
 
         {/* Footer - Fixed */}
-        <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0">
+        <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-white">
           {isUploading && uploadProgress > 0 && (
             <div className="mb-3">
               <div className="w-full bg-gray-200 rounded-full h-2">

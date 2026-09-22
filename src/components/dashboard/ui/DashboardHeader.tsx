@@ -10,6 +10,38 @@ interface DashboardHeaderProps {
   userPhone?: string;
 }
 
+/** Shown when a landlord or agent is previewing the tenant portal. */
+export const TenantPreviewBanner: React.FC = () => {
+  const { user } = useAuth();
+  const isPreview =
+    user?.role === 'landlord' ||
+    user?.role === 'agent' ||
+    user?.roles?.includes('landlord') ||
+    user?.roles?.includes('agent');
+
+  if (!isPreview) return null;
+
+  const portalLabel = user?.role === 'agent' ? 'Agent' : 'Landlord';
+
+  return (
+    <div className="mb-4 p-3 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-between">
+      <div className="flex items-center space-x-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />
+        <span className="text-sm font-semibold text-orange-900">
+          Preview Mode: Viewing Tenant Portal as {portalLabel}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={() => { window.location.href = user?.role === 'agent' ? '/agent' : '/landlord'; }}
+        className="text-xs font-semibold px-3 py-1.5 rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+      >
+        Return to {portalLabel} Portal
+      </button>
+    </div>
+  );
+};
+
 /**
  * Dashboard header component with user information and welcome message
  */
@@ -22,23 +54,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
       className={`bg-white shadow-lg rounded-xl ${isMobile ? 'px-4 py-4' : 'px-4 md:px-8 py-4 md:py-6'}`}
       style={{ fontFamily: 'Archivo, sans-serif' }}
     >
-      {/* Landlord/Agent Tenant Preview Mode Banner */}
-      {(user?.role === 'landlord' || user?.role === 'agent' || user?.roles?.includes('landlord') || user?.roles?.includes('agent')) && (
-        <div className="mb-4 p-3 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />
-            <span className="text-sm font-semibold text-orange-900">
-              Preview Mode: Viewing Tenant Portal as {user?.role === 'agent' ? 'Agent' : 'Landlord'}
-            </span>
-          </div>
-          <button
-            onClick={() => { window.location.href = user?.role === 'agent' ? '/agent' : '/landlord'; }}
-            className="text-xs font-semibold px-3 py-1.5 rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
-          >
-            Return to {user?.role === 'agent' ? 'Agent' : 'Landlord'} Portal
-          </button>
-        </div>
-      )}
+      <TenantPreviewBanner />
       {isMobile ? (
         // Mobile Header - Streamlined
         <div className="space-y-4">
