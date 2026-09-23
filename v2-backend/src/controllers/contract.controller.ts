@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req, HttpCode, Sse, MessageEvent, Logger, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { ContractService } from '../services/contract.service';
 import { EventsService } from '../services/events.service';
@@ -14,6 +15,8 @@ export interface MulterUploadedFile {
   buffer: Buffer;
 }
 
+@ApiTags('Contracts')
+@ApiBearerAuth('bearer')
 @Controller('contracts')
 export class ContractController {
   private readonly logger = new Logger(ContractController.name);
@@ -25,6 +28,7 @@ export class ContractController {
 
   @Sse('events')
   @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Subscribe to real-time contract event stream (SSE)' })
   sendContractEvents(@Req() req: any): Observable<MessageEvent> {
     const userId = req.user.uid;
     const email = req.user.email;
@@ -35,6 +39,8 @@ export class ContractController {
 
   @Get()
   @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'List contracts for authenticated user email' })
+  @ApiResponse({ status: 200, description: 'Array of contract documents' })
   async getContracts(@Req() req: any) {
     const email = req.user.email || '';
     return await this.contractService.getContracts(email);
@@ -42,6 +48,8 @@ export class ContractController {
 
   @Post('templates')
   @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Save contract template' })
+  @ApiResponse({ status: 201, description: 'Template created or updated' })
   async saveContractTemplate(@Req() req: any, @Body() body: any) {
     const userId = req.user.uid;
     const result = await this.contractService.saveTemplate(userId, body);
@@ -55,6 +63,9 @@ export class ContractController {
 
   @Get('templates')
   @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Get contract templates for landlord/agent' })
+  @ApiQuery({ name: 'status', required: false, schema: { default: 'active' } })
+  @ApiResponse({ status: 200, description: 'List of templates' })
   async getContractTemplates(@Req() req: any, @Query('status') status = 'active') {
     const userId = req.user.uid;
     return await this.contractService.getTemplates(userId, status);
@@ -62,6 +73,9 @@ export class ContractController {
 
   @Put('templates/:id/status')
   @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Update contract template status' })
+  @ApiParam({ name: 'id', description: 'Template ID' })
+  @ApiResponse({ status: 200, description: 'Template status updated' })
   async updateContractTemplateStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: string }) {
     const userId = req.user.uid;
     const result = await this.contractService.updateTemplateStatus(id, userId, body.status);
@@ -75,6 +89,9 @@ export class ContractController {
 
   @Delete('templates/:id')
   @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Delete contract template' })
+  @ApiParam({ name: 'id', description: 'Template ID' })
+  @ApiResponse({ status: 200, description: 'Template deleted' })
   async deleteContractTemplate(@Req() req: any, @Param('id') id: string) {
     const userId = req.user.uid;
     const result = await this.contractService.deleteTemplate(id, userId);
@@ -88,6 +105,8 @@ export class ContractController {
 
   @Get('stats/templates')
   @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Get template usage statistics' })
+  @ApiResponse({ status: 200, description: 'Stats object' })
   async getContractStats(@Req() req: any) {
     const userId = req.user.uid;
     return await this.contractService.getStats(userId);
@@ -97,6 +116,8 @@ export class ContractController {
   @Post('landlord')
   @UseGuards(FirebaseAuthGuard)
   @HttpCode(201)
+  @ApiOperation({ summary: 'Landlord sends contract agreement to tenant' })
+  @ApiResponse({ status: 201, description: 'Contract sent successfully' })
   async sendContractToTenant(@Req() req: any, @Body() body: any) {
     const userId = req.user.uid;
     const email = req.user.email || '';
@@ -122,6 +143,8 @@ export class ContractController {
   @Post('landlord/sync')
   @UseGuards(FirebaseAuthGuard)
   @HttpCode(201)
+  @ApiOperation({ summary: 'Sync signed contract record to landlord dashboard' })
+  @ApiResponse({ status: 201, description: 'Contract synced' })
   async syncContractToLandlord(@Req() req: any, @Body() body: any) {
     const result = await this.contractService.syncContractToLandlord(body);
     this.eventsService.emit({
@@ -138,6 +161,11 @@ export class ContractController {
   /** GET /api/contracts/landlord/exists — check if a contract exists */
   @Get('landlord/exists')
   @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Check if a contract exists between landlord and tenant' })
+  @ApiQuery({ name: 'tenantEmail' })
+  @ApiQuery({ name: 'title' })
+  @ApiQuery({ name: 'landlordEmail' })
+  @ApiResponse({ status: 200, description: 'Boolean flag indicating existence' })
   async contractExists(
     @Query('tenantEmail') tenantEmail: string,
     @Query('title') title: string,
@@ -153,6 +181,22 @@ export class ContractController {
     limits: { fileSize: 25 * 1024 * 1024 }, // 25MB PDF limit
   }))
   @HttpCode(200)
+  @ApiOperation({ summary: 'Email signed contract PDF attachment to recipient via Resend' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['to', 'contractName'],
+      properties: {
+        to: { type: 'string', description: 'Recipient email address' },
+        recipientName: { type: 'string', description: 'Recipient full name' },
+        contractName: { type: 'string', description: 'Title of the contract' },
+        attachment: { type: 'string', format: 'binary', description: 'Signed PDF file' },
+        htmlContent: { type: 'string', description: 'Optional custom email HTML template' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Email dispatched with messageId' })
   async sendSignedContract(
     @Req() req: any,
     @Body() body: any,

@@ -1,11 +1,16 @@
 import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import * as admin from 'firebase-admin';
 
+@ApiTags('Users')
+@ApiBearerAuth('bearer')
 @Controller('tenant-dashboard')
 @UseGuards(FirebaseAuthGuard)
 export class TenantDashboardController {
   @Get('summary')
+  @ApiOperation({ summary: 'Get tenant summary counts (saved properties, viewings, referencing applications)' })
+  @ApiResponse({ status: 200, description: 'Summary statistics object' })
   async getSummary(@Req() req: any) {
     const userId = req.user.uid;
     const db = admin.firestore();

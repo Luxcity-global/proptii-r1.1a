@@ -1,9 +1,12 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, Logger, Sse, MessageEvent } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { ViewingRequestService } from '../services/viewing-request.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
+@ApiTags('Viewing Requests')
+@ApiBearerAuth('bearer')
 @Controller('viewing-requests')
 @UseGuards(FirebaseAuthGuard)
 export class ViewingRequestController {
@@ -15,6 +18,7 @@ export class ViewingRequestController {
   ) {}
 
   @Sse('events')
+  @ApiOperation({ summary: 'Subscribe to real-time viewing event stream (SSE)' })
   sendViewingEvents(@Req() req: any): Observable<MessageEvent> {
     const userId = req.user.uid;
     const email = req.user.email;
@@ -24,6 +28,8 @@ export class ViewingRequestController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a new viewing booking request' })
+  @ApiResponse({ status: 201, description: 'Viewing request created' })
   async createViewing(@Req() req: any, @Body() body: any) {
     const tenantId = req.user.uid;
     const tenantEmail = req.user.email;
@@ -57,6 +63,8 @@ export class ViewingRequestController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'Get viewing requests for current user (filtered by tenant/landlord/agent role)' })
+  @ApiResponse({ status: 200, description: 'Array of viewing requests' })
   async getViewings(@Req() req: any) {
     const userId = req.user.uid;
     const role = req.user.role || 'tenant';
@@ -72,6 +80,9 @@ export class ViewingRequestController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get single viewing request by ID' })
+  @ApiParam({ name: 'id', description: 'Viewing Request ID' })
+  @ApiResponse({ status: 200, description: 'Viewing request object' })
   async getViewingById(@Param('id') id: string, @Req() req: any) {
     this.logger.log(`[getViewingById] id=${id}`);
     try {
@@ -85,6 +96,9 @@ export class ViewingRequestController {
   }
 
   @Put(':id')
+  @ApiOperation({ summary: 'Update viewing request status (confirmed, cancelled, rescheduled, completed)' })
+  @ApiParam({ name: 'id', description: 'Viewing Request ID' })
+  @ApiResponse({ status: 200, description: 'Status updated' })
   async updateViewingStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: string; notes?: string }) {
     const userId = req.user.uid;
     this.logger.log(`[updateViewingStatus] uid=${userId} id=${id} status=${body.status}`);
@@ -111,6 +125,9 @@ export class ViewingRequestController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Cancel viewing request' })
+  @ApiParam({ name: 'id', description: 'Viewing Request ID' })
+  @ApiResponse({ status: 200, description: 'Viewing request cancelled' })
   async cancelViewing(@Req() req: any, @Param('id') id: string) {
     const userId = req.user.uid;
     this.logger.log(`[cancelViewing] uid=${userId} id=${id}`);

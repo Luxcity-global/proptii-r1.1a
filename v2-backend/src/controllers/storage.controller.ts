@@ -13,6 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { StorageService } from '../services/storage.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
@@ -28,6 +29,8 @@ export interface MulterUploadedFile {
   path?: string;
 }
 
+@ApiTags('Storage')
+@ApiBearerAuth('bearer')
 @Controller('storage')
 @UseGuards(FirebaseAuthGuard)
 export class StorageController {
@@ -40,6 +43,18 @@ export class StorageController {
       fileSize: 25 * 1024 * 1024, // 25MB limit
     },
   }))
+  @ApiOperation({ summary: 'Upload file to Firebase/Cloud Storage in user-scoped directory' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary', description: 'File to upload' },
+        folder: { type: 'string', description: 'Destination folder namespace (e.g. documents, properties)' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Uploaded file public/signed URL and path' })
   async uploadFile(
     @Req() req: any,
     @UploadedFile() file: MulterUploadedFile,
@@ -65,6 +80,10 @@ export class StorageController {
 
   @Delete('file')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Delete file from cloud storage (ownership verified)' })
+  @ApiQuery({ name: 'path', description: 'Storage file path' })
+  @ApiResponse({ status: 200, description: 'File deletion result' })
+  @ApiResponse({ status: 403, description: 'Forbidden if deleting another user file' })
   async deleteFile(
     @Req() req: any,
     @Query('path') filePath: string,

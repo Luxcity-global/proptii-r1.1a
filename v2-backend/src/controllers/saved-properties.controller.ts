@@ -1,7 +1,10 @@
 import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Req, Logger } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { SavedPropertiesService } from '../services/saved-properties.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
+@ApiTags('Saved Properties')
+@ApiBearerAuth('bearer')
 @Controller()
 @UseGuards(FirebaseAuthGuard)
 export class SavedPropertiesController {
@@ -10,6 +13,10 @@ export class SavedPropertiesController {
   constructor(private readonly savedPropertiesService: SavedPropertiesService) {}
 
   @Get(['saved-properties', 'users/me/saved-properties'])
+  @ApiOperation({ summary: 'Get saved properties list for current user' })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'lastVisible', required: false })
+  @ApiResponse({ status: 200, description: 'List of saved properties' })
   async getSavedProperties(
     @Req() req: any,
     @Query('limit') limitStr?: string,
@@ -29,6 +36,8 @@ export class SavedPropertiesController {
   }
 
   @Post(['saved-properties', 'users/me/saved-properties'])
+  @ApiOperation({ summary: 'Bookmark/save a property for current user' })
+  @ApiResponse({ status: 201, description: 'Property saved' })
   async saveProperty(@Req() req: any, @Body() body: any) {
     const userId = req.user.uid;
     const propId = body?.propertyId || body?.id || body?.property?.id || body?.property?.propertyId || `prop_${Date.now()}`;
@@ -44,6 +53,10 @@ export class SavedPropertiesController {
   }
 
   @Delete(['saved-properties/:propertyId(*)', 'users/me/saved-properties/:propertyId(*)', 'saved-properties', 'users/me/saved-properties'])
+  @ApiOperation({ summary: 'Remove a saved property bookmark' })
+  @ApiParam({ name: 'propertyId', required: false, description: 'Property ID to remove' })
+  @ApiQuery({ name: 'propertyId', required: false, description: 'Optional query param for property ID' })
+  @ApiResponse({ status: 200, description: 'Property removed from saved list' })
   async unsaveProperty(
     @Req() req: any,
     @Param('propertyId') propertyIdParam?: string,

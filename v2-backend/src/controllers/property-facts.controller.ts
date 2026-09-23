@@ -61,6 +61,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
 } from 'class-validator';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiProperty } from '@nestjs/swagger';
 import { FactsStoreService }    from '../gov-data/services/facts-store.service';
 import { UprnMatchService }     from '../gov-data/services/uprn-match.service';
 import { AddressThrottleGuard } from '../guards/address-throttle.guard';
@@ -69,12 +70,14 @@ import type { PropertyFactsDoc, Flag } from '../gov-data/schemas/flag.schema';
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
 export class BatchFactsRequestDto {
+  @ApiProperty({ required: false, type: [String], description: 'List of listing IDs (up to 50)' })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50, { message: 'listingIds may not exceed 50 items per request' })
   @IsString({ each: true })
   listingIds?: string[];
 
+  @ApiProperty({ required: false, type: [String], description: 'List of UPRNs (up to 50)' })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50, { message: 'uprns may not exceed 50 items per request' })
@@ -94,6 +97,7 @@ export interface SingleFactsResponse {
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
+@ApiTags('Property Facts')
 @Controller('properties')
 export class PropertyFactsController {
 
@@ -104,25 +108,11 @@ export class PropertyFactsController {
 
   // ── POST /api/properties/facts ─────────────────────────────────────────────
 
-  /**
-   * Batched property facts lookup.
-   *
-   * Accepts up to 50 listingIds and/or 50 UPRNs per request.
-   * Returns a map of id → PropertyFactsDoc.
-   *
-   * CRITICAL: absent key in the response = unresolved on the client.
-   * Do NOT insert null entries for missing properties — a null entry would be
-   * indistinguishable from a record that says 'clear' on all flags.
-   *
-   * Request:  { listingIds?: string[], uprns?: string[] }
-   * Response: { [id: string]: PropertyFactsDoc }
-   *
-   * HTTP 400 if both listingIds and uprns are empty/absent.
-   * HTTP 200 with empty map if none of the requested IDs exist.
-   */
   @Post('facts')
   @HttpCode(200)
   @UseGuards(AddressThrottleGuard)
+  @ApiOperation({ summary: 'Batch lookup property facts for up to 50 listingIds or UPRNs' })
+  @ApiResponse({ status: 200, description: 'Map of ID to property facts' })
   async getBatchFacts(
     @Body() dto: BatchFactsRequestDto,
   ): Promise<Record<string, PropertyFactsDoc>> {
@@ -166,6 +156,11 @@ export class PropertyFactsController {
    */
   @Get(':listingId/facts')
   @UseGuards(AddressThrottleGuard)
+  @ApiOperation({ summary: 'Single property facts lookup by listingId with optional UPRN' })
+  @ApiParam({ name: 'listingId', description: 'Listing ID' })
+  @ApiQuery({ name: 'uprn', required: false, description: 'Optional UPRN for exact address match' })
+  @ApiResponse({ status: 200, description: 'Property facts including flags, UPRN, and title number' })
+  @ApiResponse({ status: 404, description: 'Property facts not found' })
   async getSingleFacts(
     @Param('listingId') listingId: string,
     @Query('uprn') uprn?: string,

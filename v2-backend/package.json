@@ -15,7 +15,7 @@
     "start:prod": "node dist/main",
     "start:render": "node dist/main",
     "seed:lens-rules": "ts-node src/gov-data/seeds/lens-rules.seed.ts",
-    "test": "vitest run",
+    "test": "nest build && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {

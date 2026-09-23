@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { SheetsService } from '../services/sheets.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
+@ApiTags('Sheets')
 @Controller('sheets')
 export class SheetsController {
   constructor(private readonly sheetsService: SheetsService) {}
@@ -25,6 +27,11 @@ export class SheetsController {
   /** GET /api/sheets — admin only (waitlist/lead retrieval) */
   @Get()
   @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Get sheet row data (admin only)' })
+  @ApiQuery({ name: 'sheetId', required: false, schema: { default: 'waitlist' } })
+  @ApiResponse({ status: 200, description: 'Sheet rows' })
+  @ApiResponse({ status: 403, description: 'Forbidden if not admin' })
   async getDefaultSheet(@Req() req: any, @Query('sheetId') sheetId = 'waitlist') {
     this.assertAdminUser(req);
     return this.sheetsService.getSheetData(sheetId);
@@ -32,6 +39,9 @@ export class SheetsController {
 
   /** POST /api/sheets — append a row (waitlist / lead capture) */
   @Post()
+  @ApiOperation({ summary: 'Append row to waitlist or campaign lead spreadsheet' })
+  @ApiQuery({ name: 'sheetId', required: false, schema: { default: 'waitlist' } })
+  @ApiResponse({ status: 201, description: 'Row appended' })
   async appendRow(@Body() body: any, @Query('sheetId') sheetId = 'waitlist') {
     return this.sheetsService.appendRow(body.sheetId || sheetId, body);
   }
@@ -39,6 +49,10 @@ export class SheetsController {
   /** GET /api/sheets/:sheetId — admin only */
   @Get(':sheetId')
   @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Get specific spreadsheet data (admin only)' })
+  @ApiParam({ name: 'sheetId', description: 'Sheet identifier' })
+  @ApiResponse({ status: 200, description: 'Sheet data' })
   async getSheet(@Req() req: any, @Param('sheetId') sheetId: string) {
     this.assertAdminUser(req);
     return this.sheetsService.getSheetData(sheetId);
@@ -46,6 +60,9 @@ export class SheetsController {
 
   /** POST /api/sheets/:sheetId */
   @Post(':sheetId')
+  @ApiOperation({ summary: 'Append row to specific spreadsheet by ID' })
+  @ApiParam({ name: 'sheetId', description: 'Sheet identifier' })
+  @ApiResponse({ status: 201, description: 'Row appended' })
   async appendToSheet(@Param('sheetId') sheetId: string, @Body() body: any) {
     return this.sheetsService.appendRow(sheetId, body);
   }

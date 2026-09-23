@@ -36,6 +36,7 @@ import {
   Logger,
   ValidationPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
 import { ClassifierService, ClassifierResult } from './classifier.service';
 import { ClassifierThrottleGuard } from '../guards/classifier-throttle.guard';
@@ -43,6 +44,7 @@ import { ClassifierThrottleGuard } from '../guards/classifier-throttle.guard';
 // ─── Request DTO ──────────────────────────────────────────────────────────────
 
 export class ClassifyRequestDto {
+  @ApiProperty({ description: 'Free-text search query string (e.g. 2 bed flat in Hackney under 1800)' })
   @IsString()
   @IsNotEmpty({ message: 'query must not be empty' })
   @MaxLength(500, { message: 'query must not exceed 500 characters' })
@@ -51,36 +53,20 @@ export class ClassifyRequestDto {
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
+@ApiTags('Search & AI')
 @Controller('search')
 export class ClassifierController {
   private readonly logger = new Logger(ClassifierController.name);
 
   constructor(private readonly classifierService: ClassifierService) {}
 
-  /**
-   * POST /api/search/classify
-   *
-   * Classifies a free-text search query into a structured intent object.
-   *
-   * Request body: { "query": "2 bed flat in Shoreditch under £1500" }
-   *
-   * Response:
-   * {
-   *   "intent":     "property_search",
-   *   "audience":   "tenant",
-   *   "entities":   { "location": "Shoreditch", "bedrooms": "2", "budget": "£1500" },
-   *   "confidence": 0.94,
-   *   "fallback":   false,
-   *   "cacheHit":   false
-   * }
-   *
-   * Always HTTP 200 — fallback responses are valid (not errors).
-   * HTTP 400 if body is missing or query exceeds 500 chars.
-   * HTTP 429 if throttle bucket (15/min/IP) is exceeded.
-   */
   @Post('classify')
   @HttpCode(200)
   @UseGuards(ClassifierThrottleGuard)
+  @ApiOperation({ summary: 'Classify free-text search query into structured search intent & entities' })
+  @ApiResponse({ status: 200, description: 'Structured classification result' })
+  @ApiResponse({ status: 400, description: 'Missing or empty query' })
+  @ApiResponse({ status: 429, description: 'Classifier rate limit exceeded (15 req/min)' })
   async classify(
     @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: false }))
     dto: ClassifyRequestDto,

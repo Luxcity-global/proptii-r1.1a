@@ -182,12 +182,57 @@ async function bootstrap() {
   // ── Swagger API Documentation ─────────────────────────────────────────────
   const config = new DocumentBuilder()
     .setTitle('Proptii API')
-    .setDescription('The Proptii v2 Backend API description')
+    .setDescription('Consolidated Proptii v2 Backend API — complete endpoint requirements, schemas, and specifications')
     .setVersion('1.4')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        description: 'Enter Firebase ID Token / JWT Bearer token',
+        in: 'header',
+      },
+      'bearer',
+    )
+    .addTag('Health', 'Health and system status endpoints')
+    .addTag('Auth', 'Authentication and role assignment')
+    .addTag('Users', 'User profile, public profile, and review management')
+    .addTag('Properties', 'Native property catalog and search')
+    .addTag('Saved Properties', 'User saved property lists and bookmarks')
+    .addTag('Viewing Requests', 'Property viewing requests, statuses, and live SSE stream')
+    .addTag('Referencing', 'Tenant referencing applications, section data, and guarantor workflows')
+    .addTag('Contracts', 'Tenancy agreements, templates, and multipart signed contract email dispatch')
+    .addTag('Communication', 'Conversations, real-time messaging, and attachments')
+    .addTag('Admin Dashboard', 'Customer metrics, accounts overview, and administrative notes')
+    .addTag('Billing', 'Stripe checkout, customer portal, plans, and subscriptions')
+    .addTag('Storage', 'Authenticated file upload to Cloud Storage')
+    .addTag('Search & AI', 'Search query classification and structured intent extraction')
+    .addTag('Property Facts', 'Government data intelligence, UPRN match, and facts pack')
+    .addTag('Reports', 'Property fact pack and compliance reports generation')
+    .addTag('Runtime Flags', 'Zero-deploy runtime feature flags')
+    .addTag('Campaign Leads', 'Public landing page lead capture and HMAC session verification')
+    .addTag('Landlords', 'Landlord and agent directory endpoints')
+    .addTag('Property Selections', 'Property selection collections')
+    .addTag('Homeowner', 'Homeowner maintenance and project management')
+    .addTag('Alerts', 'Real-time user notification alerts and SSE stream')
+    .addTag('Insights', 'Market and rental price trend insights')
+    .addTag('Sheets', 'Waitlist and lead spreadsheet append endpoints')
     .build();
+
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/docs', app, document, {
+    jsonDocumentUrl: 'api/docs-json',
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+    },
+  });
+
+  // Explicit fallback endpoint for raw OpenAPI JSON specification
+  app.getHttpAdapter().get('/api/docs-json', (_req: any, res: any) => {
+    res.json(document);
+  });
 
   // Set safe body size limit (5mb max) to prevent memory exhaustion DoS
   app.use(json({ limit: '5mb' }));
