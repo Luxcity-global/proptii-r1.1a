@@ -36,6 +36,7 @@ const cleanPropertyPrice = (price: string): string => {
 };
 
 import { Property, SearchResponse } from '../types/property';
+import type { ClassifyEntities } from '../types/govData';
 
 export interface ResolvedLocationData {
   displayName: string;
@@ -88,7 +89,13 @@ export const useSearchBackend = () => {
         const parsed = JSON.parse(cachedData);
         const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
         const currentQ = urlParams.get('q');
+        const hasUrlFilters = urlParams.has('beds') || urlParams.has('types') || urlParams.has('minPrice') || urlParams.has('maxPrice');
+
         if (!currentQ || parsed.query?.toLowerCase() === currentQ.toLowerCase()) {
+          if (hasUrlFilters && !parsed.macroSignature) {
+            // Avoid restoring stale unfiltered cached results if the current URL specifies filters
+            return;
+          }
           const cleanedCachedResults = (parsed.results || []).map((property: Property) => ({
             ...property,
             price: cleanPropertyPrice(property.price)
@@ -107,7 +114,8 @@ export const useSearchBackend = () => {
   const searchProperties = useCallback(async (
     searchQuery: string,
     type: 'onthemarket' | 'internet' | 'proptii' = 'onthemarket',
-    filters: Record<string, any> = {}
+    filters: Record<string, any> = {},
+    classifiedEntities?: ClassifyEntities | null,
   ) => {
     if (!searchQuery.trim()) {
       setError('Please enter a search query');
@@ -170,7 +178,8 @@ export const useSearchBackend = () => {
       // 2. SSE Scraper Search (hits proptii-search port 3001)
       let targetUrl = searchBackendUrl;
       let response: Response;
-      const requestPayload = { query: searchQuery, filters: filters || {} };
+      // Send classified entities so scrapers use AI intent directly (not regex parseQuery)
+      const requestPayload = { query: searchQuery, filters: filters || {}, classifiedEntities: classifiedEntities || null };
       try {
         response = await fetch(`${targetUrl}/api/v1/search`, {
           method: 'POST',

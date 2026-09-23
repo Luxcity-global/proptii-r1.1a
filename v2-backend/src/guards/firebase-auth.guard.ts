@@ -74,8 +74,12 @@ export class FirebaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing or invalid Authorization header or token query parameter');
     }
 
-    // Support local dev mock tokens
+    // Support local dev mock tokens only when explicitly enabled in non-production environments
+    const isProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL;
     if (token.startsWith('mock-') || token.startsWith('mock_')) {
+      if (isProd || (!process.env.ALLOW_DEV_MOCK_AUTH && process.env.NODE_ENV !== 'test')) {
+        throw new UnauthorizedException('Mock authentication tokens are not allowed in this environment');
+      }
       const mockId = token.replace('mock-token-', '').replace('mock-', '');
       const id = (mockId || '').toLowerCase();
       const mockRole = id.includes('agent') ? 'agent' : id.includes('landlord') ? 'landlord' : 'tenant';

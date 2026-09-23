@@ -28,9 +28,9 @@ export class AuthController {
       throw new BadRequestException('Invalid role. Must be tenant, landlord, or agent.');
     }
 
-    // Enforce Rule: Tenants CANNOT upgrade/switch to Landlord. Only Landlords can view Tenant.
+    // Enforce Rule: Tenants CANNOT upgrade/switch to Landlord or Agent.
     const currentRole = req.user?.role;
-    if (currentRole === 'tenant' && (role === 'landlord' || role === 'agent') && source === 'manual_select') {
+    if (currentRole === 'tenant' && (role === 'landlord' || role === 'agent')) {
       throw new ForbiddenException('Tenants cannot switch to a Landlord profile.');
     }
 

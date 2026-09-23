@@ -7,6 +7,7 @@ import {
   hasParkingFeature,
   hasBalconyOrGardenFeature,
   hasPetFriendlyFeature,
+  extractPetPolicy,
   hasBillsIncludedFeature,
   extractListingDateEpoch,
 } from '../propertyParsers';
@@ -182,6 +183,25 @@ describe('propertyParsers', () => {
     });
   });
 
+  describe('extractPetPolicy', () => {
+    it('returns allowed when pet friendly keywords are present', () => {
+      expect(extractPetPolicy('Cats and dogs welcome')).toBe('allowed');
+      expect(extractPetPolicy('', ['Pet friendly'])).toBe('allowed');
+      expect(extractPetPolicy('Pets considered upon request')).toBe('allowed');
+    });
+
+    it('returns forbidden when negative phrases are present', () => {
+      expect(extractPetPolicy('No pets allowed under any circumstances')).toBe('forbidden');
+      expect(extractPetPolicy('Strictly no pets')).toBe('forbidden');
+      expect(extractPetPolicy('', ['No pets'])).toBe('forbidden');
+    });
+
+    it('returns unknown when no pet mention exists', () => {
+      expect(extractPetPolicy('Lovely modern studio flat')).toBe('unknown');
+      expect(extractPetPolicy(undefined, [])).toBe('unknown');
+    });
+  });
+
   describe('hasBillsIncludedFeature', () => {
     it('detects bills included from amenities array', () => {
       expect(hasBillsIncludedFeature('', ['All bills included', 'Wifi'])).toBe(true);
@@ -320,6 +340,11 @@ describe('filterPredicates', () => {
       expect(matchPropertyType(flat, ['house'])).toBe(false);
       expect(matchPropertyType(house, ['house', 'studio'])).toBe(true);
     });
+
+    it('harmonizes studio: matches 0-bedroom properties even if propertyType is Flat', () => {
+      const zeroBedFlat = createMockProperty({ bedrooms: 0, propertyType: 'Flat' });
+      expect(matchPropertyType(zeroBedFlat, ['studio'])).toBe(true);
+    });
   });
 
   describe('matchKeywords', () => {
@@ -406,6 +431,16 @@ describe('filterPredicates', () => {
     it('matches only pet friendly properties when required', () => {
       expect(matchPetFriendly(petFriendlyProp, true)).toBe(true);
       expect(matchPetFriendly(regularProp, true)).toBe(false);
+    });
+
+    it('supports allowUnconfirmed parameter for unstated properties', () => {
+      const unstatedProp = createMockProperty({ description: 'Studio apartment with kitchen' });
+      // When allowUnconfirmed is false (default): unstated is rejected
+      expect(matchPetFriendly(unstatedProp, true, false)).toBe(false);
+      // When allowUnconfirmed is true (relaxed mode): unstated is accepted
+      expect(matchPetFriendly(unstatedProp, true, true)).toBe(true);
+      // Explicit negative is ALWAYS rejected even in relaxed mode
+      expect(matchPetFriendly(regularProp, true, true)).toBe(false);
     });
   });
 

@@ -1,4 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { GovDataModule } from './gov-data/gov-data.module';
 
@@ -66,7 +67,7 @@ import { StorageController } from './controllers/storage.controller';
 import { LeadsModule } from './leads/leads.module';
 
 // ── Rate Limiting (ThrottlerModule) ──────────────────────────────────────────
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 // ── Static File Serving (campaign + welcome pages) ───────────────────────────
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -137,6 +138,10 @@ function resolvePublicFolder(folder: string): string {
     ReportController,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     EventsService,      // SSE Central Event Broadcaster
     EmailService,       // must be before any service that injects it
     StorageService,     // Firebase Cloud Storage uploader

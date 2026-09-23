@@ -10,31 +10,37 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    // Users collection
+    function isAdmin() {
+      return isAuthenticated() && (request.auth.token.admin == true || request.auth.token.role == 'admin');
+    }
+
+    // Users collection - protect private profile data
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow write: if isOwner(userId) || isAdmin();
     }
 
     // Properties collection
     match /properties/{propertyId} {
       allow read: if true; // Public read access
-      allow create: if isAuthenticated() && (request.auth.token.role == 'landlord' || request.auth.token.role == 'agent');
+      allow create: if isAuthenticated() && (request.auth.token.role == 'landlord' || request.auth.token.role == 'agent' || isAdmin());
       allow update, delete: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || resource.data.agentId == request.auth.uid || request.auth.token.admin == true);
+        (resource.data.userId == request.auth.uid || resource.data.agentId == request.auth.uid || isAdmin());
     }
 
     // Viewing requests
     match /viewingRequests/{requestId} {
       allow read: if isAuthenticated() && 
         (resource.data.userId == request.auth.uid || 
-         resource.data.agentId == request.auth.uid);
+         resource.data.agentId == request.auth.uid ||
+         isAdmin());
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && 
         (resource.data.userId == request.auth.uid || 
-         resource.data.agentId == request.auth.uid);
+         resource.data.agentId == request.auth.uid ||
+         isAdmin());
       allow delete: if isAuthenticated() && 
-        (resource.data.agentId == request.auth.uid || request.auth.token.admin == true);
+        (resource.data.agentId == request.auth.uid || isAdmin());
     }
 
     // Search history
@@ -43,21 +49,20 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid;
     }
 
-    // Test collection (for connection testing)
-    match /test/{docId} {
-      allow read, write: if isAuthenticated();
-    }
-
     // Referencing forms collection
     match /referencingForms/{documentId} {
-      allow read, write: if isAuthenticated() && 
-        (resource == null || resource.data.userId == request.auth.uid);
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || resource.data.landlordId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // User files collection
     match /userFiles/{fileId} {
       allow read, write: if isAuthenticated() && 
-        (resource == null || resource.data.userId == request.auth.uid);
+        (resource == null || resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Book Viewing Requests collection
@@ -65,50 +70,55 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
         (resource.data.userId == request.auth.uid || 
          resource.data.landlordId == request.auth.uid || 
-         resource.data.agentId == request.auth.uid);
+         resource.data.agentId == request.auth.uid ||
+         isAdmin());
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() && 
         (resource.data.landlordId == request.auth.uid || 
-         resource.data.agentId == request.auth.uid);
+         resource.data.agentId == request.auth.uid ||
+         isAdmin());
     }
 
     // Viewing bookings collection
     match /viewingBookings/{documentId} {
       allow read, write: if isAuthenticated() && 
-        (resource == null || resource.data.userId == request.auth.uid || resource.data.landlordId == request.auth.uid || resource.data.agentId == request.auth.uid);
+        (resource == null || 
+         resource.data.userId == request.auth.uid || 
+         resource.data.landlordId == request.auth.uid || 
+         resource.data.agentId == request.auth.uid ||
+         isAdmin());
     }
 
     // Contract templates collection
     match /contractTemplates/{documentId} {
-      allow read, write: if isAuthenticated() && 
-        (resource == null || resource.data.userId == request.auth.uid);
+      allow read: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Signed contracts collection
     match /signedContracts/{documentId} {
       allow read, write: if isAuthenticated() && 
-        (resource == null || resource.data.userId == request.auth.uid);
+        (resource == null || resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Support Forms Collection
+    // Support Forms Collection - public can create, but only administrators can read/manage
     match /supportForms/{formId} {
-      // Allow anyone to create support forms (for public contact form)
       allow create: if true;
-      
-      // Only authenticated users (admin/support staff) can read, update, or delete
-      allow read, update, delete: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
     }
 
     // Alerts collection
     match /alerts/{alertId} {
       allow read, write: if isAuthenticated() && 
-        (resource == null || resource.data.userId == request.auth.uid);
+        (resource == null || resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Tenants collection
     match /tenants/{tenantId} {
       allow read, write: if isAuthenticated() && 
-        (resource == null || resource.data.userId == request.auth.uid);
+        (resource == null || resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Contracts collection
@@ -117,27 +127,25 @@ service cloud.firestore {
         (resource == null || 
          resource.data.userId == request.auth.uid || 
          resource.data.tenantEmail == request.auth.token.email || 
-         resource.data.landlordEmail == request.auth.token.email);
+         resource.data.landlordEmail == request.auth.token.email ||
+         isAdmin());
     }
 
     // Market Insights collection
     match /marketInsights/{insightId} {
       allow read: if true; // Market insights are public
-      allow create, update: if isAuthenticated() && (request.auth.token.role == 'landlord' || request.auth.token.role == 'agent' || request.auth.token.admin == true);
+      allow create, update: if isAuthenticated() && (request.auth.token.role == 'landlord' || request.auth.token.role == 'agent' || isAdmin());
       allow delete: if false; // Don't allow deletion (archive instead)
     }
 
     // Referee & Guarantor responses (submitted by external anonymous users)
     match /referee_guarantor_responses/{docId} {
-      // Anyone can submit a response, but check that basic fields are present
       allow create: if request.resource.data.email != null && request.resource.data.consent != null;
-      
-      // Only authenticated users who are part of the transaction can read/manage
       allow read, update, delete: if isAuthenticated() && 
         (resource.data.tenantEmail == request.auth.token.email || 
-         request.auth.token.role == 'landlord' || 
-         request.auth.token.role == 'agent' || 
-         request.auth.token.admin == true);
+         resource.data.landlordEmail == request.auth.token.email ||
+         resource.data.agentId == request.auth.uid ||
+         isAdmin());
     }
   }
 }

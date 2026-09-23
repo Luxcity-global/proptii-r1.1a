@@ -68,6 +68,7 @@ export function mockClassifyQuery(query: string): ClassifyResponse {
   const lower = trimmed.toLowerCase();
   const entities: ClassifyEntities = { ...EMPTY_ENTITIES };
 
+  // Bedrooms
   const bedMatch = lower.match(/(\d+)\s*(?:bed|bedroom|beds|br)\b/);
   if (bedMatch) {
     entities.bedrooms = parseInt(bedMatch[1], 10);
@@ -75,6 +76,7 @@ export function mockClassifyQuery(query: string): ClassifyResponse {
     entities.bedrooms = 0;
   }
 
+  // Price
   const priceMatch =
     lower.match(/(?:under|below|max|up\s+to|less\s+than)\s*£?\s*([\d,]+)/i) ||
     lower.match(/£\s*([\d,]+)\s*(?:pcm|pw|per\s+month)?/i) ||
@@ -83,6 +85,7 @@ export function mockClassifyQuery(query: string): ClassifyResponse {
     entities.price_max = parseInt(priceMatch[1].replace(/,/g, ''), 10);
   }
 
+  // Tenure
   if (/\b(buy|buying|purchase|for\s+sale)\b/.test(lower)) {
     entities.tenure = 'buy';
   } else if (
@@ -92,6 +95,7 @@ export function mockClassifyQuery(query: string): ClassifyResponse {
     entities.tenure = 'rent';
   }
 
+  // Location
   const locationMatch = lower.match(
     /\b(?:in|near|around|at)\s+([a-z][a-z\s'-]{1,40}?)(?:\s+(?:under|below|for|with|near|within|£|\d)|$)/i,
   );
@@ -105,10 +109,43 @@ export function mockClassifyQuery(query: string): ClassifyResponse {
     entities.location && COUNTRY_LEVEL.test(entities.location.trim()),
   );
 
+  // Address
   const postcodeMatch = trimmed.match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i);
   const streetAddress = /^\d+\s+[A-Za-z]/.test(trimmed) && postcodeMatch;
   if (streetAddress || (postcodeMatch && /\d+\s+\w+/.test(trimmed))) {
     entities.address_full = trimmed;
+  }
+
+  // ── Amenity-level signals as first-class entities ────────────────────────
+  // These allow the backend to log/rank by them, and the frontend to show chips.
+
+  // Pet-friendly: "pet friendly", "pets welcome", "dogs allowed", "with my dog/cat"
+  if (
+    /\b(pet[- ]friendly|pets?\s+welcome|pets?\s+ok|dogs?\s+(allowed|welcome|ok)|cats?\s+(allowed|welcome)|with\s+(my\s+)?(dog|cat|pet))\b/.test(lower)
+  ) {
+    entities.pet_friendly = true;
+  }
+
+  // Bills included: "bills included", "all bills", "utilities included"
+  if (/\b(bills?\s+included|all\s+bills|utilities?\s+included|inc\.?\s+bills?)\b/.test(lower)) {
+    entities.bills_included = true;
+  }
+
+  // Parking: "with parking", "parking included", "has a garage", "off-street parking"
+  if (/\b(with\s+parking|parking\s+included|off[- ]street\s+parking|garage|driveway)\b/.test(lower)) {
+    entities.parking = true;
+  }
+
+  // Balcony / garden: "with garden", "with balcony", "outdoor space", "terrace"
+  if (/\b(with\s+(a\s+)?(garden|balcony|terrace)|outdoor\s+space|outside\s+space)\b/.test(lower)) {
+    entities.balcony_or_garden = true;
+  }
+
+  // Furnished: "furnished", "unfurnished"
+  if (/\bunfurnished\b/.test(lower)) {
+    entities.furnished = 'unfurnished';
+  } else if (/\b(furnished|comes?\s+furnished)\b/.test(lower)) {
+    entities.furnished = 'furnished';
   }
 
   const hasPropertyShape =

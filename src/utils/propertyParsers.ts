@@ -188,38 +188,60 @@ export function hasBalconyOrGardenFeature(text: string | undefined | null): bool
  * Inspects amenities array, title, and description.
  * Ensures negative phrases (e.g. "strictly no pets", "no pets allowed") return false.
  */
-export function hasPetFriendlyFeature(
+export type PetPolicy = 'allowed' | 'forbidden' | 'unknown';
+
+/**
+ * Categorizes property pet policy:
+ * - 'forbidden': explicit negatives like "no pets", "pets not allowed"
+ * - 'allowed': explicit positives like "pet-friendly", "pets welcome", "dogs allowed"
+ * - 'unknown': unstated policy (common on portal summaries)
+ */
+export function extractPetPolicy(
   text: string | undefined | null,
   amenities?: string[] | null
-): boolean {
+): PetPolicy {
   // 1. Check amenities array
   if (Array.isArray(amenities)) {
     for (const am of amenities) {
       const lowerAm = (typeof am === 'string' ? am : (am as any)?.description || (am as any)?.title || '').toLowerCase();
-      if (
-        /\b(pet|pets|dog|dogs|cat|cats|animal)\b/i.test(lowerAm) &&
-        !/\b(no\s+pets?|not\s+allowed|forbidden)\b/i.test(lowerAm)
-      ) {
-        return true;
+      if (/\b(no\s+pets?|not\s+allowed|forbidden)\b/i.test(lowerAm)) {
+        return 'forbidden';
+      }
+      if (/\b(pet|pets|dog|dogs|cat|cats|animal)\b/i.test(lowerAm)) {
+        return 'allowed';
       }
     }
   }
 
-  if (!text) return false;
+  if (!text) return 'unknown';
   const lower = text.toLowerCase();
 
   // Explicit negatives take precedence
   if (
     /\b(no\s+pets?|pets?\s+not\s+allowed|pets?\s+strictly\s+forbidden|not\s+suitable\s+for\s+pets?|strictly\s+no\s+pets?|sorry\s*,?\s*no\s+(pets?|dogs?|cats?))\b/i.test(lower)
   ) {
-    return false;
+    return 'forbidden';
   }
 
   // Positive mentions
-  return (
+  if (
     /\b(pet[- ]friendly|dog[- ]friendly|cat[- ]friendly|animals?\s+welcome)\b/i.test(lower) ||
     /\b(pets?|dogs?|cats?|animals?)\s+(welcome|allowed|considered|accepted|permitted)\b/i.test(lower)
-  );
+  ) {
+    return 'allowed';
+  }
+
+  return 'unknown';
+}
+
+/**
+ * Detects whether a property allows pets.
+ */
+export function hasPetFriendlyFeature(
+  text: string | undefined | null,
+  amenities?: string[] | null
+): boolean {
+  return extractPetPolicy(text, amenities) === 'allowed';
 }
 
 /**

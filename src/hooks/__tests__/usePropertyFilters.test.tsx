@@ -155,4 +155,58 @@ describe('usePropertyFilters', () => {
     expect(result.current.filteredProperties.length).toBe(1);
     expect(result.current.filteredProperties[0].title).toBe('Spacious 3 bed flat with parking');
   });
+
+  it('deduplicates studio between bedrooms: 0 and property_type: studio from classifier', () => {
+    const classifiedEntities = {
+      bedrooms: 0,
+      property_type: 'studio',
+    };
+
+    const { result } = renderHook(
+      () => usePropertyFilters(mockProperties, classifiedEntities as any),
+      { wrapper }
+    );
+
+    // Bedrooms should be [0], and propertyTypes should NOT contain duplicate 'studio'
+    expect(result.current.filters.bedrooms).toEqual([0]);
+    expect(result.current.filters.propertyTypes).toEqual([]);
+    expect(result.current.filteredProperties.length).toBe(1);
+    expect(result.current.filteredProperties[0].title).toBe('Studio apartment to rent');
+  });
+
+  it('gracefully relaxes pet filter when no properties explicitly advertise pet policy', () => {
+    const propertiesWithoutExplicitPetTag: Property[] = [
+      {
+        title: 'Modern studio in Manchester',
+        price: '£950 pcm',
+        location: 'Manchester M1',
+        bedrooms: 0,
+        propertyType: 'Studio',
+        imageUrls: [],
+        description: 'Quiet building with lift',
+      },
+      {
+        title: 'House in Manchester (No pets allowed)',
+        price: '£1,500 pcm',
+        location: 'Manchester M2',
+        bedrooms: 2,
+        propertyType: 'House',
+        imageUrls: [],
+        description: 'Strictly no pets allowed in this property',
+      },
+    ];
+
+    const { result } = renderHook(
+      () => usePropertyFilters(propertiesWithoutExplicitPetTag, { pet_friendly: 'true' } as any),
+      { wrapper }
+    );
+
+    // Under graceful relaxation:
+    // The house strictly forbidding pets is excluded
+    // The studio with unstated policy is shown, and isPetRelaxed is true
+    expect(result.current.filters.isPetFriendly).toBe(true);
+    expect(result.current.filteredProperties.length).toBe(1);
+    expect(result.current.filteredProperties[0].title).toBe('Modern studio in Manchester');
+    expect(result.current.isPetRelaxed).toBe(true);
+  });
 });

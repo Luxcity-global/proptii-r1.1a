@@ -42,6 +42,13 @@ export class AdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const email = request.user?.email as string | undefined;
+    const isProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL;
+
+    // In production, require email verification to prevent unverified staff account takeover
+    if (isProd && request.user?.email_verified !== true) {
+      throw new ForbiddenException('Staff email address must be verified');
+    }
+
     if (!isStaffEmail(email)) {
       throw new ForbiddenException('Staff access only');
     }

@@ -72,10 +72,10 @@ export class ViewingRequestController {
   }
 
   @Get(':id')
-  async getViewingById(@Param('id') id: string) {
+  async getViewingById(@Param('id') id: string, @Req() req: any) {
     this.logger.log(`[getViewingById] id=${id}`);
     try {
-      const result = await this.viewingRequestService.getViewingById(id);
+      const result = await this.viewingRequestService.getViewingById(id, req.user);
       this.logger.log(`[getViewingById] id=${id} → found=${!!result}`);
       return result;
     } catch (err: any) {
@@ -89,7 +89,7 @@ export class ViewingRequestController {
     const userId = req.user.uid;
     this.logger.log(`[updateViewingStatus] uid=${userId} id=${id} status=${body.status}`);
     try {
-      const result = await this.viewingRequestService.updateViewingStatus(id, userId, body.status, body.notes);
+      const result = await this.viewingRequestService.updateViewingStatus(id, userId, body.status, body.notes, req.user);
       this.logger.log(`[updateViewingStatus] uid=${userId} id=${id} → updated OK`);
 
       // Broadcast SSE update event
@@ -115,7 +115,7 @@ export class ViewingRequestController {
     const userId = req.user.uid;
     this.logger.log(`[cancelViewing] uid=${userId} id=${id}`);
     try {
-      const result = await this.viewingRequestService.cancelViewing(id, userId);
+      const result = await this.viewingRequestService.cancelViewing(id, userId, req.user);
       this.logger.log(`[cancelViewing] uid=${userId} id=${id} → cancelled OK`);
 
       // Broadcast SSE delete event

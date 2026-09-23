@@ -99,8 +99,9 @@ export class RightmoveScraper implements IScraper {
   name = 'Rightmove';
 
   async scrape(query: string, filters: any = {}): Promise<PropertyData[]> {
+    // ── Priority: structured filter fields (from AI classify) → parseQuery fallback ──
     const parsed = this.parseQuery(query);
-    
+
     let resolvedLoc: ResolvedLocation | undefined = filters.resolvedLocation;
     if (!resolvedLoc && !filters.locationId) {
       try {
@@ -110,31 +111,60 @@ export class RightmoveScraper implements IScraper {
       }
     }
 
-    // Allow structured filters or resolved location to override or enhance parsed query
-    const isRental = filters.isRental !== undefined 
-      ? Boolean(filters.isRental) 
-      : (filters.channel ? filters.channel !== 'sale' : (filters.tenure ? filters.tenure !== 'buy' : parsed.isRental));
+    // Tenure: structured filter > parseQuery fallback
+    const isRental =
+      filters.isRental !== undefined
+        ? Boolean(filters.isRental)
+        : filters.channel
+          ? filters.channel !== 'sale'
+          : filters.tenure
+            ? filters.tenure !== 'buy'
+            : parsed.isRental;
+
+    // Location: resolvedLocation > structured filter > parseQuery fallback
     const locationId = resolvedLoc?.rightmoveLocationId || filters.locationId || parsed.locationId;
     const locationName = resolvedLoc?.displayName || parsed.locationName;
-    
-    const rawBeds = filters.bedrooms !== undefined ? String(filters.bedrooms) : undefined;
-    const minBeds = filters.minBeds !== undefined 
-      ? String(filters.minBeds) 
-      : (rawBeds !== undefined ? rawBeds : parsed.minBeds);
-    const maxBeds = filters.maxBeds !== undefined 
-      ? String(filters.maxBeds) 
-      : (rawBeds !== undefined ? rawBeds : parsed.maxBeds);
-      
-    const minPrice = filters.minPrice !== undefined 
-      ? String(filters.minPrice) 
-      : (filters.price_min !== undefined ? String(filters.price_min) : undefined);
-    const maxPrice = filters.maxPrice !== undefined 
-      ? String(filters.maxPrice) 
-      : (filters.price_max !== undefined ? String(filters.price_max) : (filters.budget ? String(filters.budget) : parsed.maxPrice));
-      
-    const propertyType = filters.propertyType || filters.property_type || filters.types?.[0];
+
+    // Bedrooms: structured filter (single value sets both min/max) > parseQuery fallback
+    const structuredBeds = filters.bedrooms !== undefined ? String(filters.bedrooms) : undefined;
+    const minBeds =
+      filters.minBeds !== undefined
+        ? String(filters.minBeds)
+        : structuredBeds !== undefined
+          ? structuredBeds
+          : parsed.minBeds;
+    const maxBeds =
+      filters.maxBeds !== undefined
+        ? String(filters.maxBeds)
+        : structuredBeds !== undefined
+          ? structuredBeds
+          : parsed.maxBeds;
+
+    // Price: structured filter > parseQuery fallback
+    const minPrice =
+      filters.minPrice !== undefined
+        ? String(filters.minPrice)
+        : filters.price_min !== undefined
+          ? String(filters.price_min)
+          : undefined;
+    const maxPrice =
+      filters.maxPrice !== undefined
+        ? String(filters.maxPrice)
+        : filters.price_max !== undefined
+          ? String(filters.price_max)
+          : filters.budget
+            ? String(filters.budget)
+            : parsed.maxPrice;
+
+    // Property type: structured filter > parseQuery fallback
+    const propertyType =
+      filters.propertyType ||
+      filters.property_type ||
+      filters.types?.[0] ||
+      parsed.propertyType;
 
     const url = this.buildUrl(isRental, locationId, minBeds, maxBeds, minPrice, maxPrice, propertyType);
+
 
     try {
       console.log(`[Rightmove] Fetching ${url}`);
@@ -206,13 +236,18 @@ export class RightmoveScraper implements IScraper {
       const isBogusSummary = !rawSummary || rawSummary.toLowerCase().startsWith('no_data') || rawSummary.length < 5;
       const fallbackTitle = `${p.bedrooms !== undefined && p.bedrooms !== null ? `${p.bedrooms} bed ` : ''}${p.propertySubType || 'Property'} in ${p.displayAddress}`;
       const title = isBogusSummary ? fallbackTitle : rawSummary;
+      const rawSummaryLower = (p.summary || '').toLowerCase();
+      const rawSubType = (p.propertySubType || '').toLowerCase();
+      const isStudio = rawSummaryLower.includes('studio') || rawSubType.includes('studio');
+      const bedrooms = isStudio ? 0 : ((p.bedrooms !== undefined && p.bedrooms !== null && !isNaN(Number(p.bedrooms))) ? Number(p.bedrooms) : null);
+      const propertyType = isStudio ? 'Studio' : (p.propertySubType || 'Property');
 
       results.push({
-        title,
+        title:        p.propertyTitle || p.displayAddress || 'Property',
         price:        priceStr,
-        location:     p.displayAddress,
-        bedrooms:     (p.bedrooms !== undefined && p.bedrooms !== null && !isNaN(Number(p.bedrooms))) ? Number(p.bedrooms) : null,
-        propertyType: p.propertySubType || 'Property',
+        location:     p.displayAddress || 'UK',
+        bedrooms,
+        propertyType,
         imageUrls:    p.propertyImages?.images?.map((img: any) => img.srcUrl).filter(Boolean).slice(0, 5) || 
                       (p.propertyImages?.mainImage?.src ? [p.propertyImages.mainImage.src] : []),
         agent: { 
@@ -259,18 +294,25 @@ export class RightmoveScraper implements IScraper {
       index: '0',
     });
 
-    if (minBeds) params.set('minBedrooms', minBeds);
-    if (maxBeds) params.set('maxBedrooms', maxBeds);
-    if (minPrice) params.set('minPrice', minPrice);
-    if (maxPrice) params.set('maxPrice', maxPrice);
-    if (propertyType) {
-      const lower = propertyType.toLowerCase();
-      if (lower.includes('flat') || lower.includes('apartment')) {
-        params.set('propertyTypes', 'flat');
-      } else if (lower.includes('house') || lower.includes('terraced') || lower.includes('detached')) {
-        params.set('propertyTypes', 'detached,semi-detached,terraced');
-      } else if (lower.includes('bungalow')) {
-        params.set('propertyTypes', 'bungalow');
+    const isStudioRequested = (propertyType && propertyType.toLowerCase().includes('studio')) || minBeds === '0' || maxBeds === '0';
+    if (isStudioRequested) {
+      params.set('minBedrooms', '0');
+      params.set('maxBedrooms', '0');
+      params.set('propertyTypes', 'flat');
+    } else {
+      if (minBeds) params.set('minBedrooms', minBeds);
+      if (maxBeds) params.set('maxBedrooms', maxBeds);
+      if (minPrice) params.set('minPrice', minPrice);
+      if (maxPrice) params.set('maxPrice', maxPrice);
+      if (propertyType) {
+        const lower = propertyType.toLowerCase();
+        if (lower.includes('flat') || lower.includes('apartment')) {
+          params.set('propertyTypes', 'flat');
+        } else if (lower.includes('house') || lower.includes('terraced') || lower.includes('detached')) {
+          params.set('propertyTypes', 'detached,semi-detached,terraced');
+        } else if (lower.includes('bungalow')) {
+          params.set('propertyTypes', 'bungalow');
+        }
       }
     }
 
@@ -312,8 +354,16 @@ export class RightmoveScraper implements IScraper {
       }
     }
 
-    const bedsMatch = q.match(/(\d+)\s*bed/i);
-    const beds = bedsMatch ? bedsMatch[1] : undefined;
+    let beds: string | undefined;
+    let propertyType: string | undefined;
+
+    if (/\bstudios?\b/i.test(q)) {
+      beds = '0';
+      propertyType = 'studio';
+    } else {
+      const bedsMatch = q.match(/(\d+)\s*bed/i);
+      beds = bedsMatch ? bedsMatch[1] : undefined;
+    }
 
     const priceMatch = q.match(/under\s*£?\s*([\d,]+)\s*k?/i) || q.match(/£([\d,]+)\s*pcm/i);
     let maxPrice: string | undefined;
@@ -322,6 +372,6 @@ export class RightmoveScraper implements IScraper {
       maxPrice = q.includes('k') && Number(raw) < 100 ? String(parseInt(raw) * 1000) : raw;
     }
 
-    return { isRental, locationId, locationName: rawLoc, minBeds: beds, maxBeds: beds, maxPrice };
+    return { isRental, locationId, locationName: rawLoc, minBeds: beds, maxBeds: beds, maxPrice, propertyType };
   }
 }

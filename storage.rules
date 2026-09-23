@@ -1,34 +1,41 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Referencing documents folder
-    match /referencing_documents/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.resource.size < 15 * 1024 * 1024; // 15MB limit
+    // Helper function
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Referencing documents folder - strictly scoped to owning tenant or administrator
+    match /referencing_documents/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
+      allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true)
+        && request.resource.size < 15 * 1024 * 1024;
     }
     
-    // Contracts folder - allow public read for shared viewing, write with 15MB limit
-    match /contracts/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.resource.size < 15 * 1024 * 1024;
+    // Contracts folder - restricted to authenticated users with 15MB limit
+    match /contracts/{contractId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.resource.size < 15 * 1024 * 1024;
     }
     
-    // Properties folder
+    // Properties public media folder (images, listing media)
     match /properties/{allPaths=**} {
       allow read: if true;
-      allow write: if request.resource.size < 15 * 1024 * 1024;
+      allow write: if isAuthenticated() && request.resource.size < 15 * 1024 * 1024;
     }
     
-    // General documents folder
-    match /documents/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.resource.size < 15 * 1024 * 1024;
+    // User documents folder - scoped to authenticated user
+    match /documents/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
+      allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true)
+        && request.resource.size < 15 * 1024 * 1024;
     }
     
-    // All other paths
+    // Deny all other unmapped paths
     match /{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null || request.resource.size < 15 * 1024 * 1024;
+      allow read: if false;
+      allow write: if false;
     }
   }
 }

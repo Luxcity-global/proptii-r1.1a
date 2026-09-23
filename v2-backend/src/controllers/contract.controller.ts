@@ -1,8 +1,18 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req, HttpCode, Sse, MessageEvent, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req, HttpCode, Sse, MessageEvent, Logger, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Observable } from 'rxjs';
 import { ContractService } from '../services/contract.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+
+export interface MulterUploadedFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
 
 @Controller('contracts')
 export class ContractController {
@@ -54,7 +64,7 @@ export class ContractController {
   @UseGuards(FirebaseAuthGuard)
   async updateContractTemplateStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: string }) {
     const userId = req.user.uid;
-    const result = await this.contractService.updateTemplateStatus(id, body.status);
+    const result = await this.contractService.updateTemplateStatus(id, userId, body.status);
     this.eventsService.emit({
       type: 'contract_template_updated',
       userId,
@@ -67,7 +77,7 @@ export class ContractController {
   @UseGuards(FirebaseAuthGuard)
   async deleteContractTemplate(@Req() req: any, @Param('id') id: string) {
     const userId = req.user.uid;
-    const result = await this.contractService.deleteTemplate(id);
+    const result = await this.contractService.deleteTemplate(id, userId);
     this.eventsService.emit({
       type: 'contract_template_updated',
       userId,
@@ -139,8 +149,16 @@ export class ContractController {
   /** POST /api/contracts/send-signed-contract — email signed PDF to recipient */
   @Post('send-signed-contract')
   @UseGuards(FirebaseAuthGuard)
+  @UseInterceptors(FileInterceptor('attachment', {
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB PDF limit
+  }))
   @HttpCode(200)
-  async sendSignedContract(@Req() req: any, @Body() body: any) {
-    return await this.contractService.sendSignedContract(body);
+  async sendSignedContract(
+    @Req() req: any,
+    @Body() body: any,
+    @UploadedFile() file?: MulterUploadedFile,
+  ) {
+    const senderEmail = req.user?.email || '';
+    return await this.contractService.sendSignedContract(body, senderEmail, file);
   }
 }

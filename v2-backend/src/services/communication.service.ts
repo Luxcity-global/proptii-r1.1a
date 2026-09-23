@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
@@ -129,9 +129,27 @@ export class CommunicationService {
     return { data: { ...payload, messages: [] } };
   }
 
-  async getMessages(conversationId: string) {
+  async getMessages(conversationId: string, user?: { uid: string; email?: string; admin?: boolean; role?: string }) {
     const col = this.messagesCol;
     if (!col) return { data: [] };
+
+    // Verify participant authorization if caller user context is provided
+    if (user && user.admin !== true && user.role !== 'admin' && this.conversationsCol) {
+      const convSnap = await this.conversationsCol.doc(conversationId).get();
+      if (convSnap.exists) {
+        const conv = convSnap.data();
+        const isParticipant =
+          conv?.tenantId === user.uid ||
+          conv?.landlordId === user.uid ||
+          (user.email && (
+            conv?.guestEmail?.toLowerCase() === user.email.toLowerCase() ||
+            conv?.landlordEmail?.toLowerCase() === user.email.toLowerCase()
+          ));
+        if (!isParticipant) {
+          throw new ForbiddenException('You are not authorized to view messages in this conversation');
+        }
+      }
+    }
 
     try {
       const snapshot = await col
@@ -144,15 +162,34 @@ export class CommunicationService {
 
       return { data: messages };
     } catch (err: any) {
+      if (err instanceof ForbiddenException) throw err;
       this.logger.warn(`Error getting messages for ${conversationId}: ${err?.message || err}`);
       return { data: [] };
     }
   }
 
-  async sendMessage(conversationId: string, dto: any, userId: string) {
+  async sendMessage(conversationId: string, dto: any, userId: string, user?: any) {
     const col = this.messagesCol;
     const timestamp = new Date().toISOString();
     const id = randomUUID();
+
+    // Verify participant authorization if caller user context is provided
+    if (user && user.admin !== true && user.role !== 'admin' && this.conversationsCol) {
+      const convSnap = await this.conversationsCol.doc(conversationId).get();
+      if (convSnap.exists) {
+        const conv = convSnap.data();
+        const isParticipant =
+          conv?.tenantId === userId ||
+          conv?.landlordId === userId ||
+          (user.email && (
+            conv?.guestEmail?.toLowerCase() === user.email.toLowerCase() ||
+            conv?.landlordEmail?.toLowerCase() === user.email.toLowerCase()
+          ));
+        if (!isParticipant) {
+          throw new ForbiddenException('You are not authorized to send messages in this conversation');
+        }
+      }
+    }
 
     const message = {
       id,

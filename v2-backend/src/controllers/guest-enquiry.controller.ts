@@ -25,9 +25,12 @@ export class GuestEnquiryController {
 
   @Post('claim/auto-merge')
   @UseGuards(FirebaseAuthGuard)
-  async autoMerge(@Req() req: any, @Body() body: { email?: string }) {
+  async autoMerge(@Req() req: any) {
     const userId = req.user.uid;
-    const email = body.email || req.user.email;
+    const email = req.user.email;
+    if (!email) {
+      return { data: { success: false, message: 'Authenticated user email required' } };
+    }
     return await this.guestEnquiryService.autoMerge(email, userId);
   }
 

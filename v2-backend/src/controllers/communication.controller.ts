@@ -46,15 +46,15 @@ export class CommunicationController {
 
   @Get('conversations/:id/messages')
   @HttpCode(200)
-  async getMessages(@Param('id') id: string) {
-    return await this.communicationService.getMessages(id);
+  async getMessages(@Param('id') id: string, @Req() req: any) {
+    return await this.communicationService.getMessages(id, req.user);
   }
 
   @Post('conversations/:id/messages')
   @HttpCode(201)
   async sendMessage(@Param('id') conversationId: string, @Body() dto: any, @Req() req: any) {
     const userId = req.user.uid;
-    const result = await this.communicationService.sendMessage(conversationId, dto, userId);
+    const result = await this.communicationService.sendMessage(conversationId, dto, userId, req.user);
 
     // Broadcast new message event to conversation participants
     this.eventsService.emit({

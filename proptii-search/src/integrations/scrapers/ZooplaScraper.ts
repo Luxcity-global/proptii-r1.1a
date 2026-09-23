@@ -6,6 +6,7 @@ export class ZooplaScraper implements IScraper {
   name = 'Zoopla';
 
   async scrape(query: string, filters: any = {}): Promise<PropertyData[]> {
+    // ── Priority: structured filter fields (from AI classify) → parseQuery fallback ──
     const parsed = this.parseQuery(query);
 
     let resolvedLoc: ResolvedLocation | undefined = filters.resolvedLocation;
@@ -17,19 +18,52 @@ export class ZooplaScraper implements IScraper {
       }
     }
 
-    // Determine location slug (prefer outcode or clean district slug)
-    const locationSlug = resolvedLoc?.otmLocationSlug ||
-                         resolvedLoc?.outcode?.toLowerCase() ||
-                         filters.locationSlug ||
-                         filters.location ||
-                         parsed.location;
+    // Location: resolvedLocation (geocoded) > structured filter > parseQuery fallback
+    const locationSlug =
+      resolvedLoc?.otmLocationSlug ||
+      resolvedLoc?.outcode?.toLowerCase() ||
+      filters.locationSlug ||
+      filters.location ||
+      parsed.location;
 
-    const isRental = filters.isRental !== undefined ? Boolean(filters.isRental) : parsed.isRental;
-    const minPrice = filters.minPrice !== undefined ? String(filters.minPrice) : undefined;
-    const maxPrice = filters.maxPrice !== undefined ? String(filters.maxPrice) : parsed.maxPrice;
-    const minBeds = filters.minBeds !== undefined ? String(filters.minBeds) : parsed.minBeds;
-    const maxBeds = filters.maxBeds !== undefined ? String(filters.maxBeds) : undefined;
-    const propertyType = filters.propertyType || filters.types?.[0];
+    // Tenure: structured filter > parseQuery fallback
+    const isRental =
+      filters.isRental !== undefined
+        ? Boolean(filters.isRental)
+        : filters.channel
+          ? filters.channel !== 'sale'
+          : filters.tenure
+            ? filters.tenure !== 'buy'
+            : parsed.isRental;
+
+    // Price: structured filter > parseQuery fallback
+    const minPrice =
+      filters.minPrice !== undefined ? String(filters.minPrice) : undefined;
+    const maxPrice =
+      filters.maxPrice !== undefined
+        ? String(filters.maxPrice)
+        : filters.price_max !== undefined
+          ? String(filters.price_max)
+          : parsed.maxPrice;
+
+    // Bedrooms: structured filter (single value sets both min/max) > parseQuery fallback
+    const structuredBeds = filters.bedrooms !== undefined ? String(filters.bedrooms) : undefined;
+    const minBeds =
+      filters.minBeds !== undefined
+        ? String(filters.minBeds)
+        : structuredBeds !== undefined
+          ? structuredBeds
+          : parsed.minBeds;
+    const maxBeds =
+      filters.maxBeds !== undefined
+        ? String(filters.maxBeds)
+        : structuredBeds !== undefined
+          ? structuredBeds
+          : parsed.maxBeds;
+
+    // Property type: structured filter > parseQuery fallback
+    const propertyType = filters.propertyType || filters.types?.[0] || parsed.propertyType;
+
 
     const targetUrl = this.buildUrl(locationSlug, minPrice, maxPrice, minBeds, maxBeds, isRental, propertyType);
     const fetchUrl = this.resolveFetchUrl(targetUrl);
@@ -111,17 +145,25 @@ export class ZooplaScraper implements IScraper {
 
     if (minPrice) params.set('price_min', minPrice);
     if (maxPrice) params.set('price_max', maxPrice);
-    if (minBeds) params.set('beds_min', minBeds);
-    if (maxBeds) params.set('beds_max', maxBeds);
 
-    if (propertyType) {
-      const lower = propertyType.toLowerCase();
-      if (lower.includes('flat') || lower.includes('apartment')) {
-        params.set('property_sub_type', 'flats');
-      } else if (lower.includes('house')) {
-        params.set('property_sub_type', 'houses');
-      } else if (lower.includes('bungalow')) {
-        params.set('property_sub_type', 'bungalows');
+    const isStudioRequested = (propertyType && propertyType.toLowerCase().includes('studio')) || minBeds === '0' || maxBeds === '0';
+    if (isStudioRequested) {
+      params.set('beds_min', '0');
+      params.set('beds_max', '0');
+      params.set('property_sub_type', 'flats');
+    } else {
+      if (minBeds) params.set('beds_min', minBeds);
+      if (maxBeds) params.set('beds_max', maxBeds);
+
+      if (propertyType) {
+        const lower = propertyType.toLowerCase();
+        if (lower.includes('flat') || lower.includes('apartment')) {
+          params.set('property_sub_type', 'flats');
+        } else if (lower.includes('house')) {
+          params.set('property_sub_type', 'houses');
+        } else if (lower.includes('bungalow')) {
+          params.set('property_sub_type', 'bungalows');
+        }
       }
     }
 
@@ -266,8 +308,18 @@ export class ZooplaScraper implements IScraper {
     const locMatch = q.match(/\b(?:in|around|near|at)\s+([a-z0-9\s-]+?)(?:\s+(?:under|for|max|min|from|between|with|pcm|pw|£)\b|\s*$)/i);
     const location = locMatch ? locMatch[1].replace(/^(?:in|around|near|at)\s+/i, '').trim() : 'london';
 
-    const bedsMatch = q.match(/(\d+)\s*bed/i);
-    const minBeds = bedsMatch ? bedsMatch[1] : undefined;
+    let minBeds: string | undefined;
+    let maxBeds: string | undefined;
+    let propertyType: string | undefined;
+
+    if (/\bstudios?\b/i.test(q)) {
+      minBeds = '0';
+      maxBeds = '0';
+      propertyType = 'studio';
+    } else {
+      const bedsMatch = q.match(/(\d+)\s*bed/i);
+      minBeds = bedsMatch ? bedsMatch[1] : undefined;
+    }
 
     const priceMatch = q.match(/under\s*£?\s*([\d,]+)\s*k?/i) || q.match(/£([\d,]+)\s*pcm/i);
     let maxPrice: string | undefined;
@@ -276,6 +328,6 @@ export class ZooplaScraper implements IScraper {
       maxPrice = q.includes('k') && Number(raw) < 100 ? String(parseInt(raw) * 1000) : raw;
     }
 
-    return { location, maxPrice, minBeds, isRental };
+    return { location, maxPrice, minBeds, maxBeds, isRental, propertyType };
   }
 }

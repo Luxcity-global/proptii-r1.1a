@@ -99,6 +99,12 @@ export interface AdminCustomerRow {
 @Injectable()
 export class AdminDashboardService {
   private readonly logger = new Logger(AdminDashboardService.name);
+  private cachedCustomers: { timestamp: number; payload: { customers: AdminCustomerRow[]; generatedAt: string } } | null = null;
+  private readonly CACHE_TTL_MS = 60_000; // 60 seconds TTL
+
+  public invalidateCustomerCache() {
+    this.cachedCustomers = null;
+  }
 
   private get db(): admin.firestore.Firestore | null {
     if (!admin.apps.length) return null;
@@ -327,7 +333,11 @@ export class AdminDashboardService {
     return map;
   }
 
-  private async assembleCustomers() {
+  private async assembleCustomers(forceRefresh = false) {
+    if (!forceRefresh && this.cachedCustomers && (Date.now() - this.cachedCustomers.timestamp < this.CACHE_TTL_MS)) {
+      return this.cachedCustomers.payload;
+    }
+
     const [users, subs, usage, notes, authTimes] = await Promise.all([
       this.safeGetAll('users', undefined, 2000),
       this.safeGetAll('subscriptions', undefined, 2000),
@@ -349,7 +359,9 @@ export class AdminDashboardService {
       const tb = b.signupDate ? new Date(b.signupDate).getTime() : 0;
       return tb - ta;
     });
-    return { customers, generatedAt: new Date().toISOString() };
+    const payload = { customers, generatedAt: new Date().toISOString() };
+    this.cachedCustomers = { timestamp: Date.now(), payload };
+    return payload;
   }
 
   async listCustomers(actorEmail: string) {
@@ -578,6 +590,7 @@ export class AdminDashboardService {
     };
     const ref = await db.collection('admin_account_notes').add(payload);
     await this.logAccess(actorEmail, 'add_note', userId);
+    this.invalidateCustomerCache();
     return { success: true, id: ref.id };
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException, ForbiddenException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ReferencingService } from '../services/referencing.service';
 import { RefereeGuarantorService } from '../services/referee-guarantor.service';
@@ -78,7 +78,13 @@ export class ReferencingController {
   }
 
   @Get('referencing/forms/:formId')
-  async getReferencingForm(@Param('formId') formId: string) {
+  @UseGuards(FirebaseAuthGuard)
+  async getReferencingForm(@Req() req: any, @Param('formId') formId: string) {
+    const userId = req.user?.uid;
+    const isOwnerOrStaff = userId === formId || req.user?.role === 'landlord' || req.user?.role === 'agent' || req.user?.role === 'admin' || req.user?.admin === true;
+    if (!isOwnerOrStaff) {
+      throw new ForbiddenException('You do not have permission to view this referencing form.');
+    }
     const data = await this.referencingService.getFormData(formId).catch(() => null);
     const hasContent = data && typeof data === 'object' && Object.keys(data).length > 0;
     if (!hasContent) {
@@ -90,7 +96,12 @@ export class ReferencingController {
   @Post('referencing/forms/:formId')
   @HttpCode(200)
   @UseGuards(FirebaseAuthGuard)
-  async saveReferencingForm(@Param('formId') formId: string, @Body() body: any) {
+  async saveReferencingForm(@Req() req: any, @Param('formId') formId: string, @Body() body: any) {
+    const userId = req.user?.uid;
+    const isOwnerOrAdmin = userId === formId || req.user?.role === 'admin' || req.user?.admin === true;
+    if (!isOwnerOrAdmin) {
+      throw new ForbiddenException('You do not have permission to modify this referencing form.');
+    }
     return await this.referencingService.saveFormData(formId, body);
   }
 
@@ -107,7 +118,10 @@ export class ReferencingController {
 
   @Post('referencing/ai-extract')
   @HttpCode(200)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseGuards(FirebaseAuthGuard)
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: 15 * 1024 * 1024 },
+  }))
   async extractDocumentData(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: any,

@@ -6,8 +6,11 @@ export class OnTheMarketScraper implements IScraper {
   name = 'OnTheMarket';
 
   async scrape(query: string, filters: any = {}): Promise<PropertyData[]> {
+    // ── Priority: structured filter fields (from AI classify) → parseQuery fallback ──
+    // The controller merges classifiedEntities into filters before calling scrape(),
+    // so filters.bedrooms, filters.minPrice etc. are already AI-resolved when available.
     const parsed = this.parseQuery(query);
-    
+
     let resolvedLoc: ResolvedLocation | undefined = filters.resolvedLocation;
     if (!resolvedLoc && !filters.locationSlug && !filters.location) {
       try {
@@ -17,28 +20,60 @@ export class OnTheMarketScraper implements IScraper {
       }
     }
 
-    // Structured filters or resolved location override parsed query
-    const location = resolvedLoc?.otmLocationSlug || filters.locationSlug || filters.location || parsed.location;
-    const isRental = filters.isRental !== undefined 
-      ? Boolean(filters.isRental) 
-      : (filters.channel ? filters.channel !== 'sale' : (filters.tenure ? filters.tenure !== 'buy' : parsed.isRental));
-      
-    const rawBeds = filters.bedrooms !== undefined ? String(filters.bedrooms) : undefined;
-    const minBeds = filters.minBeds !== undefined 
-      ? String(filters.minBeds) 
-      : (rawBeds !== undefined ? rawBeds : parsed.minBeds);
-    const maxBeds = filters.maxBeds !== undefined 
-      ? String(filters.maxBeds) 
-      : (rawBeds !== undefined ? rawBeds : undefined);
-      
-    const minPrice = filters.minPrice !== undefined 
-      ? String(filters.minPrice) 
-      : (filters.price_min !== undefined ? String(filters.price_min) : undefined);
-    const maxPrice = filters.maxPrice !== undefined 
-      ? String(filters.maxPrice) 
-      : (filters.price_max !== undefined ? String(filters.price_max) : (filters.budget ? String(filters.budget) : parsed.maxPrice));
-      
-    const propertyType = filters.propertyType || filters.property_type || filters.types?.[0];
+    // Location: resolvedLocation (geocoded) > structured filter > parseQuery fallback
+    const location =
+      resolvedLoc?.otmLocationSlug ||
+      filters.locationSlug ||
+      filters.location ||
+      parsed.location;
+
+    // Tenure: structured filter > parseQuery fallback
+    const isRental =
+      filters.isRental !== undefined
+        ? Boolean(filters.isRental)
+        : filters.channel
+          ? filters.channel !== 'sale'
+          : filters.tenure
+            ? filters.tenure !== 'buy'
+            : parsed.isRental;
+
+    // Bedrooms: structured filter (single value sets both min/max) > parseQuery fallback
+    const structuredBeds = filters.bedrooms !== undefined ? String(filters.bedrooms) : undefined;
+    const minBeds =
+      filters.minBeds !== undefined
+        ? String(filters.minBeds)
+        : structuredBeds !== undefined
+          ? structuredBeds
+          : parsed.minBeds;
+    const maxBeds =
+      filters.maxBeds !== undefined
+        ? String(filters.maxBeds)
+        : structuredBeds !== undefined
+          ? structuredBeds
+          : undefined;
+
+    // Price: structured filter > parseQuery fallback
+    const minPrice =
+      filters.minPrice !== undefined
+        ? String(filters.minPrice)
+        : filters.price_min !== undefined
+          ? String(filters.price_min)
+          : undefined;
+    const maxPrice =
+      filters.maxPrice !== undefined
+        ? String(filters.maxPrice)
+        : filters.price_max !== undefined
+          ? String(filters.price_max)
+          : filters.budget
+            ? String(filters.budget)
+            : parsed.maxPrice;
+
+    // Property type: structured filter > parseQuery fallback
+    const propertyType =
+      filters.propertyType ||
+      filters.property_type ||
+      filters.types?.[0] ||
+      parsed.propertyType;
 
     const url = this.buildUrl(location, minPrice, maxPrice, minBeds, maxBeds, isRental, propertyType);
 
@@ -106,12 +141,18 @@ export class OnTheMarketScraper implements IScraper {
         ? `https://www.onthemarket.com${p.agent?.['details-url'] || p.agent?.otm_url || p['agent-otm-url']}` 
         : fullUrl;
 
+      const titleLower = (p['property-title'] || p.display_address || p.title || '').toLowerCase();
+      const rawBedrooms = (p.bedrooms !== undefined && p.bedrooms !== null && !isNaN(Number(p.bedrooms))) ? Number(p.bedrooms) : null;
+      const isStudio = titleLower.includes('studio') || (p['humanised-property-type'] || '').toLowerCase().includes('studio');
+      const bedrooms = isStudio ? 0 : rawBedrooms;
+      const propertyType = isStudio ? 'Studio' : (p['humanised-property-type'] || p.property_type || 'Property');
+
       results.push({
         title:        p['property-title'] || p.display_address || p.title || 'Property',
         price:        priceStr,
         location:     p.address || p.display_address || 'UK',
-        bedrooms:     (p.bedrooms !== undefined && p.bedrooms !== null && !isNaN(Number(p.bedrooms))) ? Number(p.bedrooms) : null,
-        propertyType: p['humanised-property-type'] || p.property_type || 'Property',
+        bedrooms,
+        propertyType,
         imageUrls:    p.images?.map((img: any) => img.default || img.url).filter(Boolean).slice(0, 5) || [],
         agent: { 
           name: agentName, 
@@ -156,16 +197,24 @@ export class OnTheMarketScraper implements IScraper {
 
     if (minPrice) params.set('price-min', minPrice);
     if (maxPrice) params.set('price-max', maxPrice);
-    if (minBeds) params.set('min-bedrooms', minBeds);
-    if (maxBeds) params.set('max-bedrooms', maxBeds);
-    if (propertyType) {
-      const lower = propertyType.toLowerCase();
-      if (lower.includes('flat') || lower.includes('apartment')) {
-        params.set('prop-types', 'flat-apartment');
-      } else if (lower.includes('house')) {
-        params.set('prop-types', 'houses');
-      } else if (lower.includes('bungalow')) {
-        params.set('prop-types', 'bungalows');
+
+    const isStudioRequested = (propertyType && propertyType.toLowerCase().includes('studio')) || minBeds === '0' || maxBeds === '0';
+    if (isStudioRequested) {
+      params.set('min-bedrooms', '0');
+      params.set('max-bedrooms', '0');
+      params.set('prop-types', 'flat-apartment');
+    } else {
+      if (minBeds !== undefined && minBeds !== '') params.set('min-bedrooms', minBeds);
+      if (maxBeds !== undefined && maxBeds !== '') params.set('max-bedrooms', maxBeds);
+      if (propertyType) {
+        const lower = propertyType.toLowerCase();
+        if (lower.includes('flat') || lower.includes('apartment')) {
+          params.set('prop-types', 'flat-apartment');
+        } else if (lower.includes('house')) {
+          params.set('prop-types', 'houses');
+        } else if (lower.includes('bungalow')) {
+          params.set('prop-types', 'bungalows');
+        }
       }
     }
 
@@ -180,8 +229,18 @@ export class OnTheMarketScraper implements IScraper {
     const locMatch = q.match(/(?:in|around|near)\s+([a-z\s]+?)(?:\s+under|\s+for|\s+max|\s+from|\s*$)/i);
     const location = locMatch ? locMatch[1].trim() : 'london';
 
-    const bedsMatch = q.match(/(\d+)\s*bed/i);
-    const minBeds = bedsMatch ? bedsMatch[1] : undefined;
+    let minBeds: string | undefined;
+    let maxBeds: string | undefined;
+    let propertyType: string | undefined;
+
+    if (/\bstudios?\b/i.test(q)) {
+      minBeds = '0';
+      maxBeds = '0';
+      propertyType = 'studio';
+    } else {
+      const bedsMatch = q.match(/(\d+)\s*bed/i);
+      minBeds = bedsMatch ? bedsMatch[1] : undefined;
+    }
 
     const priceMatch = q.match(/under\s*£?\s*([\d,]+)\s*k?/i) || q.match(/£([\d,]+)\s*pcm/i);
     let maxPrice: string | undefined;
@@ -190,6 +249,6 @@ export class OnTheMarketScraper implements IScraper {
       maxPrice = q.includes('k') && Number(raw) < 100 ? String(parseInt(raw) * 1000) : raw;
     }
 
-    return { location, maxPrice, minBeds, isRental };
+    return { location, maxPrice, minBeds, maxBeds, isRental, propertyType };
   }
 }

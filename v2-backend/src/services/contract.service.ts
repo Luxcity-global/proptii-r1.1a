@@ -92,22 +92,36 @@ export class ContractService {
     }
   }
 
-  async updateTemplateStatus(id: string, status: string) {
+  async updateTemplateStatus(id: string, userId: string, status: string) {
     const col = this.templatesCol;
     if (col) {
       try {
+        const doc = await col.doc(id).get();
+        if (doc.exists && doc.data()?.userId !== userId) {
+          throw new Error('Unauthorized template modification');
+        }
         await col.doc(id).set({ status, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-      } catch {}
+      } catch (e: any) {
+        this.logger.warn(`Error updating template status: ${e?.message}`);
+        throw e;
+      }
     }
     return { success: true };
   }
 
-  async deleteTemplate(id: string) {
+  async deleteTemplate(id: string, userId: string) {
     const col = this.templatesCol;
     if (col) {
       try {
+        const doc = await col.doc(id).get();
+        if (doc.exists && doc.data()?.userId !== userId) {
+          throw new Error('Unauthorized template deletion');
+        }
         await col.doc(id).delete();
-      } catch {}
+      } catch (e: any) {
+        this.logger.warn(`Error deleting template: ${e?.message}`);
+        throw e;
+      }
     }
     return { success: true };
   }
@@ -188,7 +202,15 @@ export class ContractService {
     }
   }
 
-  async sendSignedContract(body: any) {
+  async sendSignedContract(body: any, senderEmail: string, file?: any) {
+    if (!body?.to || typeof body.to !== 'string' || !body.to.includes('@')) {
+      return { success: false, error: 'Invalid recipient email address' };
+    }
+
+    const safeContractName = String(body.contractName || 'Tenancy Contract').replace(/[<>&"']/g, '').slice(0, 120);
+    const safeRecipientName = String(body.recipientName || 'Valued Client').replace(/[<>&"']/g, '').slice(0, 100);
+    const safeSenderName = String(senderEmail || body.senderName || 'Proptii').replace(/[<>&"']/g, '').slice(0, 100);
+
     // Persist the signed contract record to Firestore
     const db = this.db;
     if (db) {
@@ -196,10 +218,11 @@ export class ContractService {
         const docId = `signed_${Date.now()}`;
         await db.collection('signed_contracts').doc(docId).set({
           id: docId,
-          to: body.to,
-          recipientName: body.recipientName,
-          contractName: body.contractName,
-          senderName: body.senderName || 'Proptii',
+          to: body.to.toLowerCase().trim(),
+          recipientName: safeRecipientName,
+          contractName: safeContractName,
+          senderName: safeSenderName,
+          senderEmail: senderEmail || null,
           sentAt: new Date().toISOString(),
           status: 'sent',
         });
@@ -208,27 +231,45 @@ export class ContractService {
       }
     }
 
-    // Email delivery via Resend
+    // Email delivery via Resend with strictly safe server-rendered template
     try {
       const { sendEmail } = await import('../utils/resend');
 
-      const attachments = body.attachmentBase64
-        ? [{
-            filename: body.documentName || `${body.contractName}_signed.pdf`,
-            content: body.attachmentBase64,
-            content_type: 'application/pdf',
-          }]
-        : undefined;
+      let attachments: any[] | undefined;
+      if (file && file.buffer) {
+        attachments = [{
+          filename: file.originalname || `${safeContractName.replace(/[^a-zA-Z0-9_-]/g, '_')}_signed.pdf`,
+          content: file.buffer.toString('base64'),
+          content_type: file.mimetype || 'application/pdf',
+        }];
+      } else if (body.attachmentBase64) {
+        attachments = [{
+          filename: `${safeContractName.replace(/[^a-zA-Z0-9_-]/g, '_')}_signed.pdf`,
+          content: body.attachmentBase64,
+          content_type: 'application/pdf',
+        }];
+      }
+
+      const safeHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+          <h2 style="color: #111827; margin-bottom: 16px;">Signed Document Available</h2>
+          <p>Hello ${safeRecipientName},</p>
+          <p>Please find attached the signed contract document: <strong>${safeContractName}</strong>.</p>
+          <p style="margin-top: 16px; font-size: 14px; color: #6b7280;">Sent by: ${safeSenderName}</p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="font-size: 12px; color: #9ca3af;">This email was sent via Proptii on behalf of ${safeSenderName}. If you were not expecting this document, please contact support.</p>
+        </div>
+      `;
 
       const id = await sendEmail({
-        to: body.to,
-        subject: `Signed Contract: ${body.contractName}`,
-        html: body.htmlContent || `<p>Please find your signed contract: <strong>${body.contractName}</strong></p>`,
+        to: body.to.toLowerCase().trim(),
+        subject: `Signed Contract: ${safeContractName}`,
+        html: safeHtml,
         attachments,
       });
 
       this.logger.log(`Signed contract email sent to ${body.to} [${id}]`);
-      return { success: true, message: 'Signed contract emailed successfully' };
+      return { success: true, message: 'Signed contract emailed successfully', messageId: id };
     } catch (err: any) {
       this.logger.error(`sendSignedContract email error: ${err?.message || err}`);
       return { success: false, error: err?.message || 'Email delivery failed' };
