@@ -74,8 +74,16 @@ export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, im
   };
 
   const removeImage = (index: number) => {
+    const removedImg = uploadedImages[index];
     const updatedImages = uploadedImages.filter((_, i) => i !== index);
-    const updatedFiles = imageFiles.filter((_, i) => i !== index);
+
+    // If removing a newly added local blob file, calculate its position among blob URLs
+    let updatedFiles = imageFiles;
+    if (removedImg && removedImg.startsWith('blob:')) {
+      const blobIndex = uploadedImages.slice(0, index).filter(url => url.startsWith('blob:')).length;
+      updatedFiles = imageFiles.filter((_, i) => i !== blobIndex);
+    }
+
     setUploadedImages(updatedImages);
     setImageFiles(updatedFiles);
     

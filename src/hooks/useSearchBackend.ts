@@ -63,22 +63,25 @@ export const useSearchBackend = () => {
         method: 'GET',
         signal: AbortSignal.timeout(10000) // Increased to 10 seconds
       });
-      return response.ok;
+      if (response.ok) {
+        return true;
+      }
     } catch (error) {
       console.warn('Network connectivity check failed on primary URL:', error);
-      if (searchBackendUrl !== PROD_SEARCH_BACKEND_URL) {
-        try {
-          const fallbackRes = await fetch(`${PROD_SEARCH_BACKEND_URL}/health`, {
-            method: 'GET',
-            signal: AbortSignal.timeout(10000)
-          });
-          return fallbackRes.ok;
-        } catch {
-          return false;
-        }
-      }
-      return false;
     }
+
+    if (searchBackendUrl !== PROD_SEARCH_BACKEND_URL) {
+      try {
+        const fallbackRes = await fetch(`${PROD_SEARCH_BACKEND_URL}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(10000)
+        });
+        return fallbackRes.ok;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   };
 
   // Load cached results on mount only if query matches current URL search query
@@ -187,9 +190,12 @@ export const useSearchBackend = () => {
           body: JSON.stringify(requestPayload),
           signal: AbortSignal.timeout(120000) // Increased to 120 seconds for slow scraper streams
         });
+        if (!response.ok && targetUrl !== PROD_SEARCH_BACKEND_URL) {
+          throw new Error(`Primary endpoint returned HTTP ${response.status}`);
+        }
       } catch (fetchErr) {
         if (targetUrl !== PROD_SEARCH_BACKEND_URL) {
-          console.warn('[Search] Primary search endpoint failed (possible ad-blocker or network error), retrying with canonical fallback:', fetchErr);
+          console.warn('[Search] Primary search endpoint failed (possible proxy error or local service down), retrying with canonical fallback:', fetchErr);
           targetUrl = PROD_SEARCH_BACKEND_URL;
           response = await fetch(`${targetUrl}/api/v1/search`, {
             method: 'POST',

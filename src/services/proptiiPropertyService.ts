@@ -78,8 +78,9 @@ async function transformProperty(firestoreProperty: FirestoreProperty): Promise<
     delete firestoreProperty.bedrooms;
   }
 
-  const coverPhoto = firestoreProperty.photos?.find(p => p.isCover) || firestoreProperty.photos?.[0];
-  const imageUrls = firestoreProperty.photos?.map(p => p.url).filter(Boolean) || [];
+  const validPhotos = (firestoreProperty.photos || []).filter(p => p && p.url && !p.url.startsWith('blob:'));
+  const coverPhoto = validPhotos.find(p => p.isCover) || validPhotos[0];
+  const imageUrls = validPhotos.map(p => p.url).filter(Boolean);
   
   // If no photos, use a placeholder
   if (imageUrls.length === 0) {

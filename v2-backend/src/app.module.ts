@@ -26,6 +26,10 @@ import { AlertsController } from './controllers/alerts.controller';
 import { InsightsController } from './controllers/insights.controller';
 import { SheetsController } from './controllers/sheets.controller';
 import { RefereeGuarantorController } from './controllers/referee-guarantor.controller';
+import { TenantsController } from './controllers/tenants.controller';
+import { PaymentsController } from './controllers/payments.controller';
+import { EmailController } from './controllers/email.controller';
+import { TenantsService } from './services/tenants.service';
 
 // ── R1.4 — Search Classifier (Sprint 1.3) ────────────────────────────────────
 import { ClassifierController } from './search/classifier.controller';
@@ -128,6 +132,9 @@ function resolvePublicFolder(folder: string): string {
     InsightsController,
     SheetsController,
     RefereeGuarantorController,
+    TenantsController,
+    PaymentsController,
+    EmailController,
     StorageController,
     // R1.4 Sprint 1.3
     ClassifierController,
@@ -163,6 +170,7 @@ function resolvePublicFolder(folder: string): string {
     InsightsService,
     SheetsService,
     RefereeGuarantorService,
+    TenantsService,
     // R1.4 Sprint 1.3
     ClassifierService,
   ],

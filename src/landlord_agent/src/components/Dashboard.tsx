@@ -71,7 +71,8 @@ function docExtLabel(type: string, name: string): string {
 }
 
 function coverUrl(property: Property): string | null {
-  const cover = property.photos?.find((p) => p.isCover) || property.photos?.[0];
+  const validPhotos = property.photos?.filter((p) => p && p.url && !p.url.startsWith('blob:')) || [];
+  const cover = validPhotos.find((p) => p.isCover) || validPhotos[0];
   return cover?.url || null;
 }
 

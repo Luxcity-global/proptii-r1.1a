@@ -1,6 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Firestore operation timed out')), timeoutMs),
+    ),
+  ]);
+}
+
 @Injectable()
 export class ContractService {
   private readonly logger = new Logger(ContractService.name);
@@ -29,10 +38,10 @@ export class ContractService {
     if (!col) return { success: true, data: [] };
 
     try {
-      const snapshot = await col
+      const snapshot = await withTimeout(col
         .where('tenantEmail', '==', tenantEmail.toLowerCase().trim())
-        .select('landlordId', 'landlordEmail', 'tenantEmail', 'tenantName', 'propertyId', 'propertyAddress', 'contractName', 'fileUrl', 'documentUrl', 'templateId', 'status', 'sentDate', 'signedDate', 'expiryDate', 'documentName', 'documentSize', 'documentType', 'agentName', 'agentEmail', 'emailSent', 'emailSentDate', 'createdAt', 'updatedAt')
-        .get();
+        .select('landlordId', 'landlordEmail', 'tenantEmail', 'tenantName', 'propertyId', 'propertyAddress', 'contractName', 'title', 'fileUrl', 'documentUrl', 'templateId', 'status', 'sentDate', 'signedDate', 'expiryDate', 'documentName', 'documentSize', 'documentType', 'agentName', 'agentEmail', 'emailSent', 'emailSentDate', 'createdAt', 'updatedAt')
+        .get());
       const data = snapshot.docs.map(doc => {
         const docData = doc.data();
         return {
@@ -66,7 +75,7 @@ export class ContractService {
     if (!col) return { success: true, templateId };
 
     try {
-      await col.doc(templateId).set(payload);
+      await withTimeout(col.doc(templateId).set(payload));
       return { success: true, templateId };
     } catch (error: any) {
       this.logger.warn(`Error saving template: ${error?.message || error}`);
@@ -79,10 +88,10 @@ export class ContractService {
     if (!col) return { success: true, templates: [] };
 
     try {
-      const snapshot = await col
+      const snapshot = await withTimeout(col
         .where('userId', '==', userId)
         .where('status', '==', status)
-        .get();
+        .get());
 
       const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       return { success: true, templates };
@@ -96,11 +105,11 @@ export class ContractService {
     const col = this.templatesCol;
     if (col) {
       try {
-        const doc = await col.doc(id).get();
+        const doc = await withTimeout(col.doc(id).get());
         if (doc.exists && doc.data()?.userId !== userId) {
           throw new Error('Unauthorized template modification');
         }
-        await col.doc(id).set({ status, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        await withTimeout(col.doc(id).set({ status, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }));
       } catch (e: any) {
         this.logger.warn(`Error updating template status: ${e?.message}`);
         throw e;
@@ -113,11 +122,11 @@ export class ContractService {
     const col = this.templatesCol;
     if (col) {
       try {
-        const doc = await col.doc(id).get();
+        const doc = await withTimeout(col.doc(id).get());
         if (doc.exists && doc.data()?.userId !== userId) {
           throw new Error('Unauthorized template deletion');
         }
-        await col.doc(id).delete();
+        await withTimeout(col.doc(id).delete());
       } catch (e: any) {
         this.logger.warn(`Error deleting template: ${e?.message}`);
         throw e;
@@ -135,34 +144,263 @@ export class ContractService {
     };
   }
 
-  async sendContractToTenant(landlordId: string, landlordEmail: string, body: any) {
+  async sendContractToTenant(landlordId: string, landlordEmail: string, body: any, file?: any) {
     const col = this.contractsCol;
     const docId = `contract_${landlordId}_${Date.now()}`;
     const payload = {
       id: docId,
       landlordId,
-      landlordEmail,
-      tenantEmail: (body.tenantEmail || '').toLowerCase().trim(),
-      tenantName: body.tenantName || '',
+      landlordEmail: (body.landlordEmail || landlordEmail || '').toLowerCase().trim(),
+      tenantEmail: (body.tenantEmail || body.recipientEmail || '').toLowerCase().trim(),
+      tenantName: body.tenantName || body.recipientName || '',
       propertyId: body.propertyId || '',
       propertyAddress: body.propertyAddress || '',
-      contractName: body.contractName || 'Tenancy Agreement',
+      title: body.title || body.contractName || 'Tenancy Agreement',
+      contractName: body.contractName || body.title || 'Tenancy Agreement',
+      contractType: body.contractType || 'tenancy-agreement',
+      fileName: file?.originalname || body.fileName || 'contract.pdf',
       fileUrl: body.fileUrl || '',
+      fileBase64: body.fileBase64 || body.base64Data || (file?.buffer ? file.buffer.toString('base64') : null),
       templateId: body.templateId || '',
-      status: 'sent',
-      sentDate: new Date().toISOString(),
+      status: body.status || 'sent',
+      sentDate: body.sentDate || new Date().toISOString(),
       expiryDate: body.expiryDate || null,
+      additionalInfo: body.additionalInfo || body.additionalEmail || body.notes || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     if (col) {
       try {
-        await col.doc(docId).set(payload);
+        await withTimeout(col.doc(docId).set(payload));
       } catch (err: any) {
         this.logger.warn(`sendContractToTenant error: ${err?.message || err}`);
       }
     }
 
-    return { success: true, contractId: docId, ...payload };
+    return { success: true, id: docId, contractId: docId, ...payload };
+  }
+
+  async createContractWithBase64(body: any, userId?: string) {
+    const col = this.contractsCol;
+    const contractData = body.contractData || body;
+    const docId = contractData.id || `contract_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const landlordId = contractData.ownerUserId || userId || contractData.landlordId || 'unknown';
+
+    const payload = {
+      ...contractData,
+      id: docId,
+      title: contractData.title || contractData.contractName || 'Tenancy Agreement',
+      contractName: contractData.contractName || contractData.title || 'Tenancy Agreement',
+      landlordId,
+      landlordEmail: (contractData.landlordEmail || '').toLowerCase().trim(),
+      tenantEmail: (contractData.tenantEmail || contractData.recipientEmail || '').toLowerCase().trim(),
+      tenantName: contractData.tenantName || contractData.recipientName || '',
+      propertyAddress: contractData.propertyAddress || '',
+      contractType: contractData.contractType || 'tenancy-agreement',
+      status: contractData.status || 'sent',
+      sentDate: contractData.sentDate ? new Date(contractData.sentDate).toISOString() : new Date().toISOString(),
+      expiryDate: contractData.expiryDate ? new Date(contractData.expiryDate).toISOString() : null,
+      fileName: body.fileName || contractData.fileName || 'contract.pdf',
+      fileBase64: body.base64Data || contractData.fileBase64 || null,
+      fileUrl: contractData.fileUrl || '#',
+      additionalInfo: contractData.additionalInfo || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (col) {
+      try {
+        await withTimeout(col.doc(docId).set(payload));
+        this.logger.log(`Created contract ${docId} with base64 attachment for user ${landlordId}`);
+      } catch (err: any) {
+        this.logger.warn(`createContractWithBase64 error: ${err?.message || err}`);
+      }
+    }
+
+    return { success: true, id: docId, contractId: docId, ...payload };
+  }
+
+  async getLandlordContracts(filters: {
+    userId?: string;
+    landlordEmail?: string;
+    landlordId?: string;
+    status?: string;
+    tenantId?: string;
+    propertyId?: string;
+  }) {
+    const col = this.contractsCol;
+    if (!col) return { success: true, contracts: [] };
+
+    try {
+      let query: admin.firestore.Query = col;
+      const targetUserId = filters.userId || filters.landlordId;
+      const targetEmail = (filters.landlordEmail || '').toLowerCase().trim();
+
+      if (targetUserId) {
+        query = query.where('landlordId', '==', targetUserId);
+      } else if (targetEmail) {
+        query = query.where('landlordEmail', '==', targetEmail);
+      }
+
+      const snapshot = await withTimeout(query.get(), 3500);
+      let contracts = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          title: d.title || d.contractName || 'Contract',
+          fileName: d.fileName || d.documentName || 'contract.pdf',
+          fileUrl: d.fileUrl || d.documentUrl || '#',
+          propertyAddress: d.propertyAddress || '',
+          tenantName: d.tenantName || '',
+          tenantEmail: d.tenantEmail || '',
+          status: d.status || 'sent',
+          sentDate: d.sentDate?.toDate?.() || d.sentDate ? new Date(d.sentDate) : new Date(),
+          signedDate: d.signedDate?.toDate?.() || (d.signedDate ? new Date(d.signedDate) : undefined),
+          expiryDate: d.expiryDate?.toDate?.() || (d.expiryDate ? new Date(d.expiryDate) : undefined),
+          contractType: d.contractType || 'tenancy-agreement',
+          additionalInfo: d.additionalInfo || '',
+          landlordId: d.landlordId || '',
+          landlordEmail: d.landlordEmail || '',
+          propertyId: d.propertyId || '',
+        };
+      });
+
+      if (filters.status && filters.status !== 'all') {
+        contracts = contracts.filter(c => c.status === filters.status);
+      }
+      if (filters.propertyId) {
+        contracts = contracts.filter(c => c.propertyId === filters.propertyId);
+      }
+
+      contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
+      return { success: true, contracts };
+    } catch (err: any) {
+      this.logger.warn(`getLandlordContracts error: ${err?.message || err}`);
+      return { success: true, contracts: [] };
+    }
+  }
+
+  async getContractById(contractId: string) {
+    const col = this.contractsCol;
+    if (!col) return { success: false, contract: null };
+
+    try {
+      const doc = await withTimeout(col.doc(contractId).get());
+      if (!doc.exists) {
+        return { success: false, contract: null };
+      }
+      const d = doc.data() || {};
+      const contract = {
+        id: doc.id,
+        ...d,
+        title: d.title || d.contractName || 'Contract',
+        fileName: d.fileName || d.documentName || 'contract.pdf',
+        fileUrl: d.fileUrl || d.documentUrl || '#',
+        sentDate: d.sentDate?.toDate?.() || (d.sentDate ? new Date(d.sentDate) : new Date()),
+        signedDate: d.signedDate?.toDate?.() || (d.signedDate ? new Date(d.signedDate) : undefined),
+        expiryDate: d.expiryDate?.toDate?.() || (d.expiryDate ? new Date(d.expiryDate) : undefined),
+      };
+      return { success: true, contract };
+    } catch (err: any) {
+      this.logger.warn(`getContractById error: ${err?.message || err}`);
+      return { success: false, contract: null };
+    }
+  }
+
+  async updateContractStatus(contractId: string, status: string, signedDate?: string, signedBy?: string) {
+    const col = this.contractsCol;
+    if (!col) return { success: true };
+
+    try {
+      const payload: any = {
+        status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      if (signedDate) payload.signedDate = signedDate;
+      if (signedBy) payload.signedBy = signedBy;
+      if (status === 'signed' && !signedDate) payload.signedDate = new Date().toISOString();
+
+      await withTimeout(col.doc(contractId).set(payload, { merge: true }));
+      return { success: true };
+    } catch (err: any) {
+      this.logger.warn(`updateContractStatus error: ${err?.message || err}`);
+      return { success: false, error: err?.message };
+    }
+  }
+
+  async deleteContract(contractId: string) {
+    const col = this.contractsCol;
+    if (!col) return { success: true };
+
+    try {
+      await withTimeout(col.doc(contractId).delete());
+      return { success: true };
+    } catch (err: any) {
+      this.logger.warn(`deleteContract error: ${err?.message || err}`);
+      return { success: false, error: err?.message };
+    }
+  }
+
+  async getExpiringContracts(days = 7) {
+    const col = this.contractsCol;
+    if (!col) return { success: true, contracts: [] };
+
+    try {
+      const now = new Date();
+      const cutoff = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+      const snapshot = await withTimeout(col.get(), 3500);
+
+      const contracts = snapshot.docs
+        .map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            title: d.title || d.contractName || 'Contract',
+            fileName: d.fileName || d.documentName || 'contract.pdf',
+            fileUrl: d.fileUrl || d.documentUrl || '#',
+            propertyAddress: d.propertyAddress || '',
+            tenantName: d.tenantName || '',
+            tenantEmail: d.tenantEmail || '',
+            status: d.status || 'sent',
+            sentDate: d.sentDate?.toDate?.() || (d.sentDate ? new Date(d.sentDate) : new Date()),
+            expiryDate: d.expiryDate?.toDate?.() || (d.expiryDate ? new Date(d.expiryDate) : undefined),
+          };
+        })
+        .filter(c => {
+          if (!c.expiryDate || c.status === 'signed') return false;
+          return c.expiryDate.getTime() >= now.getTime() && c.expiryDate.getTime() <= cutoff.getTime();
+        });
+
+      return { success: true, contracts };
+    } catch (err: any) {
+      this.logger.warn(`getExpiringContracts error: ${err?.message || err}`);
+      return { success: true, contracts: [] };
+    }
+  }
+
+  async saveSignedContract(body: any, userId?: string) {
+    const col = this.contractsCol;
+    const docId = body.id || `signed_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const effectiveUserId = userId || body.userId || 'unknown';
+
+    const payload = {
+      ...body,
+      id: docId,
+      userId: effectiveUserId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (col) {
+      try {
+        await withTimeout(col.doc(docId).set(payload));
+      } catch (err: any) {
+        this.logger.warn(`saveSignedContract error: ${err?.message || err}`);
+      }
+    }
+
+    return { success: true, id: docId, contractId: docId, ...payload };
   }
 
   async syncContractToLandlord(body: any) {
@@ -177,7 +415,7 @@ export class ContractService {
     };
     if (col) {
       try {
-        await col.doc(docId).set(payload);
+        await withTimeout(col.doc(docId).set(payload));
       } catch (err: any) {
         this.logger.warn(`syncContractToLandlord error: ${err?.message || err}`);
       }
@@ -189,12 +427,12 @@ export class ContractService {
     const col = this.contractsCol;
     if (!col) return { exists: false };
     try {
-      const snap = await col
+      const snap = await withTimeout(col
         .where('tenantEmail', '==', tenantEmail.toLowerCase().trim())
         .where('landlordEmail', '==', landlordEmail.toLowerCase().trim())
         .where('title', '==', title)
         .limit(1)
-        .get();
+        .get());
       return { exists: !snap.empty };
     } catch (err: any) {
       this.logger.warn(`contractExists error: ${err?.message || err}`);
@@ -216,7 +454,7 @@ export class ContractService {
     if (db) {
       try {
         const docId = `signed_${Date.now()}`;
-        await db.collection('signed_contracts').doc(docId).set({
+        await withTimeout(db.collection('signed_contracts').doc(docId).set({
           id: docId,
           to: body.to.toLowerCase().trim(),
           recipientName: safeRecipientName,
@@ -225,7 +463,7 @@ export class ContractService {
           senderEmail: senderEmail || null,
           sentAt: new Date().toISOString(),
           status: 'sent',
-        });
+        }));
       } catch (err: any) {
         this.logger.warn(`sendSignedContract persist error: ${err?.message || err}`);
       }

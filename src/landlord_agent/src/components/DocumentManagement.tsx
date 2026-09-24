@@ -25,6 +25,8 @@ import { propertyService } from '../services/propertyService';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import axios from 'axios';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
+import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
+import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 
 interface SelectedDocumentForm {
   file: File;
@@ -172,21 +174,48 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
         console.log('Uploading document to Firebase Storage:', docForm.file.name);
 
         let documentUrl = '';
-        try {
-          const timestamp = Date.now();
-          const cleanName = docForm.file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const docRef = ref(storage, `properties/documents/${property.id || 'general'}/${timestamp}_${cleanName}`);
 
-          await uploadBytes(docRef, docForm.file);
-          documentUrl = await getDownloadURL(docRef);
-          console.log('Document uploaded successfully to Firebase Storage:', documentUrl);
-        } catch (storageErr) {
-          console.warn('Firebase Storage upload unavailable, creating local Data URL fallback:', storageErr);
-          documentUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(docForm.file);
+        // 1. Try backend storage upload first
+        try {
+          const apiBase = getResolvedApiBaseUrl();
+          const formData = new FormData();
+          formData.append('file', docForm.file, docForm.file.name);
+          formData.append('folder', 'properties/documents');
+
+          const token = await getAccessTokenForApiRequest().catch(() => null);
+          const headers: Record<string, string> = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          const res = await fetch(`${apiBase}/storage/upload`, {
+            method: 'POST',
+            headers,
+            body: formData,
           });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.url) {
+              documentUrl = data.url;
+              console.log('✅ Document uploaded successfully via backend storage:', documentUrl);
+            }
+          }
+        } catch (apiErr) {
+          console.warn('Backend storage upload error in DocumentManagement, trying client SDK:', apiErr);
+        }
+
+        // 2. Fallback to client Firebase Storage SDK
+        if (!documentUrl) {
+          try {
+            const timestamp = Date.now();
+            const cleanName = docForm.file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const docRef = ref(storage, `properties/documents/${property.id || 'general'}/${timestamp}_${cleanName}`);
+
+            await uploadBytes(docRef, docForm.file);
+            documentUrl = await getDownloadURL(docRef);
+            console.log('✅ Document uploaded successfully via client storage:', documentUrl);
+          } catch (storageErr) {
+            console.error('All storage upload attempts failed for document:', docForm.file.name, storageErr);
+          }
         }
 
         const newDocument: Omit<PropertyDocument, 'id'> = {

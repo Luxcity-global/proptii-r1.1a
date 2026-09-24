@@ -155,4 +155,47 @@ describe('ContractController & ContractService End-to-End Functionality', () => 
       await expect(controller.deleteContractTemplate(req, 'tpl-1')).rejects.toThrow('Unauthorized template deletion');
     });
   });
+
+  describe('landlord contracts management', () => {
+    it('creates contract with base64 data', async () => {
+      const req = { user: { uid: 'll-1' } };
+      const body = {
+        contractData: {
+          title: 'AST 12 Month Agreement',
+          recipientName: 'Alice Tenant',
+          recipientEmail: 'alice@example.com',
+        },
+        fileName: 'ast_12m.pdf',
+        base64Data: 'JVBERi0xLjQK...',
+      };
+
+      const result = await controller.createContractWithBase64(req, body);
+      expect(result.success).toBe(true);
+      expect(result.id).toBeDefined();
+      expect(result.contractId).toBeDefined();
+    });
+
+    it('retrieves landlord contracts list', async () => {
+      const req = { user: { uid: 'll-1', email: 'landlord@test.com' } };
+      const result = await controller.getLandlordContracts(req, 'll-1');
+      expect(result.success).toBe(true);
+      expect(Array.isArray(result.contracts)).toBe(true);
+    });
+
+    it('saves signed contract from tenant', async () => {
+      const req = { user: { uid: 'tenant-1', email: 'tenant@test.com' } };
+      const body = {
+        title: 'Signed Tenancy Agreement',
+        tenantEmail: 'tenant@test.com',
+        status: 'signed',
+      };
+
+      const result = await controller.saveSignedContract(req, body);
+      expect(result.success).toBe(true);
+      expect(result.id).toBeDefined();
+      expect(eventsService.emit).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'contract_sent' }),
+      );
+    });
+  });
 });

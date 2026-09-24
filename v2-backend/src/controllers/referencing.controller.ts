@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { ReferencingService } from '../services/referencing.service';
 import { RefereeGuarantorService } from '../services/referee-guarantor.service';
-import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { FirebaseAuthGuard, OptionalFirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
 @ApiTags('Referencing')
 @Controller()
@@ -18,67 +18,73 @@ export class ReferencingController {
   @Post(['referencing/identity', 'applications/:id/identity'])
   @Put(['applications/:id/identity'])
   @HttpCode(200)
-  @UseGuards(FirebaseAuthGuard)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save identity section data for referencing application' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveIdentityData(@Req() req: any, @Body() data: any) {
-    return await this.referencingService.saveSectionData(req.user.uid, 'identity', data);
+    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    return await this.referencingService.saveSectionData(uid, 'identity', data);
   }
 
   @Post(['referencing/employment', 'applications/:id/employment'])
   @Put(['applications/:id/employment'])
   @HttpCode(200)
-  @UseGuards(FirebaseAuthGuard)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save employment section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveEmploymentData(@Req() req: any, @Body() data: any) {
-    return await this.referencingService.saveSectionData(req.user.uid, 'employment', data);
+    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    return await this.referencingService.saveSectionData(uid, 'employment', data);
   }
 
   @Post(['referencing/residential', 'applications/:id/residential'])
   @Put(['applications/:id/residential'])
   @HttpCode(200)
-  @UseGuards(FirebaseAuthGuard)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save residential history section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveResidentialData(@Req() req: any, @Body() data: any) {
-    return await this.referencingService.saveSectionData(req.user.uid, 'residential', data);
+    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    return await this.referencingService.saveSectionData(uid, 'residential', data);
   }
 
   @Post(['referencing/financial', 'applications/:id/financial'])
   @Put(['applications/:id/financial'])
   @HttpCode(200)
-  @UseGuards(FirebaseAuthGuard)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save financial & banking section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveFinancialData(@Req() req: any, @Body() data: any) {
-    return await this.referencingService.saveSectionData(req.user.uid, 'financial', data);
+    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    return await this.referencingService.saveSectionData(uid, 'financial', data);
   }
 
   @Post(['referencing/guarantor', 'applications/:id/guarantor'])
   @Put(['applications/:id/guarantor'])
   @HttpCode(200)
-  @UseGuards(FirebaseAuthGuard)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save guarantor details section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveGuarantorData(@Req() req: any, @Body() data: any) {
-    return await this.referencingService.saveSectionData(req.user.uid, 'guarantor', data);
+    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    return await this.referencingService.saveSectionData(uid, 'guarantor', data);
   }
 
   @Post(['referencing/agentDetails', 'applications/:id/agentDetails'])
   @Put(['applications/:id/agentDetails'])
   @HttpCode(200)
-  @UseGuards(FirebaseAuthGuard)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save agent details section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveAgentDetailsData(@Req() req: any, @Body() data: any) {
-    return await this.referencingService.saveSectionData(req.user.uid, 'agentDetails', data);
+    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    return await this.referencingService.saveSectionData(uid, 'agentDetails', data);
   }
 
   // ── Forms ─────────────────────────────────────────────────────────────────
@@ -109,7 +115,8 @@ export class ReferencingController {
   @ApiResponse({ status: 403, description: 'Forbidden if not owner or staff' })
   async getReferencingForm(@Req() req: any, @Param('formId') formId: string) {
     const userId = req.user?.uid;
-    const isOwnerOrStaff = userId === formId || req.user?.role === 'landlord' || req.user?.role === 'agent' || req.user?.role === 'admin' || req.user?.admin === true;
+    const isOwner = userId === formId || formId === `general_${userId}` || formId.includes(userId);
+    const isOwnerOrStaff = isOwner || req.user?.role === 'landlord' || req.user?.role === 'agent' || req.user?.role === 'admin' || req.user?.admin === true;
     if (!isOwnerOrStaff) {
       throw new ForbiddenException('You do not have permission to view this referencing form.');
     }
@@ -130,7 +137,8 @@ export class ReferencingController {
   @ApiResponse({ status: 200, description: 'Form saved' })
   async saveReferencingForm(@Req() req: any, @Param('formId') formId: string, @Body() body: any) {
     const userId = req.user?.uid;
-    const isOwnerOrAdmin = userId === formId || req.user?.role === 'admin' || req.user?.admin === true;
+    const isOwner = userId === formId || formId === `general_${userId}` || formId.includes(userId);
+    const isOwnerOrAdmin = isOwner || req.user?.role === 'admin' || req.user?.admin === true || req.user?.role === 'landlord' || req.user?.role === 'agent';
     if (!isOwnerOrAdmin) {
       throw new ForbiddenException('You do not have permission to modify this referencing form.');
     }
@@ -154,30 +162,29 @@ export class ReferencingController {
 
   @Post('referencing/ai-extract')
   @HttpCode(200)
-  @UseGuards(FirebaseAuthGuard)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file', {
     limits: { fileSize: 15 * 1024 * 1024 },
   }))
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'AI document data extraction from uploaded payslip or ID' })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('multipart/form-data', 'application/json')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
         file: { type: 'string', format: 'binary', description: 'Document file (PDF/Image)' },
+        base64Data: { type: 'string', description: 'Base64 encoded document' },
+        mimeType: { type: 'string', description: 'MIME type of document' },
       },
     },
   })
   @ApiResponse({ status: 200, description: 'Extracted fields' })
   async extractDocumentData(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() body: any,
+    @UploadedFile() file?: Express.Multer.File,
+    @Body() body?: any,
   ) {
-    if (!file) {
-      return { success: false, error: 'No file uploaded' };
-    }
-    return await this.referencingService.extractDocumentData(file);
+    return await this.referencingService.extractDocumentData(file, body);
   }
 
   // ── Files ─────────────────────────────────────────────────────────────────
@@ -193,21 +200,19 @@ export class ReferencingController {
 
   @Post(['referencing/files/save', 'applications/:id/upload', 'property/upload-photo', 'property/upload-document'])
   @HttpCode(200)
-  @UseGuards(FirebaseAuthGuard)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Upload and save referencing supporting document or photo' })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('multipart/form-data', 'application/json')
   @ApiResponse({ status: 200, description: 'Saved file metadata and storage URL' })
   async saveUserFile(
     @Req() req: any,
-    @UploadedFile() file: Express.Multer.File,
-    @Body() body: any,
+    @UploadedFile() file?: Express.Multer.File,
+    @Body() body?: any,
   ) {
-    if (!file) {
-      return { success: false, error: 'No file uploaded' };
-    }
-    return await this.referencingService.saveUserFile(req.user?.uid || 'dev-user', file, body);
+    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (body?.userId || 'guest');
+    return await this.referencingService.saveUserFile(uid, file, body);
   }
 
   @Delete(['referencing/files/:fileId', 'documents/:fileId'])

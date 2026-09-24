@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { StorageService } from '../services/storage.service';
-import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { FirebaseAuthGuard, OptionalFirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
 export interface MulterUploadedFile {
   fieldname: string;
@@ -32,12 +32,12 @@ export interface MulterUploadedFile {
 @ApiTags('Storage')
 @ApiBearerAuth('bearer')
 @Controller('storage')
-@UseGuards(FirebaseAuthGuard)
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
   @Post('upload')
   @HttpCode(200)
+  @UseGuards(OptionalFirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file', {
     limits: {
       fileSize: 25 * 1024 * 1024, // 25MB limit
@@ -80,6 +80,7 @@ export class StorageController {
 
   @Delete('file')
   @HttpCode(200)
+  @UseGuards(FirebaseAuthGuard)
   @ApiOperation({ summary: 'Delete file from cloud storage (ownership verified)' })
   @ApiQuery({ name: 'path', description: 'Storage file path' })
   @ApiResponse({ status: 200, description: 'File deletion result' })

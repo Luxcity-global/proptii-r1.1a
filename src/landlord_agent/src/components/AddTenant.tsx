@@ -42,7 +42,7 @@ interface AddTenantProps {
 
 // Define form steps for Typeform-style progression
 const FORM_STEPS = [
-  { id: 'welcome', title: 'Hello Sarah', icon: UserPlus, description: "Let's add your new tenant" },
+  { id: 'welcome', title: 'Welcome', icon: UserPlus, description: "Let's add your new tenant" },
   { id: 'name', title: 'Full Name', icon: User, required: true, description: "What's the tenant's full name?" },
   { id: 'email', title: 'Email Address', icon: Mail, required: true, description: "What's their email address?" },
   { id: 'phone', title: 'Phone Number', icon: Phone, required: true, description: "What's their phone number?" },
@@ -538,13 +538,28 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         }
         break;
       case 'leaseStart':
+        if (!value) {
+          isValid = false;
+          errorMessage = 'Lease start date is required';
+        } else if (!toDateOnly(value)) {
+          isValid = false;
+          errorMessage = 'Please enter a valid date';
+        }
+        break;
       case 'leaseEnd':
         if (!value) {
           isValid = false;
-          errorMessage = 'Date is required';
-        } else if (!isTodayOrFuture(value)) {
+          errorMessage = 'Lease end date is required';
+        } else if (!toDateOnly(value)) {
           isValid = false;
-          errorMessage = 'Date cannot be in the past';
+          errorMessage = 'Please enter a valid date';
+        } else if (state.formData.leaseStart) {
+          const startDate = toDateOnly(state.formData.leaseStart);
+          const endDate = toDateOnly(value);
+          if (startDate && endDate && endDate < startDate) {
+            isValid = false;
+            errorMessage = 'Lease end date must be on or after start date';
+          }
         }
         break;
       case 'emergencyContactName':
@@ -772,8 +787,16 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
       case 'paymentFrequency':
         return !!state.formData.paymentFrequency && ['monthly', 'yearly', 'fixed-time'].includes(state.formData.paymentFrequency) && !!state.formData.firstPaymentDate;
       case 'leaseStart':
-      case 'leaseEnd':
-        return !!state.formData[stepId as keyof TenantFormData] && isTodayOrFuture(state.formData[stepId as keyof TenantFormData] as string);
+        return !!state.formData.leaseStart && !!toDateOnly(state.formData.leaseStart);
+      case 'leaseEnd': {
+        if (!state.formData.leaseEnd || !toDateOnly(state.formData.leaseEnd)) return false;
+        if (state.formData.leaseStart) {
+          const s = toDateOnly(state.formData.leaseStart);
+          const e = toDateOnly(state.formData.leaseEnd);
+          if (s && e && e < s) return false;
+        }
+        return true;
+      }
       case 'emergencyName':
         return !!state.formData.emergencyContactName;
       case 'emergencyPhone':

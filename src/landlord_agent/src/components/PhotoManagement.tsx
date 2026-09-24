@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { Property, PropertyPhoto } from '../App';
 import { Input } from './ui/input';
+import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
+import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 
 interface PhotoManagementProps {
   property: Property | null;
@@ -87,13 +89,51 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
     for (let index = 0; index < files.length; index++) {
       const file = files[index];
       if (file.type.startsWith('image/')) {
-        try {
-          const timestamp = Date.now();
-          const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const photoRef = ref(storage, `properties/photos/${property.id || 'new'}/${timestamp}_${index}_${cleanName}`);
-          await uploadBytes(photoRef, file);
-          const downloadUrl = await getDownloadURL(photoRef);
+        const timestamp = Date.now();
+        let downloadUrl = '';
 
+        // 1. Try backend storage upload first
+        try {
+          const apiBase = getResolvedApiBaseUrl();
+          const formData = new FormData();
+          formData.append('file', file, file.name);
+          formData.append('folder', 'properties/photos');
+
+          const token = await getAccessTokenForApiRequest().catch(() => null);
+          const headers: Record<string, string> = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          const res = await fetch(`${apiBase}/storage/upload`, {
+            method: 'POST',
+            headers,
+            body: formData,
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.url) {
+              downloadUrl = data.url;
+              console.log(`✅ Uploaded photo ${file.name} via backend storage:`, downloadUrl);
+            }
+          }
+        } catch (apiErr) {
+          console.warn('Backend storage upload error in PhotoManagement, trying client SDK:', apiErr);
+        }
+
+        // 2. Fallback to client Firebase Storage SDK
+        if (!downloadUrl) {
+          try {
+            const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const photoRef = ref(storage, `properties/photos/${property.id || 'new'}/${timestamp}_${index}_${cleanName}`);
+            await uploadBytes(photoRef, file);
+            downloadUrl = await getDownloadURL(photoRef);
+            console.log(`✅ Uploaded photo ${file.name} via client storage:`, downloadUrl);
+          } catch (clientErr) {
+            console.error('All storage upload attempts failed for photo:', file.name, clientErr);
+          }
+        }
+
+        if (downloadUrl) {
           const newPhoto: PropertyPhoto = {
             id: `${timestamp}-${index}`,
             url: downloadUrl,
@@ -103,21 +143,6 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
           };
           setLocalPhotos(prev => [...prev, newPhoto]);
           setHasUnsavedChanges(true);
-        } catch (err) {
-          console.warn('Firebase storage upload failed, using Data URL fallback:', err);
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const newPhoto: PropertyPhoto = {
-              id: `temp-${Date.now()}-${index}`,
-              url: e.target?.result as string,
-              filename: file.name,
-              isCover: localPhotos.length === 0 && index === 0,
-              room: undefined
-            };
-            setLocalPhotos(prev => [...prev, newPhoto]);
-            setHasUnsavedChanges(true);
-          };
-          reader.readAsDataURL(file);
         }
       }
     }

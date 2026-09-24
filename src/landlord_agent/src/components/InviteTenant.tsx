@@ -72,7 +72,8 @@ export function InviteTenant({ properties, onBack, onSuccess, landlordEmail, lan
     const frontendBaseUrl = (typeof window !== 'undefined' && window.location.origin) 
       ? window.location.origin 
       : ((import.meta as any)?.env?.VITE_APP_URL || 'https://proptii.co');
-    const inviteLink = new URL('/', frontendBaseUrl);
+    const invitePath = formData.inviteType === 'new-tenant' ? '/tenant-onboarding' : '/login';
+    const inviteLink = new URL(invitePath, frontendBaseUrl);
     inviteLink.searchParams.append('invite', 'true');
     if (formData.propertyId) inviteLink.searchParams.append('propertyId', formData.propertyId);
     if (landlordEmail) inviteLink.searchParams.append('landlordEmail', landlordEmail);

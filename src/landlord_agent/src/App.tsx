@@ -47,6 +47,8 @@ import ViewingsPage from './components/ViewingsPage';
 import LandlordAgentSettingsPage from './components/LandlordAgentSettingsPage';
 import { storage } from './config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getResolvedApiBaseUrl } from '../../config/apiBaseUrl';
+import { getAccessTokenForApiRequest } from '../../services/msalAccessToken';
 import AuthContext, { useAuth } from '../../contexts/AuthContext';
 import { MessagingProvider } from '../../contexts/MessagingContext';
 import { trackEvent } from '../../utils/analytics';
@@ -757,31 +759,55 @@ export function AppContent() {
     });
   };
 
-  // Upload images to Google Firebase Cloud Storage and return PropertyPhoto objects
+  // Helper to upload a file to backend storage endpoint with signed download tokens
+  const uploadToBackendStorage = async (file: File | Blob, folder: string, filename?: string): Promise<string> => {
+    const apiBase = getResolvedApiBaseUrl();
+    const formData = new FormData();
+    formData.append('file', file, filename || (file as File).name || 'file');
+    formData.append('folder', folder);
+
+    const token = await getAccessTokenForApiRequest().catch(() => null);
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${apiBase}/storage/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Upload failed (${response.status}): ${errText}`);
+    }
+
+    const result = await response.json();
+    if (!result?.url) {
+      throw new Error('Upload succeeded but no download URL returned');
+    }
+    return result.url;
+  };
+
+  // Upload images to Cloud Storage (backend API first, with Firebase Client SDK fallback)
   const uploadPropertyImages = async (imageFiles: File[]): Promise<PropertyPhoto[]> => {
     if (imageFiles.length === 0) {
       return [];
     }
 
-    const { storage } = await import('./config/firebase');
-    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-
     const photoPromises = imageFiles.map(async (file, index) => {
+      const timestamp = Date.now();
+      // Compress large images before upload
+      let processedFile = file;
+      if (file.type.startsWith('image/') && file.size > 500 * 1024) {
+        processedFile = await compressImage(file, 150);
+      }
+
+      // 1. Try Backend Storage API first (uses Firebase Admin SDK with valid signed download tokens)
       try {
-        const timestamp = Date.now();
-        // Compress large images before upload
-        let processedFile = file;
-        if (file.type.startsWith('image/') && file.size > 500 * 1024) {
-          processedFile = await compressImage(file, 150);
-        }
-
-        const uniqueName = `${timestamp}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        const photoRef = ref(storage, `properties/photos/${uniqueName}`);
-
-        await uploadBytes(photoRef, processedFile);
-        const downloadUrl = await getDownloadURL(photoRef);
-        console.log(`✅ Uploaded image ${index + 1}/${imageFiles.length} to Firebase Storage: ${downloadUrl}`);
-
+        const downloadUrl = await uploadToBackendStorage(processedFile, 'properties/photos', file.name);
+        console.log(`✅ Uploaded image ${index + 1}/${imageFiles.length} via Backend Storage: ${downloadUrl}`);
         return {
           id: `photo-${timestamp}-${index}`,
           url: downloadUrl,
@@ -789,21 +815,36 @@ export function AppContent() {
           isCover: index === 0,
           room: index === 0 ? 'Exterior' : undefined
         };
-      } catch (error) {
-        console.warn(`⚠️ Error uploading image ${index + 1} to Firebase Storage, using data URL fallback:`, error);
+      } catch (backendError) {
+        console.warn(`⚠️ Backend storage upload failed for image ${index + 1}, trying client fallback:`, backendError);
+      }
+
+      // 2. Fallback: Client Firebase Storage
+      try {
+        const { storage } = await import('./config/firebase');
+        const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+        const uniqueName = `${timestamp}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const photoRef = ref(storage, `properties/photos/${uniqueName}`);
+        await uploadBytes(photoRef, processedFile);
+        const downloadUrl = await getDownloadURL(photoRef);
+        console.log(`✅ Uploaded image ${index + 1}/${imageFiles.length} via Client Firebase Storage: ${downloadUrl}`);
         return {
-          id: `photo-${Date.now()}-${index}`,
-          url: URL.createObjectURL(file),
+          id: `photo-${timestamp}-${index}`,
+          url: downloadUrl,
           filename: file.name,
           isCover: index === 0,
           room: index === 0 ? 'Exterior' : undefined
         };
+      } catch (clientError) {
+        console.error(`❌ Both backend and client storage uploads failed for image ${file.name}:`, clientError);
+        return null;
       }
     });
 
-    const uploadedPhotos = await Promise.all(photoPromises);
-    console.log(`✅ All ${uploadedPhotos.length} images processed successfully`);
-    return uploadedPhotos;
+    const results = await Promise.all(photoPromises);
+    const validPhotos = results.filter((p): p is PropertyPhoto => p !== null && Boolean(p.url) && !p.url.startsWith('blob:'));
+    console.log(`✅ ${validPhotos.length}/${imageFiles.length} images processed successfully`);
+    return validPhotos;
   };
 
   const uploadPropertyDocuments = async (documentFiles: File[]): Promise<PropertyDocument[]> => {
@@ -811,20 +852,14 @@ export function AppContent() {
       return [];
     }
 
-    console.log(`Uploading ${documentFiles.length} documents to Firebase Storage...`);
-    const { storage } = await import('./config/firebase');
-    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-
+    console.log(`Uploading ${documentFiles.length} documents...`);
     const documentPromises = documentFiles.map(async (file, index) => {
+      const timestamp = Date.now();
+
+      // 1. Try Backend Storage API first
       try {
-        const timestamp = Date.now();
-        const uniqueName = `${timestamp}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        const docRef = ref(storage, `properties/documents/${uniqueName}`);
-
-        await uploadBytes(docRef, file);
-        const downloadUrl = await getDownloadURL(docRef);
-        console.log(`✅ Uploaded document ${index + 1}/${documentFiles.length} to Firebase Storage: ${file.name}`);
-
+        const downloadUrl = await uploadToBackendStorage(file, 'properties/documents', file.name);
+        console.log(`✅ Uploaded document ${index + 1}/${documentFiles.length} via Backend Storage: ${file.name}`);
         return {
           id: `doc-${timestamp}-${index}`,
           name: file.name,
@@ -833,36 +868,53 @@ export function AppContent() {
           issueDate: new Date(),
           status: 'valid'
         } as PropertyDocument;
-      } catch (error) {
-        console.warn(`⚠️ Error uploading document ${file.name} to Firebase Storage, using fallback:`, error);
+      } catch (backendError) {
+        console.warn(`⚠️ Backend storage upload failed for document ${file.name}, trying client fallback:`, backendError);
+      }
+
+      // 2. Fallback: Client Firebase Storage
+      try {
+        const { storage } = await import('./config/firebase');
+        const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+        const uniqueName = `${timestamp}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const docRef = ref(storage, `properties/documents/${uniqueName}`);
+        await uploadBytes(docRef, file);
+        const downloadUrl = await getDownloadURL(docRef);
+        console.log(`✅ Uploaded document ${index + 1}/${documentFiles.length} via Client Firebase Storage: ${file.name}`);
         return {
-          id: `doc-${Date.now()}-${index}`,
+          id: `doc-${timestamp}-${index}`,
           name: file.name,
           type: 'other',
-          url: URL.createObjectURL(file),
+          url: downloadUrl,
           issueDate: new Date(),
           status: 'valid'
         } as PropertyDocument;
+      } catch (clientError) {
+        console.error(`❌ Both backend and client uploads failed for document ${file.name}:`, clientError);
+        return null;
       }
     });
 
-    const uploadedDocuments = await Promise.all(documentPromises);
-    console.log(`✅ All ${uploadedDocuments.length} documents processed successfully`);
-    return uploadedDocuments;
+    const results = await Promise.all(documentPromises);
+    const validDocs = results.filter((d): d is PropertyDocument => d !== null && Boolean(d.url) && !d.url.startsWith('blob:'));
+    console.log(`✅ ${validDocs.length}/${documentFiles.length} documents processed successfully`);
+    return validDocs;
   };
 
   // Convert property setup data to Property object
   const createPropertyFromSetupData = (): Property => {
     const { propertyType, propertyDetails, amenities, images, additionalNotes, pendingTenants } = propertySetupData;
 
-    // Convert images to PropertyPhoto format
-    const photos: PropertyPhoto[] = images.map((imageUrl, index) => ({
-      id: `photo-${index}`,
-      url: imageUrl,
-      filename: `property-photo-${index + 1}.jpg`,
-      isCover: index === 0,
-      room: index === 0 ? 'Exterior' : undefined
-    }));
+    // Convert images to PropertyPhoto format (ignore temporary blob preview URLs)
+    const photos: PropertyPhoto[] = images
+      .filter((imageUrl) => imageUrl && !imageUrl.startsWith('blob:'))
+      .map((imageUrl, index) => ({
+        id: `photo-${index}`,
+        url: imageUrl,
+        filename: `property-photo-${index + 1}.jpg`,
+        isCover: index === 0,
+        room: index === 0 ? 'Exterior' : undefined
+      }));
 
     // Convert documents to PropertyDocument format
     const documents: PropertyDocument[] = propertyDetails.uploadedDocuments.map((file, index) => ({
@@ -2904,27 +2956,68 @@ export function AppContent() {
                 // 3. Convert setup data to property
                 const newProperty = createPropertyFromSetupData();
 
-                // 4. Replace preview URLs with uploaded Firebase Storage URLs
-                if (uploadedPhotos.length > 0) {
-                  console.log('Replacing preview URLs with Firebase Storage URLs');
-                  newProperty.photos = uploadedPhotos;
-                } else {
-                  console.warn('No photos to add to property');
-                  newProperty.photos = [];
+                // 4. Resolve photos: map existing permanent URLs and newly uploaded photos
+                let finalPhotos: PropertyPhoto[] = [];
+                let uploadIdx = 0;
+
+                for (let i = 0; i < propertySetupData.images.length; i++) {
+                  const imgUrl = propertySetupData.images[i];
+                  if (imgUrl && !imgUrl.startsWith('blob:')) {
+                    // Existing photo with permanent URL
+                    const existing = (selectedProperty?.photos || []).find(p => p.url === imgUrl);
+                    finalPhotos.push({
+                      id: existing?.id || `photo-${Date.now()}-${i}`,
+                      url: imgUrl,
+                      filename: existing?.filename || `property-photo-${i + 1}.jpg`,
+                      isCover: finalPhotos.length === 0,
+                      room: existing?.room ?? (finalPhotos.length === 0 ? 'Exterior' : undefined)
+                    });
+                  } else if (imgUrl && imgUrl.startsWith('blob:')) {
+                    if (uploadIdx < uploadedPhotos.length) {
+                      finalPhotos.push({
+                        ...uploadedPhotos[uploadIdx],
+                        isCover: finalPhotos.length === 0,
+                        room: finalPhotos.length === 0 ? 'Exterior' : uploadedPhotos[uploadIdx].room
+                      });
+                      uploadIdx++;
+                    }
+                  }
                 }
 
-                if (uploadedDocuments.length > 0) {
-                  newProperty.documents = uploadedDocuments;
-                } else {
-                  newProperty.documents = [];
+                // Append any newly uploaded photos not yet included
+                while (uploadIdx < uploadedPhotos.length) {
+                  finalPhotos.push({
+                    ...uploadedPhotos[uploadIdx],
+                    isCover: finalPhotos.length === 0
+                  });
+                  uploadIdx++;
                 }
+
+                // If finalPhotos is still empty and uploadedPhotos exist, use uploadedPhotos
+                if (finalPhotos.length === 0 && uploadedPhotos.length > 0) {
+                  finalPhotos = uploadedPhotos;
+                }
+
+                // If finalPhotos is empty and editing, preserve selectedProperty photos
+                if (finalPhotos.length === 0 && isEditing && selectedProperty?.photos) {
+                  finalPhotos = selectedProperty.photos.filter(p => p.url && !p.url.startsWith('blob:'));
+                }
+
+                newProperty.photos = finalPhotos;
+
+                // Resolve documents
+                let finalDocuments: PropertyDocument[] = uploadedDocuments;
+                if (isEditing && selectedProperty?.documents && selectedProperty.documents.length > 0) {
+                  finalDocuments = [...selectedProperty.documents, ...uploadedDocuments];
+                }
+                newProperty.documents = finalDocuments;
 
                 if (isEditing && editingPropertyId) {
                   // Fetch the original property to preserve status and other important fields
                   const originalProperty = await propertyService.getProperty(editingPropertyId);
                   const preservedStatus = originalProperty?.status || selectedProperty?.status || 'vacant';
 
-                  // Prepare updates object with all changes, preserving status
+                  // Prepare updates object with all changes, including photos and documents
                   const updates = {
                     address: newProperty.address,
                     type: newProperty.type,
@@ -2935,14 +3028,13 @@ export function AppContent() {
                     amenities: newProperty.amenities,
                     notes: newProperty.notes,
                     status: preservedStatus, // Preserve the original status from database
+                    photos: newProperty.photos,
+                    documents: newProperty.documents,
                   };
-
-                  // Update in Firebase directly (bypass updateProperty to avoid double state updates)
-                  const { id, createdAt, tenant, photos, documents, ...firebaseUpdates } = updates as any;
 
                   // Filter out undefined values - Firestore doesn't accept undefined
                   const cleanUpdates = Object.fromEntries(
-                    Object.entries(firebaseUpdates).filter(([_, value]) => value !== undefined)
+                    Object.entries(updates).filter(([_, value]) => value !== undefined)
                   ) as any;
 
                   await propertyService.updateProperty(editingPropertyId, cleanUpdates);

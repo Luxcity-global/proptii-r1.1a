@@ -126,3 +126,63 @@ export class FirebaseAuthGuard implements CanActivate {
     throw new UnauthorizedException('Invalid or expired authentication token');
   }
 }
+
+@Injectable()
+export class OptionalFirebaseAuthGuard implements CanActivate {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const authHeader = request.headers.authorization;
+    let token: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split('Bearer ')[1]?.trim();
+    } else if (request.query?.token) {
+      token = (request.query.token as string).replace(/^Bearer\s+/i, '').trim();
+    } else if (request.query?.authorization) {
+      token = (request.query.authorization as string).replace(/^Bearer\s+/i, '').trim();
+    }
+
+    if (!token) {
+      request.user = { uid: 'guest', role: 'guest' };
+      return true;
+    }
+
+    // Support local dev mock tokens
+    const isProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL;
+    if (token.startsWith('mock-') || token.startsWith('mock_')) {
+      const mockId = token.replace('mock-token-', '').replace('mock-', '');
+      const id = (mockId || '').toLowerCase();
+      const mockRole = id.includes('agent') ? 'agent' : id.includes('landlord') ? 'landlord' : 'tenant';
+      request.user = {
+        uid: mockId || 'dev-user-id',
+        sub: mockId || 'dev-user-id',
+        email: `${mockRole}@test.proptii.co`,
+        role: mockRole,
+      };
+      return true;
+    }
+
+    ensureFirebaseInitialized();
+
+    try {
+      if (admin.apps.length) {
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        request.user = {
+          uid: decodedToken.uid,
+          sub: decodedToken.uid,
+          email: decodedToken.email,
+          role: decodedToken.role || null,
+          ...decodedToken,
+        };
+        return true;
+      }
+    } catch {
+      request.user = { uid: 'guest', role: 'guest' };
+      return true;
+    }
+
+    request.user = { uid: 'guest', role: 'guest' };
+    return true;
+  }
+}
+

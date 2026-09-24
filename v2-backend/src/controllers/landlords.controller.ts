@@ -36,16 +36,6 @@ export class LandlordsController {
     return this.landlordsService.registerLandlord(body);
   }
 
-  /** GET /api/tenants — list all tenants */
-  @Get('tenants')
-  @UseGuards(FirebaseAuthGuard)
-  @ApiBearerAuth('bearer')
-  @ApiOperation({ summary: 'List all tenant profiles' })
-  @ApiResponse({ status: 200, description: 'Array of tenants' })
-  async getAllTenants() {
-    return this.landlordsService.getAllTenants();
-  }
-
   /** GET /api/clients/landlords — alias for landlords list used in some frontend calls */
   @Get('clients/landlords')
   @UseGuards(FirebaseAuthGuard)

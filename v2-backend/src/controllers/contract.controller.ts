@@ -1,6 +1,32 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req, HttpCode, Sse, MessageEvent, Logger, UseInterceptors, UploadedFile } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  HttpCode,
+  Sse,
+  MessageEvent,
+  Logger,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { ContractService } from '../services/contract.service';
 import { EventsService } from '../services/events.service';
@@ -44,6 +70,23 @@ export class ContractController {
   async getContracts(@Req() req: any) {
     const email = req.user.email || '';
     return await this.contractService.getContracts(email);
+  }
+
+  @Post()
+  @UseGuards(FirebaseAuthGuard)
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Save signed contract record' })
+  @ApiResponse({ status: 201, description: 'Contract saved' })
+  async saveSignedContract(@Req() req: any, @Body() body: any) {
+    const userId = req.user?.uid || req.user?.id || req.user?.email || 'unknown';
+    const result = await this.contractService.saveSignedContract(body, userId);
+    this.eventsService.emit({
+      type: 'contract_sent',
+      userId,
+      targetEmail: body.tenantEmail || body.recipientEmail,
+      data: { contractId: result.id, title: body.title || body.contractName },
+    });
+    return result;
   }
 
   @Post('templates')
@@ -112,34 +155,151 @@ export class ContractController {
     return await this.contractService.getStats(userId);
   }
 
-  /** POST /api/contracts/landlord — landlord sends a contract to a tenant */
+  // ── Landlord Contracts ──────────────────────────────────────────────────────
+
   @Post('landlord')
   @UseGuards(FirebaseAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
   @HttpCode(201)
   @ApiOperation({ summary: 'Landlord sends contract agreement to tenant' })
+  @ApiConsumes('multipart/form-data', 'application/json')
   @ApiResponse({ status: 201, description: 'Contract sent successfully' })
-  async sendContractToTenant(@Req() req: any, @Body() body: any) {
-    const userId = req.user.uid;
+  async sendContractToTenant(
+    @Req() req: any,
+    @Body() body: any,
+    @UploadedFile() file?: MulterUploadedFile,
+  ) {
+    const userId = req.user.uid || req.user.id;
     const email = req.user.email || '';
-    const result = await this.contractService.sendContractToTenant(userId, email, body);
 
-    // Notify landlord and tenant via SSE
+    // If sent via FormData with JSON contractData string
+    let parsedBody = body;
+    if (typeof body.contractData === 'string') {
+      try {
+        parsedBody = { ...JSON.parse(body.contractData), ...body };
+      } catch {
+        parsedBody = body;
+      }
+    }
+
+    const result = await this.contractService.sendContractToTenant(userId, email, parsedBody, file);
+
     this.eventsService.emit({
       type: 'contract_sent',
       userId,
-      targetEmail: body.tenantEmail,
+      targetEmail: parsedBody.tenantEmail || parsedBody.recipientEmail,
       data: {
         contractId: (result as any)?.id,
-        tenantEmail: body.tenantEmail,
+        tenantEmail: parsedBody.tenantEmail || parsedBody.recipientEmail,
         landlordEmail: email,
-        title: body.title,
+        title: parsedBody.title || parsedBody.contractName,
       },
     });
 
     return result;
   }
 
-  /** POST /api/contracts/landlord/sync — sync a signed contract to landlord dashboard */
+  @Post('landlord/base64')
+  @UseGuards(FirebaseAuthGuard)
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Create a landlord contract with base64 encoded document' })
+  @ApiResponse({ status: 201, description: 'Contract created successfully' })
+  async createContractWithBase64(@Req() req: any, @Body() body: any) {
+    const userId = req.user?.uid || req.user?.id;
+    return await this.contractService.createContractWithBase64(body, userId);
+  }
+
+  @Get('landlord/expiring')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Get contracts expiring soon' })
+  @ApiQuery({ name: 'days', required: false, schema: { default: 7 } })
+  @ApiResponse({ status: 200, description: 'List of expiring contracts' })
+  async getExpiringContracts(@Query('days') days = 7) {
+    return await this.contractService.getExpiringContracts(Number(days) || 7);
+  }
+
+  @Get('landlord/exists')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Check if a contract exists between landlord and tenant' })
+  @ApiQuery({ name: 'tenantEmail' })
+  @ApiQuery({ name: 'title' })
+  @ApiQuery({ name: 'landlordEmail' })
+  @ApiResponse({ status: 200, description: 'Boolean flag indicating existence' })
+  async contractExists(
+    @Query('tenantEmail') tenantEmail: string,
+    @Query('title') title: string,
+    @Query('landlordEmail') landlordEmail: string,
+  ) {
+    return await this.contractService.contractExists(tenantEmail, title, landlordEmail);
+  }
+
+  @Get('landlord')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'List contracts for landlord/agent' })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'landlordEmail', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'propertyId', required: false })
+  @ApiResponse({ status: 200, description: 'Array of landlord contracts' })
+  async getLandlordContracts(
+    @Req() req: any,
+    @Query('userId') userId?: string,
+    @Query('landlordEmail') landlordEmail?: string,
+    @Query('status') status?: string,
+    @Query('propertyId') propertyId?: string,
+  ) {
+    const effectiveUserId = userId || req.user?.uid || req.user?.id;
+    const effectiveEmail = landlordEmail || req.user?.email;
+    return await this.contractService.getLandlordContracts({
+      userId: effectiveUserId,
+      landlordEmail: effectiveEmail,
+      status,
+      propertyId,
+    });
+  }
+
+  @Get('landlord/:id')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Get single landlord contract by ID' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'Contract details' })
+  async getLandlordContractById(@Param('id') id: string) {
+    return await this.contractService.getContractById(id);
+  }
+
+  @Put('landlord/:id/status')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Update landlord contract status' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'Status updated' })
+  async updateLandlordContractStatus(
+    @Param('id') id: string,
+    @Body() body: { status: string; signedDate?: string },
+  ) {
+    return await this.contractService.updateContractStatus(id, body.status, body.signedDate);
+  }
+
+  @Put('landlord/:id/sign')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Mark contract as signed by tenant or landlord' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'Marked as signed' })
+  async markContractSigned(
+    @Param('id') id: string,
+    @Body() body: { signedBy: 'tenant' | 'landlord' },
+  ) {
+    return await this.contractService.updateContractStatus(id, 'signed', undefined, body.signedBy);
+  }
+
+  @Delete('landlord/:id')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Delete landlord contract by ID' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'Contract deleted' })
+  async deleteLandlordContract(@Param('id') id: string) {
+    return await this.contractService.deleteContract(id);
+  }
+
   @Post('landlord/sync')
   @UseGuards(FirebaseAuthGuard)
   @HttpCode(201)
@@ -158,23 +318,6 @@ export class ContractController {
     return result;
   }
 
-  /** GET /api/contracts/landlord/exists — check if a contract exists */
-  @Get('landlord/exists')
-  @UseGuards(FirebaseAuthGuard)
-  @ApiOperation({ summary: 'Check if a contract exists between landlord and tenant' })
-  @ApiQuery({ name: 'tenantEmail' })
-  @ApiQuery({ name: 'title' })
-  @ApiQuery({ name: 'landlordEmail' })
-  @ApiResponse({ status: 200, description: 'Boolean flag indicating existence' })
-  async contractExists(
-    @Query('tenantEmail') tenantEmail: string,
-    @Query('title') title: string,
-    @Query('landlordEmail') landlordEmail: string,
-  ) {
-    return await this.contractService.contractExists(tenantEmail, title, landlordEmail);
-  }
-
-  /** POST /api/contracts/send-signed-contract — email signed PDF to recipient */
   @Post('send-signed-contract')
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('attachment', {
@@ -204,5 +347,37 @@ export class ContractController {
   ) {
     const senderEmail = req.user?.email || '';
     return await this.contractService.sendSignedContract(body, senderEmail, file);
+  }
+
+  // ── Generic Contract ID Routes (placed last to prevent route collision) ────
+
+  @Get(':id')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Get single contract by ID' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'Contract object' })
+  async getContractById(@Param('id') id: string) {
+    return await this.contractService.getContractById(id);
+  }
+
+  @Put(':id/status')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Update contract status by ID' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'Status updated' })
+  async updateContractStatus(
+    @Param('id') id: string,
+    @Body() body: { status: string; emailSent?: boolean },
+  ) {
+    return await this.contractService.updateContractStatus(id, body.status);
+  }
+
+  @Delete(':id')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Delete contract by ID' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'Contract deleted' })
+  async deleteContract(@Param('id') id: string) {
+    return await this.contractService.deleteContract(id);
   }
 }

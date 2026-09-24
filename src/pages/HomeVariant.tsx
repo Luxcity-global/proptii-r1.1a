@@ -98,6 +98,16 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
 
   // Check for query parameters to open the response modal
   useEffect(() => {
+    const inviteParam = searchParams.get('invite');
+    if (inviteParam === 'true') {
+      const propertyId = searchParams.get('propertyId');
+      if (propertyId) {
+        sessionStorage.setItem('invitedPropertyId', propertyId);
+      }
+      navigate('/tenant-onboarding', { replace: true });
+      return;
+    }
+
     const responseTypeParam = searchParams.get('responseType');
     const applicantParam = searchParams.get('applicant');
     const emailParam = searchParams.get('email');
@@ -113,7 +123,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
       // Clear query parameters from URL without reloading
       setSearchParams({});
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, navigate]);
 
   const handleSearchInputHeightChange = (height: number) => {
     setSearchInputHeight(height);
