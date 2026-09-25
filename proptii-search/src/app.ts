@@ -26,7 +26,12 @@ app.use(cors({
       ...envOrigins,
       ...frontendUrl,
     ];
-    if (!origin || allowedOrigins.includes(origin) || /^https:\/\/proptii(-[a-z0-9]+)?\.onrender\.com$/.test(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/proptii[a-z0-9-]*\.onrender\.com$/.test(origin) ||
+      /\.onrender\.com$/.test(origin)
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

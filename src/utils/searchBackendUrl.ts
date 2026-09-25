@@ -3,7 +3,7 @@ export const PROD_SEARCH_BACKEND_URL = (
   (import.meta as any)?.env?.VITE_SEARCH_BACKEND_URL ||
   (import.meta as any)?.env?.VITE_SEARCH_API_URL ||
   (import.meta as any)?.env?.VITE_SEARCH_URL ||
-  'https://proptii-r1-1a-q95f.onrender.com'
+  'https://proptii-scraper-api.onrender.com'
 ).trim().replace(/\/$/, '');
 
 const LOCAL_SEARCH_BACKEND_URL = (

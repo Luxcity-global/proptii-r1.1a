@@ -156,7 +156,11 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      if (trustedOrigins.includes(origin) || (isProd && /^https:\/\/proptii(-[a-z0-9]+)?\.onrender\.com$/.test(origin))) {
+      if (
+        trustedOrigins.includes(origin) ||
+        (isProd && /^https:\/\/proptii[a-z0-9-]*\.onrender\.com$/.test(origin)) ||
+        (isProd && /\.onrender\.com$/.test(origin))
+      ) {
         return callback(null, true);
       }
       if (!isProd && /^http:\/\/localhost:\d+$/.test(origin)) {

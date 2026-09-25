@@ -13,6 +13,13 @@ if (typeof document !== 'undefined') {
   document.documentElement.classList.remove('dark');
 }
 
+// Automatically reload the page if a dynamically imported chunk fails to load after a deployment
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', () => {
+    window.location.reload();
+  });
+}
+
 // Render the React tree immediately — the page paints before any async work.
 const root = createRoot(document.getElementById('root')!);
 
