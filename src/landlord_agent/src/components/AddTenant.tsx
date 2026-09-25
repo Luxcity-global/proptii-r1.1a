@@ -32,7 +32,7 @@ import { trackEvent } from '../../../utils/analytics';
 
 interface AddTenantProps {
   properties: Property[];
-  onSave: (tenant: Omit<Tenant, 'id'>) => void;
+  onSave: (tenant: Omit<Tenant, 'id'>) => Promise<void>;
   onBack: () => void;
   onBackToSelection?: () => void;
   preselectedPropertyId?: string;

@@ -27,6 +27,13 @@ export class LoggingMiddleware implements NestMiddleware {
       return;
     }
 
+    // Prevent browsers and CDNs from caching API responses — stale cached data
+    // (especially 304 Not Modified) causes GET /tenants and /properties to return
+    // empty results even after a successful write.
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Surrogate-Control', 'no-store');
+
     const { method, originalUrl, ip } = req;
     const userAgent = req.headers['user-agent'] ?? '—';
     const start = Date.now();
