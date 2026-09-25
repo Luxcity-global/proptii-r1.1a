@@ -3022,12 +3022,21 @@ export function AppContent() {
                   imagesCount: propertySetupData.images.length
                 });
 
-                // 1. Upload images to Firebase Storage
+                // 1. Upload images to storage via the v2-backend
                 let uploadedPhotos: PropertyPhoto[] = [];
                 if (propertySetupData.imageFiles.length > 0) {
-                  console.log('Uploading images to Firebase Storage...');
+                  console.log(`Uploading ${propertySetupData.imageFiles.length} image(s)...`);
                   uploadedPhotos = await uploadPropertyImages(propertySetupData.imageFiles);
-                  console.log('Uploaded photos:', uploadedPhotos);
+                  console.log('Uploaded photos:', uploadedPhotos.length);
+
+                  // If we had files to upload but got nothing back, abort before saving
+                  // a property with an empty photos array.
+                  if (uploadedPhotos.length === 0) {
+                    throw new Error(
+                      `Image upload failed — none of the ${propertySetupData.imageFiles.length} photo(s) could be uploaded. ` +
+                      `Please check your connection and try again.`
+                    );
+                  }
                 } else {
                   console.warn('No image files to upload');
                 }
@@ -3043,14 +3052,18 @@ export function AppContent() {
                 // 3. Convert setup data to property
                 const newProperty = createPropertyFromSetupData();
 
-                // 4. Resolve photos: map existing permanent URLs and newly uploaded photos
+                // 4. Resolve photos:
+                //    - blob: URLs → replace with the corresponding uploaded permanent URL
+                //    - permanent URLs (on edit) → keep as-is
                 let finalPhotos: PropertyPhoto[] = [];
                 let uploadIdx = 0;
 
                 for (let i = 0; i < propertySetupData.images.length; i++) {
                   const imgUrl = propertySetupData.images[i];
-                  if (imgUrl && !imgUrl.startsWith('blob:')) {
-                    // Existing photo with permanent URL
+                  if (!imgUrl) continue;
+
+                  if (!imgUrl.startsWith('blob:')) {
+                    // Existing permanent URL (edit mode) — preserve it
                     const existing = (selectedProperty?.photos || []).find(p => p.url === imgUrl);
                     finalPhotos.push({
                       id: existing?.id || `photo-${Date.now()}-${i}`,
@@ -3059,7 +3072,8 @@ export function AppContent() {
                       isCover: finalPhotos.length === 0,
                       room: existing?.room ?? (finalPhotos.length === 0 ? 'Exterior' : undefined)
                     });
-                  } else if (imgUrl && imgUrl.startsWith('blob:')) {
+                  } else {
+                    // Blob URL → swap in the uploaded permanent URL
                     if (uploadIdx < uploadedPhotos.length) {
                       finalPhotos.push({
                         ...uploadedPhotos[uploadIdx],
@@ -3068,10 +3082,12 @@ export function AppContent() {
                       });
                       uploadIdx++;
                     }
+                    // If upload count < blob count (partial failure), silently skip —
+                    // the hard abort above already prevented a total-zero scenario.
                   }
                 }
 
-                // Append any newly uploaded photos not yet included
+                // Append any extra uploaded photos (e.g. parallel uploads arrived out of order)
                 while (uploadIdx < uploadedPhotos.length) {
                   finalPhotos.push({
                     ...uploadedPhotos[uploadIdx],
@@ -3080,12 +3096,10 @@ export function AppContent() {
                   uploadIdx++;
                 }
 
-                // If finalPhotos is still empty and uploadedPhotos exist, use uploadedPhotos
+                // Last-resort guards
                 if (finalPhotos.length === 0 && uploadedPhotos.length > 0) {
                   finalPhotos = uploadedPhotos;
                 }
-
-                // If finalPhotos is empty and editing, preserve selectedProperty photos
                 if (finalPhotos.length === 0 && isEditing && selectedProperty?.photos) {
                   finalPhotos = selectedProperty.photos.filter(p => p.url && !p.url.startsWith('blob:'));
                 }
