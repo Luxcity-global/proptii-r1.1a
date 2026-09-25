@@ -87,7 +87,7 @@ export default defineConfig(({ mode = 'development' }) => {
   if (!viteSearchBackendUrl && aliasSearchBackendUrl) {
     define['import.meta.env.VITE_SEARCH_BACKEND_URL'] = JSON.stringify(aliasSearchBackendUrl);
   } else if (!viteSearchBackendUrl && !aliasSearchBackendUrl) {
-    define['import.meta.env.VITE_SEARCH_BACKEND_URL'] = JSON.stringify('https://proptii-scraper-api.onrender.com');
+    define['import.meta.env.VITE_SEARCH_BACKEND_URL'] = JSON.stringify('https://proptii-feed-api.onrender.com');
   }
 
   return {

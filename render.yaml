@@ -25,7 +25,7 @@ services:
       - key: VITE_NEST_API_ENDPOINT
         value: https://proptii-v2-backend.onrender.com
       - key: VITE_SEARCH_BACKEND_URL
-        value: https://proptii-scraper-api.onrender.com
+        value: https://proptii-feed-api.onrender.com
       - key: VITE_USE_REMOTE_API
         value: "true"
       - key: VITE_USE_LOCAL_SEARCH
@@ -103,7 +103,7 @@ services:
 
   # ─── Proptii Search Service (Node/Express Scraper & Search) ─────────────────
   - type: web
-    name: proptii-scraper-api
+    name: proptii-feed-api
     runtime: node
     repo: https://github.com/Luxcity-global/proptii-r1.1a
     branch: feature/search
