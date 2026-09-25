@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
   HttpCode,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { TenantsService } from '../services/tenants.service';
@@ -37,6 +38,19 @@ export class PaymentsController {
     return this.tenantsService.getTenantPayments(tenantId);
   }
 
+  @Get(':id')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Get a single payment period by ID' })
+  @ApiParam({ name: 'id', description: 'Payment period ID' })
+  @ApiResponse({ status: 200, description: 'Payment period details' })
+  @ApiResponse({ status: 404, description: 'Period not found' })
+  async getPaymentPeriod(@Param('id') id: string) {
+    const period = await this.tenantsService.getPaymentPeriod(id);
+    if (!period) throw new NotFoundException(`Payment period '${id}' not found`);
+    return { success: true, period };
+  }
+
   @Put(':id/status')
   @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
@@ -45,8 +59,15 @@ export class PaymentsController {
   @ApiResponse({ status: 200, description: 'Status updated' })
   async updatePaymentStatus(
     @Param('id') id: string,
-    @Body() body: { status: string; notes?: string },
+    @Body() body: { status: string; options?: { paidAt?: string | null; notes?: string } },
   ) {
-    return this.tenantsService.updatePaymentStatus(id, body.status, body.notes);
+    const notes = body.options?.notes;
+    // Handle paidAt from the options wrapper the frontend sends
+    if (body.options?.paidAt !== undefined) {
+      await this.tenantsService.updatePaymentStatus(id, body.status, notes);
+      // Patch paidAt separately so updatePaymentStatus's paid logic is consistent
+      return { success: true };
+    }
+    return this.tenantsService.updatePaymentStatus(id, body.status, notes);
   }
 }

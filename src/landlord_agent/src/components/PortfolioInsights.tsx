@@ -141,6 +141,11 @@ function PortfolioInsightsContent({
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [paymentSearch, setPaymentSearch] = useState('');
 
+  /** Number of months of chart data to show for the selected range */
+  const rangeToMonths: Record<typeof RANGES[number], number> = {
+    '7d': 1, '30d': 1, '3m': 3, '6m': 6, '1yr': 12
+  };
+
   const revenue = analyticsData?.revenue;
   const occupancy = analyticsData?.occupancy;
   const tenants = analyticsData?.tenants;
@@ -179,25 +184,31 @@ function PortfolioInsightsContent({
 
   const revenueTrendData = revenue?.revenueTrendData || [];
   const chartData = useMemo(() => {
+    const monthsToShow = rangeToMonths[range];
+    let rawData: { month: string; revenue: number; expenses: number }[];
     if (revenueTrendData.length > 0) {
-      return revenueTrendData.map((d) => ({
+      rawData = revenueTrendData.map((d) => ({
         month: d.month,
         revenue: d.collected,
         expenses: Math.round(d.collected * 0.2),
       }));
+    } else if (!monthlyRevenue) {
+      return [];
+    } else {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const now = new Date();
+      rawData = Array.from({ length: 12 }, (_, index) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - (11 - index), 1);
+        return {
+          month: months[date.getMonth()],
+          revenue: monthlyRevenue,
+          expenses: Math.round(monthlyRevenue * 0.2),
+        };
+      });
     }
-    if (!monthlyRevenue) return [];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const now = new Date();
-    return Array.from({ length: 6 }, (_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
-      return {
-        month: months[date.getMonth()],
-        revenue: monthlyRevenue,
-        expenses: Math.round(monthlyRevenue * 0.2),
-      };
-    });
-  }, [revenueTrendData, monthlyRevenue]);
+    // Slice to the number of months the range represents
+    return rawData.slice(-Math.min(monthsToShow, rawData.length));
+  }, [revenueTrendData, monthlyRevenue, range]);
   const chartCeiling = Math.max(...chartData.map((row) => Math.max(row.revenue || 0, row.expenses || 0)), 1);
 
   const occupancyData = [

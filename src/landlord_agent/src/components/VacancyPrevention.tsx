@@ -53,6 +53,12 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
     }
   });
 
+  const safeDate = (d: Date | string | undefined | null) => {
+    if (!d) return '—';
+    const dt = d instanceof Date ? d : new Date(d);
+    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('en-GB');
+  };
+
   const getRiskColor = (score: number) => {
     if (score >= 80) return 'text-red-600 bg-red-50 border-red-200';
     if (score >= 60) return 'text-orange-600 bg-orange-50 border-orange-200';
@@ -123,9 +129,7 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">Current Lease End</span>
                     </div>
-                    <span className="font-medium">
-                      {alert.currentTenantEndDate.toLocaleDateString('en-GB')}
-                    </span>
+                    <span className="font-medium">{safeDate(alert.currentTenantEndDate)}</span>
                   </div>
                   
                   <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
@@ -133,9 +137,7 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                       <AlertTriangle className="h-4 w-4 text-orange-600" />
                       <span className="text-sm">Predicted Vacancy</span>
                     </div>
-                    <span className="font-medium text-orange-600">
-                      {alert.predictedVacancyDate.toLocaleDateString('en-GB')}
-                    </span>
+                    <span className="font-medium text-orange-600">{safeDate(alert.predictedVacancyDate)}</span>
                   </div>
                   
                   <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -143,9 +145,7 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                       <Target className="h-4 w-4 text-green-600" />
                       <span className="text-sm">Start Marketing</span>
                     </div>
-                    <span className="font-medium text-green-600">
-                      {alert.recommendations.marketingStartDate.toLocaleDateString('en-GB')}
-                    </span>
+                    <span className="font-medium text-green-600">{safeDate(alert.recommendations.marketingStartDate)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -293,12 +293,18 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                   <span className="text-sm">{alert.propertyAddress}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Current Rent</span>
-                  <span className="font-medium">£2,400/month</span>
+                  <span className="text-sm text-muted-foreground">Recommended Rent</span>
+                  <span className="font-medium">
+                    {alert.recommendations?.optimalRentPrice
+                      ? `£${alert.recommendations.optimalRentPrice.toLocaleString()}/month`
+                      : '—'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Market Average</span>
-                  <span className="font-medium">£2,150/month</span>
+                  <span className="text-sm text-muted-foreground">Vacancy Risk Score</span>
+                  <span className={`font-medium ${alert.riskScore >= 80 ? 'text-red-600' : alert.riskScore >= 60 ? 'text-orange-600' : 'text-yellow-600'}`}>
+                    {alert.riskScore}%
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Urgency Level</span>
@@ -327,9 +333,7 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                     <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">Pre-Marketing Phase</p>
-                      <p className="text-sm text-muted-foreground">
-                        {alert.recommendations.marketingStartDate.toLocaleDateString('en-GB')}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{safeDate(alert.recommendations.marketingStartDate)}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 opacity-40">
@@ -337,7 +341,13 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                     <div className="flex-1">
                       <p className="text-sm font-medium">Active Marketing</p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(alert.recommendations.marketingStartDate.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB')}
+                        {(() => {
+                          const start = alert.recommendations.marketingStartDate instanceof Date
+                            ? alert.recommendations.marketingStartDate
+                            : new Date(alert.recommendations.marketingStartDate);
+                          const next = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+                          return safeDate(next);
+                        })()}
                       </p>
                     </div>
                   </div>

@@ -1,5 +1,5 @@
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
-import { ReferencingFormData, ReferencingDocument } from '../../../services/firestoreService';
+// ReferencingFormData and ReferencingDocument are declared locally below — no re-import needed
 
 export interface StoredFile {
   name: string;

@@ -29,7 +29,7 @@ interface SendContractModalProps {
     recipientName: string;
     recipientEmail: string;
     additionalEmail?: string;
-  }) => void;
+  }) => Promise<void>;
   tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
 }
 
@@ -151,7 +151,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
 
     setIsUploading(true);
     setUploadProgress(0);
-    setIsConverting(false);
+    setIsConverting(selectedFile != null);
 
     try {
       const contractData = {
@@ -161,31 +161,25 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
         additionalEmail: additionalEmail.trim() || undefined
       };
 
-      // If there's a file, show conversion progress
-      if (selectedFile) {
-        setIsConverting(true);
-        setUploadProgress(5);
-        
-        // Simulate progress during file processing
-        // Note: Actual progress is tracked in ContractsPage during conversion
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            if (prev >= 90) {
-              clearInterval(progressInterval);
-              return 90; // Keep at 90% until actual upload completes
-            }
-            return prev + 5;
-          });
-        }, 200);
-        
-        // Clear interval after a delay to prevent memory leaks
-        setTimeout(() => clearInterval(progressInterval), 10000);
+      // Animate progress while the parent processes
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => (prev >= 88 ? 88 : prev + 4));
+      }, 300);
+
+      try {
+        // Await the actual send so the modal stays open and progress bar is live
+        await onSend(contractData);
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        trackEvent('landlord_contract_sent', { has_file: !!selectedFile });
+      } catch (sendError: any) {
+        clearInterval(progressInterval);
+        setUploadProgress(0);
+        setErrors(prev => ({ ...prev, file: sendError?.message || 'Failed to send contract. Please try again.' }));
+        return; // Don't reset the form — let the user retry
       }
 
-      onSend(contractData);
-      trackEvent('landlord_contract_sent', { has_file: !!selectedFile });
-      
-      // Reset form
+      // Only reset after confirmed success
       setSelectedFile(null);
       setRecipientName('');
       setRecipientEmail('');
@@ -195,15 +189,9 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
       setSearchTerm('');
       setShowTenantList(true);
       setErrors({});
-      setUploadProgress(0);
-      setIsConverting(false);
-    } catch (error) {
-      console.error('Error sending contract:', error);
-      setErrors(prev => ({ ...prev, file: 'Failed to send contract. Please try again.' }));
     } finally {
       setIsUploading(false);
       setIsConverting(false);
-      setUploadProgress(0);
     }
   };
 

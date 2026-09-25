@@ -97,6 +97,16 @@ export class UserProfileController {
     return this.userProfileService.updateProfile(req.user.uid, safeBody);
   }
 
+  /** PUT /api/user/company-profile — save company profile nested inside user document */
+  @Put('user/company-profile')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Save or update company profile for the authenticated landlord/agent' })
+  @ApiResponse({ status: 200, description: 'Company profile saved' })
+  async updateCompanyProfile(@Req() req: any, @Body() body: any) {
+    return this.userProfileService.updateProfile(req.user.uid, { companyProfile: body });
+  }
+
   @Put('users/:id')
   @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')

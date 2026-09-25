@@ -16,6 +16,7 @@ import { paymentScheduleService, RentPaymentPeriod } from '../services/paymentSc
 import { tenantService } from '../services/tenantService';
 import { useTenantDetails } from '../hooks/useTenantDetails';
 import { ClientDetailsDrawer, clientInitials, type ClientStatusTone } from './ClientDetailsDrawer';
+import { uploadToFirebaseStorage } from '../../../services/storageService';
 
 interface TenantReference {
   id: string;
@@ -82,12 +83,23 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate, initialT
   const [paymentPeriods, setPaymentPeriods] = useState<RentPaymentPeriod[]>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
   const [updatingPayments, setUpdatingPayments] = useState<Record<string, boolean>>({});
+  // Persistent document list managed in React state (not mutated on displayTenant)
+  const [managedDocuments, setManagedDocuments] = useState<TenantDocument[]>([]);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const { tenantDetails: liveTenant, isLoading: isLoadingTenant } = useTenantDetails(tenant?.id);
 
   useEffect(() => {
     setActiveTab(initialTab || 'overview');
   }, [initialTab, tenant?.id]);
+
+  // Seed managed documents from existing tenant record whenever tenant changes
+  useEffect(() => {
+    const existing = (tenant as any)?.documents as TenantDocument[] | undefined;
+    setManagedDocuments(existing ? [...existing] : []);
+    setUploadError(null);
+  }, [tenant?.id]);
 
   // Fetch real referencing data from Firestore
   useEffect(() => {
@@ -106,7 +118,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate, initialT
       console.log('[TenantDetails] Referencing result:', result);
       
       setReferencingStatus(result.status);
-      setReferencingData(result.data || null);
+      setReferencingData((result.data as ReferencingDocument) || null);
       setIsLoadingReferencing(false);
     };
 
@@ -375,25 +387,33 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate, initialT
   }
 
   // Merge real tenant data with live updates
+  // Merge Firestore tenant with live profile data from Azure AD endpoint.
+  // IMPORTANT: liveTenant.status uses display-layer values ('notice', 'arrears', 'eviction')
+  // which are NOT compatible with Tenant.status ('active' | 'pending' | 'ended').
+  // We intentionally keep the authoritative Firestore status and only pull in
+  // display-safe fields (name, email, phone, avatar) from the live profile.
   const displayTenant: any = {
     ...tenant,
+    // Safe fields from live profile
     name: liveTenant?.name || tenant.name,
     email: liveTenant?.email || tenant.email,
     phone: liveTenant?.phone || tenant.phone,
     avatar: liveTenant?.avatar || tenant.avatar,
-    status: liveTenant?.status || tenant.status,
-    propertyAddress: liveTenant?.propertyAddress || tenant.propertyAddress || 'Not assigned',
+    // Status: always trust Firestore, never overwrite with the Azure endpoint value
+    status: tenant.status,
+    propertyAddress: tenant.propertyAddress || 'Not assigned',
     depositAmount: liveTenant?.depositAmount,
-    monthlyRent: liveTenant?.rentAmount || tenant.rentAmount,
-    rentAmount: liveTenant?.rentAmount || tenant.rentAmount,
+    monthlyRent: tenant.rentAmount,
+    rentAmount: tenant.rentAmount,
     tenancyType: 'assured-shorthold',
-    moveInDate: liveTenant?.leaseStart || tenant.leaseStart,
-    leaseStart: liveTenant?.leaseStart || tenant.leaseStart,
-    leaseEnd: liveTenant?.leaseEnd || tenant.leaseEnd,
-    emergencyContact: liveTenant?.emergencyContact || tenant.emergencyContact,
+    moveInDate: tenant.leaseStart,
+    leaseStart: tenant.leaseStart,
+    leaseEnd: tenant.leaseEnd,
+    emergencyContact: tenant.emergencyContact,
     notes: liveTenant?.notes || (tenant as Tenant & { notes?: string }).notes || '',
     maintenanceRequests: [],
-    documents: liveTenant?.documents || (tenant as Tenant & { documents?: TenantDocument[] }).documents || []
+    // Documents are managed via managedDocuments state — this field is for legacy compat only
+    documents: (tenant as Tenant & { documents?: TenantDocument[] }).documents || []
   };
 
   // Convert payment periods to display format
@@ -485,27 +505,58 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate, initialT
     }
   };
 
-  const handleDocumentUpload = (documentData: {
+  const handleDocumentUpload = async (documentData: {
     name: string;
     type: string;
     file: File;
     expiryDate?: string;
   }) => {
-    // Create new document object
-    const newDocument: TenantDocument = {
-      id: Date.now().toString(),
-      name: documentData.name,
-      type: documentData.type as TenantDocument['type'],
-      dateUploaded: new Date(),
-      expiryDate: documentData.expiryDate ? new Date(documentData.expiryDate) : undefined,
-      status: 'valid'
-    };
+    if (!tenant) return;
+    setIsUploadingDocument(true);
+    setUploadError(null);
 
-    // Add to displayTenant documents (in real app, this would be an API call)
-    displayTenant.documents = [...(displayTenant.documents || []), newDocument];
-    
-    console.log('Document uploaded:', newDocument);
-    // In a real app, you would call an API to save the document
+    try {
+      // 1. Upload the file to Firebase Storage under a scoped path
+      const storagePath = `tenant-documents/${tenant.id}`;
+      const result = await uploadToFirebaseStorage(documentData.file, storagePath);
+
+      if (!result.success || !result.url) {
+        throw new Error(result.error || 'Upload failed — no download URL returned');
+      }
+
+      // 2. Build the persisted document object
+      const newDocument: TenantDocument = {
+        id: Date.now().toString(),
+        name: documentData.name,
+        type: documentData.type as TenantDocument['type'],
+        dateUploaded: new Date(),
+        expiryDate: documentData.expiryDate ? new Date(documentData.expiryDate) : undefined,
+        status: 'valid',
+        downloadUrl: result.url,
+        fileSize: documentData.file.size,
+        fileType: documentData.file.type,
+      };
+
+      // 3. Persist to Firestore via tenantService
+      const updatedDocuments = [...managedDocuments, newDocument];
+      await tenantService.updateTenant(tenant.id, { documents: updatedDocuments } as any);
+
+      // 4. Update local state so the UI reflects the new document immediately
+      setManagedDocuments(updatedDocuments);
+
+      // Notify parent so its tenant state is also refreshed
+      if (onTenantUpdate) {
+        const refreshed = await tenantService.getTenant(tenant.id);
+        if (refreshed) onTenantUpdate(refreshed);
+      }
+
+      console.log('✅ [TenantDetails] Document uploaded and persisted:', newDocument.name);
+    } catch (error: any) {
+      console.error('❌ [TenantDetails] Document upload failed:', error);
+      setUploadError(error?.message || 'Failed to upload document. Please try again.');
+    } finally {
+      setIsUploadingDocument(false);
+    }
   };
 
   const getReferencingStatusLabel = (status: 'not-started' | 'in-progress' | 'complete') => {
@@ -577,8 +628,8 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate, initialT
     }
   };
 
-  // Combine display documents with referencing documents
-  const allDocuments = [...(displayTenant.documents || []), ...referencingDocuments];
+  // Combine persistently managed documents with referencing documents
+  const allDocuments = [...managedDocuments, ...referencingDocuments];
 
 const asDate = (value: unknown): Date | null => {
     if (!value) return null;
@@ -1097,7 +1148,12 @@ const asDate = (value: unknown): Date | null => {
 
       <DocumentUploadModal
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        isUploading={isUploadingDocument}
+        uploadError={uploadError}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setUploadError(null);
+        }}
         onUpload={handleDocumentUpload}
       />
     </>

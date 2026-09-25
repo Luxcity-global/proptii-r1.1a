@@ -379,6 +379,18 @@ export class ReferencingController {
     return await this.referencingService.submitApplication(userId, formData);
   }
 
+  // ── Referee & Guarantor responses by tenant email (landlord/agent view) ──────
+
+  @Get('referencing/responses/:tenantEmail')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Get referee and guarantor responses for a tenant by email (landlord/agent view)' })
+  @ApiParam({ name: 'tenantEmail', description: 'Tenant email address' })
+  @ApiResponse({ status: 200, description: 'Referee and guarantor responses' })
+  async getResponsesByEmail(@Param('tenantEmail') tenantEmail: string) {
+    return await this.refereeGuarantorService.getResponsesByEmail(tenantEmail);
+  }
+
   // ── Wildcard — must be LAST to avoid shadowing specific routes ────────────
 
   @Get(['referencing/:userId', 'applications/:userId'])

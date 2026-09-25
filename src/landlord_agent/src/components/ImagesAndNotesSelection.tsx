@@ -146,23 +146,31 @@ export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, im
   };
 
   const getImageBrightness = (img: HTMLImageElement): number => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return 0.5;
-    
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.drawImage(img, 0, 0);
-    
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    let brightness = 0;
-    
-    for (let i = 0; i < data.length; i += 4) {
-      brightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return 0.5;
+      
+      // Clamp dimensions to avoid huge memory allocations
+      const maxSize = 100;
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height, 1));
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      let brightness = 0;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        brightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+      }
+      
+      return brightness / (data.length / 4) / 255;
+    } catch {
+      // Cross-origin images throw a SecurityError on getImageData — return neutral brightness
+      return 0.5;
     }
-    
-    return brightness / (data.length / 4) / 255;
   };
 
   const dismissOnboarding = () => {

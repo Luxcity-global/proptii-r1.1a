@@ -231,7 +231,7 @@ export function ClientsPage({
   const [referencingStatuses, setReferencingStatuses] = useState<Map<string, 'not-started' | 'in-progress' | 'complete'>>(new Map());
   const [isLoadingReferencingStatuses, setIsLoadingReferencingStatuses] = useState(false);
 
-  const { landlords: liveLandlords, isLoading: isLandlordsLoading } = useLandlords();
+  const { landlords: liveLandlords, isLoading: isLandlordsLoading, refresh: refreshLandlords } = useLandlords();
   const showLandlordTab = userRole === 'agent';
 
   useEffect(() => {
@@ -294,6 +294,8 @@ export function ClientsPage({
     if (onDeleteLandlord) {
       selectedLandlords.forEach((landlordId) => onDeleteLandlord(landlordId));
       clearSelection();
+      // Re-fetch after deletions resolve
+      setTimeout(refreshLandlords, 500);
     }
   };
 
@@ -301,6 +303,7 @@ export function ClientsPage({
     if (onArchiveLandlord) {
       selectedLandlords.forEach((landlordId) => onArchiveLandlord(landlordId));
       clearSelection();
+      setTimeout(refreshLandlords, 500);
     }
   };
 

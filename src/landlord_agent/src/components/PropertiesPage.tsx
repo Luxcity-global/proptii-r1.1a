@@ -425,7 +425,7 @@ export function PropertiesPage({
       if (filterTab === 'attention') matchesTab = needsAttention(property, tenant);
       else if (filterTab === 'vacant') matchesTab = vacant;
       else if (filterTab === 'expiring') matchesTab = expiring;
-      else if (filterTab === 'drafts') matchesTab = false;
+      else if (filterTab === 'drafts') matchesTab = (property.status as string) === 'draft' || !property.address?.trim();
 
       let matchesLease = true;
       if (leaseStatusFilter === 'occupied') matchesLease = occupied && !expiring;
@@ -1276,14 +1276,12 @@ export function PropertiesPage({
       )}
       </div>
 
-      {/* Import Properties Dialog - Hidden for now */}
-      {/* 
+      {/* Import Properties Dialog */}
       <ImportPropertiesDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
         onImport={handleImportPropertiesSubmit}
       />
-      */}
     </div>
   );
 }

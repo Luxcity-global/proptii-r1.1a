@@ -55,6 +55,13 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
     fetchPaymentHistory();
   }, [tenant.id]);
 
+  // Safely coerce a Date | string | undefined to a displayable string
+  const safeDate = (value: Date | string | undefined | null): string => {
+    if (!value) return 'N/A';
+    const d = value instanceof Date ? value : new Date(value);
+    return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('en-GB');
+  };
+
   const getDaysOverdueColor = (days: number) => {
     if (days >= 30) return 'text-red-600 bg-red-50 border-red-200';
     if (days >= 14) return 'text-orange-600 bg-orange-50 border-orange-200';
@@ -187,11 +194,11 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                             payment.status === 'overdue' ? 'bg-red-500' : 'bg-orange-500'
                           }`}></div>
                           <div>
-                            <p className="font-medium">{payment.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</p>
+                            <p className="font-medium">{payment.date instanceof Date ? payment.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : safeDate(payment.date)}</p>
                             <p className="text-sm text-muted-foreground">
                               {payment.method}
                               {payment.daysLate && ` • ${payment.daysLate} days late`}
-                              {payment.paidDate && ` • Paid: ${payment.paidDate.toLocaleDateString('en-GB')}`}
+                              {payment.paidDate && ` • Paid: ${safeDate(payment.paidDate)}`}
                             </p>
                           </div>
                         </div>
@@ -224,7 +231,7 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                   </div>
                   <div>
                     <p className="font-medium">{tenant.name}</p>
-                    <p className="text-sm text-muted-foreground">Active since {tenant.leaseStart.toLocaleDateString('en-GB')}</p>
+                    <p className="text-sm text-muted-foreground">Active since {safeDate(tenant.leaseStart)}</p>
                   </div>
                 </div>
                 <Separator />
@@ -246,39 +253,60 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Lease End</span>
-                    <span className="font-medium">{tenant.leaseEnd.toLocaleDateString('en-GB')}</span>
+                    <span className="font-medium">{safeDate(tenant.leaseEnd)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Last Payment</span>
                     <span className="font-medium">
-                      {tenant.lastPaymentDate?.toLocaleDateString('en-GB') || 'N/A'}
+                      {tenant.lastPaymentDate ? safeDate(tenant.lastPaymentDate) : 'N/A'}
                     </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    if (tenant.phone) window.open(`tel:${tenant.phone}`, '_self');
+                    else alert('No phone number on record for this tenant.');
+                  }}
+                >
                   <Phone className="h-4 w-4 mr-2" />
                   Call Tenant
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    if (tenant.email) window.open(`mailto:${tenant.email}?subject=Rent%20Arrears%20Notice&body=Dear%20${encodeURIComponent(tenant.name)}%2C%0A%0AThis%20is%20a%20reminder%20that%20your%20rent%20payment%20is%20overdue.%0A%0APlease%20contact%20us%20at%20your%20earliest%20convenience.`, '_blank');
+                    else alert('No email address on record for this tenant.');
+                  }}
+                >
                   <Mail className="h-4 w-4 mr-2" />
                   Send Email
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => onInitiateWorkflow('reminder')}
+                >
                   <FileText className="h-4 w-4 mr-2" />
-                  View Lease Agreement
+                  Send Reminder Notice
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => onInitiateWorkflow('legal')}
+                >
                   <Download className="h-4 w-4 mr-2" />
-                  Download Legal Pack
+                  Initiate Legal Process
                 </Button>
               </CardContent>
             </Card>
@@ -303,7 +331,7 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                       <div>
                         <p className="font-medium">Last successful payment</p>
                         <p className="text-muted-foreground">
-                          {tenant.lastPaymentDate.toLocaleDateString('en-GB')}
+                          {safeDate(tenant.lastPaymentDate)}
                         </p>
                       </div>
                     </div>

@@ -56,8 +56,11 @@ class AlertService {
     if (filters?.status) query.append('status', filters.status);
     if (filters?.severity) query.append('severity', filters.severity);
 
-    const alerts = await apiService.get(`/alerts?${query.toString()}`);
-    return alerts.map((a: any) => ({
+    const response = await apiService.get(`/alerts?${query.toString()}`);
+    // The backend returns { alerts: [...] } — unwrap the envelope before mapping.
+    const raw = (response as any).alerts ?? (response as any).data?.alerts ?? response;
+    const list: any[] = Array.isArray(raw) ? raw : [];
+    return list.map((a: any) => ({
       ...a,
       leaseExpiryDate: a.leaseExpiryDate ? new Date(a.leaseExpiryDate) : undefined,
       contractSentDate: a.contractSentDate ? new Date(a.contractSentDate) : undefined,

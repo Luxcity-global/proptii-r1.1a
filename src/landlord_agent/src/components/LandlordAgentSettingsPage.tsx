@@ -14,7 +14,7 @@ import { getPlanById, type PlanId } from '../../../config/plans';
 import { createBillingPortalSession } from '../../../services/billingService';
 import { useIsMobile } from './ui/use-mobile';
 import LandlordPlanCompareModal from './LandlordPlanCompareModal';
-import { requestAuthAction } from '../utils/authBridge';
+import { requestAuthAction, openInParentApp } from '../utils/authBridge';
 
 function normalizePlanId(plan: string | null): PlanId {
   return (plan === 'free' ? 'explorer' : plan ?? 'explorer') as PlanId;

@@ -205,6 +205,20 @@ export class TenantsService {
     }
   }
 
+  async getPaymentPeriod(periodId: string) {
+    const col = this.paymentsCol;
+    if (!col) return null;
+
+    try {
+      const snap = await withTimeout(col.doc(periodId).get());
+      if (!snap.exists) return null;
+      return { id: snap.id, ...snap.data() };
+    } catch (err: any) {
+      this.logger.warn(`getPaymentPeriod error: ${err?.message || err}`);
+      return null;
+    }
+  }
+
   async updatePaymentStatus(periodId: string, status: string, notes?: string) {
     const col = this.paymentsCol;
     if (!col) return { success: true };

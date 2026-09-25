@@ -67,13 +67,13 @@ class PaymentScheduleService {
     const firstPayment = tenant.firstPaymentDate ? this.startOfDay(new Date(tenant.firstPaymentDate)) : this.startOfDay(new Date());
     const now = new Date();
 
-    let currentStart = firstPayment;
+    // Advance currentStart to the period that contains 'now'.
+    // The condition safety === 0 was incorrectly forcing an advance on the
+    // very first iteration regardless of date, which could skip the actual
+    // current period when firstPaymentDate is in the future.
     let safety = 0;
     while (this.addDays(currentStart, intervalDays) <= now && safety < 1000) {
-      const nextStart = this.addDays(currentStart, intervalDays);
-      if (nextStart <= now || safety === 0) {
-        currentStart = nextStart;
-      }
+      currentStart = this.addDays(currentStart, intervalDays);
       safety += 1;
     }
 
@@ -235,8 +235,18 @@ class PaymentScheduleService {
   }
 
   async unmarkPeriodPaid(periodId: string): Promise<void> {
-    // For now we assume unmark means we set to pending. True logic would fetch and check end date.
-    await this.markPeriodStatus(periodId, 'pending', { paidAt: null });
+    // Check if the period has already ended — if so it should be overdue, not pending
+    try {
+      const response = await apiService.get(`/payments/${periodId}`);
+      const period = response.period || response;
+      const periodEnd = period?.periodEnd ? new Date(period.periodEnd) : null;
+      const now = new Date();
+      const correctStatus: RentPaymentStatus = periodEnd && periodEnd < now ? 'overdue' : 'pending';
+      await this.markPeriodStatus(periodId, correctStatus, { paidAt: null });
+    } catch {
+      // Fallback: if we can't fetch the period, default to pending
+      await this.markPeriodStatus(periodId, 'pending', { paidAt: null });
+    }
   }
 
   async refreshOverdueStatuses(tenantId: string): Promise<number> {

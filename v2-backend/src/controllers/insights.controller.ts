@@ -27,6 +27,16 @@ export class InsightsController {
     return this.insightsService.getMarketInsights(q, location);
   }
 
+  /** GET /api/insights/active — alias used by the frontend dashboard */
+  @Get('active')
+  @ApiOperation({ summary: 'Get active market insights (frontend alias)' })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'location', required: false })
+  @ApiResponse({ status: 200, description: 'Active market insights' })
+  async getActive(@Query('q') q?: string, @Query('location') location?: string) {
+    return this.insightsService.getMarketInsights(q, location);
+  }
+
   /** GET /api/insights/price-trends */
   @Get('price-trends')
   @ApiOperation({ summary: 'Get rental and sale price trends by postcode' })

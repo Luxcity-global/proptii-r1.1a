@@ -41,21 +41,20 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const skipSyncRef = useRef(false);
 
-  // Sync local photos with property photos when property changes
-  // Only sync when property ID changes (new property selected) or when we don't have unsaved changes
+  // Sync local photos with property photos.
+  // Only runs when the property ID changes (switching to a different property)
+  // or when there are no unsaved changes and the parent has new photos.
   useEffect(() => {
-    if (property) {
-      if (!skipSyncRef.current) {
-        // Only sync if we don't have unsaved changes (to preserve user's work)
-        if (!hasUnsavedChanges) {
-          setLocalPhotos(property.photos);
-        }
-      } else {
-        // If we just saved, reset the skip flag
-        skipSyncRef.current = false;
-      }
+    if (!property) return;
+    if (skipSyncRef.current) {
+      skipSyncRef.current = false;
+      return;
     }
-  }, [property?.id]); // Reset when property ID changes (new property selected)
+    if (!hasUnsavedChanges) {
+      setLocalPhotos(property.photos ?? []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property?.id, property?.photos]);
 
   if (!property) {
     return (
@@ -83,67 +82,59 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || !property) return;
 
-    const { storage } = await import('../config/firebase');
-    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-
     for (let index = 0; index < files.length; index++) {
       const file = files[index];
-      if (file.type.startsWith('image/')) {
-        const timestamp = Date.now();
-        let downloadUrl = '';
+      if (!file.type.startsWith('image/')) continue;
 
-        // 1. Try backend storage upload first
-        try {
-          const apiBase = getResolvedApiBaseUrl();
-          const formData = new FormData();
-          formData.append('file', file, file.name);
-          formData.append('folder', 'properties/photos');
+      const timestamp = Date.now();
+      let downloadUrl = '';
 
-          const token = await getAccessTokenForApiRequest().catch(() => null);
-          const headers: Record<string, string> = {};
-          if (token) headers['Authorization'] = `Bearer ${token}`;
+      // Upload through the v2-backend storage endpoint — no client-side Firebase SDK fallback.
+      try {
+        const apiBase = getResolvedApiBaseUrl();
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        formData.append('folder', 'properties/photos');
 
-          const res = await fetch(`${apiBase}/storage/upload`, {
-            method: 'POST',
-            headers,
-            body: formData,
-          });
+        const token = await getAccessTokenForApiRequest().catch(() => null);
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-          if (res.ok) {
-            const data = await res.json();
-            if (data.url) {
-              downloadUrl = data.url;
-              console.log(`✅ Uploaded photo ${file.name} via backend storage:`, downloadUrl);
-            }
+        const res = await fetch(`${apiBase}/storage/upload`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            downloadUrl = data.url;
+            console.log(`✅ Uploaded photo ${file.name} via backend storage:`, downloadUrl);
+          } else {
+            throw new Error('Backend storage returned no URL');
           }
-        } catch (apiErr) {
-          console.warn('Backend storage upload error in PhotoManagement, trying client SDK:', apiErr);
+        } else {
+          const errText = await res.text().catch(() => '');
+          throw new Error(`Backend storage upload failed (${res.status}): ${errText}`);
         }
+      } catch (apiErr) {
+        console.error('❌ Photo upload failed:', apiErr);
+        // Surface the error rather than silently falling back to the client SDK
+        alert(`Failed to upload ${file.name}: ${(apiErr as Error).message}`);
+        continue;
+      }
 
-        // 2. Fallback to client Firebase Storage SDK
-        if (!downloadUrl) {
-          try {
-            const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-            const photoRef = ref(storage, `properties/photos/${property.id || 'new'}/${timestamp}_${index}_${cleanName}`);
-            await uploadBytes(photoRef, file);
-            downloadUrl = await getDownloadURL(photoRef);
-            console.log(`✅ Uploaded photo ${file.name} via client storage:`, downloadUrl);
-          } catch (clientErr) {
-            console.error('All storage upload attempts failed for photo:', file.name, clientErr);
-          }
-        }
-
-        if (downloadUrl) {
-          const newPhoto: PropertyPhoto = {
-            id: `${timestamp}-${index}`,
-            url: downloadUrl,
-            filename: file.name,
-            isCover: localPhotos.length === 0 && index === 0,
-            room: undefined
-          };
-          setLocalPhotos(prev => [...prev, newPhoto]);
-          setHasUnsavedChanges(true);
-        }
+      if (downloadUrl) {
+        const newPhoto: PropertyPhoto = {
+          id: `${timestamp}-${index}`,
+          url: downloadUrl,
+          filename: file.name,
+          isCover: localPhotos.length === 0 && index === 0,
+          room: undefined
+        };
+        setLocalPhotos(prev => [...prev, newPhoto]);
+        setHasUnsavedChanges(true);
       }
     }
   };
@@ -467,6 +458,14 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
+                        // Trigger a browser download using an anchor element
+                        const a = document.createElement('a');
+                        a.href = photo.url;
+                        a.download = photo.filename || 'photo';
+                        a.target = '_blank';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
                       }}
                     >
                       <Download className="w-4 h-4" />
@@ -571,14 +570,21 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      if (selectedPhoto) {
+                        const a = document.createElement('a');
+                        a.href = selectedPhoto.url;
+                        a.download = selectedPhoto.filename || 'photo';
+                        a.target = '_blank';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                      }
+                    }}>
                       <Download className="w-4 h-4 mr-2" />
                       Download
                     </Button>
-                    <Button variant="outline" size="sm">
-                      <Edit3 className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
+                    {/* Edit functionality reserved for future enhancement */}
                   </div>
                 </div>
               </div>

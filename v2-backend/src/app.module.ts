@@ -29,6 +29,7 @@ import { RefereeGuarantorController } from './controllers/referee-guarantor.cont
 import { TenantsController } from './controllers/tenants.controller';
 import { PaymentsController } from './controllers/payments.controller';
 import { EmailController } from './controllers/email.controller';
+import { TenantInvitationsController } from './controllers/tenant-invitations.controller';
 import { TenantsService } from './services/tenants.service';
 
 // ── R1.4 — Search Classifier (Sprint 1.3) ────────────────────────────────────
@@ -136,6 +137,7 @@ function resolvePublicFolder(folder: string): string {
     PaymentsController,
     EmailController,
     StorageController,
+    TenantInvitationsController,
     // R1.4 Sprint 1.3
     ClassifierController,
     // R1.4 Sprint 2.1

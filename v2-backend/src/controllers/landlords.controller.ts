@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { LandlordsService } from '../services/landlords.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -44,5 +44,47 @@ export class LandlordsController {
   @ApiResponse({ status: 200, description: 'Array of client landlords' })
   async getClientLandlords() {
     return this.landlordsService.getAllLandlords();
+  }
+
+  /** POST /api/clients/landlords — create landlord (frontend compatibility alias for /api/landlords/register) */
+  @Post('clients/landlords')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Create a new landlord record (compatibility alias for /api/landlords/register)' })
+  @ApiResponse({ status: 201, description: 'Landlord created' })
+  async createClientLandlord(@Body() body: any) {
+    const result = await this.landlordsService.registerLandlord(body);
+    return { ...result, id: result.id };
+  }
+
+  /** GET /api/clients/landlords/:id — get single landlord by ID */
+  @Get('clients/landlords/:id')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Get a single landlord record by ID' })
+  @ApiResponse({ status: 200, description: 'Landlord record' })
+  @ApiResponse({ status: 404, description: 'Not found' })
+  async getClientLandlordById(@Param('id') id: string) {
+    return this.landlordsService.getLandlordById(id);
+  }
+
+  /** PUT /api/clients/landlords/:id — update landlord */
+  @Put('clients/landlords/:id')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Update a landlord record by ID' })
+  @ApiResponse({ status: 200, description: 'Updated' })
+  async updateClientLandlord(@Param('id') id: string, @Body() body: any) {
+    return this.landlordsService.updateLandlord(id, body);
+  }
+
+  /** DELETE /api/clients/landlords/:id — delete landlord */
+  @Delete('clients/landlords/:id')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Delete a landlord record by ID' })
+  @ApiResponse({ status: 200, description: 'Deleted' })
+  async deleteClientLandlord(@Param('id') id: string) {
+    return this.landlordsService.deleteLandlord(id);
   }
 }
