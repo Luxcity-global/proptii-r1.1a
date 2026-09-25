@@ -108,12 +108,18 @@ export class FirebaseAuthGuard implements CanActivate {
           } catch {}
         }
 
+        // Default to 'landlord' — users authenticated via Azure B2C / Firebase who have
+        // not yet had a role written to their Firestore record should be treated as
+        // landlords so that property/tenant creation is not blocked by RolesGuard.
+        const effectiveRole = role || 'landlord';
+
         request.user = {
+          ...decodedToken,
           uid: decodedToken.uid,
           sub: decodedToken.uid,
           email: decodedToken.email,
-          role: role || null,
-          ...decodedToken,
+          // Ensure effectiveRole wins over any stale value baked into the JWT
+          role: effectiveRole,
         };
 
         return true;

@@ -113,7 +113,8 @@ export class NativePropertiesController {
   @ApiResponse({ status: 200, description: 'Property updated' })
   async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     const userId = req.user?.uid;
-    return await this.propertiesService.update(id, userId, body);
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    return await this.propertiesService.update(id, userId, userEmail, body);
   }
 
   @Delete(':id')
@@ -125,7 +126,8 @@ export class NativePropertiesController {
   @ApiResponse({ status: 200, description: 'Property deleted' })
   async remove(@Req() req: any, @Param('id') id: string) {
     const userId = req.user?.uid;
-    await this.propertiesService.remove(id, userId);
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    await this.propertiesService.remove(id, userId, userEmail);
     return { message: 'Property deleted' };
   }
 }

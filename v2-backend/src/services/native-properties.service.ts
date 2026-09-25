@@ -103,7 +103,7 @@ export class NativePropertiesService {
     }
   }
 
-  async update(id: string, userId: string, data: any) {
+  async update(id: string, userId: string, userEmail: string, data: any) {
     const col = this.collection;
     if (!col) {
       throw new InternalServerErrorException('Firestore database connection is unavailable.');
@@ -116,7 +116,15 @@ export class NativePropertiesService {
     }
 
     const existing = doc.data();
-    if (existing?.userId !== userId && existing?.landlordId !== userId) {
+    const normalizedOwnerEmail = (existing?.ownerEmail || '').toLowerCase().trim();
+    const normalizedUserEmail = (userEmail || '').toLowerCase().trim();
+
+    const isOwner =
+      existing?.userId === userId ||
+      existing?.landlordId === userId ||
+      (normalizedOwnerEmail && normalizedOwnerEmail === normalizedUserEmail);
+
+    if (!isOwner) {
       throw new NotFoundException('Property not found or unauthorized');
     }
 
@@ -128,7 +136,7 @@ export class NativePropertiesService {
     return { id, ...existing, ...updatedData };
   }
 
-  async remove(id: string, userId: string) {
+  async remove(id: string, userId: string, userEmail: string) {
     const col = this.collection;
     if (!col) {
       throw new InternalServerErrorException('Firestore database connection is unavailable.');
@@ -141,7 +149,15 @@ export class NativePropertiesService {
     }
 
     const existing = doc.data();
-    if (existing?.userId !== userId && existing?.landlordId !== userId) {
+    const normalizedOwnerEmail = (existing?.ownerEmail || '').toLowerCase().trim();
+    const normalizedUserEmail = (userEmail || '').toLowerCase().trim();
+
+    const isOwner =
+      existing?.userId === userId ||
+      existing?.landlordId === userId ||
+      (normalizedOwnerEmail && normalizedOwnerEmail === normalizedUserEmail);
+
+    if (!isOwner) {
       throw new NotFoundException('Property not found or unauthorized');
     }
 

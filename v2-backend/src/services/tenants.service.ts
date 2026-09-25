@@ -98,14 +98,14 @@ export class TenantsService {
     };
   }
 
-  async getTenants(userId?: string, ownedPropertyIds?: string[], userEmail?: string) {
+  async getTenants(userId?: string, ownedPropertyIds?: string[], userEmail?: string, extraUserId?: string) {
     const col = this.collection;
     if (!col) return { success: true, tenants: [] };
 
     try {
       const docMap = new Map<string, any>();
 
-      // 1. Query by userId (UID)
+      // 1. Query by userId (UID from JWT)
       if (userId) {
         try {
           const snap1 = await withTimeout(col.where('userId', '==', userId).get(), 15000);
@@ -116,6 +116,7 @@ export class TenantsService {
       }
 
       // 2. Query by userEmail if provided and different from userId
+      //    (catches tenants stored with email as userId)
       const email = userEmail?.toLowerCase()?.trim();
       if (email && email !== userId) {
         try {
@@ -126,7 +127,17 @@ export class TenantsService {
         }
       }
 
-      // 3. Query by ownedPropertyIds
+      // 3. Query by extraUserId from query param (e.g. email string passed explicitly by frontend)
+      if (extraUserId && extraUserId !== userId && extraUserId !== email) {
+        try {
+          const snap4 = await withTimeout(col.where('userId', '==', extraUserId).get(), 15000);
+          snap4.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        } catch (e: any) {
+          this.logger.warn(`getTenants by extraUserId error: ${e?.message}`);
+        }
+      }
+
+      // 4. Query by ownedPropertyIds
       if (ownedPropertyIds && ownedPropertyIds.length > 0) {
         // Firestore "in" queries support up to 30 elements per batch
         for (let i = 0; i < ownedPropertyIds.length; i += 30) {

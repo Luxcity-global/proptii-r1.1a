@@ -48,11 +48,16 @@ class TenantService {
 
   async getTenants(ownerUserId?: string, ownedPropertyIds?: Set<string>): Promise<Tenant[]> {
     try {
-      const propIdsParam = ownedPropertyIds && ownedPropertyIds.size > 0 
-        ? `?ownedPropertyIds=${Array.from(ownedPropertyIds).join(',')}` 
-        : '';
-        
-      const response = await apiService.get(`/tenants${propIdsParam}`);
+      // Build query params — pass userId so backend can use it as a fallback
+      // alongside the JWT uid for users whose tenants were stored with email as userId
+      const params = new URLSearchParams();
+      if (ownerUserId) params.append('userId', ownerUserId);
+      if (ownedPropertyIds && ownedPropertyIds.size > 0) {
+        params.append('ownedPropertyIds', Array.from(ownedPropertyIds).join(','));
+      }
+      const queryString = params.toString() ? `?${params.toString()}` : '';
+
+      const response = await apiService.get(`/tenants${queryString}`);
       // Unwrap ApiResponse envelope
       const payload = (response as any).data ?? response;
       const list = payload.tenants || payload || [];
