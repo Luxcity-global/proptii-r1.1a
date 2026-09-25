@@ -88,11 +88,11 @@ export class NativePropertiesController {
 
   @Post()
   @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('landlord', 'agent')
+  @Roles('landlord', 'agent', 'homeowner')
   @ApiBearerAuth('bearer')
-  @ApiOperation({ summary: 'Create new native property listing (landlord or agent)' })
+  @ApiOperation({ summary: 'Create new native property listing (landlord, agent, homeowner)' })
   @ApiResponse({ status: 201, description: 'Property created' })
-  @ApiResponse({ status: 403, description: 'Forbidden if not landlord or agent' })
+  @ApiResponse({ status: 403, description: 'Forbidden if not landlord, agent, or homeowner' })
   async create(@Req() req: any, @Body() body: any) {
     const email = req.user?.email || '';
     const userId = req.user?.uid;
@@ -106,7 +106,7 @@ export class NativePropertiesController {
 
   @Put(':id')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('landlord', 'agent')
+  @Roles('landlord', 'agent', 'homeowner')
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Update native property listing' })
   @ApiParam({ name: 'id', description: 'Property ID' })
@@ -118,7 +118,7 @@ export class NativePropertiesController {
 
   @Delete(':id')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('landlord', 'agent')
+  @Roles('landlord', 'agent', 'homeowner')
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Delete native property listing' })
   @ApiParam({ name: 'id', description: 'Property ID' })

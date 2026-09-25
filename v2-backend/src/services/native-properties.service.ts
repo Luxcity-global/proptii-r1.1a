@@ -1,14 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('Firestore operation timed out')), timeoutMs)
-    ),
-  ]);
-}
 
 @Injectable()
 export class NativePropertiesService {
@@ -27,11 +18,11 @@ export class NativePropertiesService {
   }
 
   async searchPublic(query = '', limit = 50) {
-    try {
-      const col = this.collection;
-      if (!col) return [];
+    const col = this.collection;
+    if (!col) return [];
 
-      const snapshot = await withTimeout(col.limit(limit).get(), 2000);
+    try {
+      const snapshot = await col.limit(limit).get();
       let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       if (query) {
@@ -46,16 +37,16 @@ export class NativePropertiesService {
 
       return docs;
     } catch (err: any) {
-      console.warn('[NativePropertiesService] Firestore search timed out or unavailable:', err?.message || err);
+      console.warn('[NativePropertiesService] Firestore search error:', err?.message || err);
       return [];
     }
   }
 
   async findAllByUser(userId?: string, email?: string) {
-    try {
-      const col = this.collection;
-      if (!col) return [];
+    const col = this.collection;
+    if (!col) return [];
 
+    try {
       let ref: admin.firestore.Query = col;
       if (userId) {
         ref = ref.where('userId', '==', userId);
@@ -63,26 +54,26 @@ export class NativePropertiesService {
         ref = ref.where('ownerEmail', '==', email.toLowerCase().trim());
       }
 
-      const snapshot = await withTimeout(ref.get(), 2000);
+      const snapshot = await ref.get();
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } catch (err: any) {
-      console.warn('[NativePropertiesService] Firestore query timed out or unavailable:', err?.message || err);
+      console.warn('[NativePropertiesService] Firestore findAllByUser error:', err?.message || err);
       return [];
     }
   }
 
   async findById(id: string) {
-    try {
-      const col = this.collection;
-      if (!col) return null;
+    const col = this.collection;
+    if (!col) return null;
 
-      const doc = await withTimeout(col.doc(id).get(), 2000);
+    try {
+      const doc = await col.doc(id).get();
       if (!doc.exists) {
         return null;
       }
       return { id: doc.id, ...doc.data() };
     } catch (err: any) {
-      console.warn('[NativePropertiesService] Firestore findById timed out or unavailable:', err?.message || err);
+      console.warn('[NativePropertiesService] Firestore findById error:', err?.message || err);
       return null;
     }
   }
@@ -90,7 +81,7 @@ export class NativePropertiesService {
   async create(data: any) {
     const col = this.collection;
     if (!col) {
-      return { id: `local_${Date.now()}`, ...data };
+      throw new InternalServerErrorException('Firestore database connection is unavailable. Property could not be saved to DB.');
     }
 
     try {
@@ -101,62 +92,59 @@ export class NativePropertiesService {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
-      await withTimeout(docRef.set(propertyData), 2000);
+      await docRef.set(propertyData);
+      console.log(`[NativePropertiesService] Successfully saved property ${docRef.id} to Firestore.`);
       return propertyData;
-    } catch {
-      return { id: `local_${Date.now()}`, ...data };
+    } catch (err: any) {
+      console.error('[NativePropertiesService] Failed to save property to Firestore:', err);
+      throw new InternalServerErrorException(`Failed to save property to database: ${err?.message || err}`);
     }
   }
 
   async update(id: string, userId: string, data: any) {
     const col = this.collection;
-    if (!col) return { id, ...data };
-
-    try {
-      const docRef = col.doc(id);
-      const doc = await withTimeout(docRef.get(), 2000);
-      if (!doc.exists) {
-        throw new NotFoundException('Property not found');
-      }
-
-      const existing = doc.data();
-      if (existing?.userId !== userId && existing?.landlordId !== userId) {
-        throw new NotFoundException('Property not found or unauthorized');
-      }
-
-      const updatedData = {
-        ...data,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
-      await withTimeout(docRef.update(updatedData), 2000);
-      return { id, ...existing, ...updatedData };
-    } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-      return { id, ...data };
+    if (!col) {
+      throw new InternalServerErrorException('Firestore database connection is unavailable.');
     }
+
+    const docRef = col.doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      throw new NotFoundException('Property not found');
+    }
+
+    const existing = doc.data();
+    if (existing?.userId !== userId && existing?.landlordId !== userId) {
+      throw new NotFoundException('Property not found or unauthorized');
+    }
+
+    const updatedData = {
+      ...data,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    await docRef.update(updatedData);
+    return { id, ...existing, ...updatedData };
   }
 
   async remove(id: string, userId: string) {
     const col = this.collection;
-    if (!col) return { success: true };
-
-    try {
-      const docRef = col.doc(id);
-      const doc = await withTimeout(docRef.get(), 2000);
-      if (!doc.exists) {
-        throw new NotFoundException('Property not found');
-      }
-
-      const existing = doc.data();
-      if (existing?.userId !== userId && existing?.landlordId !== userId) {
-        throw new NotFoundException('Property not found or unauthorized');
-      }
-
-      await withTimeout(docRef.delete(), 2000);
-      return { success: true };
-    } catch (e: any) {
-      if (e instanceof NotFoundException) throw e;
-      return { success: true };
+    if (!col) {
+      throw new InternalServerErrorException('Firestore database connection is unavailable.');
     }
+
+    const docRef = col.doc(id);
+    const doc = await docRef.get();
+    if (!doc.exists) {
+      throw new NotFoundException('Property not found');
+    }
+
+    const existing = doc.data();
+    if (existing?.userId !== userId && existing?.landlordId !== userId) {
+      throw new NotFoundException('Property not found or unauthorized');
+    }
+
+    await docRef.delete();
+    return { success: true };
   }
 }
+

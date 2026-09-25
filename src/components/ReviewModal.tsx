@@ -80,27 +80,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
       setFeedback('');
     } catch (error) {
       console.error('Failed to submit review:', error);
-      // Fallback: store in localStorage as backup
-      const reviewData = {
-        rating,
-        feedback: feedback.trim() || 'No feedback provided',
-        userType,
-        timestamp: new Date().toISOString(),
-        source: source,
-        userId: userId || 'Anonymous',
-        userEmail: userEmail || 'No email provided'
-      };
-      
-      const existingReviews = JSON.parse(localStorage.getItem('proptii_reviews') || '[]');
-      existingReviews.push(reviewData);
-      localStorage.setItem('proptii_reviews', JSON.stringify(existingReviews));
-      
-      toast.success('Thank you for your feedback!');
-      onClose();
-      
-      // Reset form
-      setRating(0);
-      setFeedback('');
+      toast.error('Failed to submit feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

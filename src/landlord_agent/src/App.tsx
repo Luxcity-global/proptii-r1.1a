@@ -1386,18 +1386,12 @@ export function AppContent() {
         console.log('Property added to Firebase:', propertyId);
         return propertyId;
       } else {
-        throw new Error('Failed to retrieve created property');
+        throw new Error('Failed to retrieve created property from database');
       }
     } catch (error) {
-      console.error('Error adding property to Firebase:', error);
-      // Fallback to local state if Firebase fails
-      const newProperty: Property = {
-        ...(safeProperty as any),
-        id: Date.now().toString(),
-        createdAt: new Date(),
-      };
-      setProperties(prev => [...prev, newProperty]);
-      return newProperty.id;
+      console.error('Error adding property to database:', error);
+      // Do NOT fall back to fake local state or IDs. Ensure error is propagated.
+      throw error;
     }
   };
 
@@ -1444,14 +1438,8 @@ export function AppContent() {
         });
       }
     } catch (error) {
-      console.error('Error updating property in Firebase:', error);
-      // Fallback to local state update if Firebase fails
-      setProperties(prev =>
-        prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
-      );
-      if (selectedProperty && selectedProperty.id === propertyId) {
-        setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
-      }
+      console.error('Error updating property in database:', error);
+      throw error;
     }
   };
 
@@ -3213,14 +3201,10 @@ export function AppContent() {
                     }
                   }
 
-                  // 6. Fetch created property or fallback to local constructed property
-                  let createdProperty = await propertyService.getProperty(propertyId).catch(() => null);
+                  // 6. Fetch created property from DB
+                  const createdProperty = await propertyService.getProperty(propertyId);
                   if (!createdProperty) {
-                    createdProperty = {
-                      ...newProperty,
-                      id: propertyId,
-                      createdAt: new Date(),
-                    } as Property;
+                    throw new Error('Property was created but could not be verified in the database. Please check your properties list.');
                   }
 
                   selectProperty(createdProperty);

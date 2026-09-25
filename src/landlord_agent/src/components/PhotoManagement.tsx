@@ -184,7 +184,7 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
     setHasUnsavedChanges(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!property) return;
     
     // Process photos: replace temp IDs with proper IDs for new photos
@@ -201,13 +201,18 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
       return photo;
     });
     
-    // Update all photos at once (including new photos, updates, and reordering)
-    updateProperty(property.id, { photos: photosToSave });
-    
-    // Update local state with the new IDs and mark as saved
-    setLocalPhotos(photosToSave);
-    setHasUnsavedChanges(false);
-    skipSyncRef.current = true; // Prevent immediate sync that would overwrite our changes
+    try {
+      // Update all photos at once (including new photos, updates, and reordering) in database
+      await updateProperty(property.id, { photos: photosToSave });
+      
+      // Update local state with the new IDs and mark as saved only after DB update succeeds
+      setLocalPhotos(photosToSave);
+      setHasUnsavedChanges(false);
+      skipSyncRef.current = true; // Prevent immediate sync that would overwrite our changes
+    } catch (err: any) {
+      console.error('Failed to save photos to database:', err);
+      alert(`Failed to save photos to database: ${err?.message || err}`);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, photoId: string) => {
