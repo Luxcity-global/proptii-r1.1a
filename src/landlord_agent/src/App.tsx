@@ -56,6 +56,7 @@ import {
   getAgentDummyProperties,
   getAgentDummyTenants,
   isAgentTestAccount,
+  mergeAgentDemoProperties,
   mergeById,
 } from './data/agentTestPersona';
 
@@ -555,7 +556,11 @@ export function AppContent() {
       });
 
       if (agentPersona) {
-        setProperties((prev) => (prev.length === 0 ? getAgentDummyProperties() : prev));
+        setProperties((prev) =>
+          prev.length === 0
+            ? getAgentDummyProperties()
+            : mergeAgentDemoProperties(getAgentDummyProperties(), prev),
+        );
         setTenants((prev) => (prev.length === 0 ? getAgentDummyTenants() : prev));
         setIsPortfolioLoading(false);
       }
@@ -1044,7 +1049,7 @@ export function AppContent() {
         if (!cancelled) {
           setProperties(
             isAgentTestAccount(currentUserId, userEmail)
-              ? mergeById(getAgentDummyProperties(), fetchedProperties)
+              ? mergeAgentDemoProperties(getAgentDummyProperties(), fetchedProperties)
               : fetchedProperties
           );
         }
@@ -1713,6 +1718,9 @@ export function AppContent() {
               navigateToScreen('photo-management');
             }}
             onViewInsights={() => handleNavigation('insights')}
+            onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
             onViewAllProperties={() => handleNavigation('properties')}
             onViewViewings={() => handleNavigation('viewings')}
             onViewClients={() => handleNavigation('clients')}
@@ -2048,6 +2056,9 @@ export function AppContent() {
                 alert('Failed to export documents. Please try again.');
               }
             }}
+            onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
             userProfile={userProfile}
           />
         );
@@ -2064,6 +2075,10 @@ export function AppContent() {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
             }}
+            onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
+            onViewInsights={() => handleNavigation('insights')}
           />
         );
 
@@ -2256,6 +2271,9 @@ export function AppContent() {
             }}
             // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
             onViewInsights={() => {/* navigateToScreen('portfolio-insights') */ }}
+            onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
+            onViewSettings={() => handleNavigation('settings')}
+            onViewNotifications={() => handleNavigation('messages')}
             onViewAllProperties={() => handleNavigation('properties')}
             onViewViewings={() => handleNavigation('viewings')}
             onViewClients={() => handleNavigation('clients')}

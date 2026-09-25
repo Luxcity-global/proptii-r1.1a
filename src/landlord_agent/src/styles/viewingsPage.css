@@ -1,0 +1,1371 @@
+/* Landlord viewings page — scoped to .ll-vw */
+
+.ll-vw {
+  --ll-bg: #f8fafc;
+  --ll-card: #ffffff;
+  --ll-text: #1e293b;
+  --ll-muted: #64748b;
+  --ll-light: #94a3b8;
+  --ll-orange: #dc5f12;
+  --ll-orange-hover: #ba4e0b;
+  --ll-blue: #136c9e;
+  --ll-blue-hover: #0f567e;
+  --ll-border: #e2e8f0;
+  font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--ll-bg);
+  color: var(--ll-text);
+  min-height: 100%;
+  padding: 0 20px 40px;
+}
+
+.ll-vw h1,
+.ll-vw h2,
+.ll-vw h3,
+.ll-vw .ll-vw-heading {
+  font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 600;
+}
+
+.ll-vw-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Header */
+.ll-vw-header {
+  background: #fff;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.ll-vw-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: nowrap;
+  padding: 20px 0;
+}
+
+.ll-vw-header-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 480px;
+}
+
+.ll-vw-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.ll-vw-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  max-width: 460px;
+  white-space: normal;
+}
+
+.ll-vw-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.ll-vw-header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--ll-border);
+  background: #fff;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.ll-vw-header-icon:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.ll-vw-header-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: var(--ll-orange);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.ll-vw-header-icon.refreshing svg {
+  animation: ll-vw-spin 0.7s linear infinite;
+}
+
+@keyframes ll-vw-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ll-vw-btn-insights {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--ll-border);
+  background: #fff;
+  color: #334155;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s;
+}
+
+.ll-vw-btn-insights:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.ll-vw-insights-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: #f5f3ff;
+  color: #7c3aed;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ll-vw-btn-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: none;
+  background: var(--ll-orange);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(220, 95, 18, 0.25);
+  transition: all 0.2s;
+}
+
+.ll-vw-btn-cta:hover {
+  background: var(--ll-orange-hover);
+}
+
+.ll-vw-btn-cta:active {
+  transform: scale(0.97);
+}
+
+/* Body */
+.ll-vw-body {
+  padding: 24px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Feedback */
+.ll-vw-feedback {
+  border-radius: 14px;
+  border: 1px solid transparent;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ll-vw-feedback.is-success {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.ll-vw-feedback.is-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* KPI */
+.ll-vw-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .ll-vw-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .ll-vw-kpi-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.ll-vw-kpi {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: box-shadow 0.2s, background 0.2s;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+}
+
+.ll-vw-kpi:hover {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.ll-vw-kpi.is-active {
+  box-shadow: 0 0 0 2px rgba(220, 95, 18, 0.35);
+  background: rgba(255, 247, 237, 0.35);
+}
+
+.ll-vw-kpi-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ll-vw-kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.ll-vw-kpi-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ll-vw-kpi-icon.is-amber { color: #d97706; }
+.ll-vw-kpi-icon.is-blue { color: var(--ll-blue); }
+.ll-vw-kpi-icon.is-green { color: #10b981; }
+.ll-vw-kpi-icon.is-orange { color: #f97316; }
+
+.ll-vw-kpi-value {
+  margin-top: 10px;
+  font-family: 'Archivo', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.ll-vw-kpi-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+/* Bulk bar */
+.ll-vw-bulk {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+@media (min-width: 640px) {
+  .ll-vw-bulk {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.ll-vw-bulk-left {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9a3412;
+}
+
+.ll-vw-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ll-vw-ghost-btn,
+.ll-vw-danger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ll-vw-ghost-btn {
+  border: 1px solid var(--ll-border);
+  background: #fff;
+  color: #334155;
+}
+
+.ll-vw-ghost-btn:hover {
+  background: #f8fafc;
+}
+
+.ll-vw-danger-btn {
+  border: none;
+  background: #dc2626;
+  color: #fff;
+}
+
+.ll-vw-danger-btn:hover {
+  background: #b91c1c;
+}
+
+.ll-vw-ghost-btn:disabled,
+.ll-vw-danger-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Tabs */
+.ll-vw-tabs {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ll-vw-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.ll-vw-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #fff;
+  color: #475569;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.ll-vw-tab:hover {
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.ll-vw-tab.is-active {
+  border-color: var(--ll-orange);
+  color: var(--ll-orange);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(220, 95, 18, 0.12);
+}
+
+.ll-vw-tab-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.ll-vw-tab.is-active .ll-vw-tab-count {
+  background: #ffedd5;
+  color: var(--ll-orange);
+}
+
+.ll-vw-tab[data-tab='requests'] .ll-vw-tab-count {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Toolbar */
+.ll-vw-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  padding: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+@media (min-width: 640px) {
+  .ll-vw-toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.ll-vw-search {
+  position: relative;
+  flex: 1;
+  max-width: 420px;
+  width: 100%;
+}
+
+.ll-vw-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.ll-vw-search input,
+.ll-vw-select {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--ll-border);
+  background: #f8fafc;
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.ll-vw-search input {
+  padding: 0 12px 0 36px;
+}
+
+.ll-vw-select {
+  padding: 0 36px 0 12px;
+  font-weight: 600;
+  appearance: none;
+  cursor: pointer;
+  min-width: 140px;
+}
+
+.ll-vw-search input:focus,
+.ll-vw-select:focus {
+  background: #fff;
+  border-color: var(--ll-blue);
+  box-shadow: 0 0 0 3px rgba(19, 108, 158, 0.15);
+}
+
+.ll-vw-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.ll-vw-filter-wrap {
+  position: relative;
+}
+
+.ll-vw-filter-wrap svg {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.ll-vw-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.ll-vw-display-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748b;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ll-vw-display-btn.is-active {
+  background: var(--ll-blue);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(19, 108, 158, 0.25);
+}
+
+/* Content panel */
+.ll-vw-panel {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.ll-vw-empty {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.ll-vw-empty-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #f1f5f9;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.ll-vw-empty h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.ll-vw-empty p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Loading */
+.ll-vw-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  padding: 40px 20px;
+}
+
+.ll-vw-loading-inner {
+  text-align: center;
+}
+
+.ll-vw-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #e2e8f0;
+  border-top-color: var(--ll-blue);
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  animation: ll-vw-spin 0.7s linear infinite;
+}
+
+.ll-vw-error {
+  max-width: 560px;
+  margin: 40px auto;
+  background: #fff;
+  border: 1px solid #fecaca;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.ll-vw-error h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.ll-vw-error p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+/* Soften nested legacy cards inside redesigned shell */
+.ll-vw .ll-vw-panel .divide-y > div:hover {
+  background: #f8fafc;
+}
+
+.ll-vw .ll-vw-panel [class*='bg-gray-50'] {
+  background: #f8fafc !important;
+}
+
+/* Shared modal system (HTML guide parity) */
+.ll-vw-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.ll-vw-modal {
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+  overflow: hidden;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ll-vw-modal-lg {
+  max-width: 520px;
+}
+
+.ll-vw-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  background: rgba(248, 250, 252, 0.7);
+}
+
+.ll-vw-modal-head.is-amber {
+  background: rgba(255, 251, 235, 0.7);
+}
+
+.ll-vw-modal-head.is-insights {
+  background: rgba(245, 243, 255, 0.7);
+}
+
+.ll-vw-modal-head-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ll-vw-modal-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.ll-vw-modal-head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ll-vw-modal-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ll-vw-modal-icon.is-blue {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.ll-vw-modal-icon.is-orange {
+  background: #ffedd5;
+  color: #dc5f12;
+}
+
+.ll-vw-modal-icon.is-amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.ll-vw-modal-icon.is-red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.ll-vw-modal-icon.is-insights {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.ll-vw-modal-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.ll-vw-modal-close:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.ll-vw-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.ll-vw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.ll-vw-field > span {
+  color: #475569;
+}
+
+.ll-vw-field input:not([type='radio']):not([type='checkbox']),
+.ll-vw-field select,
+.ll-vw-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.ll-vw-field input:not([type='radio']):not([type='checkbox']):focus,
+.ll-vw-field select:focus,
+.ll-vw-field textarea:focus {
+  outline: none;
+  background: #fff;
+  border-color: #136c9e;
+  box-shadow: 0 0 0 3px rgba(19, 108, 158, 0.18);
+}
+
+.ll-vw-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ll-vw-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ll-vw-type-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  font-weight: 500;
+  color: #334155;
+}
+
+.ll-vw-type-option input[type='radio'] {
+  width: auto;
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: #dc5f12;
+}
+
+.ll-vw-type-option > span {
+  display: inline;
+  line-height: 1.3;
+}
+
+.ll-vw-type-option.is-active {
+  border-color: #dc5f12;
+  background: #fff7ed;
+}
+
+.ll-vw-modal-info {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.ll-vw-modal-info span {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.ll-vw-modal-info strong {
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.ll-vw-modal-note {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.ll-vw-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.ll-vw-modal-footer.is-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.ll-vw-modal-secondary,
+.ll-vw-modal-primary,
+.ll-vw-modal-cta,
+.ll-vw-modal-danger {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.ll-vw-modal-secondary {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+.ll-vw-modal-secondary:hover {
+  background: #f8fafc;
+}
+
+.ll-vw-modal-primary {
+  background: #136c9e;
+  color: #fff;
+}
+
+.ll-vw-modal-primary:hover {
+  background: #0f567e;
+}
+
+.ll-vw-modal-cta {
+  background: #dc5f12;
+  color: #fff;
+}
+
+.ll-vw-modal-cta:hover {
+  background: #ba4e0b;
+}
+
+.ll-vw-modal-danger {
+  background: #dc2626;
+  color: #fff;
+}
+
+.ll-vw-modal-danger:hover {
+  background: #b91c1c;
+}
+
+.ll-vw-modal-secondary:disabled,
+.ll-vw-modal-primary:disabled,
+.ll-vw-modal-cta:disabled,
+.ll-vw-modal-danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ll-vw-event-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #136c9e;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.ll-vw-event-dot.is-pending {
+  background: #f59e0b;
+}
+
+.ll-vw-event-dot.is-confirmed {
+  background: #10b981;
+}
+
+.ll-vw-event-dot.is-rescheduled {
+  background: #3b82f6;
+}
+
+.ll-vw-event-dot.is-cancelled {
+  background: #ef4444;
+}
+
+.ll-vw-event-summary {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ll-vw-event-summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.ll-vw-event-summary span {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.ll-vw-event-summary strong {
+  color: #0f172a;
+  font-weight: 700;
+  text-align: right;
+}
+
+.ll-vw-event-status {
+  font-style: normal;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #d1fae5;
+  color: #047857;
+}
+
+.ll-vw-event-status.is-pending {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.ll-vw-event-status.is-rescheduled {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.ll-vw-event-status.is-cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.ll-vw-agent-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.ll-vw-agent-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ll-vw-agent-avatar.is-agent {
+  background: #136c9e;
+}
+
+.ll-vw-agent-card strong {
+  display: block;
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.ll-vw-agent-card span {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.ll-vw-insights-banner {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(245, 243, 255, 0.7);
+  border: 1px solid #ddd6fe;
+  color: #2e1065;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ll-vw-insights-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ll-vw-insights-grid > div {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.ll-vw-insights-grid span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.ll-vw-insights-grid strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Calendar View tab */
+.ll-vw-calendar {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  padding: 20px 22px;
+  overflow: hidden;
+}
+
+.ll-vw-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ll-vw-calendar-head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.ll-vw-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.ll-vw-calendar-nav button {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 8px;
+}
+
+.ll-vw-calendar-nav button:hover {
+  background: #fff;
+  color: #1e293b;
+}
+
+.ll-vw-calendar-nav button.is-today {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.ll-vw-calendar-scroll {
+  overflow-x: auto;
+}
+
+.ll-vw-calendar-grid {
+  min-width: 760px;
+}
+
+.ll-vw-calendar-weekdays {
+  display: grid;
+  grid-template-columns: 64px repeat(7, 1fr);
+  gap: 0;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 0;
+  text-align: center;
+}
+
+.ll-vw-calendar-time-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding-right: 10px;
+}
+
+.ll-vw-calendar-weekday span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.ll-vw-calendar-weekday strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+  min-width: 28px;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.ll-vw-calendar-weekday strong.is-today {
+  border-radius: 999px;
+  background: #136c9e;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(19, 108, 158, 0.35);
+}
+
+.ll-vw-calendar-hours {
+  display: flex;
+  flex-direction: column;
+}
+
+.ll-vw-calendar-row {
+  display: grid;
+  grid-template-columns: 64px repeat(7, 1fr);
+  min-height: 64px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ll-vw-calendar-hour {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 8px 10px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.ll-vw-calendar-cell {
+  position: relative;
+  border: 0;
+  border-left: 1px solid #f1f5f9;
+  background: transparent;
+  padding: 4px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  min-height: 64px;
+}
+
+.ll-vw-calendar-cell:hover {
+  background: rgba(248, 250, 252, 0.85);
+}
+
+.ll-vw-calendar-event {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 10px;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.16);
+  margin-bottom: 4px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.ll-vw-calendar-event strong {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ll-vw-calendar-event em {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.ll-vw-calendar-empty {
+  margin: 16px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .ll-vw-header-inner {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .ll-vw-header-copy {
+    max-width: 100%;
+  }
+
+  .ll-vw-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .ll-vw-btn-insights span.hide-sm {
+    display: none;
+  }
+
+  .ll-vw-field-grid,
+  .ll-vw-type-grid,
+  .ll-vw-insights-grid,
+  .ll-vw-modal-footer.is-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .ll-vw {
+    padding: 0 14px 32px;
+  }
+
+  .ll-vw-header {
+    margin-left: -14px;
+    margin-right: -14px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .ll-vw-header h1 {
+    font-size: 22px;
+  }
+
+  .ll-vw-display-btn span.hide-sm {
+    display: none;
+  }
+}

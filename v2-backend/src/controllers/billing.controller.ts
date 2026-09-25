@@ -28,7 +28,9 @@ export class BillingController {
   @UseGuards(FirebaseAuthGuard)
   async getStatus(@Req() req: any) {
     const userId = req.user.uid;
-    return await this.billingService.getBillingStatus(userId);
+    const email = req.user.email || '';
+    const role = req.user.role || req.user.roles?.[0] || '';
+    return await this.billingService.getBillingStatus(userId, email, role);
   }
 
   @Post('confirm-checkout')

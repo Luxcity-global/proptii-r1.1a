@@ -3,9 +3,22 @@ import {
   fetchBillingStatus,
   type BillingStatus,
 } from '../../../services/billingService';
+import {
+  complimentaryBillingStatus,
+  isComplimentaryAccessEmail,
+} from '../../../utils/complimentaryAccess';
+
+export interface LandlordBillingOptions {
+  email?: string | null;
+  role?: string | null;
+}
 
 /** Billing status for the landlord/agent app (no AuthContext dependency). */
-export function useLandlordBillingStatus(isAuthenticated: boolean) {
+export function useLandlordBillingStatus(
+  isAuthenticated: boolean,
+  options: LandlordBillingOptions = {},
+) {
+  const { email, role } = options;
   const [data, setData] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,6 +26,12 @@ export function useLandlordBillingStatus(isAuthenticated: boolean) {
   const refresh = useCallback(async () => {
     if (!isAuthenticated) {
       setData(null);
+      setLoading(false);
+      return;
+    }
+    if (isComplimentaryAccessEmail(email)) {
+      setData(complimentaryBillingStatus(role));
+      setError(null);
       setLoading(false);
       return;
     }
@@ -27,7 +46,7 @@ export function useLandlordBillingStatus(isAuthenticated: boolean) {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, email, role]);
 
   useEffect(() => {
     refresh();

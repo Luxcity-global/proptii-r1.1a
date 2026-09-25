@@ -44,11 +44,15 @@ function statusLabel(status: string | null, planId: PlanId): string {
 interface Props {
   isAuthenticated: boolean;
   pricingSegment: 'landlords' | 'agents';
+  email?: string | null;
+  role?: string | null;
 }
 
 const LandlordPlanBadgePopover: React.FC<Props> = ({
   isAuthenticated,
   pricingSegment,
+  email,
+  role,
 }) => {
   const {
     plan,
@@ -58,7 +62,7 @@ const LandlordPlanBadgePopover: React.FC<Props> = ({
     trialEndsAt,
     hasStripeCustomer,
     loading,
-  } = useLandlordBillingStatus(isAuthenticated);
+  } = useLandlordBillingStatus(isAuthenticated, { email, role });
 
   const planId = normalizePlanId(plan);
   const planConfig = getPlanById(planId);

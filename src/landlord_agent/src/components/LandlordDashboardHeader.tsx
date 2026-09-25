@@ -63,6 +63,8 @@ const LandlordDashboardHeader: React.FC<LandlordDashboardHeaderProps> = ({
             <LandlordPlanBadgePopover
               isAuthenticated={isAuthenticated}
               pricingSegment={pricingSegment}
+              email={userEmail}
+              role={userRole}
             />
           </div>
         </div>
@@ -148,6 +150,8 @@ const LandlordDashboardHeader: React.FC<LandlordDashboardHeaderProps> = ({
             <LandlordPlanBadgePopover
               isAuthenticated={isAuthenticated}
               pricingSegment={pricingSegment}
+              email={userEmail}
+              role={userRole}
             />
           </div>
         </div>

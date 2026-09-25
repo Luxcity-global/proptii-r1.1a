@@ -15,7 +15,14 @@ import {
   CheckSquare,
   Square,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw,
+  Settings,
+  Bell,
+  Sparkles,
+  LayoutGrid,
+  List,
+  RotateCcw,
 } from 'lucide-react';
 import viewingService, { ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import {
@@ -31,10 +38,18 @@ import { trackEvent } from '../../../utils/analytics';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { Property, UserProfile } from '../App';
+import {
+  getAgentDummyViewingRequests,
+  getAgentDummyViewings,
+  isAgentTestAccount,
+  mergeById,
+} from '../data/agentTestPersona';
+import '../styles/viewingsPage.css';
 
 // ViewingsPage component for managing property viewings and requests
 
-type TabKey = 'requests' | 'upcoming' | 'completed' | 'past';
+type TabKey = 'requests' | 'upcoming' | 'completed' | 'calendar';
+type DisplayStyle = 'grid' | 'table';
 
 interface ViewingsPageProps {
   managerId: string | null;
@@ -43,6 +58,10 @@ interface ViewingsPageProps {
   userProfile?: UserProfile | null;
   properties?: Property[];
   onAddProperty?: () => void;
+  onRefresh?: () => void;
+  onViewSettings?: () => void;
+  onViewNotifications?: () => void;
+  onViewInsights?: () => void;
 }
 
 interface ScheduleFormState {
@@ -60,6 +79,17 @@ interface RescheduleFormState {
   message: string;
 }
 
+interface RequestViewingFormState {
+  propertyId: string;
+  date: string;
+  time: string;
+  preference: 'In-Person Viewing' | 'Virtual Viewing';
+  notes: string;
+  tenantName: string;
+  tenantEmail: string;
+  tenantPhone: string;
+}
+
 const initialScheduleForm: ScheduleFormState = {
   date: '',
   time: '',
@@ -74,6 +104,122 @@ const initialRescheduleForm: RescheduleFormState = {
   time: '',
   message: ''
 };
+
+const initialRequestForm: RequestViewingFormState = {
+  propertyId: '',
+  date: '',
+  time: '14:00',
+  preference: 'In-Person Viewing',
+  notes: '',
+  tenantName: '',
+  tenantEmail: '',
+  tenantPhone: ''
+};
+
+const VIEWING_TIME_SLOTS = [
+  { value: '10:00', label: '10:00 AM – 10:45 AM' },
+  { value: '11:30', label: '11:30 AM – 12:15 PM' },
+  { value: '14:00', label: '02:00 PM – 02:45 PM' },
+  { value: '16:00', label: '04:00 PM – 04:45 PM' },
+  { value: '18:00', label: '06:00 PM – 06:45 PM (Evening)' },
+];
+
+const CALENDAR_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+const CALENDAR_EVENT_COLORS = ['#136C9E', '#7c3aed', '#DC5F12', '#059669', '#0369a1'];
+
+function propertyStreet(address?: string): string {
+  if (!address) return 'Property';
+  return (address.split(',')[0] || address).trim();
+}
+
+function statusDisplayLabel(status: ViewingBooking['status']): string {
+  switch (status) {
+    case 'confirmed':
+      return 'Confirmed by Agent';
+    case 'pending':
+      return 'Awaiting Confirmation';
+    case 'rescheduled':
+      return 'Reschedule Proposed';
+    case 'completed':
+      return 'Completed';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return status;
+  }
+}
+
+function formatLongDate(date: string) {
+  if (!date) return 'TBD';
+  try {
+    return new Date(date).toLocaleDateString(undefined, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return date;
+  }
+}
+
+function startOfWeekMonday(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function toDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function sameDateKey(a: string | undefined, b: string): boolean {
+  if (!a) return false;
+  const normalized = a.includes('T') ? a.slice(0, 10) : a.slice(0, 10);
+  return normalized === b;
+}
+
+function parseViewingHour(time?: string): number | null {
+  if (!time) return null;
+  const trimmed = time.trim();
+  const twentyFour = trimmed.match(/^(\d{1,2}):(\d{2})/);
+  if (twentyFour) {
+    const hour = Number(twentyFour[1]);
+    if (Number.isFinite(hour)) return hour;
+  }
+  const twelve = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (twelve) {
+    let hour = Number(twelve[1]);
+    const meridiem = twelve[3].toUpperCase();
+    if (meridiem === 'PM' && hour < 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+    return hour;
+  }
+  return null;
+}
+
+function formatHourLabel(hour: number): string {
+  if (hour === 0) return '12 AM';
+  if (hour < 12) return `${hour} AM`;
+  if (hour === 12) return '12 PM';
+  return `${hour - 12} PM`;
+}
+
+function calendarEventColor(index: number): string {
+  return CALENDAR_EVENT_COLORS[index % CALENDAR_EVENT_COLORS.length];
+}
 
 function formatDate(date: string) {
   if (!date) return 'TBD';
@@ -104,20 +250,37 @@ function formatTime(time: string) {
   }
 }
 
-const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail, userProfile, properties = [], onAddProperty }) => {
+const ViewingsPage: React.FC<ViewingsPageProps> = ({
+  managerId,
+  managerName,
+  managerEmail,
+  userProfile,
+  properties = [],
+  onAddProperty,
+  onRefresh,
+  onViewSettings,
+  onViewNotifications,
+  onViewInsights,
+}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
+  const [displayStyle, setDisplayStyle] = useState<DisplayStyle>('table');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [requests, setRequests] = useState<BookViewingRequest[]>([]);
   const [bookings, setBookings] = useState<ViewingBooking[]>([]);
   const [stats, setStats] = useState<ViewingStats>({ upcoming: 0, completed: 0, rescheduled: 0, total: 0 });
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [isEventDetailOpen, setIsEventDetailOpen] = useState(false);
+  const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<BookViewingRequest | null>(null);
   const [selectedViewing, setSelectedViewing] = useState<ViewingBooking | null>(null);
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(initialScheduleForm);
   const [rescheduleForm, setRescheduleForm] = useState<RescheduleFormState>(initialRescheduleForm);
+  const [requestForm, setRequestForm] = useState<RequestViewingFormState>(initialRequestForm);
   const [cancelMessage, setCancelMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -127,12 +290,43 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const isAuthenticatedUser = Boolean(userProfile);
+  const showAsTable = displayStyle === 'table' && !isMobile;
+  const isAgentPersona = isAgentTestAccount(managerId, managerEmail);
+
+  const withAgentDummyRequests = (live: BookViewingRequest[]) =>
+    isAgentPersona ? mergeById(getAgentDummyViewingRequests(), live) : live;
+
+  const withAgentDummyBookings = (live: ViewingBooking[]) =>
+    isAgentPersona ? mergeById(getAgentDummyViewings(), live) : live;
+
+  const statsFromBookings = (items: ViewingBooking[]): ViewingStats =>
+    items.reduce<ViewingStats>(
+      (acc, booking) => {
+        acc.total++;
+        if (['pending', 'confirmed'].includes(booking.status)) acc.upcoming++;
+        if (booking.status === 'completed') acc.completed++;
+        if (booking.status === 'rescheduled') acc.rescheduled++;
+        return acc;
+      },
+      { upcoming: 0, completed: 0, rescheduled: 0, total: 0 },
+    );
+
+  const handleHeaderRefresh = () => {
+    setIsRefreshing(true);
+    onRefresh?.();
+    window.setTimeout(() => setIsRefreshing(false), 700);
+  };
+
+  const switchTab = (tab: TabKey) => {
+    setActiveTab(tab);
+    setSelectedViewings(new Set());
+  };
   
   // Pagination state for each tab
   const [currentRequestsPage, setCurrentRequestsPage] = useState<number>(1);
   const [currentUpcomingPage, setCurrentUpcomingPage] = useState<number>(1);
   const [currentCompletedPage, setCurrentCompletedPage] = useState<number>(1);
-  const [currentPastPage, setCurrentPastPage] = useState<number>(1);
+  const [calendarWeekStart, setCalendarWeekStart] = useState<Date>(() => startOfWeekMonday(new Date()));
   
   const ITEMS_PER_PAGE = 10;
 
@@ -171,6 +365,14 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         }
 
         if (!managerEmail) {
+          if (isAgentPersona) {
+            const dummyBookings = getAgentDummyViewings();
+            setRequests(getAgentDummyViewingRequests());
+            setBookings(dummyBookings);
+            setStats(statsFromBookings(dummyBookings));
+            setLoading(false);
+            return;
+          }
           setError('Unable to determine your email. Please sign in again.');
           setLoading(false);
           return;
@@ -203,8 +405,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         if (landlordUserId && requestsResultById?.success && requestsResultById.requests) {
           requestsResultById.requests.forEach(req => requestsMap.set(req.id, req));
         }
-        const mergedRequests = Array.from(requestsMap.values());
-        
+
         // Merge bookings
         const bookingsMap = new Map<string, ViewingBooking>();
         if (emailBookingsResult.success && emailBookingsResult.bookings) {
@@ -213,16 +414,12 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         if (landlordUserId && bookingsResultById?.success && bookingsResultById.bookings) {
           bookingsResultById.bookings.forEach(booking => bookingsMap.set(booking.id, booking));
         }
-        const mergedBookings = Array.from(bookingsMap.values());
+
+        const mergedRequests = withAgentDummyRequests(Array.from(requestsMap.values()));
+        const mergedBookings = withAgentDummyBookings(Array.from(bookingsMap.values()));
 
         // Calculate stats from merged bookings
-        const stats = mergedBookings.reduce<ViewingStats>((acc, booking) => {
-          acc.total++;
-          if (['pending', 'confirmed'].includes(booking.status)) acc.upcoming++;
-          if (booking.status === 'completed') acc.completed++;
-          if (booking.status === 'rescheduled') acc.rescheduled++;
-          return acc;
-        }, { upcoming: 0, completed: 0, rescheduled: 0, total: 0 });
+        const stats = statsFromBookings(mergedBookings);
 
         const requestsResult = { success: true, requests: mergedRequests };
         const bookingsResult = { success: true, bookings: mergedBookings };
@@ -260,7 +457,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   prevBookings.forEach(b => merged.set(b.id, b));
                   // Add/update with ID-based bookings
                   items.forEach(b => merged.set(b.id, b));
-                  return Array.from(merged.values());
+                  return withAgentDummyBookings(Array.from(merged.values()));
                 });
               },
               (err) => {
@@ -290,7 +487,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   prevRequests.forEach(r => merged.set(r.id, r));
                   // Add/update with ID-based requests
                   items.forEach(r => merged.set(r.id, r));
-                  return Array.from(merged.values());
+                  return withAgentDummyRequests(Array.from(merged.values()));
                 });
               },
               (err) => console.error('Viewing requests subscription error (ID-based):', err)
@@ -312,7 +509,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   prevBookings.forEach(b => merged.set(b.id, b));
                   // Add/update with email-based bookings
                   items.forEach(b => merged.set(b.id, b));
-                  return Array.from(merged.values());
+                  return withAgentDummyBookings(Array.from(merged.values()));
                 });
               },
               (err) => {
@@ -348,7 +545,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   prevRequests.forEach(r => merged.set(r.id, r));
                   // Add/update with email-based requests
                   items.forEach(r => merged.set(r.id, r));
-                  return Array.from(merged.values());
+                  return withAgentDummyRequests(Array.from(merged.values()));
                 });
               },
               (err) => console.error('Viewing requests subscription error (email-based):', err)
@@ -370,7 +567,15 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         };
       } catch (err) {
         console.error('Error loading manager viewings:', err);
-        setError('Failed to load viewings data. Please try again later.');
+        if (isAgentPersona) {
+          const dummyBookings = getAgentDummyViewings();
+          setError(null);
+          setRequests(getAgentDummyViewingRequests());
+          setBookings(dummyBookings);
+          setStats(statsFromBookings(dummyBookings));
+        } else {
+          setError('Failed to load viewings data. Please try again later.');
+        }
         setLoading(false);
       }
     };
@@ -382,7 +587,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       unsubscribeRequests?.();
       unsubscribeStats?.();
     };
-  }, [managerId, managerEmail, isAuthenticatedUser]);
+  }, [managerId, managerEmail, isAuthenticatedUser, isAgentPersona]);
 
   // Function to check if a viewing date/time has passed
   const isViewingDatePassed = (viewing: ViewingBooking): boolean => {
@@ -464,42 +669,93 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     [bookings]
   );
 
-  const pastViewings = useMemo(
+  const calendarViewings = useMemo(
     () =>
-      bookings.filter((viewing) => viewing.status === 'cancelled'),
-    [bookings]
+      bookings.filter((viewing) =>
+        ['confirmed', 'rescheduled', 'pending'].includes(viewing.status),
+      ),
+    [bookings],
   );
 
+  const calendarDays = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDays(calendarWeekStart, index)),
+    [calendarWeekStart],
+  );
+
+  const calendarMonthLabel = useMemo(() => {
+    const end = addDays(calendarWeekStart, 6);
+    const startLabel = calendarWeekStart.toLocaleDateString(undefined, {
+      month: 'long',
+      year: 'numeric',
+    });
+    const endLabel = end.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    return startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`;
+  }, [calendarWeekStart]);
+
+  const calendarWeekEvents = useMemo(() => {
+    const dayKeys = new Set(calendarDays.map(toDateKey));
+    return calendarViewings
+      .filter((viewing) => {
+        const date = viewing.viewingDetails?.date;
+        if (!date) return false;
+        const key = date.includes('T') ? date.slice(0, 10) : date.slice(0, 10);
+        return dayKeys.has(key);
+      })
+      .filter((viewing) => {
+        if (!filterQuery) return true;
+        const query = filterQuery.toLowerCase();
+        const propertyText = `${viewing.property.street} ${viewing.property.town || ''} ${viewing.property.city || ''}`.toLowerCase();
+        const tenant = viewing.viewingDetails?.userDetails?.fullName?.toLowerCase() || '';
+        return propertyText.includes(query) || tenant.includes(query);
+      });
+  }, [calendarViewings, calendarDays, filterQuery]);
+
   const summaryCards = useMemo(() => {
-    const cancelledCount = bookings.filter((viewing) => viewing.status === 'cancelled').length;
     const completedCount = bookings.filter((viewing) => viewing.status === 'completed').length;
+    const rescheduledCount =
+      bookings.filter((viewing) => viewing.status === 'rescheduled').length || stats.rescheduled;
     return [
       {
+        key: 'requests' as TabKey,
         title: 'Pending Requests',
         value: requests.length + pendingViewings.length,
-        icon: <Mail className="w-5 h-5 text-blue-600" />,
-        accent: 'bg-blue-100'
+        hint: 'Awaiting your approval',
+        icon: <Clock size={16} />,
+        tone: 'is-amber',
       },
       {
-        title: 'Scheduled Viewings',
+        key: 'upcoming' as TabKey,
+        title: 'Upcoming / Confirmed',
         value: upcomingViewings.length,
-        icon: <Calendar className="w-5 h-5 text-orange-600" />,
-        accent: 'bg-orange-100'
+        hint: 'Next scheduled visits',
+        icon: <Calendar size={16} />,
+        tone: 'is-blue',
       },
       {
-        title: 'Completed Viewings',
+        key: 'completed' as TabKey,
+        title: 'Completed',
         value: completedCount || stats.completed,
-        icon: <CheckCircle className="w-5 h-5 text-green-600" />,
-        accent: 'bg-green-100'
+        hint: 'Total visits done',
+        icon: <CheckCircle size={16} />,
+        tone: 'is-green',
       },
       {
-        title: 'Cancelled Viewings',
-        value: cancelledCount,
-        icon: <X className="w-5 h-5 text-red-600" />,
-        accent: 'bg-red-100'
-      }
+        key: 'upcoming' as TabKey,
+        title: 'Rescheduled',
+        value: rescheduledCount,
+        hint: 'Needs new time slot',
+        icon: <RotateCcw size={16} />,
+        tone: 'is-orange',
+      },
     ];
-  }, [requests.length, pendingViewings.length, upcomingViewings.length, stats.completed, bookings]);
+  }, [
+    requests.length,
+    pendingViewings.length,
+    upcomingViewings.length,
+    stats.completed,
+    stats.rescheduled,
+    bookings,
+  ]);
 
   // Filter function
   const filterItems = <T extends { 
@@ -540,7 +796,6 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const filteredUpcomingViewings = useMemo(() => filterItems(upcomingViewings), [upcomingViewings, filterQuery, filterType]);
   const filteredPendingViewings = useMemo(() => filterItems(pendingViewings), [pendingViewings, filterQuery, filterType]);
   const filteredCompletedViewings = useMemo(() => filterItems(completedViewings), [completedViewings, filterQuery, filterType]);
-  const filteredPastViewings = useMemo(() => filterItems(pastViewings), [pastViewings, filterQuery, filterType]);
 
   // Pagination for requests tab (combines requests and pending viewings)
   const allRequestsCount = requests.length + filteredPendingViewings.length;
@@ -580,17 +835,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const completedEndIndex = completedStartIndex + ITEMS_PER_PAGE;
   const paginatedCompletedViewings = filteredCompletedViewings.slice(completedStartIndex, completedEndIndex);
 
-  const totalPastPages = Math.ceil(filteredPastViewings.length / ITEMS_PER_PAGE);
-  const pastStartIndex = (currentPastPage - 1) * ITEMS_PER_PAGE;
-  const pastEndIndex = pastStartIndex + ITEMS_PER_PAGE;
-  const paginatedPastViewings = filteredPastViewings.slice(pastStartIndex, pastEndIndex);
-
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentRequestsPage(1);
     setCurrentUpcomingPage(1);
     setCurrentCompletedPage(1);
-    setCurrentPastPage(1);
   }, [filterQuery, filterType, activeTab]);
 
   // Pagination component helper
@@ -808,12 +1057,151 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
   const handleOpenReschedule = (viewing: ViewingBooking) => {
     setSelectedViewing(viewing);
+    setIsEventDetailOpen(false);
     setRescheduleForm({
       date: viewing.viewingDetails?.date || '',
       time: viewing.viewingDetails?.time || '',
       message: ''
     });
     setIsRescheduleModalOpen(true);
+  };
+
+  const handleOpenEventDetail = (viewing: ViewingBooking) => {
+    setSelectedViewing(viewing);
+    setIsEventDetailOpen(true);
+  };
+
+  const handleOpenRequestModal = (
+    propertyId?: string,
+    slot?: { date?: string; time?: string },
+  ) => {
+    const list = properties || [];
+    setRequestForm({
+      ...initialRequestForm,
+      propertyId: propertyId || list[0]?.id || '',
+      date: slot?.date || new Date().toISOString().slice(0, 10),
+      time: slot?.time || '14:00',
+    });
+    setIsRequestModalOpen(true);
+  };
+
+  const handleRequestViewingSubmit = async () => {
+    const property = (properties || []).find((p) => p.id === requestForm.propertyId);
+    if (!property) {
+      setFeedback({ type: 'error', message: 'Please select a property for the viewing.' });
+      return;
+    }
+    if (!requestForm.date || !requestForm.time) {
+      setFeedback({ type: 'error', message: 'Please provide a preferred date and time slot.' });
+      return;
+    }
+
+    const addressParts = property.address.split(',').map((part) => part.trim());
+    const viewingDetails: ViewingBooking['viewingDetails'] = {
+      date: requestForm.date,
+      time: requestForm.time,
+      preference: requestForm.preference,
+      userDetails: {
+        fullName: requestForm.tenantName || 'Prospective Tenant',
+        email: requestForm.tenantEmail,
+        phoneNumber: requestForm.tenantPhone,
+      },
+    };
+
+    const propertyPayload: ViewingBooking['property'] = {
+      street: addressParts[0] || property.address,
+      town: addressParts[1],
+      city: addressParts[2] || addressParts[1],
+      postcode: addressParts[addressParts.length - 1],
+      agent: {
+        id: managerId || 'agent',
+        name: managerName || userProfile?.name || 'Agent',
+        email: managerEmail || userProfile?.email || '',
+        phone: '',
+        company: '',
+      },
+    };
+
+    setIsProcessing(true);
+    try {
+      if (isAgentPersona) {
+        const localBooking: ViewingBooking = {
+          id: `demo-viewing-req-${Date.now()}`,
+          userId: managerId || 'agent-demo',
+          propertyId: property.id,
+          agentId: managerId,
+          agentEmail: managerEmail || null,
+          property: propertyPayload,
+          viewingDetails,
+          status: 'confirmed',
+          notes: requestForm.notes || undefined,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          confirmedAt: new Date().toISOString(),
+        };
+        setBookings((prev) => [localBooking, ...prev]);
+        setStats((prev) => ({
+          ...prev,
+          upcoming: prev.upcoming + 1,
+          total: prev.total + 1,
+        }));
+      } else {
+        if (!managerId) {
+          throw new Error('Missing manager id');
+        }
+        const saveResult = await viewingService.saveViewingBooking(
+          managerId,
+          propertyPayload,
+          viewingDetails,
+          property.id,
+          { agentId: managerId, landlordId: null },
+        );
+        if (!saveResult.success || !saveResult.bookingId) {
+          throw new Error(saveResult.error || 'Failed to create viewing request');
+        }
+        await viewingService.updateViewingStatus(
+          saveResult.bookingId,
+          'confirmed',
+          requestForm.notes || undefined,
+          undefined,
+          { viewingDetails },
+        );
+        if (requestForm.tenantEmail) {
+          await emailService.sendEmail({
+            to: requestForm.tenantEmail,
+            subject: `Viewing Scheduled - ${propertyStreet(property.address)}`,
+            formData: {
+              property: propertyPayload,
+              viewing: viewingDetails,
+              manager: {
+                name: managerName,
+                email: managerEmail,
+              },
+              user: {
+                name: requestForm.tenantName,
+                email: requestForm.tenantEmail,
+              },
+            },
+            attachments: [],
+            emailType: 'viewing-user',
+          });
+        }
+      }
+
+      trackEvent('landlord_viewing_requested');
+      setFeedback({
+        type: 'success',
+        message: 'Viewing request submitted and appointment confirmed.',
+      });
+      setIsRequestModalOpen(false);
+      setRequestForm(initialRequestForm);
+      switchTab('upcoming');
+    } catch (err) {
+      console.error('Failed to request viewing:', err);
+      setFeedback({ type: 'error', message: 'Failed to submit viewing request. Please try again.' });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleRescheduleSubmit = async () => {
@@ -1038,10 +1426,12 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading viewings...</p>
+      <div className="ll-vw">
+        <div className="ll-vw-loading">
+          <div className="ll-vw-loading-inner">
+            <div className="ll-vw-spinner" />
+            <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Loading viewings...</p>
+          </div>
         </div>
       </div>
     );
@@ -1055,83 +1445,128 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
     // For other errors, show the standard error message
     return (
-      <div className="max-w-4xl mx-auto bg-white border border-red-200 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-red-700 mb-2">Unable to load viewings</h2>
-        <p className="text-sm text-red-600 mb-4">{error}</p>
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          onClick={() => window.location.reload()}
-        >
-          Retry
-        </button>
+      <div className="ll-vw">
+        <div className="ll-vw-error">
+          <h2>Unable to load viewings</h2>
+          <p>{error}</p>
+          <button type="button" className="ll-vw-btn-cta" onClick={() => window.location.reload()}>
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 overflow-x-hidden w-full" style={{ fontFamily: 'Archivo, sans-serif' }}>
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Viewings & Requests</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Manage incoming requests, schedule property viewings, and keep tenants informed.
-        </p>
-      </div>
+    <div className="ll-vw">
+      <header className="ll-vw-header">
+        <div className="ll-vw-inner ll-vw-header-inner">
+          <div className="ll-vw-header-copy">
+            <h1>Viewings</h1>
+            <p>Manage incoming requests, schedule property viewings, and keep tenants informed.</p>
+          </div>
 
+          <div className="ll-vw-header-actions">
+            <button
+              type="button"
+              className={`ll-vw-header-icon${isRefreshing ? ' refreshing' : ''}`}
+              title="Refresh Portfolio Data"
+              onClick={handleHeaderRefresh}
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              type="button"
+              className="ll-vw-header-icon"
+              title="Settings"
+              onClick={onViewSettings}
+            >
+              <Settings size={18} />
+            </button>
+            <button
+              type="button"
+              className="ll-vw-header-icon"
+              title="Notifications"
+              onClick={onViewNotifications}
+            >
+              <Bell size={18} />
+              <span className="ll-vw-header-dot" />
+            </button>
+            <button
+              type="button"
+              className="ll-vw-btn-insights"
+              onClick={() => setIsInsightsModalOpen(true)}
+            >
+              <span className="ll-vw-insights-icon">
+                <Sparkles size={12} />
+              </span>
+              <span className="hide-sm">Portfolio Insights</span>
+            </button>
+            <button
+              type="button"
+              className="ll-vw-btn-cta"
+              onClick={() => handleOpenRequestModal()}
+              disabled={(properties || []).length === 0}
+            >
+              <Eye size={16} />
+              Request Viewing
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="ll-vw-inner ll-vw-body">
       {feedback && (
         <div
-          className={`rounded-xl border p-4 text-sm ${
-            feedback.type === 'success'
-              ? 'bg-green-50 border-green-200 text-green-700'
-              : 'bg-red-50 border-red-200 text-red-700'
+          className={`ll-vw-feedback ${
+            feedback.type === 'success' ? 'is-success' : 'is-error'
           }`}
         >
           {feedback.message}
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+      <div className="ll-vw-kpi-grid">
         {summaryCards.map((card) => (
-          <div
+          <button
             key={card.title}
-            className="bg-white p-4 sm:p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow"
+            type="button"
+            className={`ll-vw-kpi${activeTab === card.key ? ' is-active' : ''}`}
+            onClick={() => switchTab(card.key)}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-700">{card.title}</h3>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.accent} flex-shrink-0`}>
-                {card.icon}
-              </div>
+            <div className="ll-vw-kpi-top">
+              <span className="ll-vw-kpi-label">{card.title}</span>
+              <span className={`ll-vw-kpi-icon ${card.tone}`}>{card.icon}</span>
             </div>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">{card.value}</p>
-          </div>
+            <div className="ll-vw-kpi-value">{card.value}</div>
+            <div className="ll-vw-kpi-hint">{card.hint}</div>
+          </button>
         ))}
       </div>
 
-      {/* Selection Bar */}
       {selectedViewings.size > 0 && (
-        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-          <div className="flex items-center space-x-3">
-            <span className="text-sm font-medium text-orange-800" style={{ fontFamily: 'Archivo, sans-serif' }}>
-              {selectedViewings.size} viewing{selectedViewings.size !== 1 ? 's' : ''} selected
-            </span>
+        <div className="ll-vw-bulk">
+          <div className="ll-vw-bulk-left">
+            {selectedViewings.size} viewing{selectedViewings.size !== 1 ? 's' : ''} selected
           </div>
-          <div className="flex items-center flex-wrap gap-2">
+          <div className="ll-vw-bulk-actions">
             <button
-              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition disabled:opacity-50 text-sm font-medium"
+              type="button"
+              className="ll-vw-ghost-btn"
               onClick={handleClearSelection}
               disabled={isDeleting}
-              style={{ fontFamily: 'Archivo, sans-serif' }}
             >
               Clear Selection
             </button>
             <button
-              className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+              type="button"
+              className="ll-vw-danger-btn"
               onClick={handleDeleteSelected}
               disabled={isDeleting}
-              style={{ fontFamily: 'Archivo, sans-serif' }}
             >
               {isDeleting ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span className="hidden sm:inline">Deleting...</span>
                 </>
               ) : (
@@ -1147,96 +1582,118 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       )}
 
       <div>
-        <div className="mb-6 flex flex-col gap-4">
-          {/* Tabs */}
-          <div className="inline-flex rounded-full border border-gray-200 p-1 bg-white overflow-x-auto">
-            <button
-              onClick={() => {
-                setActiveTab('requests');
-                setSelectedViewings(new Set()); // Clear selection when switching tabs
-              }}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
-                activeTab === 'requests' ? 'bg-orange-500 text-white' : 'text-gray-600'
-              }`}
-            >
-              Requests ({requests.length + pendingViewings.length})
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('upcoming');
-                setSelectedViewings(new Set()); // Clear selection when switching tabs
-              }}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
-                activeTab === 'upcoming' ? 'bg-orange-500 text-white' : 'text-gray-600'
-              }`}
-            >
-              Scheduled ({upcomingViewings.length})
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('completed');
-                setSelectedViewings(new Set()); // Clear selection when switching tabs
-              }}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
-                activeTab === 'completed' ? 'bg-orange-500 text-white' : 'text-gray-600'
-              }`}
-            >
-              Completed ({completedViewings.length})
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('past');
-                setSelectedViewings(new Set()); // Clear selection when switching tabs
-              }}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
-                activeTab === 'past' ? 'bg-orange-500 text-white' : 'text-gray-600'
-              }`}
-            >
-              Past ({pastViewings.length})
-            </button>
+        <div className="mb-5 flex flex-col gap-4">
+          <div className="ll-vw-tabs">
+            <div className="ll-vw-tabs-row" role="tablist" aria-label="Viewing sections">
+              <button
+                type="button"
+                data-tab="requests"
+                role="tab"
+                aria-selected={activeTab === 'requests'}
+                onClick={() => switchTab('requests')}
+                className={`ll-vw-tab${activeTab === 'requests' ? ' is-active' : ''}`}
+              >
+                <span>Pending Requests</span>
+                <span className="ll-vw-tab-count">{requests.length + pendingViewings.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'upcoming'}
+                onClick={() => switchTab('upcoming')}
+                className={`ll-vw-tab${activeTab === 'upcoming' ? ' is-active' : ''}`}
+              >
+                <span>Upcoming</span>
+                <span className="ll-vw-tab-count">{upcomingViewings.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'completed'}
+                onClick={() => switchTab('completed')}
+                className={`ll-vw-tab${activeTab === 'completed' ? ' is-active' : ''}`}
+              >
+                <span>Past/Completed</span>
+                <span className="ll-vw-tab-count">{completedViewings.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'calendar'}
+                onClick={() => switchTab('calendar')}
+                className={`ll-vw-tab${activeTab === 'calendar' ? ' is-active' : ''}`}
+              >
+                <span>Calendar View</span>
+                <span className="ll-vw-tab-count">{calendarWeekEvents.length}</span>
+              </button>
+            </div>
           </div>
 
-          {/* Filter Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white border border-[#f3f3f3] rounded-lg p-4 w-full">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="ll-vw-toolbar">
+            <div className="ll-vw-search">
+              <Search size={16} />
               <input
-                type="text"
-                placeholder="Search viewings..."
+                type="search"
+                placeholder="Search by applicant, property, or time..."
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
+                aria-label="Search viewings"
               />
             </div>
-            <div className="relative">
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as 'all' | 'name' | 'email' | 'date' | 'status')}
-                className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer w-full sm:w-[140px] min-w-[120px]"
-              >
-                <option value="all">All Fields</option>
-                <option value="name">Name</option>
-                <option value="email">Email</option>
-                <option value="date">Date</option>
-                <option value="status">Status</option>
-              </select>
-              <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <div className="ll-vw-toolbar-right">
+              <div className="ll-vw-filter-wrap">
+                <select
+                  className="ll-vw-select"
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value as 'all' | 'name' | 'email' | 'date' | 'status')}
+                  aria-label="Filter field"
+                >
+                  <option value="all">All Fields</option>
+                  <option value="name">Name</option>
+                  <option value="email">Email</option>
+                  <option value="date">Date</option>
+                  <option value="status">Status</option>
+                </select>
+                <Filter size={14} />
+              </div>
+              {activeTab !== 'calendar' && (
+                <div className="ll-vw-display" role="group" aria-label="Display style">
+                  <button
+                    type="button"
+                    className={`ll-vw-display-btn${displayStyle === 'grid' ? ' is-active' : ''}`}
+                    onClick={() => setDisplayStyle('grid')}
+                  >
+                    <LayoutGrid size={14} />
+                    <span className="hide-sm">Grid</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`ll-vw-display-btn${displayStyle === 'table' ? ' is-active' : ''}`}
+                    onClick={() => setDisplayStyle('table')}
+                  >
+                    <List size={14} />
+                    <span className="hide-sm">Table</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {activeTab === 'requests' && (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="ll-vw-panel">
             {allRequestsCount === 0 ? (
-              <div className="p-12 text-center">
-                <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 mb-2">No pending requests</h3>
-                <p className="text-sm text-gray-500">New viewing requests will appear here for approval.</p>
+              <div className="ll-vw-empty">
+                <div className="ll-vw-empty-icon">
+                  <Mail size={24} />
+                </div>
+                <h3>No pending requests</h3>
+                <p>New viewing requests will appear here for approval.</p>
               </div>
             ) : (
               <>
                 {/* Desktop Table View */}
-                {!isMobile && (
+                {showAsTable && (
                   <>
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -1346,12 +1803,18 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
                         {/* Property */}
                         <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
-                            {viewing.property.street}
-                          </h3>
-                          <p className="text-xs text-gray-500 truncate">
-                            {viewing.property.town}, {viewing.property.city}
-                          </p>
+                          <button
+                            type="button"
+                            className="text-left w-full"
+                            onClick={() => handleOpenEventDetail(viewing)}
+                          >
+                            <h3 className="text-sm font-semibold text-gray-900 truncate hover:text-[#136C9E]">
+                              {viewing.property.street}
+                            </h3>
+                            <p className="text-xs text-gray-500 truncate">
+                              {viewing.property.town}, {viewing.property.city}
+                            </p>
+                          </button>
                         </div>
 
                         {/* Date & Time */}
@@ -1430,7 +1893,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 )}
 
                 {/* Mobile Card View */}
-                {isMobile && (
+                {!showAsTable && (
                   <div className="space-y-4 p-4">
                     {/* Unscheduled Requests */}
                     {paginatedRequests.requests.map((request) => (
@@ -1512,12 +1975,18 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                               )}
                             </button>
                             <div className="flex-1 min-w-0">
-                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                                {viewing.property.street}
-                              </h3>
-                              <p className="text-xs text-gray-500 mb-2">
-                                {viewing.property.town}, {viewing.property.city}
-                              </p>
+                              <button
+                                type="button"
+                                className="text-left w-full"
+                                onClick={() => handleOpenEventDetail(viewing)}
+                              >
+                                <h3 className="text-sm font-semibold text-gray-900 mb-1 hover:text-[#136C9E]">
+                                  {viewing.property.street}
+                                </h3>
+                                <p className="text-xs text-gray-500 mb-2">
+                                  {viewing.property.town}, {viewing.property.city}
+                                </p>
+                              </button>
                               <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
                                 Pending
                               </span>
@@ -1595,21 +2064,36 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         )}
 
         {activeTab === 'upcoming' && (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="ll-vw-panel">
             {filteredUpcomingViewings.length === 0 ? (
-              <div className="p-12 text-center">
-                <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 mb-2">
+              <div className="ll-vw-empty">
+                <div className="ll-vw-empty-icon">
+                  <Calendar size={24} />
+                </div>
+                <h3>
                   {filterQuery ? 'No matching viewings' : 'No scheduled viewings'}
                 </h3>
-                <p className="text-sm text-gray-500">
-                  {filterQuery ? 'Try adjusting your search filters' : 'Scheduled viewings will appear here once you confirm requests.'}
+                <p>
+                  {filterQuery
+                    ? 'Try adjusting your search filters'
+                    : 'Scheduled viewings will appear here once you confirm requests.'}
                 </p>
+                {!filterQuery && (properties || []).length > 0 && (
+                  <button
+                    type="button"
+                    className="ll-vw-btn-cta"
+                    style={{ marginTop: 12 }}
+                    onClick={() => handleOpenRequestModal()}
+                  >
+                    <Eye size={16} />
+                    Request Viewing
+                  </button>
+                )}
               </div>
             ) : (
               <>
                 {/* Desktop Table View */}
-                {!isMobile && (
+                {showAsTable && (
                   <>
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -1645,12 +2129,18 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
                         {/* Property */}
                         <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
-                            {viewing.property.street}
-                          </h3>
-                          <p className="text-xs text-gray-500 truncate">
-                            {viewing.property.town}, {viewing.property.city}
-                          </p>
+                          <button
+                            type="button"
+                            className="text-left w-full"
+                            onClick={() => handleOpenEventDetail(viewing)}
+                          >
+                            <h3 className="text-sm font-semibold text-gray-900 truncate hover:text-[#136C9E]">
+                              {viewing.property.street}
+                            </h3>
+                            <p className="text-xs text-gray-500 truncate">
+                              {viewing.property.town}, {viewing.property.city}
+                            </p>
+                          </button>
                         </div>
 
                         {/* Date & Time */}
@@ -1739,7 +2229,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 )}
 
                 {/* Mobile Card View */}
-                {isMobile && (
+                {!showAsTable && (
                   <div className="space-y-4 p-4">
                     {paginatedUpcomingViewings.map((viewing) => (
                       <div 
@@ -1759,12 +2249,18 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                               )}
                             </button>
                             <div className="flex-1 min-w-0">
-                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                                {viewing.property.street}
-                              </h3>
-                              <p className="text-xs text-gray-500 mb-2">
-                                {viewing.property.town}, {viewing.property.city}
-                              </p>
+                              <button
+                                type="button"
+                                className="text-left w-full"
+                                onClick={() => handleOpenEventDetail(viewing)}
+                              >
+                                <h3 className="text-sm font-semibold text-gray-900 mb-1 hover:text-[#136C9E]">
+                                  {viewing.property.street}
+                                </h3>
+                                <p className="text-xs text-gray-500 mb-2">
+                                  {viewing.property.town}, {viewing.property.city}
+                                </p>
+                              </button>
                               <span
                                 className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                                   viewing.status === 'confirmed'
@@ -1852,21 +2348,23 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         )}
 
         {activeTab === 'completed' && (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="ll-vw-panel">
             {filteredCompletedViewings.length === 0 ? (
-              <div className="p-12 text-center">
-                <CheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 mb-2">
+              <div className="ll-vw-empty">
+                <div className="ll-vw-empty-icon">
+                  <CheckCircle size={24} />
+                </div>
+                <h3>
                   {filterQuery ? 'No matching viewings' : 'No completed viewings'}
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p>
                   {filterQuery ? 'Try adjusting your search filters' : 'Completed viewings will appear here once viewings are finished.'}
                 </p>
               </div>
             ) : (
               <>
                 {/* Desktop Table View */}
-                {!isMobile && (
+                {showAsTable && (
                   <>
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -1902,12 +2400,18 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
                         {/* Property */}
                         <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
-                            {viewing.property.street}
-                          </h3>
-                          <p className="text-xs text-gray-500 truncate">
-                            {viewing.property.town}, {viewing.property.city}
-                          </p>
+                          <button
+                            type="button"
+                            className="text-left w-full"
+                            onClick={() => handleOpenEventDetail(viewing)}
+                          >
+                            <h3 className="text-sm font-semibold text-gray-900 truncate hover:text-[#136C9E]">
+                              {viewing.property.street}
+                            </h3>
+                            <p className="text-xs text-gray-500 truncate">
+                              {viewing.property.town}, {viewing.property.city}
+                            </p>
+                          </button>
                         </div>
 
                         {/* Date & Time */}
@@ -1963,7 +2467,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 )}
 
                 {/* Mobile Card View */}
-                {isMobile && (
+                {!showAsTable && (
                   <div className="space-y-4 p-4">
                     {paginatedCompletedViewings.map((viewing) => (
                       <div 
@@ -1983,12 +2487,18 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                               )}
                             </button>
                             <div className="flex-1 min-w-0">
-                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                                {viewing.property.street}
-                              </h3>
-                              <p className="text-xs text-gray-500 mb-2">
-                                {viewing.property.town}, {viewing.property.city}
-                              </p>
+                              <button
+                                type="button"
+                                className="text-left w-full"
+                                onClick={() => handleOpenEventDetail(viewing)}
+                              >
+                                <h3 className="text-sm font-semibold text-gray-900 mb-1 hover:text-[#136C9E]">
+                                  {viewing.property.street}
+                                </h3>
+                                <p className="text-xs text-gray-500 mb-2">
+                                  {viewing.property.town}, {viewing.property.city}
+                                </p>
+                              </button>
                               <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                                 Completed
                               </span>
@@ -2046,259 +2556,179 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
           </div>
         )}
 
-        {activeTab === 'past' && (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            {filteredPastViewings.length === 0 ? (
-              <div className="p-12 text-center">
-                <Eye className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 mb-2">
-                  {filterQuery ? 'No matching viewings' : 'No cancelled viewings'}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {filterQuery ? 'Try adjusting your search filters' : 'Cancelled viewings will appear here.'}
-                </p>
+        {activeTab === 'calendar' && (
+          <div className="ll-vw-calendar">
+            <div className="ll-vw-calendar-head">
+              <h2>{calendarMonthLabel}</h2>
+              <div className="ll-vw-calendar-nav">
+                <button
+                  type="button"
+                  aria-label="Previous week"
+                  onClick={() => setCalendarWeekStart((prev) => addDays(prev, -7))}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="is-today"
+                  onClick={() => setCalendarWeekStart(startOfWeekMonday(new Date()))}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next week"
+                  onClick={() => setCalendarWeekStart((prev) => addDays(prev, 7))}
+                >
+                  <ChevronRight size={16} />
+                </button>
               </div>
-            ) : (
-              <>
-                {/* Desktop Table View */}
-                {!isMobile && (
-                  <>
-                    {/* Table Header */}
-                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                        <div className="col-span-1">Select</div>
-                        <div className="col-span-2">Property</div>
-                        <div className="col-span-2">Date & Time</div>
-                        <div className="col-span-1">Status</div>
-                        <div className="col-span-2">Tenant Name</div>
-                        <div className="col-span-2">Tenant Email</div>
-                        <div className="col-span-2">Notes</div>
+            </div>
+
+            <div className="ll-vw-calendar-scroll">
+              <div className="ll-vw-calendar-grid">
+                <div className="ll-vw-calendar-weekdays">
+                  <div className="ll-vw-calendar-time-label">Time</div>
+                  {calendarDays.map((day) => {
+                    const key = toDateKey(day);
+                    const isToday = key === toDateKey(new Date());
+                    return (
+                      <div key={key} className="ll-vw-calendar-weekday">
+                        <span>{day.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                        <strong className={isToday ? 'is-today' : undefined}>
+                          {day.getDate()}
+                        </strong>
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
 
-                    {/* Table Body */}
-                    <div className="divide-y divide-gray-100">
-                  {paginatedPastViewings.map((viewing) => (
-                    <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                      <div className="grid grid-cols-12 gap-4 items-center">
-                        {/* Checkbox */}
-                        <div className="col-span-1">
-                          <button
-                            onClick={() => handleToggleSelect(viewing.id)}
-                            className="flex items-center justify-center"
-                            title={selectedViewings.has(viewing.id) ? 'Deselect' : 'Select'}
+                <div className="ll-vw-calendar-hours">
+                  {CALENDAR_HOURS.map((hour) => (
+                    <div key={hour} className="ll-vw-calendar-row">
+                      <div className="ll-vw-calendar-hour">{formatHourLabel(hour)}</div>
+                      {calendarDays.map((day) => {
+                        const dayKey = toDateKey(day);
+                        const slotEvents = calendarWeekEvents.filter((viewing) => {
+                          const viewingHour = parseViewingHour(viewing.viewingDetails?.time);
+                          return (
+                            sameDateKey(viewing.viewingDetails?.date, dayKey) &&
+                            viewingHour === hour
+                          );
+                        });
+                        return (
+                          <div
+                            key={`${dayKey}-${hour}`}
+                            className="ll-vw-calendar-cell"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              if (slotEvents[0]) {
+                                handleOpenEventDetail(slotEvents[0]);
+                                return;
+                              }
+                              handleOpenRequestModal(undefined, {
+                                date: dayKey,
+                                time: `${String(hour).padStart(2, '0')}:00`,
+                              });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (slotEvents[0]) {
+                                  handleOpenEventDetail(slotEvents[0]);
+                                  return;
+                                }
+                                handleOpenRequestModal(undefined, {
+                                  date: dayKey,
+                                  time: `${String(hour).padStart(2, '0')}:00`,
+                                });
+                              }
+                            }}
                           >
-                            {selectedViewings.has(viewing.id) ? (
-                              <CheckSquare className="w-5 h-5 text-orange-500" />
-                            ) : (
-                              <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
-                            )}
-                          </button>
-                        </div>
-                        {/* Property */}
-                        <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
-                            {viewing.property.street}
-                          </h3>
-                          <p className="text-xs text-gray-500 truncate">
-                            {viewing.property.town}, {viewing.property.city}
-                          </p>
-                        </div>
-
-                        {/* Date & Time */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-xs text-gray-600 mb-1">
-                            <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                            {slotEvents.map((viewing, index) => (
+                              <button
+                                key={viewing.id}
+                                type="button"
+                                className="ll-vw-calendar-event"
+                                style={{ background: calendarEventColor(index + hour) }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEventDetail(viewing);
+                                }}
+                              >
+                                <strong>{viewing.property.street}</strong>
+                                <em>
+                                  <Clock size={11} />
+                                  {formatTime(viewing.viewingDetails?.time || '')}
+                                </em>
+                              </button>
+                            ))}
                           </div>
-                          <div className="flex items-center text-xs text-gray-600">
-                            <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
-                            <span>{formatTime(viewing.viewingDetails?.time || '')}</span>
-                          </div>
-                        </div>
-
-                        {/* Status */}
-                        <div className="col-span-1">
-                          <span
-                            className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                              viewing.status === 'completed'
-                                ? 'bg-green-100 text-green-700'
-                                : viewing.status === 'cancelled'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-gray-100 text-gray-700'
-                            }`}
-                          >
-                            {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
-                          </span>
-                        </div>
-
-                        {/* Tenant Name */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-900">
-                            <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
-                              {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Tenant Email */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
-                              {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Notes */}
-                        <div className="col-span-2">
-                          <span className="text-xs text-gray-500 truncate">
-                            {viewing.notes || viewing.agentNotes || '—'}
-                          </span>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
                   ))}
-                    </div>
-                  </>
-                )}
+                </div>
+              </div>
+            </div>
 
-                {/* Mobile Card View */}
-                {isMobile && (
-                  <div className="space-y-4 p-4">
-                    {paginatedPastViewings.map((viewing) => (
-                      <div 
-                        key={viewing.id} 
-                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <button
-                              onClick={() => handleToggleSelect(viewing.id)}
-                              className="mt-1 flex-shrink-0"
-                            >
-                              {selectedViewings.has(viewing.id) ? (
-                                <CheckSquare className="w-5 h-5 text-orange-500" />
-                              ) : (
-                                <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
-                              )}
-                            </button>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                                {viewing.property.street}
-                              </h3>
-                              <p className="text-xs text-gray-500 mb-2">
-                                {viewing.property.town}, {viewing.property.city}
-                              </p>
-                              <span
-                                className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                                  viewing.status === 'completed'
-                                    ? 'bg-green-100 text-green-700'
-                                    : viewing.status === 'cancelled'
-                                    ? 'bg-red-100 text-red-700'
-                                    : 'bg-gray-100 text-gray-700'
-                                }`}
-                              >
-                                {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 mb-3 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Date & Time:</span>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              <p className="font-medium">{formatDate(viewing.viewingDetails?.date || '')}</p>
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Clock className="h-3 w-3 text-muted-foreground" />
-                              <p className="font-medium">{formatTime(viewing.viewingDetails?.time || '')}</p>
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Tenant:</span>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <p className="font-medium">{viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}</p>
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Mail className="h-3 w-3 text-muted-foreground" />
-                              <p className="text-sm text-gray-600 truncate">{viewing.viewingDetails?.userDetails?.email || 'Not provided'}</p>
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Notes:</span>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {viewing.notes || viewing.agentNotes || '—'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
+            {calendarWeekEvents.length === 0 && (
+              <p className="ll-vw-calendar-empty">
+                No viewings scheduled this week. Click an empty slot to request a viewing.
+              </p>
             )}
-            
-            {/* Pagination Controls for Past Tab */}
-            <PaginationControls
-              currentPage={currentPastPage}
-              totalPages={totalPastPages}
-              onPageChange={setCurrentPastPage}
-              startIndex={pastStartIndex}
-              endIndex={pastEndIndex}
-              totalItems={filteredPastViewings.length}
-              itemName="viewings"
-            />
           </div>
         )}
+      </div>
       </div>
 
       {/* Schedule Modal */}
       {isScheduleModalOpen && selectedRequest && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Schedule Viewing</h3>
+        <div className="ll-vw-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="ll-vw-modal ll-vw-modal-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="ll-vw-modal-head">
+              <div className="ll-vw-modal-head-copy">
+                <div className="ll-vw-modal-icon is-blue">
+                  <Calendar size={16} />
+                </div>
+                <div>
+                  <h3>Schedule Viewing</h3>
+                  <p>Confirm a slot for {selectedRequest.property.street}</p>
+                </div>
+              </div>
               <button
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                type="button"
+                className="ll-vw-modal-close"
                 onClick={() => {
                   setIsScheduleModalOpen(false);
                   setSelectedRequest(null);
                   setScheduleForm(initialScheduleForm);
                 }}
               >
-                <X className="w-4 h-4" />
+                <X size={16} />
               </button>
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <div className="ll-vw-modal-body">
+              <label className="ll-vw-field">
+                <span>Date</span>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={scheduleForm.date}
                   onChange={(e) => setScheduleForm((prev) => ({ ...prev, date: e.target.value }))}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+              </label>
+              <label className="ll-vw-field">
+                <span>Time</span>
                 <input
                   type="time"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={scheduleForm.time}
                   onChange={(e) => setScheduleForm((prev) => ({ ...prev, time: e.target.value }))}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Viewing Preference</label>
+              </label>
+              <label className="ll-vw-field">
+                <span>Viewing Preference</span>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={scheduleForm.preference}
                   onChange={(e) => setScheduleForm((prev) => ({ ...prev, preference: e.target.value }))}
                 >
@@ -2306,41 +2736,38 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   <option>Virtual Viewing</option>
                   <option>Phone Consultation</option>
                 </select>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tenant Name</label>
+              </label>
+              <div className="ll-vw-field-grid">
+                <label className="ll-vw-field">
+                  <span>Tenant Name</span>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     value={scheduleForm.tenantName}
                     onChange={(e) => setScheduleForm((prev) => ({ ...prev, tenantName: e.target.value }))}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tenant Phone</label>
+                </label>
+                <label className="ll-vw-field">
+                  <span>Tenant Phone</span>
                   <input
                     type="tel"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     value={scheduleForm.tenantPhone}
                     onChange={(e) => setScheduleForm((prev) => ({ ...prev, tenantPhone: e.target.value }))}
                   />
-                </div>
+                </label>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tenant Email<span className="text-red-500">*</span></label>
+              <label className="ll-vw-field">
+                <span>Tenant Email *</span>
                 <input
                   type="email"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={scheduleForm.tenantEmail}
                   onChange={(e) => setScheduleForm((prev) => ({ ...prev, tenantEmail: e.target.value }))}
                 />
-              </div>
+              </label>
             </div>
-
-            <div className="flex items-center justify-end gap-3 mt-6">
+            <div className="ll-vw-modal-footer">
               <button
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                type="button"
+                className="ll-vw-modal-secondary"
                 onClick={() => {
                   setIsScheduleModalOpen(false);
                   setSelectedRequest(null);
@@ -2351,12 +2778,12 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 Cancel
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+                type="button"
+                className="ll-vw-modal-primary"
                 onClick={handleScheduleSubmit}
                 disabled={isProcessing}
               >
-                {isProcessing && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
-                Schedule Viewing
+                {isProcessing ? 'Scheduling…' : 'Schedule Viewing'}
               </button>
             </div>
           </div>
@@ -2365,55 +2792,78 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
       {/* Reschedule Modal */}
       {isRescheduleModalOpen && selectedViewing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Reschedule Viewing</h3>
+        <div className="ll-vw-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="ll-vw-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ll-vw-modal-head is-amber">
+              <div className="ll-vw-modal-head-copy">
+                <div className="ll-vw-modal-icon is-amber">
+                  <Clock size={16} />
+                </div>
+                <div>
+                  <h3>Propose Alternative Time</h3>
+                  <p>Suggest a revised slot for this viewing request</p>
+                </div>
+              </div>
               <button
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                type="button"
+                className="ll-vw-modal-close"
                 onClick={() => {
                   setIsRescheduleModalOpen(false);
                   setSelectedViewing(null);
                   setRescheduleForm(initialRescheduleForm);
                 }}
               >
-                <X className="w-4 h-4" />
+                <X size={16} />
               </button>
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Date</label>
+            <div className="ll-vw-modal-body">
+              <div className="ll-vw-modal-info">
+                <span>Applicant & Property</span>
+                <strong>
+                  {selectedViewing.viewingDetails?.userDetails?.fullName || 'Applicant'} ·{' '}
+                  {selectedViewing.property.street}
+                </strong>
+              </div>
+              <label className="ll-vw-field">
+                <span>Proposed New Date</span>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={rescheduleForm.date}
                   onChange={(e) => setRescheduleForm((prev) => ({ ...prev, date: e.target.value }))}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Time</label>
-                <input
-                  type="time"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              </label>
+              <label className="ll-vw-field">
+                <span>Proposed Time Slot</span>
+                <select
                   value={rescheduleForm.time}
                   onChange={(e) => setRescheduleForm((prev) => ({ ...prev, time: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Message to Tenant (optional)</label>
+                >
+                  <option value="">Select a time</option>
+                  {VIEWING_TIME_SLOTS.map((slot) => (
+                    <option key={slot.value} value={slot.value}>
+                      {slot.label}
+                    </option>
+                  ))}
+                  {rescheduleForm.time &&
+                    !VIEWING_TIME_SLOTS.some((slot) => slot.value === rescheduleForm.time) && (
+                      <option value={rescheduleForm.time}>{rescheduleForm.time}</option>
+                    )}
+                </select>
+              </label>
+              <label className="ll-vw-field">
+                <span>Message to Applicant</span>
                 <textarea
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={2}
+                  placeholder="I have another viewing booked then, would this alternative work for you?"
                   value={rescheduleForm.message}
                   onChange={(e) => setRescheduleForm((prev) => ({ ...prev, message: e.target.value }))}
                 />
-              </div>
+              </label>
             </div>
-
-            <div className="flex items-center justify-end gap-3 mt-6">
+            <div className="ll-vw-modal-footer is-split">
               <button
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                type="button"
+                className="ll-vw-modal-secondary"
                 onClick={() => {
                   setIsRescheduleModalOpen(false);
                   setSelectedViewing(null);
@@ -2424,12 +2874,12 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 Cancel
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+                type="button"
+                className="ll-vw-modal-cta"
                 onClick={handleRescheduleSubmit}
                 disabled={isProcessing}
               >
-                {isProcessing && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
-                Send Update
+                {isProcessing ? 'Sending…' : 'Send Proposal'}
               </button>
             </div>
           </div>
@@ -2438,37 +2888,48 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
       {/* Cancel Modal */}
       {isCancelModalOpen && selectedViewing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Cancel Viewing</h3>
+        <div className="ll-vw-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="ll-vw-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ll-vw-modal-head">
+              <div className="ll-vw-modal-head-copy">
+                <div className="ll-vw-modal-icon is-red">
+                  <X size={16} />
+                </div>
+                <div>
+                  <h3>Cancel Viewing</h3>
+                  <p>Notify the tenant that this appointment will not go ahead</p>
+                </div>
+              </div>
               <button
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                type="button"
+                className="ll-vw-modal-close"
                 onClick={() => {
                   setIsCancelModalOpen(false);
                   setSelectedViewing(null);
                   setCancelMessage('');
                 }}
               >
-                <X className="w-4 h-4" />
+                <X size={16} />
               </button>
             </div>
-
-            <p className="text-sm text-gray-600 mb-4">
-              An email notification will be sent to the tenant letting them know this viewing has been cancelled.
-            </p>
-
-            <label className="block text-sm font-medium text-gray-700 mb-2">Optional message to tenant</label>
-            <textarea
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-              value={cancelMessage}
-              onChange={(e) => setCancelMessage(e.target.value)}
-            />
-
-            <div className="flex items-center justify-end gap-3 mt-6">
+            <div className="ll-vw-modal-body">
+              <p className="ll-vw-modal-note">
+                An email notification will be sent to the tenant letting them know this viewing has been
+                cancelled.
+              </p>
+              <label className="ll-vw-field">
+                <span>Optional message to tenant</span>
+                <textarea
+                  rows={3}
+                  value={cancelMessage}
+                  onChange={(e) => setCancelMessage(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="ll-vw-modal-footer">
               <button
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                type="button"
+                className="ll-vw-modal-secondary"
                 onClick={() => {
                   setIsCancelModalOpen(false);
                   setSelectedViewing(null);
@@ -2479,12 +2940,403 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 Keep Viewing
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 flex items-center gap-2"
+                type="button"
+                className="ll-vw-modal-danger"
                 onClick={handleCancelSubmit}
                 disabled={isProcessing}
               >
-                {isProcessing && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
-                Cancel Viewing
+                {isProcessing ? 'Cancelling…' : 'Cancel Viewing'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Request Viewing Modal */}
+      {isRequestModalOpen && (
+        <div
+          className="ll-vw-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsRequestModalOpen(false)}
+        >
+          <div className="ll-vw-modal ll-vw-modal-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="ll-vw-modal-head">
+              <div className="ll-vw-modal-head-copy">
+                <div className="ll-vw-modal-icon is-orange">
+                  <Eye size={16} />
+                </div>
+                <div>
+                  <h3>Request a Property Viewing</h3>
+                  <p>Coordinate an in-person or virtual walkthrough with a lettings agent</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ll-vw-modal-close"
+                onClick={() => setIsRequestModalOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="ll-vw-modal-body">
+              <label className="ll-vw-field">
+                <span>Select Property</span>
+                <select
+                  value={requestForm.propertyId}
+                  onChange={(e) =>
+                    setRequestForm((prev) => ({ ...prev, propertyId: e.target.value }))
+                  }
+                >
+                  <option value="" disabled>
+                    Choose a property
+                  </option>
+                  {(properties || []).map((property) => (
+                    <option key={property.id} value={property.id}>
+                      {propertyStreet(property.address)} — {property.address} (£
+                      {property.rent.toLocaleString()}/mo)
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="ll-vw-field-grid">
+                <label className="ll-vw-field">
+                  <span>Preferred Date</span>
+                  <input
+                    type="date"
+                    value={requestForm.date}
+                    onChange={(e) => setRequestForm((prev) => ({ ...prev, date: e.target.value }))}
+                  />
+                </label>
+                <label className="ll-vw-field">
+                  <span>Time Slot</span>
+                  <select
+                    value={requestForm.time}
+                    onChange={(e) => setRequestForm((prev) => ({ ...prev, time: e.target.value }))}
+                  >
+                    {VIEWING_TIME_SLOTS.map((slot) => (
+                      <option key={slot.value} value={slot.value}>
+                        {slot.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="ll-vw-field">
+                <span>Viewing Type</span>
+                <div className="ll-vw-type-grid">
+                  <label
+                    className={`ll-vw-type-option${
+                      requestForm.preference === 'In-Person Viewing' ? ' is-active' : ''
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="viewingType"
+                      checked={requestForm.preference === 'In-Person Viewing'}
+                      onChange={() =>
+                        setRequestForm((prev) => ({ ...prev, preference: 'In-Person Viewing' }))
+                      }
+                    />
+                    <span>In-Person Accompanied</span>
+                  </label>
+                  <label
+                    className={`ll-vw-type-option${
+                      requestForm.preference === 'Virtual Viewing' ? ' is-active' : ''
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="viewingType"
+                      checked={requestForm.preference === 'Virtual Viewing'}
+                      onChange={() =>
+                        setRequestForm((prev) => ({ ...prev, preference: 'Virtual Viewing' }))
+                      }
+                    />
+                    <span>Live Virtual Tour</span>
+                  </label>
+                </div>
+              </div>
+              <div className="ll-vw-field-grid">
+                <label className="ll-vw-field">
+                  <span>Applicant Name</span>
+                  <input
+                    type="text"
+                    value={requestForm.tenantName}
+                    onChange={(e) =>
+                      setRequestForm((prev) => ({ ...prev, tenantName: e.target.value }))
+                    }
+                  />
+                </label>
+                <label className="ll-vw-field">
+                  <span>Applicant Phone</span>
+                  <input
+                    type="tel"
+                    value={requestForm.tenantPhone}
+                    onChange={(e) =>
+                      setRequestForm((prev) => ({ ...prev, tenantPhone: e.target.value }))
+                    }
+                  />
+                </label>
+              </div>
+              <label className="ll-vw-field">
+                <span>Applicant Email</span>
+                <input
+                  type="email"
+                  value={requestForm.tenantEmail}
+                  onChange={(e) =>
+                    setRequestForm((prev) => ({ ...prev, tenantEmail: e.target.value }))
+                  }
+                />
+              </label>
+              <label className="ll-vw-field">
+                <span>Special Instructions or Notes</span>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Please bring floorplans, tenant interested in 12-month AST with break clause..."
+                  value={requestForm.notes}
+                  onChange={(e) => setRequestForm((prev) => ({ ...prev, notes: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="ll-vw-modal-footer">
+              <button
+                type="button"
+                className="ll-vw-modal-secondary"
+                onClick={() => setIsRequestModalOpen(false)}
+                disabled={isProcessing}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ll-vw-modal-cta"
+                onClick={handleRequestViewingSubmit}
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Submitting…' : 'Submit Viewing Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event Appointment Dossier Modal */}
+      {isEventDetailOpen && selectedViewing && (
+        <div
+          className="ll-vw-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsEventDetailOpen(false)}
+        >
+          <div className="ll-vw-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ll-vw-modal-head">
+              <div className="ll-vw-modal-head-copy">
+                <span className={`ll-vw-event-dot is-${selectedViewing.status}`} />
+                <div>
+                  <h3>Viewing Appointment</h3>
+                  <p>{selectedViewing.property.street}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ll-vw-modal-close"
+                onClick={() => setIsEventDetailOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="ll-vw-modal-body">
+              <div className="ll-vw-event-summary">
+                <div>
+                  <span>Date</span>
+                  <strong>{formatLongDate(selectedViewing.viewingDetails?.date || '')}</strong>
+                </div>
+                <div>
+                  <span>Time Slot</span>
+                  <strong>{formatTime(selectedViewing.viewingDetails?.time || '')}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <em className={`ll-vw-event-status is-${selectedViewing.status}`}>
+                    {statusDisplayLabel(selectedViewing.status)}
+                  </em>
+                </div>
+              </div>
+
+              <div className="ll-vw-field">
+                <span>Applicant</span>
+                <div className="ll-vw-agent-card">
+                  <div className="ll-vw-agent-avatar">
+                    {(selectedViewing.viewingDetails?.userDetails?.fullName || 'TN')
+                      .split(' ')
+                      .map((part) => part[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
+                  <div>
+                    <strong>
+                      {selectedViewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
+                    </strong>
+                    <span>
+                      {selectedViewing.viewingDetails?.userDetails?.email || 'No email'}
+                      {selectedViewing.viewingDetails?.userDetails?.phoneNumber
+                        ? ` · ${selectedViewing.viewingDetails.userDetails.phoneNumber}`
+                        : ''}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="ll-vw-field">
+                <span>Assigned Lettings Agent</span>
+                <div className="ll-vw-agent-card">
+                  <div className="ll-vw-agent-avatar is-agent">
+                    {(managerName || selectedViewing.property.agent?.name || 'AG')
+                      .split(' ')
+                      .map((part) => part[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
+                  <div>
+                    <strong>{managerName || selectedViewing.property.agent?.name || 'Agent'}</strong>
+                    <span>
+                      {managerEmail || selectedViewing.property.agent?.email || 'No email on file'}
+                      {selectedViewing.property.agent?.phone
+                        ? ` · ${selectedViewing.property.agent.phone}`
+                        : ''}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="ll-vw-modal-footer is-split"
+                style={{ padding: 0, border: 0, background: 'transparent' }}
+              >
+                <button
+                  type="button"
+                  className="ll-vw-modal-secondary"
+                  onClick={() => handleOpenReschedule(selectedViewing)}
+                  disabled={isProcessing}
+                >
+                  Reschedule
+                </button>
+                {selectedViewing.status !== 'confirmed' && selectedViewing.status !== 'completed' && (
+                  <button
+                    type="button"
+                    className="ll-vw-modal-primary"
+                    onClick={async () => {
+                      await handleConfirmViewing(selectedViewing);
+                      setIsEventDetailOpen(false);
+                    }}
+                    disabled={isProcessing}
+                  >
+                    Check In
+                  </button>
+                )}
+                {(selectedViewing.status === 'confirmed' ||
+                  selectedViewing.status === 'rescheduled') && (
+                  <button
+                    type="button"
+                    className="ll-vw-modal-primary"
+                    onClick={() => {
+                      setIsEventDetailOpen(false);
+                      handleOpenCancel(selectedViewing);
+                    }}
+                    disabled={isProcessing}
+                  >
+                    Cancel Appointment
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Portfolio Insights Modal */}
+      {isInsightsModalOpen && (
+        <div
+          className="ll-vw-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsInsightsModalOpen(false)}
+        >
+          <div className="ll-vw-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ll-vw-modal-head is-insights">
+              <div className="ll-vw-modal-head-copy">
+                <div className="ll-vw-modal-icon is-insights">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h3>Portfolio Insights</h3>
+                  <p>Algorithmic viewing demand telemetry</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ll-vw-modal-close"
+                onClick={() => setIsInsightsModalOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="ll-vw-modal-body">
+              <div className="ll-vw-insights-banner">
+                <strong>
+                  {(properties || [])[0]
+                    ? `${propertyStreet((properties || [])[0].address)} is generating elevated inquiry volume`
+                    : 'Viewing demand is tracking above baseline'}
+                </strong>{' '}
+                this month, with {requests.length} open request
+                {requests.length === 1 ? '' : 's'} and {stats.upcoming} upcoming appointment
+                {stats.upcoming === 1 ? '' : 's'} across the portfolio.
+              </div>
+              <div className="ll-vw-insights-grid">
+                <div>
+                  <span>Average Inquiries / Day</span>
+                  <strong>
+                    {(Math.max(requests.length, bookings.length) / 7).toFixed(1)} inquiries
+                  </strong>
+                </div>
+                <div>
+                  <span>Viewing-to-Offer Rate</span>
+                  <strong>
+                    {bookings.length
+                      ? `${
+                          Math.round(
+                            (bookings.filter((b) => b.status === 'completed').length /
+                              Math.max(bookings.length, 1)) *
+                              1000,
+                          ) / 10
+                        }%`
+                      : '0%'}
+                  </strong>
+                </div>
+              </div>
+            </div>
+            <div className="ll-vw-modal-footer">
+              {onViewInsights && (
+                <button
+                  type="button"
+                  className="ll-vw-modal-secondary"
+                  onClick={() => {
+                    setIsInsightsModalOpen(false);
+                    onViewInsights();
+                  }}
+                >
+                  Open full insights
+                </button>
+              )}
+              <button
+                type="button"
+                className="ll-vw-modal-primary"
+                onClick={() => setIsInsightsModalOpen(false)}
+              >
+                Got it
               </button>
             </div>
           </div>

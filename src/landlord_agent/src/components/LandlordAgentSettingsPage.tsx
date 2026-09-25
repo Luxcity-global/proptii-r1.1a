@@ -158,7 +158,10 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
     hasStripeCustomer,
     loading,
     refresh,
-  } = useLandlordBillingStatus(isAuthenticated);
+  } = useLandlordBillingStatus(isAuthenticated, {
+    email: userProfile?.email,
+    role: userRole,
+  });
 
   const [portalBusy, setPortalBusy] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);

@@ -77,6 +77,7 @@ declare namespace google {
 
     interface InfoWindowOptions {
       content?: string | Node;
+      headerDisabled?: boolean;
     }
 
     interface GeocoderRequest {

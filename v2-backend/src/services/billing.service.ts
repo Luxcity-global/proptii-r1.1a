@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import {
+  complimentaryBillingPayload,
+  isComplimentaryAccessEmail,
+} from '../utils/complimentary-access';
 
 @Injectable()
 export class BillingService {
@@ -19,7 +23,11 @@ export class BillingService {
     return db ? db.collection('subscriptions') : null;
   }
 
-  async getBillingStatus(userId: string) {
+  async getBillingStatus(userId: string, email?: string, role?: string) {
+    if (isComplimentaryAccessEmail(email)) {
+      return complimentaryBillingPayload(role);
+    }
+
     const col = this.collection;
     if (!col) {
       return {

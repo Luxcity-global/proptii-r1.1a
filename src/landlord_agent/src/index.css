@@ -6,6 +6,8 @@
 @import "./styles/clientsPage.css";
 @import "./styles/clientDetails.css";
 @import "./styles/referencingPage.css";
+@import "./styles/documentsPage.css";
+@import "./styles/viewingsPage.css";
 
 @tailwind base;
 @tailwind components;

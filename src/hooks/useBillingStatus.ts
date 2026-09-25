@@ -6,6 +6,10 @@ import {
 } from '../services/billingService';
 import type { BillingDashboard } from '../config/plans';
 import { isMockTestUserId } from '../data/mockTestUsers';
+import {
+  complimentaryBillingStatus,
+  isComplimentaryAccessEmail,
+} from '../utils/complimentaryAccess';
 
 function mockBillingStatus(role?: string | null): BillingStatus {
   const plan =
@@ -43,6 +47,12 @@ export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
       setLoading(false);
       return;
     }
+    if (isComplimentaryAccessEmail(user?.email)) {
+      setData(complimentaryBillingStatus(user?.roles?.[0]));
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -54,7 +64,7 @@ export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, dashboard, user?.id, user?.roles]);
+  }, [isAuthenticated, dashboard, user?.id, user?.roles, user?.email]);
 
   useEffect(() => {
     if (authLoading) return;

@@ -22,6 +22,7 @@ import {
 } from '../../utils/pricingRoutes';
 import type { BillingCycle } from '../../components/pricing/PricingBillingToggle';
 import { trackEvent } from '../../utils/analytics';
+import { isComplimentaryAccessEmail } from '../../utils/complimentaryAccess';
 import '../../styles/pricing.css';
 
 const WelcomeContent: React.FC = () => {
@@ -62,6 +63,8 @@ const WelcomeContent: React.FC = () => {
 
     if (loading || checkoutStarted.current) return;
     if (plan?.isFree || plan?.isContactSales) return;
+    // Company staff (@theluxcity.co.uk) already have full complimentary access.
+    if (isComplimentaryAccessEmail(user?.email)) return;
     if (status === 'trialing' || status === 'active') return;
 
     if (getPricingFlow() === 'pay_now') {
@@ -114,7 +117,7 @@ const WelcomeContent: React.FC = () => {
     };
 
     runCheckout();
-  }, [loading, status, plan, planId, cycle, navigate]);
+  }, [loading, status, plan, planId, cycle, navigate, user?.email]);
 
   return (
     <div className="pr-page min-h-screen flex flex-col">

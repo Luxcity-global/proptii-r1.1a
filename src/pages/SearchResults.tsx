@@ -1259,17 +1259,12 @@ const SearchResults = () => {
     filteredProperties,
     counts: filterCounts,
     setPriceRange,
-    setMinPrice,
-    setMaxPrice,
     toggleBedroom,
     setBedrooms,
     togglePropertyType,
     setFurnishing,
     toggleParking,
     toggleBalconyOrGarden,
-    togglePetFriendly,
-    toggleBillsIncluded,
-    setKeywords,
     setSortBy,
     resetFilters,
     removeFilter,
@@ -1285,6 +1280,7 @@ const SearchResults = () => {
   const [mapNode, setMapNode] = useState<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const openPropertyFromMapRef = useRef<(property: Property) => void>(() => {});
   const markersGeocodedRef = useRef<boolean>(false);
   const lastResultsKeyRef = useRef<string | null>(null);
   const boundsFittedRef = useRef<boolean>(false); // Flag to prevent any resets after bounds are fitted
@@ -1738,10 +1734,11 @@ const SearchResults = () => {
           
           // Create info window with property details and image navigation
           const infoWindow = new window.google.maps.InfoWindow({
+            headerDisabled: true,
             content: `
-              <div style="max-width: 280px; padding: 0;">
+              <div id="map-iw-${propertyId}" class="sr-map-iw">
                 ${firstImageUrl ? `
-                  <div style="position: relative; width: 100%; height: 150px; overflow: hidden; border-radius: 8px 8px 0 0; background-color: #f0f0f0;">
+                  <div style="position: relative; width: 100%; height: 150px; overflow: hidden; border-radius: 12px 12px 0 0; background-color: #f0f0f0;">
                     <img id="info-img-${propertyId}" src="${firstImageUrl}" alt="Property" style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s;" />
                     ${imageUrls.length > 1 ? `
                       <button id="prev-btn-${propertyId}" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">‹</button>
@@ -1770,6 +1767,46 @@ const SearchResults = () => {
 
           // Set up image navigation when info window is ready
           window.google.maps.event.addListener(infoWindow, 'domready', () => {
+            const card = document.getElementById(`map-iw-${propertyId}`);
+            const iwContainer = card?.closest('.gm-style-iw-c') as HTMLElement | null;
+            const iwInner = card?.closest('.gm-style-iw-d') as HTMLElement | null;
+
+            if (iwContainer) {
+              iwContainer.style.padding = '0';
+              iwContainer.style.overflow = 'visible';
+            }
+            if (iwInner) {
+              iwInner.style.overflowX = 'hidden';
+              iwInner.style.overflowY = 'auto';
+              iwInner.style.padding = '0';
+              const keepScrollOnCard = (event: Event) => event.stopPropagation();
+              iwInner.addEventListener('wheel', keepScrollOnCard, { passive: true });
+              iwInner.addEventListener('touchmove', keepScrollOnCard, { passive: true });
+            }
+            iwContainer?.querySelectorAll('.gm-style-iw-chr, .gm-ui-hover-effect').forEach((node) => {
+              (node as HTMLElement).style.display = 'none';
+            });
+
+            // Sit the close control on the box corner, outside the scrolling content.
+            if (iwContainer && !iwContainer.querySelector('.sr-map-iw-close')) {
+              const closeBtn = document.createElement('button');
+              closeBtn.type = 'button';
+              closeBtn.className = 'sr-map-iw-close';
+              closeBtn.setAttribute('aria-label', 'Close listing');
+              closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" /></svg>';
+              closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                infoWindow.close();
+              });
+              iwContainer.appendChild(closeBtn);
+            }
+            card?.addEventListener('click', (e) => {
+              const target = e.target as HTMLElement | null;
+              if (target?.closest('button')) return;
+              openPropertyFromMapRef.current(property);
+            });
+
             const imgEl = document.getElementById(`info-img-${propertyId}`) as HTMLImageElement;
             const prevBtn = document.getElementById(`prev-btn-${propertyId}`) as HTMLButtonElement;
             const nextBtn = document.getElementById(`next-btn-${propertyId}`) as HTMLButtonElement;
@@ -1899,6 +1936,7 @@ const SearchResults = () => {
     setSelectedProperty(property);
     setIsModalOpen(true);
   };
+  openPropertyFromMapRef.current = openModal;
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -2370,17 +2408,12 @@ const SearchResults = () => {
                 filters={filters}
                 counts={filterCounts}
                 setPriceRange={setPriceRange}
-                setMinPrice={setMinPrice}
-                setMaxPrice={setMaxPrice}
                 toggleBedroom={toggleBedroom}
                 setBedrooms={setBedrooms}
                 togglePropertyType={togglePropertyType}
                 setFurnishing={setFurnishing}
                 toggleParking={toggleParking}
                 toggleBalconyOrGarden={toggleBalconyOrGarden}
-                togglePetFriendly={togglePetFriendly}
-                toggleBillsIncluded={toggleBillsIncluded}
-                setKeywords={setKeywords}
                 setSortBy={setSortBy}
                 resetFilters={resetFilters}
                 removeFilter={removeFilter}

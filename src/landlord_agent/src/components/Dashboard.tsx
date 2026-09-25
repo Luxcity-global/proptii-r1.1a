@@ -8,6 +8,9 @@ import {
   Image,
   BarChart3,
   Bell,
+  RefreshCw,
+  Settings,
+  Sparkles,
   Home,
   Check,
   User,
@@ -32,6 +35,9 @@ interface DashboardProps {
   onManageDocuments: (property: Property) => void;
   onManagePhotos: (property: Property) => void;
   onViewInsights: () => void;
+  onRefresh?: () => void;
+  onViewSettings?: () => void;
+  onViewNotifications?: () => void;
   onViewAllProperties?: () => void;
   onViewViewings?: () => void;
   onViewClients?: () => void;
@@ -170,46 +176,105 @@ function DashboardOverviewHeader({
   userName,
   onViewInsights,
   onAddProperty,
+  onRefresh,
+  onViewSettings,
+  onViewNotifications,
   addLabel = "Add Property",
   showInsights = true,
 }: {
   userName: string;
   onViewInsights?: () => void;
   onAddProperty?: () => void;
+  onRefresh?: () => void;
+  onViewSettings?: () => void;
+  onViewNotifications?: () => void;
   addLabel?: string;
   showInsights?: boolean;
 }) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    onRefresh?.();
+    window.setTimeout(() => setIsRefreshing(false), 700);
+  };
+
   return (
     <header className="ll-header-bar">
-      <div>
-        <h1>
-          Welcome, <span>{userName}</span>
-        </h1>
-        <p>Here&apos;s the latest update on your portfolio today.</p>
-      </div>
-      <div className="ll-header-actions">
-        {showInsights && (
-          <button type="button" className="ll-btn-insights" onClick={onViewInsights}>
-            <BarChart3 size={16} />
-            Portfolio Insights
+      <div className="ll-overview-inner ll-header-inner">
+        <div>
+          <h1>
+            Welcome, <span>{userName}</span>
+          </h1>
+          <p>Here&apos;s the latest update on your portfolio today.</p>
+        </div>
+        <div className="ll-header-actions">
+          <button
+            type="button"
+            className={`ll-header-icon${isRefreshing ? " refreshing" : ""}`}
+            title="Refresh Portfolio Data"
+            onClick={handleRefresh}
+          >
+            <RefreshCw size={16} />
           </button>
-        )}
-        {onAddProperty && (
-          <button type="button" className="ll-btn-add" onClick={onAddProperty}>
-            <Plus size={16} strokeWidth={2.5} />
-            {addLabel}
+          <button
+            type="button"
+            className="ll-header-icon"
+            title="Settings"
+            onClick={onViewSettings}
+          >
+            <Settings size={18} />
           </button>
-        )}
+          <button
+            type="button"
+            className="ll-header-icon"
+            title="Notifications"
+            onClick={onViewNotifications}
+          >
+            <Bell size={18} />
+            <span className="ll-header-dot" />
+          </button>
+          {showInsights && (
+            <button type="button" className="ll-header-insights" onClick={onViewInsights}>
+              <span className="ll-insights-icon">
+                <Sparkles size={12} />
+              </span>
+              Portfolio Insights
+            </button>
+          )}
+          {onAddProperty && (
+            <button type="button" className="ll-header-add" onClick={onAddProperty}>
+              <Plus size={16} strokeWidth={2.5} />
+              {addLabel}
+            </button>
+          )}
+        </div>
       </div>
     </header>
   );
 }
 
-function DashboardSkeleton({ userName }: { userName: string }) {
+function DashboardSkeleton({
+  userName,
+  onRefresh,
+  onViewSettings,
+  onViewNotifications,
+}: {
+  userName: string;
+  onRefresh?: () => void;
+  onViewSettings?: () => void;
+  onViewNotifications?: () => void;
+}) {
   return (
     <div className="ll-overview">
-      <div className="ll-overview-inner">
-        <DashboardOverviewHeader userName={userName} showInsights={false} />
+      <DashboardOverviewHeader
+        userName={userName}
+        showInsights={false}
+        onRefresh={onRefresh}
+        onViewSettings={onViewSettings}
+        onViewNotifications={onViewNotifications}
+      />
+      <div className="ll-overview-inner ll-overview-body">
 
         <div className="ll-top-stat-grid">
           {[0, 1, 2].map((i) => (
@@ -288,25 +353,34 @@ function DashboardGlobalEmpty({
   onAddProperty,
   onSignIn,
   onViewInsights,
+  onRefresh,
+  onViewSettings,
+  onViewNotifications,
 }: {
   variant: "guest" | "new-user";
   userName: string;
   onAddProperty?: () => void;
   onSignIn?: () => void;
   onViewInsights?: () => void;
+  onRefresh?: () => void;
+  onViewSettings?: () => void;
+  onViewNotifications?: () => void;
 }) {
   const isGuest = variant === "guest";
   return (
     <div className="ll-overview">
-      <div className="ll-overview-inner">
-        {!isGuest && (
-          <DashboardOverviewHeader
-            userName={userName}
-            onViewInsights={onViewInsights}
-            onAddProperty={onAddProperty}
-            addLabel="Add Property"
-          />
-        )}
+      {!isGuest && (
+        <DashboardOverviewHeader
+          userName={userName}
+          onViewInsights={onViewInsights}
+          onAddProperty={onAddProperty}
+          onRefresh={onRefresh}
+          onViewSettings={onViewSettings}
+          onViewNotifications={onViewNotifications}
+          addLabel="Add Property"
+        />
+      )}
+      <div className="ll-overview-inner ll-overview-body">
         <div className="ll-global-empty">
           <div className="ll-global-empty-icon">
             <Home size={32} />
@@ -344,6 +418,9 @@ export function Dashboard({
   onManageDocuments,
   onManagePhotos,
   onViewInsights,
+  onRefresh,
+  onViewSettings,
+  onViewNotifications,
   onViewAllProperties,
   onViewViewings,
   onViewClients,
@@ -558,7 +635,14 @@ export function Dashboard({
   }
 
   if (isPortfolioLoading) {
-    return <DashboardSkeleton userName={userName} />;
+    return (
+      <DashboardSkeleton
+        userName={userName}
+        onRefresh={onRefresh}
+        onViewSettings={onViewSettings}
+        onViewNotifications={onViewNotifications}
+      />
+    );
   }
 
   const hasRevenue = totalRent > 0 || revenueSeries.some((r) => r.revenue > 0);
@@ -585,12 +669,15 @@ export function Dashboard({
 
   return (
     <div className="ll-overview">
-      <div className="ll-overview-inner">
-        <DashboardOverviewHeader
-          userName={userName}
-          onViewInsights={onViewInsights}
-          onAddProperty={onAddProperty}
-        />
+      <DashboardOverviewHeader
+        userName={userName}
+        onViewInsights={onViewInsights}
+        onAddProperty={onAddProperty}
+        onRefresh={onRefresh}
+        onViewSettings={onViewSettings}
+        onViewNotifications={onViewNotifications}
+      />
+      <div className="ll-overview-inner ll-overview-body">
 
         <section className="ll-top-stat-grid">
           <div className="ll-stat-card ll-card-profile">
