@@ -109,6 +109,14 @@ function initializeFirebase() {
     }
   } catch (e: any) {
     console.error('❌ Failed to initialize Firebase Admin SDK:', e?.message || e);
+  } finally {
+    if (admin.apps.length) {
+      try {
+        admin.firestore().settings({ ignoreUndefinedProperties: true });
+      } catch (settingsErr: any) {
+        // May already be initialized or configured
+      }
+    }
   }
 }
 

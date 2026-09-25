@@ -47,15 +47,17 @@ export class NativePropertiesService {
     if (!col) return [];
 
     try {
-      let ref: admin.firestore.Query = col;
+      const docMap = new Map<string, any>();
       if (userId) {
-        ref = ref.where('userId', '==', userId);
-      } else if (email) {
-        ref = ref.where('ownerEmail', '==', email.toLowerCase().trim());
+        const snap1 = await col.where('userId', '==', userId).get();
+        snap1.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+      }
+      if (email) {
+        const snap2 = await col.where('ownerEmail', '==', email.toLowerCase().trim()).get();
+        snap2.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
       }
 
-      const snapshot = await ref.get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return Array.from(docMap.values());
     } catch (err: any) {
       console.warn('[NativePropertiesService] Firestore findAllByUser error:', err?.message || err);
       return [];

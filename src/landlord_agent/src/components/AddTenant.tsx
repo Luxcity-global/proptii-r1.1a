@@ -139,7 +139,7 @@ const initialFormState: FormState = {
     firstPaymentDate: '',
     leaseStart: '',
     leaseEnd: '',
-    status: 'pending',
+    status: 'active',
     referencingStatus: 'not-started',
     paymentStatus: 'current',
     emergencyContactName: '',
@@ -887,7 +887,7 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         firstPaymentDate: toDateOnly(state.formData.firstPaymentDate) || new Date(),
         leaseStart: toDateOnly(state.formData.leaseStart) || new Date(),
         leaseEnd: toDateOnly(state.formData.leaseEnd) || new Date(),
-        status: state.formData.status === 'inactive' ? 'ended' : state.formData.status,
+        status: state.formData.status === 'inactive' ? 'ended' : (state.formData.status || 'active'),
         referencingStatus: normalizedReferencing as any,
         paymentStatus: normalizedPayment as any,
         emergencyContact: {
@@ -896,12 +896,12 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
           relationship: state.formData.emergencyContactRelationship
         },
         defaultRiskScore: parseInt(state.formData.defaultRiskScore) || 75,
-        // Additional fields for steps 12-15
-        notes: state.formData.notes || undefined,
-        employer: state.formData.employer || undefined,
-        jobTitle: state.formData.jobTitle || undefined,
-        annualIncome: state.formData.annualIncome ? parseFloat(state.formData.annualIncome.replace(/[^\d.]/g, '')) : undefined,
-        employmentType: state.formData.employmentType || undefined
+        // Additional fields for steps 12-15 (avoid undefined for Firestore safety)
+        notes: state.formData.notes || '',
+        employer: state.formData.employer || '',
+        jobTitle: state.formData.jobTitle || '',
+        annualIncome: state.formData.annualIncome ? parseFloat(state.formData.annualIncome.replace(/[^\d.]/g, '')) : 0,
+        employmentType: state.formData.employmentType || ''
       };
 
       // Call onSave and wait for it to complete (it's async)
@@ -2373,7 +2373,7 @@ export const FormTestUtils = {
     firstPaymentDate: '2027-01-01',
     leaseStart: '2024-01-01',
     leaseEnd: '2025-01-01',
-    status: 'pending',
+    status: 'active',
     referencingStatus: 'not-started',
     paymentStatus: 'current',
     emergencyContactName: 'Jane Doe',

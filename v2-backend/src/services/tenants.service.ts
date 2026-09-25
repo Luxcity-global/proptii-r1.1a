@@ -10,6 +10,21 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> {
   ]);
 }
 
+function cleanUndefined(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) return obj.map(cleanUndefined);
+  if (typeof obj === 'object' && !(obj instanceof Date) && !(obj instanceof admin.firestore.FieldValue)) {
+    const res: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        res[key] = cleanUndefined(value);
+      }
+    }
+    return res;
+  }
+  return obj;
+}
+
 @Injectable()
 export class TenantsService {
   private readonly logger = new Logger(TenantsService.name);
@@ -38,20 +53,37 @@ export class TenantsService {
     const docId = tenantData.id || `tenant_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const effectiveUserId = userId || tenantData.userId || 'unknown';
 
-    const payload = {
+    const rawPayload = {
       ...tenantData,
       id: docId,
       userId: effectiveUserId,
+      status: tenantData.status || 'active',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
+    const payload = cleanUndefined(rawPayload);
 
     if (col) {
       try {
         await withTimeout(col.doc(docId).set(payload));
         this.logger.log(`Created tenant ${docId} for user ${effectiveUserId}`);
+
+        // Link to property if propertyId is provided
+        if (payload.propertyId && this.db) {
+          try {
+            await this.db.collection('properties').doc(payload.propertyId).update({
+              status: 'occupied',
+              tenantId: docId,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            this.logger.log(`Linked property ${payload.propertyId} to tenant ${docId} with status occupied`);
+          } catch (propErr: any) {
+            this.logger.warn(`Failed to update property status to occupied: ${propErr?.message || propErr}`);
+          }
+        }
       } catch (err: any) {
-        this.logger.warn(`createTenant error (proceeding with local payload): ${err?.message || err}`);
+        this.logger.error(`createTenant Firestore error: ${err?.message || err}`, err?.stack);
+        throw err;
       }
     }
 
@@ -66,35 +98,58 @@ export class TenantsService {
     };
   }
 
-  async getTenants(userId?: string, ownedPropertyIds?: string[]) {
+  async getTenants(userId?: string, ownedPropertyIds?: string[], userEmail?: string) {
     const col = this.collection;
     if (!col) return { success: true, tenants: [] };
 
     try {
-      let query: admin.firestore.Query = col;
+      const docMap = new Map<string, any>();
+
+      // 1. Query by userId (UID)
       if (userId) {
-        query = query.where('userId', '==', userId);
+        try {
+          const snap1 = await withTimeout(col.where('userId', '==', userId).get(), 3500);
+          snap1.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        } catch (e: any) {
+          this.logger.warn(`getTenants by userId error: ${e?.message}`);
+        }
       }
 
-      const snapshot = await withTimeout(query.get(), 3500);
-      let tenants = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt,
-          updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() || data.updatedAt,
-          leaseStart: data.leaseStart?.toDate?.()?.toISOString?.() || data.leaseStart,
-          leaseEnd: data.leaseEnd?.toDate?.()?.toISOString?.() || data.leaseEnd,
-          firstPaymentDate: data.firstPaymentDate?.toDate?.()?.toISOString?.() || data.firstPaymentDate,
-          lastPaymentDate: data.lastPaymentDate?.toDate?.()?.toISOString?.() || data.lastPaymentDate,
-        };
-      });
+      // 2. Query by userEmail if provided and different from userId
+      const email = userEmail?.toLowerCase()?.trim();
+      if (email && email !== userId) {
+        try {
+          const snap2 = await withTimeout(col.where('userId', '==', email).get(), 3500);
+          snap2.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        } catch (e: any) {
+          this.logger.warn(`getTenants by email error: ${e?.message}`);
+        }
+      }
 
+      // 3. Query by ownedPropertyIds
       if (ownedPropertyIds && ownedPropertyIds.length > 0) {
-        const propSet = new Set(ownedPropertyIds);
-        tenants = tenants.filter((t: any) => !t.propertyId || propSet.has(t.propertyId));
+        // Firestore "in" queries support up to 30 elements per batch
+        for (let i = 0; i < ownedPropertyIds.length; i += 30) {
+          const batch = ownedPropertyIds.slice(i, i + 30);
+          try {
+            const snap3 = await withTimeout(col.where('propertyId', 'in', batch).get(), 3500);
+            snap3.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+          } catch (e: any) {
+            this.logger.warn(`getTenants by propertyId batch error: ${e?.message}`);
+          }
+        }
       }
+
+      const tenants = Array.from(docMap.values()).map((data) => ({
+        id: data.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt,
+        updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() || data.updatedAt,
+        leaseStart: data.leaseStart?.toDate?.()?.toISOString?.() || data.leaseStart,
+        leaseEnd: data.leaseEnd?.toDate?.()?.toISOString?.() || data.leaseEnd,
+        firstPaymentDate: data.firstPaymentDate?.toDate?.()?.toISOString?.() || data.firstPaymentDate,
+        lastPaymentDate: data.lastPaymentDate?.toDate?.()?.toISOString?.() || data.lastPaymentDate,
+      }));
 
       return { success: true, tenants };
     } catch (err: any) {

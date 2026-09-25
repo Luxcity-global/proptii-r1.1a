@@ -39,8 +39,9 @@ export class TenantsController {
   @ApiResponse({ status: 200, description: 'Array of tenants' })
   async getTenants(@Req() req: any, @Query('ownedPropertyIds') ownedPropertyIds?: string) {
     const userId = req.user?.uid || req.user?.id || req.user?.email;
+    const userEmail = req.user?.email;
     const propIds = ownedPropertyIds ? ownedPropertyIds.split(',').filter(Boolean) : undefined;
-    return this.tenantsService.getTenants(userId, propIds);
+    return this.tenantsService.getTenants(userId, propIds, userEmail);
   }
 
   @Get(':id')

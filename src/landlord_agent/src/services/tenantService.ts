@@ -6,9 +6,14 @@ class TenantService {
   async createTenant(tenantData: Omit<Tenant, 'id'>, ownerUserId: string): Promise<string> {
     try {
       console.log('✅ TenantService: Creating tenant with userId:', ownerUserId);
+      const payload = {
+        ...tenantData,
+        userId: ownerUserId,
+        status: (tenantData as any).status || 'active',
+      };
       // apiService.post() returns ApiResponse<BackendPayload> — the actual backend
       // response is nested under .data, so we must unwrap it here.
-      const response = await apiService.post('/tenants', tenantData);
+      const response = await apiService.post('/tenants', payload);
       const data = (response as any).data ?? response; // unwrap ApiResponse envelope
       const tenantId: string = data.id;
 

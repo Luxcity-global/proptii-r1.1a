@@ -983,7 +983,7 @@ export function AppContent() {
     try {
       let ownedPropertyIds: Set<string> | undefined;
       
-      if (userId) {
+      if (propertiesRef.current.length > 0) {
         ownedPropertyIds = new Set(propertiesRef.current.map(p => p.id));
       }
       
@@ -1516,54 +1516,55 @@ export function AppContent() {
       const currentUserId = resolveManagerId() ?? userProfile?.email ?? '';
       console.log('📝 [App] Creating tenant with userId:', currentUserId);
 
-      const id = await tenantService.createTenant(tenant, currentUserId);
+      const tenantToCreate = {
+        ...tenant,
+        userId: currentUserId,
+        status: tenant.status || 'active',
+      };
+
+      const id = await tenantService.createTenant(tenantToCreate, currentUserId);
       console.log('✅ [App] Tenant created with id:', id);
 
       const saved = await tenantService.getTenant(id);
-      if (saved) {
-        console.log('✅ [App] Fetched saved tenant from Firestore:', saved);
-        // Ensure userId is preserved when adding to state
-        const tenantWithUserId = { ...saved, userId: currentUserId } as any;
-        console.log('✅ [App] Adding tenant to state with userId:', currentUserId);
+      const tenantWithUserId: Tenant = saved || ({ ...tenantToCreate, id } as Tenant);
 
-        // Update the backend property status to 'occupied'
-        if (saved.propertyId) {
-          try {
-            console.log(`🔄 Updating property ${saved.propertyId} status to occupied...`);
-            await propertyService.updateProperty(saved.propertyId, { 
-              status: 'occupied',
-              tenantId: saved.id 
-            });
-            // Update local state
-            setProperties(prev => prev.map(p => p.id === saved.propertyId ? { ...p, status: 'occupied', tenantId: saved.id } as Property : p));
-            console.log('✅ Property status updated to occupied');
-          } catch (propError) {
-            console.error('⚠️ Failed to update property status:', propError);
-          }
-        }
-
-        // Trigger alert generation after tenant is created (to check for lease expiry, etc.)
+      // Update the backend property status to 'occupied'
+      if (tenantWithUserId.propertyId) {
         try {
-          console.log('🔄 Triggering alert generation after tenant creation...');
-          await alertService.generateAlerts(currentUserId);
-          console.log('✅ Alerts updated after tenant creation');
-        } catch (alertError) {
-          console.warn('⚠️ Failed to generate alerts after tenant creation:', alertError);
+          console.log(`🔄 Updating property ${tenantWithUserId.propertyId} status to occupied...`);
+          await propertyService.updateProperty(tenantWithUserId.propertyId, { 
+            status: 'occupied',
+            tenantId: tenantWithUserId.id 
+          });
+          // Update local state
+          setProperties(prev => prev.map(p => p.id === tenantWithUserId.propertyId ? { ...p, status: 'occupied', tenantId: tenantWithUserId.id } as Property : p));
+          console.log('✅ Property status updated to occupied');
+        } catch (propError) {
+          console.error('⚠️ Failed to update property status:', propError);
         }
-
-        setTenants(prev => {
-          // Check if tenant already exists (avoid duplicates)
-          if (prev.some(t => t.id === tenantWithUserId.id)) {
-            console.log('[App] Tenant already in list, updating instead');
-            return prev.map(t => t.id === tenantWithUserId.id ? tenantWithUserId : t);
-          }
-          return [...prev, tenantWithUserId];
-        });
-        return;
-      } else {
-        console.error('❌ [App] ERROR: Tenant was not found in Firestore after creation!');
-        throw new Error('Tenant was not saved to Firestore');
       }
+
+      // Trigger alert generation after tenant is created (to check for lease expiry, etc.)
+      try {
+        console.log('🔄 Triggering alert generation after tenant creation...');
+        await alertService.generateAlerts(currentUserId);
+        console.log('✅ Alerts updated after tenant creation');
+      } catch (alertError) {
+        console.warn('⚠️ Failed to generate alerts after tenant creation:', alertError);
+      }
+
+      setTenants(prev => {
+        // Check if tenant already exists (avoid duplicates)
+        if (prev.some(t => t.id === tenantWithUserId.id)) {
+          console.log('[App] Tenant already in list, updating instead');
+          return prev.map(t => t.id === tenantWithUserId.id ? tenantWithUserId : t);
+        }
+        return [...prev, tenantWithUserId];
+      });
+
+      // Keep backend and state perfectly synced
+      loadScopedTenants().catch(err => console.warn('Background reload failed:', err));
+      return;
     } catch (e) {
       console.error('❌ [App] addTenant failed:', e);
       console.error('❌ [App] Error details:', {

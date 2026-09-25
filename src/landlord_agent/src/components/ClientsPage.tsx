@@ -338,10 +338,10 @@ export function ClientsPage({
 
     let filtered = (tenants || []).filter((tenant) => {
       const matchesSearch =
-        tenant.name.toLowerCase().includes(query) ||
-        tenant.email.toLowerCase().includes(query) ||
+        (tenant.name || '').toLowerCase().includes(query) ||
+        (tenant.email || '').toLowerCase().includes(query) ||
         (tenant.phone || '').toLowerCase().includes(query) ||
-        tenant.propertyAddress.toLowerCase().includes(query);
+        (tenant.propertyAddress || '').toLowerCase().includes(query);
       const matchesFilter = tenantFilter === 'all' || tenant.status === tenantFilter;
 
       let matchesOverdue = true;
@@ -509,7 +509,7 @@ export function ClientsPage({
   const tenantKpis = useMemo(() => {
     const list = tenants || [];
     const props = properties || [];
-    const activeTenants = list.filter((t) => t.status === 'active').length;
+    const activeTenants = list.filter((t) => t.status === 'active' || t.status === 'pending').length;
     const occupiedCount = props.filter((p) => p.status === 'occupied').length || activeTenants;
     const vacantCount = props.filter((p) => p.status === 'vacant').length;
     const occupancyBase = occupiedCount + vacantCount;
@@ -591,7 +591,7 @@ export function ClientsPage({
     return <LandlordPageEmptyShell page="clients" variant="guest" />;
   }
 
-  if (isNewPortfolioUser(properties)) {
+  if (isNewPortfolioUser(properties) && (tenants || []).length === 0) {
     return (
       <LandlordPageEmptyShell
         page="clients"
