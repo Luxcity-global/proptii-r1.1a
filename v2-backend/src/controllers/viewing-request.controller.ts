@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, Logger, Sse, MessageEvent } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ViewingRequestService } from '../services/viewing-request.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -18,6 +19,7 @@ export class ViewingRequestController {
   ) {}
 
   @Sse('events')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Subscribe to real-time viewing event stream (SSE)' })
   sendViewingEvents(@Req() req: any): Observable<MessageEvent> {
     const userId = req.user.uid;

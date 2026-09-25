@@ -91,11 +91,11 @@ function resolvePublicFolder(folder: string): string {
   imports: [
     GovDataModule,
     LeadsModule,
-    // Global rate limiter (5 req / 10 min default; per-endpoint overrides via @Throttle)
+    // Global rate limiter (120 req / 1 min default per client IP; per-endpoint overrides via @Throttle)
     ThrottlerModule.forRoot([{
       name: 'default',
-      ttl: 600000,
-      limit: 100,
+      ttl: 60000,
+      limit: 120,
     }]),
     // Serve static campaign pages at /campaign/* and /welcome/*
     ServeStaticModule.forRoot(

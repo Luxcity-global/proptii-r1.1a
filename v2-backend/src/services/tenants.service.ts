@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
@@ -108,7 +108,7 @@ export class TenantsService {
       // 1. Query by userId (UID)
       if (userId) {
         try {
-          const snap1 = await withTimeout(col.where('userId', '==', userId).get(), 3500);
+          const snap1 = await withTimeout(col.where('userId', '==', userId).get(), 15000);
           snap1.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
         } catch (e: any) {
           this.logger.warn(`getTenants by userId error: ${e?.message}`);
@@ -119,7 +119,7 @@ export class TenantsService {
       const email = userEmail?.toLowerCase()?.trim();
       if (email && email !== userId) {
         try {
-          const snap2 = await withTimeout(col.where('userId', '==', email).get(), 3500);
+          const snap2 = await withTimeout(col.where('userId', '==', email).get(), 15000);
           snap2.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
         } catch (e: any) {
           this.logger.warn(`getTenants by email error: ${e?.message}`);
@@ -132,7 +132,7 @@ export class TenantsService {
         for (let i = 0; i < ownedPropertyIds.length; i += 30) {
           const batch = ownedPropertyIds.slice(i, i + 30);
           try {
-            const snap3 = await withTimeout(col.where('propertyId', 'in', batch).get(), 3500);
+            const snap3 = await withTimeout(col.where('propertyId', 'in', batch).get(), 15000);
             snap3.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
           } catch (e: any) {
             this.logger.warn(`getTenants by propertyId batch error: ${e?.message}`);

@@ -28,6 +28,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ContractService } from '../services/contract.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -53,6 +54,7 @@ export class ContractController {
   ) {}
 
   @Sse('events')
+  @SkipThrottle()
   @UseGuards(FirebaseAuthGuard)
   @ApiOperation({ summary: 'Subscribe to real-time contract event stream (SSE)' })
   sendContractEvents(@Req() req: any): Observable<MessageEvent> {

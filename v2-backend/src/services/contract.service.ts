@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs = 3000): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req, Sse, MessageEvent, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { SkipThrottle } from '@nestjs/throttler';
 import { AlertsService } from '../services/alerts.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -18,6 +19,7 @@ export class AlertsController {
   ) {}
 
   @Sse('events')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Subscribe to real-time notification alert events stream (SSE)' })
   sendAlertEvents(@Req() req: any): Observable<MessageEvent> {
     const userId = req.user.uid;

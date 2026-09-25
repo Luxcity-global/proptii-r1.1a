@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, Req, NotFoundException, Sse, MessageEvent, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { SkipThrottle } from '@nestjs/throttler';
 import { CommunicationService } from '../services/communication.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -18,6 +19,7 @@ export class CommunicationController {
   ) {}
 
   @Sse('events')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Subscribe to real-time communication events stream (SSE)' })
   sendCommunicationEvents(@Req() req: any): Observable<MessageEvent> {
     const userId = req.user.uid;

@@ -125,6 +125,11 @@ async function bootstrap() {
 
   // Disable default body parser so we can set a custom payload limit
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+  // Trust reverse proxy (Render / Cloudflare) so client IP is extracted correctly for rate limiting
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
   app.setGlobalPrefix('api');
 
   // ── Global ValidationPipe (Sprint 1.3 PRD requirement) ──────────────────────
