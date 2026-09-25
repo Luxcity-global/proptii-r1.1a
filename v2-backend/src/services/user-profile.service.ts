@@ -25,7 +25,7 @@ export class UserProfileService {
     return db ? db.collection('reviews') : null;
   }
 
-  async getProfile(uid: string) {
+  async getProfile(uid: string): Promise<Record<string, any>> {
     const col = this.usersCol;
     if (!col) return { uid, role: 'tenant' };
 

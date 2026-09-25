@@ -6,15 +6,24 @@ class TenantService {
   async createTenant(tenantData: Omit<Tenant, 'id'>, ownerUserId: string): Promise<string> {
     try {
       console.log('✅ TenantService: Creating tenant with userId:', ownerUserId);
-      const data = await apiService.post('/tenants', tenantData);
+      // apiService.post() returns ApiResponse<BackendPayload> — the actual backend
+      // response is nested under .data, so we must unwrap it here.
+      const response = await apiService.post('/tenants', tenantData);
+      const data = (response as any).data ?? response; // unwrap ApiResponse envelope
+      const tenantId: string = data.id;
+
+      if (!tenantId) {
+        console.error('[tenantService] Backend response missing id field:', response);
+        throw new Error('Backend did not return a tenant ID');
+      }
       
       try {
         const createdTenant: Tenant = {
           ...tenantData,
-          id: data.id
+          id: tenantId
         } as Tenant;
         
-        console.log('📅 [tenantService] Generating payment schedule for tenant:', data.id);
+        console.log('📅 [tenantService] Generating payment schedule for tenant:', tenantId);
         await paymentScheduleService.generateScheduleForTenant(createdTenant, {
           historyPeriods: 6,
           futurePeriods: 12,
@@ -25,7 +34,7 @@ class TenantService {
         console.error('⚠️ [tenantService] Error generating payment schedule:', scheduleError);
       }
       
-      return data.id;
+      return tenantId;
     } catch (error) {
       console.error('❌ [tenantService] ERROR creating tenant:', error);
       throw error;
@@ -39,7 +48,9 @@ class TenantService {
         : '';
         
       const response = await apiService.get(`/tenants${propIdsParam}`);
-      const list = response.tenants || [];
+      // Unwrap ApiResponse envelope
+      const payload = (response as any).data ?? response;
+      const list = payload.tenants || payload || [];
       return list.map((t: any) => this.mapTenant(t));
     } catch (error) {
       console.error('Error fetching tenants:', error);
@@ -49,8 +60,16 @@ class TenantService {
 
   async getTenant(id: string): Promise<Tenant | null> {
     try {
+      if (!id || id === 'undefined') {
+        console.warn('[tenantService] getTenant called with invalid id:', id);
+        return null;
+      }
       const response = await apiService.get(`/tenants/${id}`);
-      return this.mapTenant(response.tenant);
+      // Unwrap ApiResponse envelope
+      const payload = (response as any).data ?? response;
+      const tenantData = payload.tenant ?? payload;
+      if (!tenantData || !tenantData.id) return null;
+      return this.mapTenant(tenantData);
     } catch {
       return null;
     }

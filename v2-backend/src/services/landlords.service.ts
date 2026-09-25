@@ -82,4 +82,44 @@ export class LandlordsService {
       return { users: [] };
     }
   }
+
+  async getLandlordById(id: string) {
+    const col = this.usersCol;
+    if (!col) return { success: false, user: null };
+    try {
+      const doc = await col.doc(id).get();
+      if (!doc.exists) return { success: false, user: null };
+      return { success: true, user: serializeUserDates({ id: doc.id, ...doc.data() }) };
+    } catch (err: any) {
+      this.logger.warn(`getLandlordById error: ${err?.message || err}`);
+      return { success: false, user: null };
+    }
+  }
+
+  async updateLandlord(id: string, updates: any) {
+    const col = this.usersCol;
+    if (!col) return { success: true };
+    try {
+      await col.doc(id).set(
+        { ...updates, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      return { success: true };
+    } catch (err: any) {
+      this.logger.warn(`updateLandlord error: ${err?.message || err}`);
+      return { success: false, error: err?.message };
+    }
+  }
+
+  async deleteLandlord(id: string) {
+    const col = this.usersCol;
+    if (!col) return { success: true };
+    try {
+      await col.doc(id).delete();
+      return { success: true };
+    } catch (err: any) {
+      this.logger.warn(`deleteLandlord error: ${err?.message || err}`);
+      return { success: false, error: err?.message };
+    }
+  }
 }

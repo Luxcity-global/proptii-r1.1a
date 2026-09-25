@@ -43,6 +43,12 @@ export interface ClassifyEntities {
   intentSummary?: string | null;
   expandedKeywords?: string[] | null;
   amenities?: string[] | null;
+  /** First-class amenity signals extracted by the AI classifier. */
+  pet_friendly?: boolean | null;
+  bills_included?: boolean | null;
+  parking?: boolean | null;
+  balcony_or_garden?: boolean | null;
+  furnished?: 'furnished' | 'unfurnished' | null;
   [key: string]: any;
 }
 
@@ -156,6 +162,11 @@ export const EMPTY_ENTITIES: ClassifyEntities = {
   tenure: null,
   price_max: null,
   address_full: null,
+  pet_friendly: null,
+  bills_included: null,
+  parking: null,
+  balcony_or_garden: null,
+  furnished: null,
 };
 
 export const propertySearchFallback = (): ClassifyResponse => ({

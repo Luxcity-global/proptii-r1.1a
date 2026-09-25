@@ -21,9 +21,19 @@ export function notifyAuthReady(): void {
   window.dispatchEvent(new CustomEvent('auth-init-complete'));
 }
 
-export function waitForAuthReady(): Promise<void> {
+export function waitForAuthReady(timeoutMs = 5000): Promise<void> {
   if (isAuthReady) return Promise.resolve();
   return new Promise((resolve) => {
-    window.addEventListener('auth-init-complete', () => resolve(), { once: true });
+    const timer = setTimeout(() => {
+      // Auth took too long — proceed anyway so API calls don't hang indefinitely.
+      // They'll get a 401 and the caller can handle it.
+      console.warn('[authReady] waitForAuthReady timed out after', timeoutMs, 'ms — proceeding without confirmed auth');
+      resolve();
+    }, timeoutMs);
+
+    window.addEventListener('auth-init-complete', () => {
+      clearTimeout(timer);
+      resolve();
+    }, { once: true });
   });
 }

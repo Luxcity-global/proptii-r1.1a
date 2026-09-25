@@ -319,8 +319,9 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
         return;
       }
 
+      const gmapsKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || '';
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCreeouNjZpNrF2-RtJNRvPM0mB2CNpU60&libraries=places&callback=initGoogleMaps`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${gmapsKey}&libraries=places&callback=initGoogleMaps`;
       script.async = true;
       script.defer = true;
       
@@ -349,7 +350,17 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
     };
   }, []);
 
-  const isFormValid = propertyDetails.address && propertyDetails.monthlyRent && propertyDetails.bedrooms && propertyDetails.bathrooms;
+  const rentValue = parseFloat(propertyDetails.monthlyRent);
+  const bedroomsValue = parseInt(propertyDetails.bedrooms, 10);
+  const bathroomsValue = parseInt(propertyDetails.bathrooms, 10);
+  const isFormValid =
+    propertyDetails.address?.trim() &&
+    propertyDetails.monthlyRent?.trim() &&
+    !isNaN(rentValue) && rentValue > 0 &&
+    propertyDetails.bedrooms?.trim() &&
+    !isNaN(bedroomsValue) && bedroomsValue >= 0 && bedroomsValue <= 50 &&
+    propertyDetails.bathrooms?.trim() &&
+    !isNaN(bathroomsValue) && bathroomsValue >= 0 && bathroomsValue <= 20;
 
   return (
     <div className="min-h-screen flex flex-col px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>

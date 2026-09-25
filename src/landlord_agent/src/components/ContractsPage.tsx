@@ -413,6 +413,32 @@ export function ContractsPage({
         const mimeType = base64Data.split(',')[0].split(':')[1].split(';')[0];
         
         console.log('File converted to base64, size:', base64Content.length, 'bytes');
+
+        // ── Save contract record BEFORE sending the email ──────────────────
+        // This ensures we always have a Firestore record even if the email fails.
+        let savedContractId: string | null = null;
+        try {
+          const currentUserId = userId ?? '';
+          savedContractId = await contractService.createContractWithBase64({
+            title: contractData.file.name.replace(/\.[^/.]+$/, ''),
+            propertyAddress: '',
+            tenantName: contractData.recipientName,
+            tenantEmail: contractData.recipientEmail,
+            contractType: 'tenancy-agreement',
+            additionalInfo: contractData.additionalEmail,
+            status: 'sent',
+            sentDate: new Date(),
+            expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            landlordEmail: landlordEmail || undefined,
+          } as any, contractData.file.name, base64Data, currentUserId || 'unknown');
+          console.log('✅ Contract saved to Firestore before email send:', savedContractId);
+        } catch (saveError: any) {
+          console.error('Failed to save contract record:', saveError);
+          const saveMsg = saveError?.message || 'Failed to save the contract record. Please try again.';
+          setError(saveMsg);
+          alert(`Could not save contract: ${saveMsg}`);
+          return; // Abort — don't send email if we can't track the contract
+        }
         
         const formData = new FormData();
         formData.append('to', contractData.recipientEmail);
@@ -553,36 +579,9 @@ export function ContractsPage({
         
         console.log('Contract email sent successfully with attachment');
         
-        // Save contract to Firestore for tracking
-        try {
-          // userId is already resolved from AuthContext — no localStorage fallback needed
-          const currentUserId = userId ?? '';
-
-          if (!currentUserId) {
-            console.warn('No userId found — contract will be saved without userId');
-          }
-
-          const contractId = await contractService.createContractWithBase64({
-            title: contractData.file.name.replace(/\.[^/.]+$/, ''),
-            propertyAddress: '',
-            tenantName: contractData.recipientName,
-            tenantEmail: contractData.recipientEmail,
-            contractType: 'tenancy-agreement',
-            additionalInfo: contractData.additionalEmail,
-            status: 'sent',
-            sentDate: new Date(),
-            expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-            landlordEmail: landlordEmail || undefined, // Include landlord email for filtering
-          } as any, contractData.file.name, base64Data, currentUserId || 'unknown');
-          
-          console.log('Contract saved to Firestore:', contractId);
-          
-          // Reload contracts to show the new one
-          await loadContracts();
-        } catch (firestoreError) {
-          console.error('Error saving contract to Firestore:', firestoreError);
-          // Don't fail the whole operation if Firestore save fails
-        }
+        // Contract is already saved to Firestore (done above before sending email)
+        // Reload contracts to show the new one
+        await loadContracts();
         
         // Show success screen instead of alert
         setSuccessData({

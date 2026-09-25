@@ -104,29 +104,24 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
             {options.map((option, index) => {
               const IconComponent = option.icon;
               const iconColors = iconColorSets[index];
-              const isExistingUserDisabled = option.id === 'existing';
               return (
                 <Card
                   key={option.id}
-                  className={`relative transition-all duration-300 ${
-                    isExistingUserDisabled
-                      ? 'overflow-hidden'
-                      : `cursor-pointer ${option.recommended ? 'ring-1 shadow-lg' : 'hover:shadow-md'}`
+                  className={`relative transition-all duration-300 cursor-pointer ${
+                    option.recommended ? 'ring-1 shadow-lg' : 'hover:shadow-md'
                   }`}
                   style={{
                     ...(option.recommended ? { borderColor: '#136C9E', borderWidth: '1px' } : {}),
                   }}
                   onMouseEnter={(e) => {
-                    if (isExistingUserDisabled) return;
                     e.currentTarget.style.transform = 'translateY(-8px)';
                     e.currentTarget.style.boxShadow = '0 20px 40px rgba(231, 242, 255, 0.8), 0 8px 16px rgba(231, 242, 255, 0.6)';
                   }}
                   onMouseLeave={(e) => {
-                    if (isExistingUserDisabled) return;
                     e.currentTarget.style.transform = 'translateY(0px)';
                     e.currentTarget.style.boxShadow = '';
                   }}
-                  onClick={isExistingUserDisabled ? undefined : option.onClick}
+                  onClick={option.onClick}
                 >
                   {option.recommended && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -152,8 +147,8 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
                     
                     <div className="space-y-2 mb-6 text-center">
                       <p className="text-sm font-medium text-gray-700 mb-2">Features:</p>
-                      {option.features.map((feature, index) => (
-                        <div key={index} className="flex items-center justify-center text-sm text-gray-600">
+                      {option.features.map((feature, featureIndex) => (
+                        <div key={featureIndex} className="flex items-center justify-center text-sm text-gray-600">
                           <div className="w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: '#DC5F12' }} />
                           <span>{feature}</span>
                         </div>
@@ -165,22 +160,14 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
                       className="w-full"
                       size="lg"
                       style={{ fontFamily: 'Archivo, sans-serif' }}
-                      disabled={isExistingUserDisabled}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!isExistingUserDisabled) option.onClick();
+                        option.onClick();
                       }}
                     >
                       {option.buttonText}
                     </Button>
                   </CardContent>
-                  {isExistingUserDisabled && (
-                    <div
-                      className="absolute inset-0 z-20 cursor-not-allowed rounded-[inherit] bg-white/45 backdrop-blur-sm"
-                      style={{ WebkitBackdropFilter: 'blur(6px)' }}
-                      aria-hidden="true"
-                    />
-                  )}
                 </Card>
               );
             })}

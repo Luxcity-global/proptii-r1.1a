@@ -534,18 +534,8 @@ class FirestoreService {
       const json = await res.json();
       return { success: true, share: json.share };
     } catch (error: any) {
-      console.warn('Backend share failed, saving to local cache:', error);
-      const localShares = JSON.parse(localStorage.getItem(`referencing_shares_${userId}`) || '[]');
-      const newShare = {
-        id: `share_${Date.now()}`,
-        userId,
-        ...shareData,
-        status: 'sent',
-        createdAt: new Date().toISOString()
-      };
-      localShares.push(newShare);
-      localStorage.setItem(`referencing_shares_${userId}`, JSON.stringify(localShares));
-      return { success: true, share: newShare };
+      console.error('Backend share failed:', error);
+      return { success: false, error: error?.message || 'Failed to save referencing share to database' };
     }
   }
 
@@ -568,13 +558,10 @@ class FirestoreService {
 
       const json = await res.json();
       const shares = json.data || [];
-      // Sync local cache
-      localStorage.setItem(`referencing_shares_${userId}`, JSON.stringify(shares));
       return { success: true, data: shares };
     } catch (error: any) {
-      console.warn('Backend fetch shares failed, using local cache:', error);
-      const localShares = JSON.parse(localStorage.getItem(`referencing_shares_${userId}`) || '[]');
-      return { success: true, data: localShares };
+      console.error('Backend fetch shares failed:', error);
+      return { success: false, error: error?.message || 'Failed to load referencing shares from database', data: [] };
     }
   }
 
@@ -587,21 +574,17 @@ class FirestoreService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const headers = await authHeaders();
-      await fetch(`${API_BASE}/api/referencing/shares/${shareId}`, {
+      const res = await fetch(`${API_BASE}/api/referencing/shares/${shareId}`, {
         method: 'DELETE',
         headers
       });
-      // Update local cache
-      const localShares = JSON.parse(localStorage.getItem(`referencing_shares_${userId}`) || '[]');
-      const updated = localShares.filter((s: any) => s.id !== shareId);
-      localStorage.setItem(`referencing_shares_${userId}`, JSON.stringify(updated));
+      if (!res.ok) {
+        throw new Error(`Failed to delete share: ${res.statusText}`);
+      }
       return { success: true };
     } catch (error: any) {
-      console.warn('Backend delete share failed, updating local cache:', error);
-      const localShares = JSON.parse(localStorage.getItem(`referencing_shares_${userId}`) || '[]');
-      const updated = localShares.filter((s: any) => s.id !== shareId);
-      localStorage.setItem(`referencing_shares_${userId}`, JSON.stringify(updated));
-      return { success: true };
+      console.error('Backend delete share failed:', error);
+      return { success: false, error: error?.message || 'Failed to delete referencing share from database' };
     }
   }
 

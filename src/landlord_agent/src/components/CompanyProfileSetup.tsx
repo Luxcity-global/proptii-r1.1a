@@ -13,8 +13,11 @@ import {
   MapPin,
   Globe,
   ArrowLeft,
-  Save
+  Save,
+  Loader2
 } from 'lucide-react';
+import { uploadToFirebaseStorage } from '../../../services/storageService';
+import apiService from '../../../services/api';
 
 interface CompanyProfile {
   companyName: string;
@@ -54,6 +57,9 @@ export function CompanyProfileSetup({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
   const handleInputChange = (field: keyof CompanyProfile, value: string) => {
     setProfile(prev => ({
@@ -89,24 +95,55 @@ export function CompanyProfileSetup({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateForm()) {
-      onCompanyProfileComplete(profile);
+    if (!validateForm()) return;
+
+    setIsSaving(true);
+    try {
+      // Persist company profile to backend
+      await apiService.put('/user/company-profile', profile);
+    } catch (err) {
+      // Non-fatal: profile is still passed up to parent (stored in app state)
+      console.warn('[CompanyProfileSetup] Could not persist to backend:', err);
+    } finally {
+      setIsSaving(false);
     }
+    onCompanyProfileComplete(profile);
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setProfile(prev => ({
-          ...prev,
-          logo: event.target?.result as string
-        }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Validate: images only, max 2 MB
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Please select an image file (JPG, PNG, SVG, etc.).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError('Logo must be under 2 MB.');
+      return;
+    }
+    setLogoError(null);
+    setIsUploadingLogo(true);
+
+    try {
+      const result = await uploadToFirebaseStorage(file, 'company-logos');
+      if (result.success && result.url) {
+        setProfile(prev => ({ ...prev, logo: result.url! }));
+      } else {
+        setLogoError(result.error || 'Upload failed. Please try again.');
+        // Show a local preview while upload failed
+        const localUrl = URL.createObjectURL(file);
+        setProfile(prev => ({ ...prev, logo: localUrl }));
+      }
+    } catch {
+      setLogoError('Upload failed. Please try again.');
+      const localUrl = URL.createObjectURL(file);
+      setProfile(prev => ({ ...prev, logo: localUrl }));
+    } finally {
+      setIsUploadingLogo(false);
     }
   };
 
@@ -249,18 +286,22 @@ export function CompanyProfileSetup({
                           accept="image/*"
                           onChange={handleLogoUpload}
                           className="hidden"
+                          disabled={isUploadingLogo}
                         />
                         <Button
                           type="button"
                           variant="outline"
+                          disabled={isUploadingLogo}
                           onClick={() => document.getElementById('logo')?.click()}
                         >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Logo
+                          {isUploadingLogo
+                            ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading…</>
+                            : <><Upload className="h-4 w-4 mr-2" />Upload Logo</>}
                         </Button>
                         <p className="text-sm text-muted-foreground mt-1">
-                          PNG, JPG up to 2MB
+                          PNG, JPG, SVG — max 2 MB
                         </p>
+                        {logoError && <p className="text-sm text-destructive mt-1">{logoError}</p>}
                       </div>
                     </div>
                   </div>
@@ -317,9 +358,10 @@ export function CompanyProfileSetup({
                 <Button type="button" variant="outline" onClick={onBack}>
                   Back
                 </Button>
-                <Button type="submit">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Company Profile
+                <Button type="submit" disabled={isSaving || isUploadingLogo}>
+                  {isSaving
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
+                    : <><Save className="h-4 w-4 mr-2" />Save Company Profile</>}
                 </Button>
               </div>
             </form>

@@ -8,6 +8,8 @@ import {
   hasParkingFeature,
   hasBalconyOrGardenFeature,
   hasPetFriendlyFeature,
+  extractPetPolicy,
+  type PetPolicy,
   hasBillsIncludedFeature,
   extractListingDateEpoch
 } from './propertyParsers';
@@ -63,12 +65,19 @@ export function matchBedrooms(
   if (beds === null && property.description) {
     beds = extractBedrooms(property.description);
   }
+  // 3. Fallback for Studio: if propertyType indicates studio, treat as 0 beds
+  if (beds === null && categorizePropertyType(property.propertyType, property.title) === 'studio') {
+    beds = 0;
+  }
 
   if (beds === null) return false;
 
   return selectedBedrooms.some((sel) => {
     const target = typeof sel === 'string' ? parseInt(sel, 10) : sel;
     if (isNaN(target)) return false;
+    if (target === 0) {
+      return beds === 0 || categorizePropertyType(property.propertyType, property.title) === 'studio';
+    }
     if (target >= 4) {
       return beds >= 4;
     }
@@ -87,7 +96,15 @@ export function matchPropertyType(
   if (!selectedTypes || selectedTypes.length === 0) return true;
 
   const category = categorizePropertyType(property.propertyType, property.title);
-  return selectedTypes.includes(category);
+  if (selectedTypes.includes(category)) return true;
+
+  // Harmonized studio matching: if selectedTypes includes 'studio' and listing is 0 bedrooms
+  if (selectedTypes.includes('studio')) {
+    const beds = extractBedrooms(property.bedrooms) ?? (property.title ? extractBedrooms(property.title) : null);
+    if (beds === 0) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -194,8 +211,17 @@ export function matchBalconyOrGarden(property: Property, required: boolean): boo
 
 /**
  * Checks if a property is pet-friendly.
+ * - If required is false, matches all.
+ * - If required is true:
+ *   - listings explicitly forbidding pets ('forbidden') are ALWAYS rejected.
+ *   - listings explicitly allowing pets ('allowed') are ALWAYS accepted.
+ *   - unstated listings ('unknown') are accepted if allowUnconfirmed is true, else rejected.
  */
-export function matchPetFriendly(property: Property, required: boolean): boolean {
+export function matchPetFriendly(
+  property: Property,
+  required: boolean,
+  allowUnconfirmed: boolean = false
+): boolean {
   if (!required) return true;
   const combinedText = [
     property.title,
@@ -203,7 +229,10 @@ export function matchPetFriendly(property: Property, required: boolean): boolean
     property.propertyType,
   ].filter(Boolean).join(' ');
 
-  return hasPetFriendlyFeature(combinedText, property.amenities);
+  const policy = extractPetPolicy(combinedText, property.amenities);
+  if (policy === 'forbidden') return false;
+  if (policy === 'allowed') return true;
+  return allowUnconfirmed;
 }
 
 /**

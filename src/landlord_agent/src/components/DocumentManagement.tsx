@@ -25,6 +25,8 @@ import { propertyService } from '../services/propertyService';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import axios from 'axios';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
+import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
+import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 
 interface SelectedDocumentForm {
   file: File;
@@ -38,15 +40,17 @@ interface DocumentManagementProps {
   property: Property | null;
   onBack: () => void;
   onDocumentAdd: (propertyId: string, document: Omit<PropertyDocument, 'id'>) => void;
+  onDocumentDelete?: (propertyId: string, documentId: string) => Promise<void>;
 }
 
-export function DocumentManagement({ property, onBack, onDocumentAdd }: DocumentManagementProps) {
+export function DocumentManagement({ property, onBack, onDocumentAdd, onDocumentDelete }: DocumentManagementProps) {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedDocuments, setSelectedDocuments] = useState<SelectedDocumentForm[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (!property) {
     return (
@@ -102,6 +106,29 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
         return <Badge className="bg-red-100 text-red-800 border-red-200">Expired</Badge>;
       default:
         return <Badge variant="secondary">Unknown</Badge>;
+    }
+  };
+
+  const handleDeleteDocument = async (documentId: string) => {
+    if (!property) return;
+    if (!window.confirm('Delete this document? This action cannot be undone.')) return;
+
+    setDeletingId(documentId);
+    try {
+      if (onDocumentDelete) {
+        await onDocumentDelete(property.id, documentId);
+      } else {
+        // Fallback: update property documents directly
+        const updatedDocuments = property.documents.filter(d => d.id !== documentId);
+        await propertyService.updateProperty(property.id, { documents: updatedDocuments } as any);
+        // Parent won't receive the callback, but at least the backend is updated
+        console.warn('[DocumentManagement] onDocumentDelete not provided — backend updated but local state not refreshed.');
+      }
+    } catch (error) {
+      console.error('[DocumentManagement] Delete failed:', error);
+      alert(`Failed to delete document: ${(error as any)?.message || 'Unknown error'}`);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -162,31 +189,46 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
     setIsUploading(true);
 
     try {
-      // Upload files to Google Firebase Storage
-      const { storage } = await import('../config/firebase');
-      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-
+      // Upload files through the v2-backend storage endpoint — no client-side Firebase SDK fallback.
+      const apiBase = getResolvedApiBaseUrl();
       const uploadedCount = selectedDocuments.length;
 
       for (const docForm of selectedDocuments) {
-        console.log('Uploading document to Firebase Storage:', docForm.file.name);
+        console.log('Uploading document via backend storage:', docForm.file.name);
 
         let documentUrl = '';
-        try {
-          const timestamp = Date.now();
-          const cleanName = docForm.file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const docRef = ref(storage, `properties/documents/${property.id || 'general'}/${timestamp}_${cleanName}`);
 
-          await uploadBytes(docRef, docForm.file);
-          documentUrl = await getDownloadURL(docRef);
-          console.log('Document uploaded successfully to Firebase Storage:', documentUrl);
-        } catch (storageErr) {
-          console.warn('Firebase Storage upload unavailable, creating local Data URL fallback:', storageErr);
-          documentUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(docForm.file);
+        try {
+          const formData = new FormData();
+          formData.append('file', docForm.file, docForm.file.name);
+          formData.append('folder', 'properties/documents');
+
+          const token = await getAccessTokenForApiRequest().catch(() => null);
+          const headers: Record<string, string> = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          const res = await fetch(`${apiBase}/storage/upload`, {
+            method: 'POST',
+            headers,
+            body: formData,
           });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.url) {
+              documentUrl = data.url;
+              console.log('✅ Document uploaded successfully via backend storage:', documentUrl);
+            } else {
+              throw new Error('Backend storage upload returned no URL');
+            }
+          } else {
+            const errText = await res.text().catch(() => '');
+            throw new Error(`Backend storage upload failed (${res.status}): ${errText}`);
+          }
+        } catch (uploadErr) {
+          console.error('❌ Document upload failed for', docForm.file.name, uploadErr);
+          alert(`Failed to upload ${docForm.file.name}: ${(uploadErr as Error).message}`);
+          continue;
         }
 
         const newDocument: Omit<PropertyDocument, 'id'> = {
@@ -598,8 +640,16 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                         >
                           <Download className="w-4 h-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
-                          <X className="w-4 h-4" />
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          disabled={deletingId === document.id}
+                          onClick={() => handleDeleteDocument(document.id)}
+                          aria-label="Delete document"
+                        >
+                          {deletingId === document.id
+                            ? <Clock className="w-4 h-4 animate-spin" />
+                            : <X className="w-4 h-4" />}
                         </Button>
                       </div>
                     </div>

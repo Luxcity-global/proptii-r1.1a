@@ -75,21 +75,29 @@ class PropertyService {
         ownerUserId: string,
         ownerEmail?: string
     ): Promise<string> {
-        try {
-            const headers = await authHeaders();
-            const res = await fetch(`${API_BASE}/api/native-properties`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ ...mapToApi(propertyData), userId: ownerUserId, ownerEmail }),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                return data.id || data._id || `prop-${Date.now()}`;
+        const headers = await authHeaders();
+        const res = await fetch(`${API_BASE}/api/native-properties`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ ...mapToApi(propertyData), userId: ownerUserId, ownerEmail }),
+        });
+        if (!res.ok) {
+            const errText = await res.text().catch(() => '');
+            let errMsg = `Failed to save property to database (HTTP ${res.status})`;
+            try {
+                const errJson = JSON.parse(errText);
+                if (errJson.message) errMsg = Array.isArray(errJson.message) ? errJson.message.join(', ') : errJson.message;
+            } catch {
+                if (errText) errMsg = errText;
             }
-        } catch (e) {
-            console.warn('Backend createProperty fallback to local ID:', e);
+            throw new Error(errMsg);
         }
-        return `prop-${Date.now()}`;
+        const data = await res.json();
+        const propertyId = data.id || data._id;
+        if (!propertyId || propertyId.startsWith('local_') || propertyId.startsWith('prop-')) {
+            throw new Error('Database did not return a valid persistent property ID.');
+        }
+        return propertyId;
     }
 
     async getProperties(filters?: { status?: Property['status']; type?: string; userId?: string; email?: string }): Promise<Property[]> {
@@ -127,7 +135,17 @@ class PropertyService {
             headers,
             body: JSON.stringify(updates),
         });
-        if (!res.ok) throw new Error(`Failed to update property (${res.status})`);
+        if (!res.ok) {
+            const errText = await res.text().catch(() => '');
+            let errMsg = `Failed to update property in database (HTTP ${res.status})`;
+            try {
+                const errJson = JSON.parse(errText);
+                if (errJson.message) errMsg = Array.isArray(errJson.message) ? errJson.message.join(', ') : errJson.message;
+            } catch {
+                if (errText) errMsg = errText;
+            }
+            throw new Error(errMsg);
+        }
     }
 
     async deleteProperty(propertyId: string): Promise<void> {

@@ -140,12 +140,30 @@ async function bootstrap() {
   // ALLOWED_ORIGINS env var: comma-separated list for production deployments.
   // Falls back to a wildcard in local dev (NODE_ENV !== 'production').
   const isProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL;
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
+  const defaultOrigins = [
+    'https://proptii.co',
+    'https://www.proptii.co',
+    'https://proptii-frontend.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:5176',
+    'http://localhost:3000',
+  ];
+  const envOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
-    : null;
+    : [];
+  const trustedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
   app.enableCors({
-    origin: true, // Reflects the incoming origin, allowing any frontend to connect with credentials
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (trustedOrigins.includes(origin) || (isProd && /^https:\/\/proptii(-[a-z0-9]+)?\.onrender\.com$/.test(origin))) {
+        return callback(null, true);
+      }
+      if (!isProd && /^http:\/\/localhost:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
@@ -164,16 +182,61 @@ async function bootstrap() {
   // ── Swagger API Documentation ─────────────────────────────────────────────
   const config = new DocumentBuilder()
     .setTitle('Proptii API')
-    .setDescription('The Proptii v2 Backend API description')
+    .setDescription('Consolidated Proptii v2 Backend API — complete endpoint requirements, schemas, and specifications')
     .setVersion('1.4')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        description: 'Enter Firebase ID Token / JWT Bearer token',
+        in: 'header',
+      },
+      'bearer',
+    )
+    .addTag('Health', 'Health and system status endpoints')
+    .addTag('Auth', 'Authentication and role assignment')
+    .addTag('Users', 'User profile, public profile, and review management')
+    .addTag('Properties', 'Native property catalog and search')
+    .addTag('Saved Properties', 'User saved property lists and bookmarks')
+    .addTag('Viewing Requests', 'Property viewing requests, statuses, and live SSE stream')
+    .addTag('Referencing', 'Tenant referencing applications, section data, and guarantor workflows')
+    .addTag('Contracts', 'Tenancy agreements, templates, and multipart signed contract email dispatch')
+    .addTag('Communication', 'Conversations, real-time messaging, and attachments')
+    .addTag('Admin Dashboard', 'Customer metrics, accounts overview, and administrative notes')
+    .addTag('Billing', 'Stripe checkout, customer portal, plans, and subscriptions')
+    .addTag('Storage', 'Authenticated file upload to Cloud Storage')
+    .addTag('Search & AI', 'Search query classification and structured intent extraction')
+    .addTag('Property Facts', 'Government data intelligence, UPRN match, and facts pack')
+    .addTag('Reports', 'Property fact pack and compliance reports generation')
+    .addTag('Runtime Flags', 'Zero-deploy runtime feature flags')
+    .addTag('Campaign Leads', 'Public landing page lead capture and HMAC session verification')
+    .addTag('Landlords', 'Landlord and agent directory endpoints')
+    .addTag('Property Selections', 'Property selection collections')
+    .addTag('Homeowner', 'Homeowner maintenance and project management')
+    .addTag('Alerts', 'Real-time user notification alerts and SSE stream')
+    .addTag('Insights', 'Market and rental price trend insights')
+    .addTag('Sheets', 'Waitlist and lead spreadsheet append endpoints')
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
 
-  // Increase payload limit for base64 file uploads (413 Payload Too Large)
-  app.use(json({ limit: '50mb' }));
-  app.use(urlencoded({ extended: true, limit: '50mb' }));
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    jsonDocumentUrl: 'api/docs-json',
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+    },
+  });
+
+  // Explicit fallback endpoint for raw OpenAPI JSON specification
+  app.getHttpAdapter().get('/api/docs-json', (_req: any, res: any) => {
+    res.json(document);
+  });
+
+  // Set safe body size limit (5mb max) to prevent memory exhaustion DoS
+  app.use(json({ limit: '5mb' }));
+  app.use(urlencoded({ extended: true, limit: '5mb' }));
 
   const port = process.env.PORT || 3002;
   await app.listen(port);

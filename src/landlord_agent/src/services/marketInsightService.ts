@@ -36,15 +36,18 @@ export interface MarketInsight {
 class MarketInsightService {
   async getActiveInsights(userId?: string): Promise<MarketInsight[]> {
     try {
-      const response = await apiService.get('/insights/active');
-      const insights = response.insights || [];
-      return insights.map((i: any) => ({
+      // Backend route is GET /api/insights (not /insights/active which doesn't exist).
+      // Response shape: { data: [...], source: 'cache' | 'static' }
+      const response = await apiService.get('/insights');
+      const raw = (response as any).data ?? (response as any).insights ?? response;
+      const list: any[] = Array.isArray(raw) ? raw : [];
+      return list.map((i: any) => ({
         ...i,
-        date: new Date(i.date),
+        date: i.date ? new Date(i.date) : new Date(),
         effectiveDate: i.effectiveDate ? new Date(i.effectiveDate) : undefined,
         expiryDate: i.expiryDate ? new Date(i.expiryDate) : undefined,
-        createdAt: new Date(i.createdAt),
-        updatedAt: new Date(i.updatedAt),
+        createdAt: i.createdAt ? new Date(i.createdAt) : new Date(),
+        updatedAt: i.updatedAt ? new Date(i.updatedAt) : new Date(),
       }));
     } catch (error) {
       console.error('Error getting active insights:', error);

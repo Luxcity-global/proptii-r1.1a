@@ -1,4 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { GovDataModule } from './gov-data/gov-data.module';
 
@@ -25,6 +26,11 @@ import { AlertsController } from './controllers/alerts.controller';
 import { InsightsController } from './controllers/insights.controller';
 import { SheetsController } from './controllers/sheets.controller';
 import { RefereeGuarantorController } from './controllers/referee-guarantor.controller';
+import { TenantsController } from './controllers/tenants.controller';
+import { PaymentsController } from './controllers/payments.controller';
+import { EmailController } from './controllers/email.controller';
+import { TenantInvitationsController } from './controllers/tenant-invitations.controller';
+import { TenantsService } from './services/tenants.service';
 
 // ── R1.4 — Search Classifier (Sprint 1.3) ────────────────────────────────────
 import { ClassifierController } from './search/classifier.controller';
@@ -66,7 +72,7 @@ import { StorageController } from './controllers/storage.controller';
 import { LeadsModule } from './leads/leads.module';
 
 // ── Rate Limiting (ThrottlerModule) ──────────────────────────────────────────
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 // ── Static File Serving (campaign + welcome pages) ───────────────────────────
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -127,7 +133,11 @@ function resolvePublicFolder(folder: string): string {
     InsightsController,
     SheetsController,
     RefereeGuarantorController,
+    TenantsController,
+    PaymentsController,
+    EmailController,
     StorageController,
+    TenantInvitationsController,
     // R1.4 Sprint 1.3
     ClassifierController,
     // R1.4 Sprint 2.1
@@ -137,6 +147,10 @@ function resolvePublicFolder(folder: string): string {
     ReportController,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     EventsService,      // SSE Central Event Broadcaster
     EmailService,       // must be before any service that injects it
     StorageService,     // Firebase Cloud Storage uploader
@@ -158,6 +172,7 @@ function resolvePublicFolder(folder: string): string {
     InsightsService,
     SheetsService,
     RefereeGuarantorService,
+    TenantsService,
     // R1.4 Sprint 1.3
     ClassifierService,
   ],

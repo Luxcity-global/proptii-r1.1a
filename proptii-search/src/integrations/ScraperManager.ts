@@ -48,9 +48,11 @@ export class ScraperManager {
   ): Promise<PropertyData[]> {
     console.log(`[ScraperManager] Running scraper: ${scraper.name}`);
 
-    const timeout = new Promise<PropertyData[]>((_, reject) =>
-      setTimeout(() => reject(new Error(`Timeout after ${SCRAPER_TIMEOUT_MS}ms`)), SCRAPER_TIMEOUT_MS)
-    );
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<PropertyData[]>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Timeout after ${SCRAPER_TIMEOUT_MS}ms`)), SCRAPER_TIMEOUT_MS);
+      timer?.unref?.();
+    });
 
     try {
       const results = await Promise.race([scraper.scrape(query, filters), timeout]);
@@ -62,6 +64,10 @@ export class ScraperManager {
       console.error(`[ScraperManager] Scraper "${scraper.name}" failed: ${err.message || err}`);
       if (onResults) onResults(scraper.name, []);
       return [];
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
     }
   }
 }

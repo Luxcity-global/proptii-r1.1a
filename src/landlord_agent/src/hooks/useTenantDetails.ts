@@ -18,6 +18,11 @@ export interface TenantDetails {
   email: string;
   phone: string;
   avatar: string | null;
+  /**
+   * Status values from the Azure AD user endpoint.
+   * These are display-layer values and must NOT be written back to the
+   * Tenant Firestore record which uses 'active' | 'pending' | 'ended'.
+   */
   status: 'active' | 'notice' | 'arrears' | 'eviction';
   propertyAddress: string;
   rentAmount: number;

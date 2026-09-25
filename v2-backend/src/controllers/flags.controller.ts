@@ -45,8 +45,14 @@
  */
 
 import { Controller, Get, Logger } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiProperty } from '@nestjs/swagger';
 import { FactsStoreService } from '../gov-data/services/facts-store.service';
 import { getRedisClient } from '../utils/redis-client';
+
+export class FlagsResponseDto {
+  @ApiProperty({ description: 'Whether the government data layer is enabled' })
+  gov_data_layer: boolean;
+}
 
 // Response type — deliberately minimal (not a flag collection, just one toggle)
 export interface FlagsResponse {
@@ -60,6 +66,7 @@ export interface FlagsResponse {
 const FLAGS_CACHE_KEY = 'flags:gov_data_layer';
 const FLAGS_CACHE_TTL = 60; // seconds — propagation window after a Firestore flip
 
+@ApiTags('Runtime Flags')
 @Controller()
 export class FlagsController {
   private readonly logger = new Logger(FlagsController.name);
@@ -77,6 +84,8 @@ export class FlagsController {
    * to avoid a Firestore outage looking like a deliberate rollback.
    */
   @Get('flags')
+  @ApiOperation({ summary: 'Get runtime feature flags (zero-deploy kill-switches)' })
+  @ApiResponse({ status: 200, type: FlagsResponseDto, description: 'Runtime flags state' })
   async getFlags(): Promise<FlagsResponse> {
     // ── 1. Check Redis cache (60s TTL) ────────────────────────────────────────
     const cached = await this.getCached();

@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import * as crypto from 'crypto';
 import { Logger } from '@nestjs/common';
 
 const logger = new Logger('FirebaseStorage');
@@ -67,16 +68,32 @@ export async function uploadBase64ToStorage(
   const buffer = Buffer.from(match[2], 'base64');
 
   const file = bucket.file(storagePath);
+  const downloadToken = crypto.randomUUID();
+  const tokenUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+
   await file.save(buffer, {
-    metadata: { contentType },
+    metadata: {
+      contentType,
+      metadata: {
+        firebaseStorageDownloadTokens: downloadToken,
+        uploadedAt: new Date().toISOString(),
+      },
+    },
     resumable: false,
   });
 
-  // Generate a signed URL so the client can read the file without public bucket access
-  const [downloadUrl] = await file.getSignedUrl({
-    action:  'read',
-    expires: Date.now() + SIGNED_URL_EXPIRY_MS,
-  });
+  let downloadUrl = tokenUrl;
+  try {
+    const [signedUrl] = await file.getSignedUrl({
+      action:  'read',
+      expires: Date.now() + SIGNED_URL_EXPIRY_MS,
+    });
+    if (signedUrl) {
+      downloadUrl = signedUrl;
+    }
+  } catch (signErr: any) {
+    logger.warn(`Could not generate signed URL (using token URL fallback): ${signErr?.message || signErr}`);
+  }
 
   logger.log(`Uploaded ${storagePath} (${buffer.length} bytes, ${contentType})`);
 
@@ -98,16 +115,32 @@ export async function uploadBufferToStorage(
 ): Promise<StorageUploadResult> {
   const bucket = getBucket();
   const file = bucket.file(storagePath);
+  const downloadToken = crypto.randomUUID();
+  const tokenUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
   await file.save(buffer, {
-    metadata: { contentType },
+    metadata: {
+      contentType,
+      metadata: {
+        firebaseStorageDownloadTokens: downloadToken,
+        uploadedAt: new Date().toISOString(),
+      },
+    },
     resumable: false,
   });
 
-  const [downloadUrl] = await file.getSignedUrl({
-    action:  'read',
-    expires: Date.now() + SIGNED_URL_EXPIRY_MS,
-  });
+  let downloadUrl = tokenUrl;
+  try {
+    const [signedUrl] = await file.getSignedUrl({
+      action:  'read',
+      expires: Date.now() + SIGNED_URL_EXPIRY_MS,
+    });
+    if (signedUrl) {
+      downloadUrl = signedUrl;
+    }
+  } catch (signErr: any) {
+    logger.warn(`Could not generate signed URL (using token URL fallback): ${signErr?.message || signErr}`);
+  }
 
   logger.log(`Uploaded ${storagePath} (${buffer.length} bytes, ${contentType})`);
 

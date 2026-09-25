@@ -60,6 +60,7 @@ interface TenantInboxProps {
   onViewSettings?: () => void;
   onViewNotifications?: () => void;
   onAddTenant?: () => void;
+  onBack?: () => void;
 }
 
 const EmptyState: React.FC<{ message: string; sub: string }> = ({ message, sub }) => (
@@ -78,11 +79,25 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   onViewSettings,
   onViewNotifications,
   onAddTenant,
+  onBack,
 }) => {
   const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount } =
     useMessagingContext();
   const { user } = useAuth();
-  const navigate = useNavigate();
+  // Note: useNavigate is from react-router-dom but the landlord app uses MemoryRouter.
+  // Navigation is handled via the onBack prop instead.
+  // We keep this import for compatibility if rendered outside MemoryRouter.
+  let navigateFn: ((path: string) => void) | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    navigateFn = useNavigate();
+  } catch {
+    navigateFn = null;
+  }
+  const handleBackToDashboard = () => {
+    if (onBack) { onBack(); return; }
+    if (navigateFn) navigateFn('/landlord/dashboard');
+  };
 
   const [activeTab, setActiveTab] = useState<TabId>('inbox');
   const [search, setSearch] = useState('');
@@ -93,10 +108,26 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const optimisticBottomRef = useRef<HTMLDivElement>(null);
+  // Track last seen lastMessageAt per conversation to detect when real messages arrive
+  const lastSeenAt = useRef<Record<string, string | null>>({});
 
   const scrollToBottom = useCallback(() => {
     optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
+
+  // When the active conversation receives a new real message (lastMessageAt advances),
+  // clear the optimistic messages for that conversation to prevent double-rendering.
+  useEffect(() => {
+    if (!activeConversationId) return;
+    const conv = conversations.find((c) => c.id === activeConversationId);
+    if (!conv) return;
+    const prev = lastSeenAt.current[activeConversationId];
+    const now = conv.lastMessageAt;
+    if (now && prev !== null && now !== prev) {
+      setOptimisticMessages((m) => ({ ...m, [activeConversationId]: [] }));
+    }
+    lastSeenAt.current[activeConversationId] = now;
+  }, [activeConversationId, conversations]);
 
   useEffect(() => {
     if (conversations.length === 0) {
@@ -309,7 +340,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
             </div>
 
             <div className="ll-msg-back">
-              <button type="button" onClick={() => navigate('/landlord/dashboard')}>
+              <button type="button" onClick={handleBackToDashboard}>
                 Back to Dashboard
               </button>
             </div>

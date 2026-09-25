@@ -129,12 +129,14 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
     setIsInitialized(true);
   }, []);
 
-  // ─── Keep localStorage in sync (offline cache) ───────────────────────────────
+  // When initialized, clear any stale legacy localStorage saved properties so DB is the single source of truth
   useEffect(() => {
     if (isInitialized) {
-      localStorage.setItem('savedProperties', JSON.stringify(savedProperties));
+      try {
+        localStorage.removeItem('savedProperties');
+      } catch {}
     }
-  }, [savedProperties, isInitialized]);
+  }, [isInitialized]);
 
   // ─── Fetch from Backend when authenticated ─────────────────────────────────
   const fetchProperties = useCallback(async (reset = false, currentLast: string | null = null) => {
@@ -309,12 +311,17 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
         await apiService.post('/users/me/saved-properties', savedProperty);
       } catch (err) {
         console.error('Failed to save property to backend:', err);
-        // localStorage already updated — property is retained offline
+        // Revert optimistic update since database write failed
+        setSavedProperties(prev => prev.filter(p => p.id !== propertyId));
+        setAllSavedIds(prev => prev.filter(id => id !== propertyId));
+        throw err;
       }
     }
   }, [isPropertySaved, user?.id]);
 
   const unsaveProperty = useCallback(async (propertyId: string) => {
+    const previousSaved = savedProperties;
+    const previousIds = allSavedIds;
     setSavedProperties(prev => prev.filter(prop => prop.id !== propertyId));
     setAllSavedIds(prev => prev.filter(id => id !== propertyId));
 
@@ -324,9 +331,12 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
         await apiService.delete(`/users/me/saved-properties/${encodedId}`);
       } catch (err) {
         console.error('Failed to delete property from backend:', err);
+        setSavedProperties(previousSaved);
+        setAllSavedIds(previousIds);
+        throw err;
       }
     }
-  }, [user?.id]);
+  }, [user?.id, savedProperties, allSavedIds]);
 
   const toggleSaveProperty = useCallback((property: any) => {
     const propertyId = stablePropertyId(property);

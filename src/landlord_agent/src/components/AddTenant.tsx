@@ -42,7 +42,7 @@ interface AddTenantProps {
 
 // Define form steps for Typeform-style progression
 const FORM_STEPS = [
-  { id: 'welcome', title: 'Hello Sarah', icon: UserPlus, description: "Let's add your new tenant" },
+  { id: 'welcome', title: 'Welcome', icon: UserPlus, description: "Let's add your new tenant" },
   { id: 'name', title: 'Full Name', icon: User, required: true, description: "What's the tenant's full name?" },
   { id: 'email', title: 'Email Address', icon: Mail, required: true, description: "What's their email address?" },
   { id: 'phone', title: 'Phone Number', icon: Phone, required: true, description: "What's their phone number?" },
@@ -93,7 +93,6 @@ interface TenantFormData {
   bankName: string;
   accountNumber: string;
   sortCode: string;
-  documentsUploaded: File[];
 }
 
 // Phase 4: Advanced State Management Interfaces
@@ -160,8 +159,7 @@ const initialFormState: FormState = {
     previousLandlordReference: '',
     bankName: '',
     accountNumber: '',
-    sortCode: '',
-    documentsUploaded: []
+    sortCode: ''
   },
   errors: {},
   validationStatus: {},
@@ -320,7 +318,7 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
       firstPaymentDate: formatDate(tenant.firstPaymentDate),
       leaseStart: formatDate(tenant.leaseStart),
       leaseEnd: formatDate(tenant.leaseEnd),
-      status: tenant.status === 'ended' ? 'inactive' : (tenant.status || 'pending'),
+      status: tenant.status === 'ended' ? 'inactive' : (tenant.status === 'active' ? 'active' : 'pending'),
       referencingStatus: tenant.referencingStatus === 'complete' ? 'completed' : (tenant.referencingStatus || 'not-started'),
       paymentStatus: tenant.paymentStatus === 'payment-plan' ? 'current' : (tenant.paymentStatus === 'overdue' ? 'overdue' : 'current'),
       emergencyContactName: tenant.emergencyContact?.name || '',
@@ -535,16 +533,34 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         } else if (!toDateOnly(value)) {
           isValid = false;
           errorMessage = 'Please enter a valid date';
+        } else if (!isTodayOrFuture(value)) {
+          isValid = false;
+          errorMessage = 'First payment date must be today or in the future';
         }
         break;
       case 'leaseStart':
+        if (!value) {
+          isValid = false;
+          errorMessage = 'Lease start date is required';
+        } else if (!toDateOnly(value)) {
+          isValid = false;
+          errorMessage = 'Please enter a valid date';
+        }
+        break;
       case 'leaseEnd':
         if (!value) {
           isValid = false;
-          errorMessage = 'Date is required';
-        } else if (!isTodayOrFuture(value)) {
+          errorMessage = 'Lease end date is required';
+        } else if (!toDateOnly(value)) {
           isValid = false;
-          errorMessage = 'Date cannot be in the past';
+          errorMessage = 'Please enter a valid date';
+        } else if (state.formData.leaseStart) {
+          const startDate = toDateOnly(state.formData.leaseStart);
+          const endDate = toDateOnly(value);
+          if (startDate && endDate && endDate < startDate) {
+            isValid = false;
+            errorMessage = 'Lease end date must be on or after start date';
+          }
         }
         break;
       case 'emergencyContactName':
@@ -581,12 +597,10 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         }
         break;
       case 'annualIncome':
-        if (!value.trim()) {
+        // Optional field — only validate if user has actually typed something
+        if (value.trim() && (isNaN(parseFloat(value)) || parseFloat(value) <= 0)) {
           isValid = false;
-          errorMessage = 'Annual income is required';
-        } else if (isNaN(parseFloat(value)) || parseFloat(value) <= 0) {
-          isValid = false;
-          errorMessage = 'Please enter a valid income amount';
+          errorMessage = 'Please enter a valid income amount greater than zero';
         }
         break;
     }
@@ -684,14 +698,22 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         if (!state.formData.leaseStart) {
           const nextMonth = new Date();
           nextMonth.setMonth(nextMonth.getMonth() + 1);
-          dispatch({ type: 'UPDATE_FIELD', field: 'leaseStart', value: nextMonth.toISOString().split('T')[0] });
+          const y = nextMonth.getFullYear();
+          const m = String(nextMonth.getMonth() + 1).padStart(2, '0');
+          const d = String(nextMonth.getDate()).padStart(2, '0');
+          dispatch({ type: 'UPDATE_FIELD', field: 'leaseStart', value: `${y}-${m}-${d}` });
         }
         break;
       case 'leaseEnd':
         if (!state.formData.leaseEnd && state.formData.leaseStart) {
-          const startDate = new Date(state.formData.leaseStart);
-          startDate.setFullYear(startDate.getFullYear() + 1);
-          dispatch({ type: 'UPDATE_FIELD', field: 'leaseEnd', value: startDate.toISOString().split('T')[0] });
+          const startDate = toDateOnly(state.formData.leaseStart);
+          if (startDate) {
+            const endDate = new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate(), 12, 0, 0);
+            const endY = endDate.getFullYear();
+            const endM = String(endDate.getMonth() + 1).padStart(2, '0');
+            const endD = String(endDate.getDate()).padStart(2, '0');
+            dispatch({ type: 'UPDATE_FIELD', field: 'leaseEnd', value: `${endY}-${endM}-${endD}` });
+          }
         }
         break;
     }
@@ -770,10 +792,18 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
       case 'rent':
         return !isNaN(parseFloat(state.formData.rentAmount)) && parseFloat(state.formData.rentAmount) > 0;
       case 'paymentFrequency':
-        return !!state.formData.paymentFrequency && ['monthly', 'yearly', 'fixed-time'].includes(state.formData.paymentFrequency) && !!state.formData.firstPaymentDate;
+        return !!state.formData.paymentFrequency && ['monthly', 'yearly', 'fixed-time'].includes(state.formData.paymentFrequency) && !!state.formData.firstPaymentDate && isTodayOrFuture(state.formData.firstPaymentDate);
       case 'leaseStart':
-      case 'leaseEnd':
-        return !!state.formData[stepId as keyof TenantFormData] && isTodayOrFuture(state.formData[stepId as keyof TenantFormData] as string);
+        return !!state.formData.leaseStart && !!toDateOnly(state.formData.leaseStart);
+      case 'leaseEnd': {
+        if (!state.formData.leaseEnd || !toDateOnly(state.formData.leaseEnd)) return false;
+        if (state.formData.leaseStart) {
+          const s = toDateOnly(state.formData.leaseStart);
+          const e = toDateOnly(state.formData.leaseEnd);
+          if (s && e && e < s) return false;
+        }
+        return true;
+      }
       case 'emergencyName':
         return !!state.formData.emergencyContactName;
       case 'emergencyPhone':
@@ -783,7 +813,8 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
       case 'employment':
         return true; // Employment is optional
       case 'income':
-        return !state.formData.annualIncome || (!isNaN(parseFloat(state.formData.annualIncome)) && parseFloat(state.formData.annualIncome) > 0);
+        // Optional step: valid if empty OR if a valid positive number is entered
+        return !state.formData.annualIncome.trim() || (!isNaN(parseFloat(state.formData.annualIncome)) && parseFloat(state.formData.annualIncome) > 0);
       case 'notes':
         return true; // Notes are optional
     }
@@ -806,6 +837,15 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
           hasErrors = true;
           errors.push(`Please complete the ${step.title} step`);
         }
+      }
+
+      // Auth guard: if the user is not logged in, show an error and bail out
+      if (!userProfile) {
+        dispatch({
+          type: 'SET_GLOBAL_ERROR',
+          error: 'You must be signed in to add a tenant. Please sign in and try again.'
+        });
+        return;
       }
 
       if (hasErrors) {
@@ -847,7 +887,7 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         firstPaymentDate: toDateOnly(state.formData.firstPaymentDate) || new Date(),
         leaseStart: toDateOnly(state.formData.leaseStart) || new Date(),
         leaseEnd: toDateOnly(state.formData.leaseEnd) || new Date(),
-        status: state.formData.status,
+        status: state.formData.status === 'inactive' ? 'ended' : state.formData.status,
         referencingStatus: normalizedReferencing as any,
         paymentStatus: normalizedPayment as any,
         emergencyContact: {
@@ -892,7 +932,7 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
       dispatch({ type: 'SET_LOADING', isLoading: false });
       dispatch({ type: 'SET_RETRYING', isRetrying: false });
     }
-  }, [state.formData, state.errors, onSave]);
+  }, [state.formData, state.errors, onSave, userProfile]);
 
   // Phase 4: Accessibility - Keyboard navigation
   useEffect(() => {
@@ -1165,7 +1205,16 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
               <div className="relative group">
                 <Select
                   value={state.formData.propertyId}
-                  onValueChange={(value) => handleInputChange('propertyId', value)}
+                  onValueChange={(value) => {
+                    // Dispatch both propertyId and propertyAddress atomically so that
+                    // propertyAddress is always populated before form submission, regardless
+                    // of the async useEffect timing.
+                    handleInputChange('propertyId', value);
+                    const matched = properties.find(p => p.id === value);
+                    if (matched) {
+                      dispatch({ type: 'UPDATE_FIELD', field: 'propertyAddress', value: matched.address });
+                    }
+                  }}
                 >
                     <SelectTrigger className={`w-full text-lg py-6 px-6 border-2 transition-all duration-300 rounded-2xl focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none focus:ring-0 focus:ring-transparent focus-visible:ring-0 focus-visible:ring-transparent ${
                     state.formData.propertyId
@@ -1375,33 +1424,52 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
               </div>
             </div>
             <div className="space-y-4">
-              <h1 className="font-bold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '2.5rem', color: '#136C9E' }}>{getStepTitle(step)}</h1>
-              <p className="text-xl text-gray-600 max-w-md mx-auto" style={{ fontFamily: 'Archivo, sans-serif' }}>{step.description}</p>
-              <button
-                onClick={() => {
-                  // Reset form to initial state
-                  dispatch({ type: 'RESET_FORM' });
-                  // Go back to step 1
-                  dispatch({ type: 'SET_CURRENT_STEP', step: 0 });
-                }}
-                className="px-8 py-3 rounded-full border-2 font-medium transition-all duration-300 hover:bg-opacity-10"
-                style={{ 
-                  fontFamily: 'Archivo, sans-serif',
-                  borderColor: '#136C9E',
-                  color: '#136C9E',
-                  backgroundColor: 'transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#136C9E';
-                  e.currentTarget.style.color = 'white';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#136C9E';
-                }}
-              >
-                Add New Tenant
-              </button>
+              <h1 className="font-bold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '2.5rem', color: '#136C9E' }}>Tenant Added!</h1>
+              <p className="text-xl text-gray-600 max-w-md mx-auto" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                {state.formData.name} has been successfully added to your tenant list.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                <button
+                  onClick={() => {
+                    // Clear saved progress and reset the form for a new entry
+                    localStorage.removeItem('tenantFormProgress');
+                    dispatch({ type: 'RESET_FORM' });
+                    setIsSaved(false);
+                  }}
+                  className="px-8 py-3 rounded-full border-2 font-medium transition-all duration-300"
+                  style={{ 
+                    fontFamily: 'Archivo, sans-serif',
+                    borderColor: '#136C9E',
+                    color: '#136C9E',
+                    backgroundColor: 'transparent'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#136C9E';
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#136C9E';
+                  }}
+                >
+                  Add Another Tenant
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('tenantFormProgress');
+                    onBack();
+                  }}
+                  className="px-8 py-3 rounded-full font-medium text-white transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                  style={{
+                    fontFamily: 'Archivo, sans-serif',
+                    background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                    boxShadow: '0 4px 14px 0 rgba(220, 95, 18, 0.39)',
+                    border: 'none',
+                  }}
+                >
+                  Go to Tenant List
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -1772,8 +1840,6 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
               <div className="text-center space-y-2">
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
-                  {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Please review all information before submitting</p>
             </div>
@@ -1782,7 +1848,7 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
                   <CardHeader>
                     <CardTitle style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant Information</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Name</Label>
@@ -1795,6 +1861,10 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
                       <div>
                         <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Phone</Label>
                         <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.phone}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Property</Label>
+                        <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.propertyAddress || state.formData.propertyId}</p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Rent Amount</Label>
@@ -1819,8 +1889,9 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
                         <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.leaseEnd}</p>
                       </div>
                     </div>
+
                     <div className="pt-4 border-t">
-                      <h3 className="font-semibold mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>Emergency Contact</h3>
+                      <h3 className="font-semibold mb-3" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Emergency Contact</h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Name</Label>
@@ -1832,10 +1903,53 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Relationship</Label>
-                          <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.emergencyContactRelationship}</p>
+                          <p className="text-lg capitalize" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.emergencyContactRelationship}</p>
                         </div>
                       </div>
                     </div>
+
+                    {/* Employment & Income — only shown when filled in */}
+                    {(state.formData.employmentType || state.formData.employer || state.formData.annualIncome) && (
+                      <div className="pt-4 border-t">
+                        <h3 className="font-semibold mb-3" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Employment Details</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {state.formData.employmentType && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Employment Status</Label>
+                              <p className="text-lg capitalize" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                                {state.formData.employmentType.replace(/-/g, ' ')}
+                              </p>
+                            </div>
+                          )}
+                          {state.formData.employer && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Employer</Label>
+                              <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.employer}</p>
+                            </div>
+                          )}
+                          {state.formData.jobTitle && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Job Title</Label>
+                              <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.jobTitle}</p>
+                            </div>
+                          )}
+                          {state.formData.annualIncome && (
+                            <div>
+                              <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Annual Income</Label>
+                              <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>£{parseFloat(state.formData.annualIncome).toLocaleString('en-GB')}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notes — only shown when filled in */}
+                    {state.formData.notes && (
+                      <div className="pt-4 border-t">
+                        <h3 className="font-semibold mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Additional Notes</h3>
+                        <p className="text-base text-gray-700 whitespace-pre-wrap" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.notes}</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -2217,10 +2331,8 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
               </button>
             ) : (
               <button
-                onClick={async () => {
-                  if (!isSaved) {
-                    await handleSubmit();
-                  }
+                onClick={() => {
+                  localStorage.removeItem('tenantFormProgress');
                   onBack();
                 }}
                 className="bg-gradient-to-r from-[#DC5F12] to-[#DC5F12]/80 hover:from-[#DC5F12]/90 hover:to-[#DC5F12]/70 text-white px-8 py-3 rounded-full transition-all duration-300 hover:scale-105 hover: min-w-[140px] font-medium"
@@ -2257,6 +2369,8 @@ export const FormTestUtils = {
     propertyId: '1',
     propertyAddress: '123 Test Street',
     rentAmount: '1500',
+    paymentFrequency: 'monthly',
+    firstPaymentDate: '2027-01-01',
     leaseStart: '2024-01-01',
     leaseEnd: '2025-01-01',
     status: 'pending',
@@ -2279,8 +2393,7 @@ export const FormTestUtils = {
     previousLandlordReference: 'Good tenant',
     bankName: 'Test Bank',
     accountNumber: '12345678',
-    sortCode: '12-34-56',
-    documentsUploaded: []
+    sortCode: '12-34-56'
   }),
 
   // Helper to check if form step is valid

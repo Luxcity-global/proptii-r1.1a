@@ -4,8 +4,9 @@ import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Upload, User, Building, Mail, Phone, X } from 'lucide-react';
+import { Upload, User, Building, Mail, Phone, X, Loader2 } from 'lucide-react';
 import { UserRole, UserProfile } from '../App';
+import { uploadToFirebaseStorage } from '../../../services/storageService';
 
 interface ProfileSetupProps {
   role: UserRole;
@@ -22,6 +23,8 @@ export function ProfileSetup({ role, onProfileComplete, onSkip }: ProfileSetupPr
     logo: ''
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (field: keyof UserProfile, value: string) => {
@@ -32,13 +35,33 @@ export function ProfileSetup({ role, onProfileComplete, onSkip }: ProfileSetupPr
     }
   };
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setLogoFile(file);
-      // In a real app, you'd upload this to a server
-      const logoUrl = URL.createObjectURL(file);
-      setFormData(prev => ({ ...prev, logo: logoUrl }));
+    if (!file) return;
+
+    // Validate size (max 2 MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError('Logo must be under 2 MB.');
+      return;
+    }
+    setLogoError(null);
+    setLogoFile(file);
+    setIsUploadingLogo(true);
+
+    try {
+      const result = await uploadToFirebaseStorage(file, 'profile-logos');
+      if (result.success && result.url) {
+        setFormData(prev => ({ ...prev, logo: result.url! }));
+      } else {
+        setLogoError(result.error || 'Upload failed. Please try again.');
+        // Fall back to blob URL for preview only
+        setFormData(prev => ({ ...prev, logo: URL.createObjectURL(file) }));
+      }
+    } catch {
+      setLogoError('Upload failed. Please try again.');
+      setFormData(prev => ({ ...prev, logo: URL.createObjectURL(file) }));
+    } finally {
+      setIsUploadingLogo(false);
     }
   };
 
@@ -120,9 +143,10 @@ export function ProfileSetup({ role, onProfileComplete, onSkip }: ProfileSetupPr
                       variant="outline"
                       size="sm"
                       className="absolute -bottom-2 -right-2 rounded-full p-2"
+                      disabled={isUploadingLogo}
                       onClick={() => document.getElementById('logo-upload')?.click()}
                     >
-                      <Upload className="w-3 h-3" />
+                      {isUploadingLogo ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
                     </Button>
                   )}
                   <input
@@ -134,6 +158,7 @@ export function ProfileSetup({ role, onProfileComplete, onSkip }: ProfileSetupPr
                   />
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">Company Logo (Optional)</p>
+                {logoError && <p className="text-sm text-destructive mt-1">{logoError}</p>}
               </div>
             )}
 

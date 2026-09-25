@@ -45,8 +45,8 @@ import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
 import ViewingsPage from './components/ViewingsPage';
 import LandlordAgentSettingsPage from './components/LandlordAgentSettingsPage';
-import { storage } from './config/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getResolvedApiBaseUrl } from '../../config/apiBaseUrl';
+import { getAccessTokenForApiRequest } from '../../services/msalAccessToken';
 import AuthContext, { useAuth } from '../../contexts/AuthContext';
 import { MessagingProvider } from '../../contexts/MessagingContext';
 import { trackEvent } from '../../utils/analytics';
@@ -506,6 +506,15 @@ export function AppContent() {
     setIsAuthLoading(hostIsLoading);
     setIsAuthenticated(hostIsAuthenticated);
 
+    // Signal authReady so token acquisition in API calls unblocks immediately
+    // when the host app resolves auth — without this the landlord app's API
+    // calls hang for the full 5 s timeout on every request.
+    if (hostIsAuthenticated && !hostIsLoading) {
+      import('../../services/authReady').then(({ notifyAuthReady }) => {
+        notifyAuthReady();
+      }).catch(() => {});
+    }
+
     // While host auth is still resolving, do not wipe portfolio state or force
     // loading off — that caused a skeleton → empty flash on first paint.
     if (hostIsLoading) {
@@ -762,31 +771,53 @@ export function AppContent() {
     });
   };
 
-  // Upload images to Google Firebase Cloud Storage and return PropertyPhoto objects
-  const uploadPropertyImages = async (imageFiles: File[]): Promise<PropertyPhoto[]> => {
-    if (imageFiles.length === 0) {
-      return [];
+  // Helper to upload a file to backend storage endpoint with signed download tokens
+  const uploadToBackendStorage = async (file: File | Blob, folder: string, filename?: string): Promise<string> => {
+    const apiBase = getResolvedApiBaseUrl();
+    const formData = new FormData();
+    formData.append('file', file, filename || (file as File).name || 'file');
+    formData.append('folder', folder);
+
+    const token = await getAccessTokenForApiRequest().catch(() => null);
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const { storage } = await import('./config/firebase');
-    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+    const response = await fetch(`${apiBase}/storage/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Upload failed (${response.status}): ${errText}`);
+    }
+
+    const result = await response.json();
+    if (!result?.url) {
+      throw new Error('Upload succeeded but no download URL returned');
+    }
+    return result.url;
+  };
+
+  // Upload images to Cloud Storage via the v2-backend storage endpoint.
+  // No client-side Firebase SDK fallback — if the backend is unavailable the
+  // error surfaces immediately rather than bypassing auth/ownership checks.
+  const uploadPropertyImages = async (imageFiles: File[]): Promise<PropertyPhoto[]> => {
+    if (imageFiles.length === 0) return [];
 
     const photoPromises = imageFiles.map(async (file, index) => {
+      const timestamp = Date.now();
+      let processedFile = file;
+      if (file.type.startsWith('image/') && file.size > 500 * 1024) {
+        processedFile = await compressImage(file, 150);
+      }
+
       try {
-        const timestamp = Date.now();
-        // Compress large images before upload
-        let processedFile = file;
-        if (file.type.startsWith('image/') && file.size > 500 * 1024) {
-          processedFile = await compressImage(file, 150);
-        }
-
-        const uniqueName = `${timestamp}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        const photoRef = ref(storage, `properties/photos/${uniqueName}`);
-
-        await uploadBytes(photoRef, processedFile);
-        const downloadUrl = await getDownloadURL(photoRef);
-        console.log(`✅ Uploaded image ${index + 1}/${imageFiles.length} to Firebase Storage: ${downloadUrl}`);
-
+        const downloadUrl = await uploadToBackendStorage(processedFile, 'properties/photos', file.name);
+        console.log(`✅ Uploaded image ${index + 1}/${imageFiles.length}: ${downloadUrl}`);
         return {
           id: `photo-${timestamp}-${index}`,
           url: downloadUrl,
@@ -794,42 +825,28 @@ export function AppContent() {
           isCover: index === 0,
           room: index === 0 ? 'Exterior' : undefined
         };
-      } catch (error) {
-        console.warn(`⚠️ Error uploading image ${index + 1} to Firebase Storage, using data URL fallback:`, error);
-        return {
-          id: `photo-${Date.now()}-${index}`,
-          url: URL.createObjectURL(file),
-          filename: file.name,
-          isCover: index === 0,
-          room: index === 0 ? 'Exterior' : undefined
-        };
+      } catch (err) {
+        console.error(`❌ Backend storage upload failed for image ${file.name}:`, err);
+        return null;
       }
     });
 
-    const uploadedPhotos = await Promise.all(photoPromises);
-    console.log(`✅ All ${uploadedPhotos.length} images processed successfully`);
-    return uploadedPhotos;
+    const results = await Promise.all(photoPromises);
+    const validPhotos = results.filter((p): p is PropertyPhoto => p !== null && Boolean(p.url) && !p.url.startsWith('blob:'));
+    console.log(`✅ ${validPhotos.length}/${imageFiles.length} images processed successfully`);
+    return validPhotos;
   };
 
   const uploadPropertyDocuments = async (documentFiles: File[]): Promise<PropertyDocument[]> => {
-    if (documentFiles.length === 0) {
-      return [];
-    }
+    if (documentFiles.length === 0) return [];
 
-    console.log(`Uploading ${documentFiles.length} documents to Firebase Storage...`);
-    const { storage } = await import('./config/firebase');
-    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-
+    console.log(`Uploading ${documentFiles.length} documents...`);
     const documentPromises = documentFiles.map(async (file, index) => {
+      const timestamp = Date.now();
+
       try {
-        const timestamp = Date.now();
-        const uniqueName = `${timestamp}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        const docRef = ref(storage, `properties/documents/${uniqueName}`);
-
-        await uploadBytes(docRef, file);
-        const downloadUrl = await getDownloadURL(docRef);
-        console.log(`✅ Uploaded document ${index + 1}/${documentFiles.length} to Firebase Storage: ${file.name}`);
-
+        const downloadUrl = await uploadToBackendStorage(file, 'properties/documents', file.name);
+        console.log(`✅ Uploaded document ${index + 1}/${documentFiles.length}: ${file.name}`);
         return {
           id: `doc-${timestamp}-${index}`,
           name: file.name,
@@ -838,36 +855,33 @@ export function AppContent() {
           issueDate: new Date(),
           status: 'valid'
         } as PropertyDocument;
-      } catch (error) {
-        console.warn(`⚠️ Error uploading document ${file.name} to Firebase Storage, using fallback:`, error);
-        return {
-          id: `doc-${Date.now()}-${index}`,
-          name: file.name,
-          type: 'other',
-          url: URL.createObjectURL(file),
-          issueDate: new Date(),
-          status: 'valid'
-        } as PropertyDocument;
+      } catch (err) {
+        console.error(`❌ Backend storage upload failed for document ${file.name}:`, err);
+        return null;
       }
     });
 
-    const uploadedDocuments = await Promise.all(documentPromises);
-    console.log(`✅ All ${uploadedDocuments.length} documents processed successfully`);
-    return uploadedDocuments;
+    const results = await Promise.all(documentPromises);
+    const validDocs = results.filter((d): d is PropertyDocument => d !== null && Boolean(d.url) && !d.url.startsWith('blob:'));
+    console.log(`✅ ${validDocs.length}/${documentFiles.length} documents processed successfully`);
+    return validDocs;
   };
 
   // Convert property setup data to Property object
   const createPropertyFromSetupData = (): Property => {
     const { propertyType, propertyDetails, amenities, images, additionalNotes, pendingTenants } = propertySetupData;
 
-    // Convert images to PropertyPhoto format
-    const photos: PropertyPhoto[] = images.map((imageUrl, index) => ({
-      id: `photo-${index}`,
-      url: imageUrl,
-      filename: `property-photo-${index + 1}.jpg`,
-      isCover: index === 0,
-      room: index === 0 ? 'Exterior' : undefined
-    }));
+    // Convert images to PropertyPhoto format — allow blob: preview URLs so the
+    // preview screen (screen 2) can display the images before they are uploaded.
+    const photos: PropertyPhoto[] = images
+      .filter((imageUrl) => !!imageUrl)
+      .map((imageUrl, index) => ({
+        id: `photo-${index}`,
+        url: imageUrl,
+        filename: `property-photo-${index + 1}.jpg`,
+        isCover: index === 0,
+        room: index === 0 ? 'Exterior' : undefined
+      }));
 
     // Convert documents to PropertyDocument format
     const documents: PropertyDocument[] = propertyDetails.uploadedDocuments.map((file, index) => ({
@@ -958,9 +972,15 @@ export function AppContent() {
     setAlerts([]);
   }, []);
 
+  // Stable ref for userProfile email — avoids recreating loadScopedTenants on every profile update
+  const userProfileRef = React.useRef<UserProfile | null>(null);
+  React.useEffect(() => { userProfileRef.current = userProfile; }, [userProfile]);
+
   const loadScopedTenants = React.useCallback(async () => {
+    const userId = resolveManagerId();
+    // Don't fire if we don't have a user yet — avoids token-wait hangs on startup
+    if (!userId && !userProfileRef.current?.email) return;
     try {
-      const userId = resolveManagerId();
       let ownedPropertyIds: Set<string> | undefined;
       
       if (userId) {
@@ -970,17 +990,17 @@ export function AppContent() {
       let list = await tenantService.getTenants(userId || undefined, ownedPropertyIds);
 
       // The fallback filtering is now done directly inside tenantService.getTenants
-      if (isAgentTestAccount(userId, userProfile?.email)) {
+      if (isAgentTestAccount(userId, userProfileRef.current?.email)) {
         list = mergeById(getAgentDummyTenants(), list);
       }
       setTenants(list);
     } catch (e) {
       console.error('Failed to load tenants:', e);
-      if (isAgentTestAccount(resolveManagerId(), userProfile?.email)) {
+      if (isAgentTestAccount(resolveManagerId(), userProfileRef.current?.email)) {
         setTenants(getAgentDummyTenants());
       }
     }
-  }, [userProfile]); // removed `properties` — use propertiesRef instead to keep stable identity
+  }, [resolveManagerId]); // userProfile accessed via userProfileRef to keep callback stable
 
   // Reload and scope tenants once we know the current user's properties
   React.useEffect(() => {
@@ -1025,7 +1045,8 @@ export function AppContent() {
 
     const loadProperties = async () => {
       const currentUserId = resolveManagerId();
-      const userEmail = userProfile?.email;
+      // Read email from ref to avoid re-running this effect on every profile update
+      const userEmail = userProfileRef.current?.email;
 
       if (!currentUserId && !userEmail) {
         if (!hostIsAuthenticated && !hostIsLoading) {
@@ -1077,9 +1098,10 @@ export function AppContent() {
     hostIsAuthenticated,
     hostIsLoading,
     hostUser?.id,
-    userProfile?.email,
     resolveManagerId,
     portfolioRefreshKey,
+    // userProfile?.email intentionally omitted — read via userProfileRef to prevent
+    // re-fetching on every shallow profile object recreation
   ]);
 
   // Helper function to get current user ID — delegates to resolveManagerId
@@ -1258,7 +1280,7 @@ export function AppContent() {
         clearTimeout(alertGenerationTimeout);
       }
     };
-  }, [userProfile, loadScopedTenants]);
+  }, [hostUser?.id, loadScopedTenants]); // hostUser.id is the stable auth signal; userProfile causes excess re-runs
 
   // Load market insights from Firestore
   React.useEffect(() => {
@@ -1340,7 +1362,7 @@ export function AppContent() {
       }
       unsubscribe();
     };
-  }, [userProfile]);
+  }, [hostUser?.id]); // was [userProfile] — hostUser.id is the stable signal for when auth is ready
 
   const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>) => {
     // Strip any accidental id/createdAt fields before saving (define outside try-catch for scope)
@@ -1369,18 +1391,12 @@ export function AppContent() {
         console.log('Property added to Firebase:', propertyId);
         return propertyId;
       } else {
-        throw new Error('Failed to retrieve created property');
+        throw new Error('Failed to retrieve created property from database');
       }
     } catch (error) {
-      console.error('Error adding property to Firebase:', error);
-      // Fallback to local state if Firebase fails
-      const newProperty: Property = {
-        ...(safeProperty as any),
-        id: Date.now().toString(),
-        createdAt: new Date(),
-      };
-      setProperties(prev => [...prev, newProperty]);
-      return newProperty.id;
+      console.error('Error adding property to database:', error);
+      // Do NOT fall back to fake local state or IDs. Ensure error is propagated.
+      throw error;
     }
   };
 
@@ -1427,14 +1443,8 @@ export function AppContent() {
         });
       }
     } catch (error) {
-      console.error('Error updating property in Firebase:', error);
-      // Fallback to local state update if Firebase fails
-      setProperties(prev =>
-        prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
-      );
-      if (selectedProperty && selectedProperty.id === propertyId) {
-        setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
-      }
+      console.error('Error updating property in database:', error);
+      throw error;
     }
   };
 
@@ -1565,12 +1575,8 @@ export function AppContent() {
     }
   };
 
-  const addLandlord = (landlordData: any) => {
-    // This would typically save to a landlords state or database
-    // For now, we'll just log it since we don't have a landlords state
-    console.log('New landlord added:', landlordData);
-    // In a real app, you'd have: setLandlords(prev => [...prev, newLandlord]);
-  };
+  // addLandlord is handled entirely within AddLandlordWizard via landlordService.createLandlord()
+  // The ClientsPage reloads landlords via useLandlords() on every mount.
 
   const deleteProperty = async (property: Property) => {
     try {
@@ -1586,20 +1592,42 @@ export function AppContent() {
     }
   };
 
-  const archiveProperty = (property: Property) => {
-    // In a real app, you might have an archived state or mark as archived
-    console.log('Archiving property:', property.id);
-    // For now, we'll just log it
+  const archiveProperty = async (property: Property) => {
+    try {
+      await propertyService.updateProperty(property.id, { status: 'under-renovation' } as any);
+      setProperties(prev =>
+        prev.map(p => p.id === property.id ? { ...p, status: 'under-renovation' as any } : p)
+      );
+      if (selectedProperty?.id === property.id) {
+        setSelectedProperty(prev => prev ? { ...prev, status: 'under-renovation' as any } : null);
+      }
+      console.log('Archived property:', property.id);
+    } catch (error) {
+      console.error('Failed to archive property:', error);
+      alert(`Failed to archive property: ${(error as any)?.message || 'Unknown error'}`);
+    }
   };
 
-  const duplicateProperty = (property: Property) => {
-    const duplicatedProperty: Property = {
-      ...property,
-      id: `property-${Date.now()}`,
-      address: `${property.address} (Copy)`,
-      createdAt: new Date()
-    };
-    setProperties(prev => [...prev, duplicatedProperty]);
+  const duplicateProperty = async (property: Property) => {
+    try {
+      const currentUserId = resolveManagerId() ?? userProfile?.email ?? '';
+      const { id: _id, createdAt: _createdAt, ...rest } = property;
+      const duplicateData = {
+        ...rest,
+        address: `${property.address} (Copy)`,
+        status: 'vacant' as const,
+        tenantId: undefined,
+      };
+      const newId = await propertyService.createProperty(duplicateData as any, currentUserId);
+      const created = await propertyService.getProperty(newId);
+      if (created) {
+        setProperties(prev => [...prev, created]);
+      }
+      console.log('Duplicated property, new id:', newId);
+    } catch (error) {
+      console.error('Failed to duplicate property:', error);
+      alert(`Failed to duplicate property: ${(error as any)?.message || 'Unknown error'}`);
+    }
   };
 
   const exportProperties = (propertiesToExport: Property[], format: string) => {
@@ -1619,78 +1647,143 @@ export function AppContent() {
         URL.revokeObjectURL(url);
         break;
 
-      case 'csv':
-        const csvHeaders = 'Address,Type,Bedrooms,Rent,Status,Amenities,Notes,Created Date\n';
+      case 'csv': {
+        const csvHeaders = 'Address,Type,Bedrooms,Bathrooms,Rent (£/mo),Status,Amenities,Notes,Created Date\n';
         const csvData = propertiesToExport.map(property => {
           const amenities = property.amenities.join('; ');
-          const notes = (property.notes || '').replace(/,/g, ';').replace(/\n/g, ' ');
-          return `"${property.address}","${property.type}","${property.bedrooms}","${property.rent}","${property.status}","${amenities}","${notes}","${property.createdAt.toLocaleDateString()}"`;
+          const notes = (property.notes || '').replace(/,/g, ';').replace(/\n/g, ' ').replace(/"/g, '""');
+          const createdDate = property.createdAt instanceof Date ? property.createdAt.toLocaleDateString('en-GB') : new Date(property.createdAt).toLocaleDateString('en-GB');
+          return [property.address, property.type, property.bedrooms, (property as any).bathrooms ?? '', property.rent, property.status, amenities, notes, createdDate]
+            .map(v => `"${String(v ?? '').replace(/"/g, '""')}"`)
+            .join(',');
         }).join('\n');
-        const csvContent = csvHeaders + csvData;
-        const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const csvBlob = new Blob(['\uFEFF' + csvHeaders + csvData], { type: 'text/csv;charset=utf-8;' });
         const csvUrl = URL.createObjectURL(csvBlob);
         const csvLink = document.createElement('a');
         csvLink.href = csvUrl;
         csvLink.download = `properties-export-${timestamp}.csv`;
+        document.body.appendChild(csvLink);
         csvLink.click();
+        document.body.removeChild(csvLink);
         URL.revokeObjectURL(csvUrl);
         break;
+      }
 
-      case 'excel':
-        // For Excel, we'll create a CSV that can be opened in Excel
-        // In a real app, you'd use a library like xlsx
-        const excelHeaders = 'Address\tType\tBedrooms\tRent\tStatus\tAmenities\tNotes\tCreated Date\n';
+      case 'excel': {
+        // Tab-separated CSV with .xlsx extension — opens correctly in Excel without needing a library
+        const excelHeaders = 'Address\tType\tBedrooms\tBathrooms\tRent (£/mo)\tStatus\tAmenities\tNotes\tCreated Date\r\n';
         const excelData = propertiesToExport.map(property => {
           const amenities = property.amenities.join('; ');
-          const notes = (property.notes || '').replace(/\t/g, ' ').replace(/\n/g, ' ');
-          return `"${property.address}"\t"${property.type}"\t"${property.bedrooms}"\t"${property.rent}"\t"${property.status}"\t"${amenities}"\t"${notes}"\t"${property.createdAt.toLocaleDateString()}"`;
-        }).join('\n');
-        const excelContent = excelHeaders + excelData;
-        const excelBlob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
+          const notes = (property.notes || '').replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/"/g, '""');
+          const createdDate = property.createdAt instanceof Date ? property.createdAt.toLocaleDateString('en-GB') : new Date(property.createdAt).toLocaleDateString('en-GB');
+          return [property.address, property.type, property.bedrooms, (property as any).bathrooms ?? '', property.rent, property.status, amenities, notes, createdDate]
+            .map(v => `"${String(v ?? '').replace(/"/g, '""')}"`)
+            .join('\t');
+        }).join('\r\n');
+        const excelBlob = new Blob(['\uFEFF' + excelHeaders + excelData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
         const excelUrl = URL.createObjectURL(excelBlob);
         const excelLink = document.createElement('a');
         excelLink.href = excelUrl;
-        excelLink.download = `properties-export-${timestamp}.xls`;
+        excelLink.download = `properties-export-${timestamp}.xlsx`;
+        document.body.appendChild(excelLink);
         excelLink.click();
+        document.body.removeChild(excelLink);
         URL.revokeObjectURL(excelUrl);
         break;
+      }
 
-      case 'pdf':
-        // For PDF, we'll create a simple text representation
-        // In a real app, you'd use a library like jsPDF
-        const pdfContent = `PROPERTIES EXPORT - ${timestamp}\n\n` +
-          propertiesToExport.map((property, index) =>
-            `${index + 1}. ${property.address}\n` +
-            `   Type: ${property.type}\n` +
-            `   Bedrooms: ${property.bedrooms}\n` +
-            `   Rent: £${property.rent.toLocaleString()}/month\n` +
-            `   Status: ${property.status}\n` +
-            `   Amenities: ${property.amenities.join(', ')}\n` +
-            `   Notes: ${property.notes || 'None'}\n` +
-            `   Created: ${property.createdAt.toLocaleDateString()}\n`
-          ).join('\n');
+      case 'pdf': {
+        // Build an HTML page and open it in a new tab so the browser's built-in Print → Save as PDF works
+        const rows = propertiesToExport.map((property, index) => {
+          const amenities = property.amenities.join(', ') || '—';
+          const notes = property.notes || '—';
+          const createdDate = property.createdAt instanceof Date ? property.createdAt.toLocaleDateString('en-GB') : new Date(property.createdAt).toLocaleDateString('en-GB');
+          const rent = `£${property.rent.toLocaleString()}/mo`;
+          return `<tr>
+            <td>${index + 1}</td>
+            <td>${property.address}</td>
+            <td>${property.type}</td>
+            <td>${property.bedrooms}</td>
+            <td>${rent}</td>
+            <td>${property.status}</td>
+            <td>${amenities}</td>
+            <td>${notes}</td>
+            <td>${createdDate}</td>
+          </tr>`;
+        }).join('');
 
-        const pdfBlob = new Blob([pdfContent], { type: 'text/plain' });
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        const pdfLink = document.createElement('a');
-        pdfLink.href = pdfUrl;
-        pdfLink.download = `properties-export-${timestamp}.txt`;
-        pdfLink.click();
-        URL.revokeObjectURL(pdfUrl);
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Properties Export — ${timestamp}</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #333; }
+            h2 { color: #136C9E; margin-bottom: 4px; }
+            p { color: #666; margin-top: 0; font-size: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+            th { background: #136C9E; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }
+            td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+            tr:nth-child(even) td { background: #f9fafb; }
+            @media print { button { display: none; } }
+          </style></head><body>
+          <h2>Properties Export</h2>
+          <p>Generated: ${new Date().toLocaleString('en-GB')} &nbsp;|&nbsp; Total: ${propertiesToExport.length} propert${propertiesToExport.length === 1 ? 'y' : 'ies'}</p>
+          <button onclick="window.print()" style="margin-bottom:12px;padding:6px 14px;background:#DC5F12;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">Print / Save as PDF</button>
+          <table>
+            <thead><tr><th>#</th><th>Address</th><th>Type</th><th>Beds</th><th>Rent</th><th>Status</th><th>Amenities</th><th>Notes</th><th>Created</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></body></html>`;
+
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(html);
+          win.document.close();
+        } else {
+          // Fallback: download as HTML if popup is blocked
+          const pdfBlob = new Blob([html], { type: 'text/html;charset=utf-8' });
+          const pdfUrl = URL.createObjectURL(pdfBlob);
+          const pdfLink = document.createElement('a');
+          pdfLink.href = pdfUrl;
+          pdfLink.download = `properties-export-${timestamp}.html`;
+          document.body.appendChild(pdfLink);
+          pdfLink.click();
+          document.body.removeChild(pdfLink);
+          URL.revokeObjectURL(pdfUrl);
+        }
         break;
+      }
 
       default:
         console.error('Unsupported export format:', format);
     }
   };
 
-  const importProperties = (importedProperties: Property[]) => {
-    console.log('Importing properties:', importedProperties);
-    setProperties(prev => [...prev, ...importedProperties]);
+  const importProperties = async (importedProperties: Property[]) => {
+    const currentUserId = resolveManagerId() ?? userProfile?.email ?? '';
+    const created: Property[] = [];
+    const failed: string[] = [];
+
+    for (const prop of importedProperties) {
+      try {
+        const { id: _id, createdAt: _ca, ...rest } = prop;
+        const newId = await propertyService.createProperty(rest as any, currentUserId);
+        const saved = await propertyService.getProperty(newId);
+        if (saved) created.push(saved);
+      } catch (err) {
+        console.error('Failed to import property:', prop.address, err);
+        failed.push(prop.address);
+      }
+    }
+
+    if (created.length > 0) {
+      setProperties(prev => [...prev, ...created]);
+    }
+
+    if (failed.length > 0) {
+      alert(`${created.length} propert${created.length === 1 ? 'y' : 'ies'} imported. ${failed.length} failed: ${failed.join(', ')}`);
+    } else {
+      console.log(`✅ Imported ${created.length} properties`);
+    }
   };
 
   const renderMainAppScreen = () => {
-    console.log('🔄 renderMainAppScreen called with navigationScreen:', navigationScreen);
     switch (navigationScreen) {
       case 'dashboard':
         return (
@@ -1850,15 +1943,15 @@ export function AppContent() {
                   // Filter out deleted documents
                   const updatedDocuments = property.documents.filter(doc => !docIdsToDelete.includes(doc.id));
 
-                  // Update Firebase - convert dates to Timestamps
+                  // Update property — pass plain Date objects, no Firestore Timestamp needed
                   await propertyService.updateProperty(propertyId, {
                     documents: updatedDocuments.map(doc => ({
                       id: doc.id,
                       name: doc.name,
                       type: doc.type,
                       url: doc.url,
-                      issueDate: Timestamp.fromDate(doc.issueDate),
-                      expiryDate: doc.expiryDate ? Timestamp.fromDate(doc.expiryDate) : undefined,
+                      issueDate: doc.issueDate instanceof Date ? doc.issueDate.toISOString() : doc.issueDate,
+                      expiryDate: doc.expiryDate instanceof Date ? doc.expiryDate.toISOString() : (doc.expiryDate ?? undefined),
                       status: doc.status
                     })) as any
                   });
@@ -1917,11 +2010,11 @@ export function AppContent() {
                       name: doc.name,
                       type: doc.type,
                       url: doc.url,
-                      issueDate: doc.issueDate,
-                      expiryDate: doc.expiryDate,
+                      issueDate: doc.issueDate instanceof Date ? doc.issueDate.toISOString() : doc.issueDate,
+                      expiryDate: doc.expiryDate instanceof Date ? doc.expiryDate.toISOString() : (doc.expiryDate ?? undefined),
                       status: doc.status,
                       archived: (doc as any).archived || false
-                    }))
+                    })) as any
                   });
 
                   // Update local state
@@ -2154,14 +2247,71 @@ export function AppContent() {
               }
               setTenants(prev => prev.filter(t => t.id !== tenantId));
             }}
-            onArchiveTenant={(tenantId) => {
-              setTenants(prev => prev.map(t =>
-                t.id === tenantId ? { ...t, status: 'archived' as any } : t
-              ));
+            onArchiveTenant={async (tenantId) => {
+              try {
+                // 'ended' is the correct Tenant.status value for an archived/ended tenancy
+                await tenantService.updateTenant(tenantId, { status: 'ended' });
+                setTenants(prev => prev.map(t =>
+                  t.id === tenantId ? { ...t, status: 'ended' as const } : t
+                ));
+              } catch (err) {
+                console.error('Failed to archive tenant:', err);
+                alert('Failed to archive tenant. Please try again.');
+              }
             }}
             onExportTenants={(format) => {
-              const selectedTenants = tenants; // In real app, this would be the selected tenants
-              console.log('Exporting tenants...', format, selectedTenants);
+              const timestamp = new Date().toISOString().split('T')[0];
+              const toExport = tenants;
+
+              if (format === 'json') {
+                const blob = new Blob([JSON.stringify(toExport, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `tenants-export-${timestamp}.json`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              } else if (format === 'csv' || format === 'excel') {
+                const sep = format === 'excel' ? '\t' : ',';
+                const q = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+                const headers = ['Name', 'Email', 'Phone', 'Property', 'Rent (£/mo)', 'Lease Start', 'Lease End', 'Status', 'Payment Status'];
+                const rows = toExport.map(t => [
+                  t.name, t.email, t.phone, t.propertyAddress,
+                  t.rentAmount,
+                  t.leaseStart instanceof Date ? t.leaseStart.toLocaleDateString('en-GB') : new Date(t.leaseStart as any).toLocaleDateString('en-GB'),
+                  t.leaseEnd instanceof Date ? t.leaseEnd.toLocaleDateString('en-GB') : new Date(t.leaseEnd as any).toLocaleDateString('en-GB'),
+                  t.status, t.paymentStatus
+                ].map(v => q(v as any)).join(sep));
+                const content = '\uFEFF' + [headers.map(h => q(h)).join(sep), ...rows].join('\r\n');
+                const ext = format === 'excel' ? 'xlsx' : 'csv';
+                const mime = format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv';
+                const blob = new Blob([content], { type: `${mime};charset=UTF-8` });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `tenants-export-${timestamp}.${ext}`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              } else if (format === 'pdf') {
+                const rows = toExport.map((t, i) => `<tr>
+                  <td>${i + 1}</td><td>${t.name}</td><td>${t.email}</td><td>${t.phone}</td>
+                  <td>${t.propertyAddress}</td><td>£${t.rentAmount.toLocaleString()}</td>
+                  <td>${t.status}</td><td>${t.paymentStatus}</td>
+                </tr>`).join('');
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+                  <title>Tenants Export — ${timestamp}</title>
+                  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}
+                  h2{color:#136C9E}table{width:100%;border-collapse:collapse;margin-top:12px}
+                  th{background:#136C9E;color:white;padding:6px 8px;text-align:left}
+                  td{padding:5px 8px;border-bottom:1px solid #e5e7eb}
+                  tr:nth-child(even) td{background:#f9fafb}
+                  @media print{button{display:none}}</style></head>
+                  <body><h2>Tenants Export</h2>
+                  <p>Generated: ${new Date().toLocaleString('en-GB')} | Total: ${toExport.length}</p>
+                  <button onclick="window.print()" style="margin-bottom:12px;padding:6px 14px;background:#DC5F12;color:white;border:none;border-radius:6px;cursor:pointer">Print / Save as PDF</button>
+                  <table><thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Property</th><th>Rent</th><th>Status</th><th>Payment</th></tr></thead>
+                  <tbody>${rows}</tbody></table></body></html>`;
+                const win = window.open('', '_blank');
+                if (win) { win.document.write(html); win.document.close(); }
+              }
             }}
             onDeleteLandlord={(landlordId) => {
               // In real app, this would delete from landlord state
@@ -2432,41 +2582,12 @@ export function AppContent() {
         );
 
       case 'property-setup':
-        return (
-          <PropertySetup
-            property={selectedProperty}
-            onPropertyComplete={async (property) => {
-              if (selectedProperty) {
-                // Editing existing property
-                await updateProperty(selectedProperty.id, property);
-                navigateToScreen('property-details');
-              } else {
-                // Adding new property
-                const propertyId = await addProperty(property);
-                const newProperty = properties.find(p => p.id === propertyId) ||
-                  await propertyService.getProperty(propertyId) ||
-                  { ...property, id: propertyId, createdAt: new Date() } as Property;
-                setSelectedProperty(newProperty);
-                if (isOnboarding) {
-                  navigateToScreen('photo-upload');
-                } else {
-                  navigateToScreen('property-details');
-                }
-              }
-            }}
-            onSkip={isOnboarding ? () => navigateToScreen('onboarding-options') : () => navigateToScreen('main-app')}
-            onBack={() => {
-              // If user has properties, they're past onboarding - go to main app
-              if (properties.length > 0) {
-                setCurrentScreen('main-app');
-                setNavigationScreen('dashboard');
-              } else {
-                // No properties yet, likely in onboarding - go back to onboarding
-                navigateToScreen('onboarding-options');
-              }
-            }}
-          />
-        );
+        // The legacy single-page PropertySetup wizard is no longer navigated to.
+        // All "Add Property" flows now use the multi-step wizard starting at
+        // 'property-setup-step1'. Redirect here to avoid rendering a dead screen.
+        console.warn('[App] Redirecting legacy property-setup screen to property-setup-step1');
+        navigateToScreen(selectedProperty ? 'property-details' : 'property-setup-step1');
+        return null;
 
       case 'photo-upload':
         return (
@@ -2922,27 +3043,68 @@ export function AppContent() {
                 // 3. Convert setup data to property
                 const newProperty = createPropertyFromSetupData();
 
-                // 4. Replace preview URLs with uploaded Firebase Storage URLs
-                if (uploadedPhotos.length > 0) {
-                  console.log('Replacing preview URLs with Firebase Storage URLs');
-                  newProperty.photos = uploadedPhotos;
-                } else {
-                  console.warn('No photos to add to property');
-                  newProperty.photos = [];
+                // 4. Resolve photos: map existing permanent URLs and newly uploaded photos
+                let finalPhotos: PropertyPhoto[] = [];
+                let uploadIdx = 0;
+
+                for (let i = 0; i < propertySetupData.images.length; i++) {
+                  const imgUrl = propertySetupData.images[i];
+                  if (imgUrl && !imgUrl.startsWith('blob:')) {
+                    // Existing photo with permanent URL
+                    const existing = (selectedProperty?.photos || []).find(p => p.url === imgUrl);
+                    finalPhotos.push({
+                      id: existing?.id || `photo-${Date.now()}-${i}`,
+                      url: imgUrl,
+                      filename: existing?.filename || `property-photo-${i + 1}.jpg`,
+                      isCover: finalPhotos.length === 0,
+                      room: existing?.room ?? (finalPhotos.length === 0 ? 'Exterior' : undefined)
+                    });
+                  } else if (imgUrl && imgUrl.startsWith('blob:')) {
+                    if (uploadIdx < uploadedPhotos.length) {
+                      finalPhotos.push({
+                        ...uploadedPhotos[uploadIdx],
+                        isCover: finalPhotos.length === 0,
+                        room: finalPhotos.length === 0 ? 'Exterior' : uploadedPhotos[uploadIdx].room
+                      });
+                      uploadIdx++;
+                    }
+                  }
                 }
 
-                if (uploadedDocuments.length > 0) {
-                  newProperty.documents = uploadedDocuments;
-                } else {
-                  newProperty.documents = [];
+                // Append any newly uploaded photos not yet included
+                while (uploadIdx < uploadedPhotos.length) {
+                  finalPhotos.push({
+                    ...uploadedPhotos[uploadIdx],
+                    isCover: finalPhotos.length === 0
+                  });
+                  uploadIdx++;
                 }
+
+                // If finalPhotos is still empty and uploadedPhotos exist, use uploadedPhotos
+                if (finalPhotos.length === 0 && uploadedPhotos.length > 0) {
+                  finalPhotos = uploadedPhotos;
+                }
+
+                // If finalPhotos is empty and editing, preserve selectedProperty photos
+                if (finalPhotos.length === 0 && isEditing && selectedProperty?.photos) {
+                  finalPhotos = selectedProperty.photos.filter(p => p.url && !p.url.startsWith('blob:'));
+                }
+
+                newProperty.photos = finalPhotos;
+
+                // Resolve documents
+                let finalDocuments: PropertyDocument[] = uploadedDocuments;
+                if (isEditing && selectedProperty?.documents && selectedProperty.documents.length > 0) {
+                  finalDocuments = [...selectedProperty.documents, ...uploadedDocuments];
+                }
+                newProperty.documents = finalDocuments;
 
                 if (isEditing && editingPropertyId) {
                   // Fetch the original property to preserve status and other important fields
                   const originalProperty = await propertyService.getProperty(editingPropertyId);
                   const preservedStatus = originalProperty?.status || selectedProperty?.status || 'vacant';
 
-                  // Prepare updates object with all changes, preserving status
+                  // Prepare updates object with all changes, including photos and documents
                   const updates = {
                     address: newProperty.address,
                     type: newProperty.type,
@@ -2953,14 +3115,13 @@ export function AppContent() {
                     amenities: newProperty.amenities,
                     notes: newProperty.notes,
                     status: preservedStatus, // Preserve the original status from database
+                    photos: newProperty.photos,
+                    documents: newProperty.documents,
                   };
-
-                  // Update in Firebase directly (bypass updateProperty to avoid double state updates)
-                  const { id, createdAt, tenant, photos, documents, ...firebaseUpdates } = updates as any;
 
                   // Filter out undefined values - Firestore doesn't accept undefined
                   const cleanUpdates = Object.fromEntries(
-                    Object.entries(firebaseUpdates).filter(([_, value]) => value !== undefined)
+                    Object.entries(updates).filter(([_, value]) => value !== undefined)
                   ) as any;
 
                   await propertyService.updateProperty(editingPropertyId, cleanUpdates);
@@ -3058,14 +3219,10 @@ export function AppContent() {
                     }
                   }
 
-                  // 6. Fetch created property or fallback to local constructed property
-                  let createdProperty = await propertyService.getProperty(propertyId).catch(() => null);
+                  // 6. Fetch created property from DB
+                  const createdProperty = await propertyService.getProperty(propertyId);
                   if (!createdProperty) {
-                    createdProperty = {
-                      ...newProperty,
-                      id: propertyId,
-                      createdAt: new Date(),
-                    } as Property;
+                    throw new Error('Property was created but could not be verified in the database. Please check your properties list.');
                   }
 
                   selectProperty(createdProperty);
@@ -3162,8 +3319,14 @@ export function AppContent() {
                   return;
                 }
               } else {
-                // Add new tenant
-                addTenant(tenant);
+                // Add new tenant — must be awaited so errors surface to the caller
+                try {
+                  await addTenant(tenant);
+                } catch (error) {
+                  console.error('Error creating tenant:', error);
+                  alert('Failed to save tenant. Please try again.');
+                  return;
+                }
 
                 // If coming from property-preview, also store tenant in propertySetupData for preview
                 if (previousScreen === 'property-preview') {
@@ -3190,8 +3353,9 @@ export function AppContent() {
               } else if (selectedTenant) {
                 navigateToScreen('tenant-details');
               } else {
-                // If no tenant selected, go back to tenant-selection page
-                navigateToScreen('tenant-selection');
+                // New tenant added — navigate to the client list so the user can see it
+                navigateToScreen('main-app');
+                setNavigationScreen('clients');
               }
             }}
           />
@@ -3204,6 +3368,14 @@ export function AppContent() {
             landlordEmail={userProfile?.email}
             landlordId={getCurrentUserId() || undefined}
             onBack={() => navigateToScreen('tenant-selection')}
+            onTenantCreated={(tenant) => {
+              // Add the newly-created pending tenant to state so it shows
+              // immediately in the Clients tab without a page reload.
+              setTenants(prev => {
+                if (prev.some(t => t.id === tenant.id)) return prev;
+                return [...prev, tenant];
+              });
+            }}
             onSuccess={() => {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
@@ -3249,7 +3421,9 @@ export function AppContent() {
               navigateToScreen('main-app');
               setNavigationScreen('clients');
             }}
-            onSaved={() => {
+            onSaved={(_id) => {
+              // Navigate back to clients — ClientsPage's useLandlords hook will
+              // re-fetch when mounted, so no extra state management needed here.
               navigateToScreen('main-app');
               setNavigationScreen('clients');
             }}

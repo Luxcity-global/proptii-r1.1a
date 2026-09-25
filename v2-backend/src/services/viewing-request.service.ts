@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
 @Injectable()
@@ -57,49 +57,75 @@ export class ViewingRequestService {
     }
   }
 
-  async getViewingById(id: string) {
+  private assertViewingAccess(viewing: any, user?: any) {
+    if (!user) return;
+    const isAdmin = user.admin === true || user.role === 'admin';
+    if (isAdmin) return;
+    const isOwner =
+      viewing.tenantId === user.uid ||
+      viewing.userId === user.uid ||
+      viewing.landlordId === user.uid ||
+      viewing.agentId === user.uid ||
+      (user.email && (
+        viewing.tenantEmail?.toLowerCase() === user.email.toLowerCase() ||
+        viewing.landlordEmail?.toLowerCase() === user.email.toLowerCase()
+      ));
+    if (!isOwner) {
+      throw new ForbiddenException('You are not authorized to access or modify this viewing request');
+    }
+  }
+
+  async getViewingById(id: string, user?: any) {
     const col = this.collection;
     if (!col) throw new NotFoundException('Viewing request not found');
     try {
       const doc = await col.doc(id).get();
       if (!doc.exists) throw new NotFoundException('Viewing request not found');
-      return { id: doc.id, ...doc.data() };
+      const data = doc.data();
+      this.assertViewingAccess(data, user);
+      return { id: doc.id, ...data };
     } catch (err: any) {
-      if (err?.status === 404) throw err;
+      if (err?.status === 403 || err?.status === 404) throw err;
       console.warn('[ViewingRequestService] getViewingById error:', err?.message || err);
       throw new NotFoundException('Viewing request not found');
     }
   }
 
-  async updateViewingStatus(id: string, userId: string, status: string, notes?: string) {
+  async updateViewingStatus(id: string, userId: string, status: string, notes?: string, user?: any) {
     const col = this.collection;
     if (!col) return { id, status };
     try {
       const docRef = col.doc(id);
       const doc = await docRef.get();
       if (!doc.exists) throw new NotFoundException('Viewing request not found');
+      const data = doc.data();
+      this.assertViewingAccess(data, user || { uid: userId });
+
       const payload: any = { status, updatedAt: new Date().toISOString() };
       if (notes) payload.notes = notes;
       await docRef.update(payload);
-      return { id, ...doc.data(), ...payload };
+      return { id, ...data, ...payload };
     } catch (err: any) {
-      if (err?.status === 404) throw err;
+      if (err?.status === 403 || err?.status === 404) throw err;
       console.warn('[ViewingRequestService] updateViewingStatus error:', err?.message || err);
       return { id, status };
     }
   }
 
-  async cancelViewing(id: string, userId: string) {
+  async cancelViewing(id: string, userId: string, user?: any) {
     const col = this.collection;
     if (!col) return { success: true, message: 'Viewing request cancelled' };
     try {
       const docRef = col.doc(id);
       const doc = await docRef.get();
       if (!doc.exists) throw new NotFoundException('Viewing request not found');
+      const data = doc.data();
+      this.assertViewingAccess(data, user || { uid: userId });
+
       await docRef.update({ status: 'cancelled', updatedAt: new Date().toISOString() });
       return { success: true, message: 'Viewing request cancelled' };
     } catch (err: any) {
-      if (err?.status === 404) throw err;
+      if (err?.status === 403 || err?.status === 404) throw err;
       console.warn('[ViewingRequestService] cancelViewing error:', err?.message || err);
       return { success: true, message: 'Viewing request cancelled' };
     }

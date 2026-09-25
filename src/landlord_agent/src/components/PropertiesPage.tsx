@@ -73,7 +73,8 @@ function asDate(value?: Date | string | number | null): Date | null {
 }
 
 function coverUrl(property: Property): string | null {
-  const cover = property.photos?.find((p) => p.isCover) || property.photos?.[0];
+  const validPhotos = property.photos?.filter((p) => p && p.url && !p.url.startsWith('blob:')) || [];
+  const cover = validPhotos.find((p) => p.isCover) || validPhotos[0];
   return cover?.url || null;
 }
 
@@ -424,7 +425,7 @@ export function PropertiesPage({
       if (filterTab === 'attention') matchesTab = needsAttention(property, tenant);
       else if (filterTab === 'vacant') matchesTab = vacant;
       else if (filterTab === 'expiring') matchesTab = expiring;
-      else if (filterTab === 'drafts') matchesTab = false;
+      else if (filterTab === 'drafts') matchesTab = (property.status as string) === 'draft' || !property.address?.trim();
 
       let matchesLease = true;
       if (leaseStatusFilter === 'occupied') matchesLease = occupied && !expiring;
@@ -1275,14 +1276,12 @@ export function PropertiesPage({
       )}
       </div>
 
-      {/* Import Properties Dialog - Hidden for now */}
-      {/* 
+      {/* Import Properties Dialog */}
       <ImportPropertiesDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
         onImport={handleImportPropertiesSubmit}
       />
-      */}
     </div>
   );
 }

@@ -49,20 +49,23 @@ export function entitiesToPills(entities: ClassifyEntities | null | undefined): 
   if (entities.address_full) {
     pills.push({ key: 'address', label: entities.address_full, iconName: 'location' });
   }
+  const isStudioBed = entities.bedrooms === 0;
   if (entities.bedrooms !== null && entities.bedrooms !== undefined) {
     pills.push({
       key: 'bedrooms',
-      label: entities.bedrooms === 0 ? 'Studio' : `${entities.bedrooms} bed`,
+      label: isStudioBed ? 'Studio' : `${entities.bedrooms} bed`,
       iconName: 'bedrooms',
     });
   }
   if (entities.propertyType || entities.property_type) {
-    const pt = entities.propertyType || entities.property_type;
-    pills.push({
-      key: 'propertyType',
-      label: String(pt).charAt(0).toUpperCase() + String(pt).slice(1),
-      iconName: 'propertyType',
-    });
+    const pt = String(entities.propertyType || entities.property_type);
+    if (!(isStudioBed && pt.toLowerCase() === 'studio')) {
+      pills.push({
+        key: 'propertyType',
+        label: pt.charAt(0).toUpperCase() + pt.slice(1),
+        iconName: 'propertyType',
+      });
+    }
   }
   if (entities.tenure) {
     pills.push({

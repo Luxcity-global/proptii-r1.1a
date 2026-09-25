@@ -33,6 +33,34 @@ export class RefereeGuarantorService {
   }
 
   /**
+   * Fetch all referee and guarantor responses for a tenant identified by email.
+   * Used by landlords/agents to view a tenant's referencing responses.
+   */
+  async getResponsesByEmail(tenantEmail: string) {
+    const db = this.db;
+    if (!db) return { responses: [] };
+    const email = tenantEmail.toLowerCase().trim();
+    try {
+      const snap = await db.collection('referee_guarantor_responses')
+        .where('tenantEmail', '==', email)
+        .orderBy('createdAt', 'desc')
+        .get();
+      if (!snap.empty) {
+        return { responses: snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) };
+      }
+      // Fallback: try applicantEmail field (older records)
+      const snap2 = await db.collection('referee_guarantor_responses')
+        .where('applicantEmail', '==', email)
+        .orderBy('createdAt', 'desc')
+        .get();
+      return { responses: snap2.docs.map(doc => ({ id: doc.id, ...doc.data() })) };
+    } catch (err: any) {
+      this.logger.warn(`getResponsesByEmail error: ${err?.message || err}`);
+      return { responses: [] };
+    }
+  }
+
+  /**
    * Save an incoming referee or guarantor response, auto-update tenant's passport,
    * and send notification emails to both tenant and guarantor.
    */

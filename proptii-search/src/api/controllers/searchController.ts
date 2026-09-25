@@ -12,7 +12,7 @@ const scraperManager = new ScraperManager();
 const enrichmentService = new AgentEnrichmentService();
 
 export const searchProperties: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-  const { query, filters } = req.body;
+  const { query, filters, classifiedEntities } = req.body;
   let isClosed = false;
 
   const write = (payload: object) => {
@@ -104,11 +104,28 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
 
     // ── 4. Live Scraping + Strict Email Enrichment + Stream Verified Only ────
     const allScrapedAndEnriched: any[] = [];
+    // Merge classifiedEntities (AI intent) as structured filter fields.
+    // Scrapers use this to build portal URLs directly, avoiding redundant parseQuery() regex.
     const searchFilters = {
       ...(filters || {}),
+      ...(classifiedEntities ? {
+        // Normalise field names for scraper consumption
+        bedrooms: classifiedEntities.bedrooms ?? undefined,
+        minBeds: classifiedEntities.minBeds ?? (classifiedEntities.bedrooms != null ? Number(classifiedEntities.bedrooms) : undefined),
+        maxBeds: classifiedEntities.maxBeds ?? (classifiedEntities.bedrooms != null ? Number(classifiedEntities.bedrooms) : undefined),
+        minPrice: classifiedEntities.price_min ?? classifiedEntities.minPrice ?? undefined,
+        maxPrice: classifiedEntities.price_max ?? classifiedEntities.maxPrice ?? undefined,
+        propertyType: classifiedEntities.property_type ?? classifiedEntities.propertyType ?? undefined,
+        isRental: classifiedEntities.tenure === 'rent' ? true : (classifiedEntities.tenure === 'buy' ? false : undefined),
+        channel: classifiedEntities.tenure ?? classifiedEntities.channel ?? undefined,
+        location: classifiedEntities.location ?? undefined,
+      } : {}),
       resolvedLocation,
     };
-    
+    if (classifiedEntities) {
+      console.log(`[SSE] Using AI-classified entities for "${query}":`, JSON.stringify(classifiedEntities));
+    }
+
     await scraperManager.scrapeAll(query, searchFilters, async (provider, providerResults) => {
       if (providerResults && providerResults.length > 0) {
         const normalizedBatch = providerResults.map(p => {

@@ -36,6 +36,7 @@ const cleanPropertyPrice = (price: string): string => {
 };
 
 import { Property, SearchResponse } from '../types/property';
+import type { ClassifyEntities } from '../types/govData';
 
 export interface ResolvedLocationData {
   displayName: string;
@@ -62,22 +63,25 @@ export const useSearchBackend = () => {
         method: 'GET',
         signal: AbortSignal.timeout(10000) // Increased to 10 seconds
       });
-      return response.ok;
+      if (response.ok) {
+        return true;
+      }
     } catch (error) {
       console.warn('Network connectivity check failed on primary URL:', error);
-      if (searchBackendUrl !== PROD_SEARCH_BACKEND_URL) {
-        try {
-          const fallbackRes = await fetch(`${PROD_SEARCH_BACKEND_URL}/health`, {
-            method: 'GET',
-            signal: AbortSignal.timeout(10000)
-          });
-          return fallbackRes.ok;
-        } catch {
-          return false;
-        }
-      }
-      return false;
     }
+
+    if (searchBackendUrl !== PROD_SEARCH_BACKEND_URL) {
+      try {
+        const fallbackRes = await fetch(`${PROD_SEARCH_BACKEND_URL}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(10000)
+        });
+        return fallbackRes.ok;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   };
 
   // Load cached results on mount only if query matches current URL search query
@@ -88,7 +92,13 @@ export const useSearchBackend = () => {
         const parsed = JSON.parse(cachedData);
         const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
         const currentQ = urlParams.get('q');
+        const hasUrlFilters = urlParams.has('beds') || urlParams.has('types') || urlParams.has('minPrice') || urlParams.has('maxPrice');
+
         if (!currentQ || parsed.query?.toLowerCase() === currentQ.toLowerCase()) {
+          if (hasUrlFilters && !parsed.macroSignature) {
+            // Avoid restoring stale unfiltered cached results if the current URL specifies filters
+            return;
+          }
           const cleanedCachedResults = (parsed.results || []).map((property: Property) => ({
             ...property,
             price: cleanPropertyPrice(property.price)
@@ -107,7 +117,8 @@ export const useSearchBackend = () => {
   const searchProperties = useCallback(async (
     searchQuery: string,
     type: 'onthemarket' | 'internet' | 'proptii' = 'onthemarket',
-    filters: Record<string, any> = {}
+    filters: Record<string, any> = {},
+    classifiedEntities?: ClassifyEntities | null,
   ) => {
     if (!searchQuery.trim()) {
       setError('Please enter a search query');
@@ -170,7 +181,8 @@ export const useSearchBackend = () => {
       // 2. SSE Scraper Search (hits proptii-search port 3001)
       let targetUrl = searchBackendUrl;
       let response: Response;
-      const requestPayload = { query: searchQuery, filters: filters || {} };
+      // Send classified entities so scrapers use AI intent directly (not regex parseQuery)
+      const requestPayload = { query: searchQuery, filters: filters || {}, classifiedEntities: classifiedEntities || null };
       try {
         response = await fetch(`${targetUrl}/api/v1/search`, {
           method: 'POST',
@@ -178,9 +190,12 @@ export const useSearchBackend = () => {
           body: JSON.stringify(requestPayload),
           signal: AbortSignal.timeout(120000) // Increased to 120 seconds for slow scraper streams
         });
+        if (!response.ok && targetUrl !== PROD_SEARCH_BACKEND_URL) {
+          throw new Error(`Primary endpoint returned HTTP ${response.status}`);
+        }
       } catch (fetchErr) {
         if (targetUrl !== PROD_SEARCH_BACKEND_URL) {
-          console.warn('[Search] Primary search endpoint failed (possible ad-blocker or network error), retrying with canonical fallback:', fetchErr);
+          console.warn('[Search] Primary search endpoint failed (possible proxy error or local service down), retrying with canonical fallback:', fetchErr);
           targetUrl = PROD_SEARCH_BACKEND_URL;
           response = await fetch(`${targetUrl}/api/v1/search`, {
             method: 'POST',

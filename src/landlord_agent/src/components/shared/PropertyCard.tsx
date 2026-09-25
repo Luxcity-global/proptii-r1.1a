@@ -86,19 +86,25 @@ export function PropertyCard({
     <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
       {/* Property Image */}
       <div className="aspect-video relative overflow-hidden">
-        {property.photos.length > 0 ? (
-          <img
-            src={
-              property.photos.find((p) => p.isCover)?.url || property.photos[0].url
-            }
-            alt={property.address}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-muted flex items-center justify-center">
-            <Image className="w-8 h-8 text-muted-foreground" />
-          </div>
-        )}
+        {(() => {
+          const validPhotos = property.photos?.filter((p) => p && p.url && !p.url.startsWith('blob:')) || [];
+          const coverPhotoUrl = validPhotos.find((p) => p.isCover)?.url || validPhotos[0]?.url;
+          return coverPhotoUrl ? (
+            <img
+              src={coverPhotoUrl}
+              alt={property.address}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // If remote image fails to load, gracefully fall back
+                e.currentTarget.src = '/images/property-placeholder.jpg';
+              }}
+            />
+          ) : (
+            <div className="w-full h-full bg-muted flex items-center justify-center">
+              <Image className="w-8 h-8 text-muted-foreground" />
+            </div>
+          );
+        })()}
 
         {/* Status Badge */}
         <div className="absolute top-3 left-3">

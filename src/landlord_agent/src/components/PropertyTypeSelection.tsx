@@ -30,6 +30,7 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
   ];
 
   const propertyTypes = [
+    { id: 'house', name: 'House', icon: Home, description: 'Detached, semi-detached, or terraced house' },
     { id: 'flat', name: 'Flat/Apartment', icon: Building2, description: 'Self-contained residential unit' },
     { id: 'studio', name: 'Studio', icon: Home, description: 'Single room with kitchen and bathroom' },
     { id: 'shared', name: 'Room in shared house', icon: Users, description: 'Private room in shared accommodation' },

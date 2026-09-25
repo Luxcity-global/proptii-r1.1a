@@ -77,7 +77,8 @@ function docExtLabel(type: string, name: string): string {
 }
 
 function coverUrl(property: Property): string | null {
-  const cover = property.photos?.find((p) => p.isCover) || property.photos?.[0];
+  const validPhotos = property.photos?.filter((p) => p && p.url && !p.url.startsWith('blob:')) || [];
+  const cover = validPhotos.find((p) => p.isCover) || validPhotos[0];
   return cover?.url || null;
 }
 
@@ -524,9 +525,13 @@ export function Dashboard({
         const propertyAddedDate = property.createdAt || new Date();
         if (propertyAddedDate > monthEnd) return;
         if (property.tenant) {
-          const leaseStart = property.tenant.leaseStart;
-          const leaseEnd = property.tenant.leaseEnd;
-          if (leaseStart <= monthEnd && leaseEnd >= monthStart) {
+          const leaseStart = property.tenant.leaseStart instanceof Date
+            ? property.tenant.leaseStart
+            : new Date(property.tenant.leaseStart as any);
+          const leaseEnd = property.tenant.leaseEnd instanceof Date
+            ? property.tenant.leaseEnd
+            : new Date(property.tenant.leaseEnd as any);
+          if (!isNaN(leaseStart.getTime()) && !isNaN(leaseEnd.getTime()) && leaseStart <= monthEnd && leaseEnd >= monthStart) {
             const revenueStartDate = leaseStart > propertyAddedDate ? leaseStart : propertyAddedDate;
             if (revenueStartDate <= monthEnd) monthlyRevenue += property.rent;
           }

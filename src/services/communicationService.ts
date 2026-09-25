@@ -8,8 +8,6 @@
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAccessTokenForApiRequest } from './msalAccessToken';
-import { storage } from '../config/firebaseConfig';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
 import type {
     Conversation,
@@ -186,12 +184,14 @@ const communicationService = {
     },
 
     /**
-     * Upload a file attachment for a conversation directly to Firebase Storage,
-     * then notify the backend to create the attachment record.
+     * Upload a file attachment for a conversation through the v2-backend storage endpoint,
+     * then register the attachment record with the communication service.
      * Requirements: 7.1
+     *
+     * Files go to POST /api/storage/upload (v2-backend) instead of directly to Firebase Storage.
+     * The backend signs the upload with the Admin SDK — no client-side Firebase SDK needed.
      */
     async uploadAttachment(file: File, conversationId: string): Promise<MessageAttachment> {
-        // Derive MIME type from the file extension when the browser doesn't provide one.
         const extensionMimeMap: Record<string, string> = {
             pdf: 'application/pdf',
             doc: 'application/msword',
@@ -201,15 +201,41 @@ const communicationService = {
         const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
         const mimeType = file.type || extensionMimeMap[ext] || 'application/octet-stream';
 
-        // 1. Upload to Firebase Storage
+        // 1. Upload through the backend storage endpoint (POST /api/storage/upload)
         const fileId = uuidv4();
         const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const storageRef = ref(storage, `attachments/${conversationId}/${fileId}-${safeName}`);
-        
-        await uploadBytes(storageRef, file, { contentType: mimeType });
-        const blobUrl = await getDownloadURL(storageRef);
+        const folder = `attachments/${conversationId}`;
 
-        // 2. Register attachment with backend
+        const storageFormData = new FormData();
+        // Rename the file to include the fileId to avoid collisions
+        const renamedFile = new File([file], `${fileId}-${safeName}`, { type: mimeType });
+        storageFormData.append('file', renamedFile);
+        storageFormData.append('folder', folder);
+
+        let blobUrl: string;
+        try {
+            const token = await getAccessTokenForApiRequest().catch(() => null);
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const storageRes = await fetch(`${getResolvedApiBaseUrl()}/storage/upload`, {
+                method: 'POST',
+                headers,
+                body: storageFormData,
+            });
+            if (!storageRes.ok) {
+                const errText = await storageRes.text().catch(() => '');
+                throw new Error(`Storage upload failed (${storageRes.status}): ${errText}`);
+            }
+            const storageJson = await storageRes.json();
+            if (!storageJson?.url) throw new Error('Storage upload succeeded but returned no URL');
+            blobUrl = storageJson.url as string;
+        } catch (uploadErr) {
+            console.error('[communicationService] Attachment upload failed:', uploadErr);
+            throw uploadErr;
+        }
+
+        // 2. Register attachment with the communication backend
         const { data } = await commApi.post('/attachments', {
             filename: file.name,
             mimeType,
@@ -217,7 +243,7 @@ const communicationService = {
             blobUrl,
             conversationId,
         });
-        
+
         return unwrap<MessageAttachment>(data);
     },
 

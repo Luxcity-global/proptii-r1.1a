@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../contexts/AuthContext';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
@@ -24,7 +24,11 @@ export function useLandlords() {
   const [landlords, setLandlords] = useState<Landlord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { token, isAuthenticated, user } = useAuth();
+
+  /** Call this after adding/deleting a landlord to force a re-fetch. */
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   useEffect(() => {
     const fetchLandlords = async () => {
@@ -73,7 +77,7 @@ export function useLandlords() {
     };
 
     fetchLandlords();
-  }, [token, isAuthenticated, user?.id, user?.email]);
+  }, [token, isAuthenticated, user?.id, user?.email, refreshKey]);
 
-  return { landlords, isLoading, error };
+  return { landlords, isLoading, error, refresh };
 }

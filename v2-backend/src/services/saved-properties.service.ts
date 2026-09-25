@@ -102,13 +102,10 @@ export class SavedPropertiesService {
       savedAt: new Date().toISOString(),
     });
     const col = this.collection;
-    if (col) {
-      try {
-        await col.doc(docId).set(payload, { merge: true });
-      } catch (err: any) {
-        console.warn('[SavedPropertiesService] saveProperty error:', err?.message || err);
-      }
+    if (!col) {
+      throw new Error('Firestore database connection is unavailable.');
     }
+    await col.doc(docId).set(payload, { merge: true });
     return payload;
   }
 

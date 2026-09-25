@@ -34,6 +34,21 @@ import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 
+/** Maps wizard IDs to human-readable display names */
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  house: 'House',
+  flat: 'Flat/Apartment',
+  studio: 'Studio',
+  shared: 'Room (Shared House)',
+  commercial: 'Commercial',
+  other: 'Other',
+};
+
+function formatPropertyType(type: string | undefined | null): string {
+  if (!type) return '—';
+  return PROPERTY_TYPE_LABELS[type.toLowerCase()] ?? type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 interface PropertyDetailsProps {
   property: Property | null;
   tenants?: Tenant[];
@@ -212,7 +227,7 @@ export function PropertyDetails({
                     {getStatusText(property.status)}
                   </Badge>
                   <span className="text-muted-foreground">
-                    {property.type} • {property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}
+                    {formatPropertyType(property.type)} • {property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}
                     {typeof (property as any).bathrooms === 'number' && ` • ${(property as any).bathrooms} bath${(property as any).bathrooms !== 1 ? 's' : ''}`}
                     {typeof (property as any).squareFootage === 'number' && ` • ${(property as any).squareFootage} sq ft`}
                   </span>
@@ -729,7 +744,7 @@ export function PropertyDetails({
               <div className="space-y-4">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Type</span>
-                  <span>{property.type}</span>
+                  <span>{formatPropertyType(property.type)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">

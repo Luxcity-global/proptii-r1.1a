@@ -78,16 +78,30 @@ export class ReferencingService {
 
     for (const field of fields) {
       const value = result[field];
-      if (!isBase64DataUri(value)) continue;
+      if (!value) continue;
+
+      let rawDataUri: string | null = null;
+      if (typeof value === 'string' && isBase64DataUri(value)) {
+        rawDataUri = value;
+      } else if (typeof value === 'object') {
+        const potential = value.dataUrl || value.content || value.base64 || value.fileData;
+        if (typeof potential === 'string' && isBase64DataUri(potential)) {
+          rawDataUri = potential;
+        }
+      }
+
+      if (!rawDataUri) continue;
 
       try {
-        const ext = value.split(';')[0].split('/')[1] || 'bin';
+        const ext = rawDataUri.split(';')[0].split('/')[1] || 'bin';
         const storagePath = `referencing/${userId}/${section}/${field}/${randomUUID()}.${ext}`;
-        const uploaded = await uploadBase64ToStorage(value, storagePath);
+        const uploaded = await uploadBase64ToStorage(rawDataUri, storagePath);
 
-        // Replace raw base64 with small metadata object
+        // Replace raw base64 with metadata object preserving existing fields
         result[field] = {
+          ...(typeof value === 'object' ? value : {}),
           url:         uploaded.downloadUrl,
+          dataUrl:     uploaded.downloadUrl, // Keep URL in dataUrl so existing preview bindings resolve
           storagePath: uploaded.storagePath,
           contentType: uploaded.contentType,
           size:        uploaded.size,
@@ -96,8 +110,17 @@ export class ReferencingService {
         this.logger.error(
           `Failed to upload ${section}.${field} for user ${userId}: ${err?.message || err}`,
         );
-        // Remove the raw bytes rather than letting them hit Firestore
-        delete result[field];
+        if (typeof value === 'object') {
+          // Keep object metadata but delete raw bytes to protect Firestore
+          const cleanedObj = { ...value };
+          delete cleanedObj.dataUrl;
+          delete cleanedObj.content;
+          delete cleanedObj.base64;
+          delete cleanedObj.fileData;
+          result[field] = cleanedObj;
+        } else {
+          delete result[field];
+        }
       }
     }
 
@@ -294,9 +317,9 @@ export class ReferencingService {
       } catch (err: any) {
         this.logger.error(`saveUserFile upload failed for ${userId}: ${err?.message || err}`);
       }
-    } else if (isBase64DataUri(fileData.base64 || fileData.fileData || fileData.content)) {
+    } else if (isBase64DataUri(fileData.base64 || fileData.fileData || fileData.content || fileData.dataUrl)) {
       // Fallback for old base64 payloads if still used anywhere internally
-      const raw = fileData.base64 || fileData.fileData || fileData.content;
+      const raw = fileData.base64 || fileData.fileData || fileData.content || fileData.dataUrl;
       const section  = fileData.section  || 'general';
       const field    = fileData.field    || 'document';
       const ext      = raw.split(';')[0].split('/')[1] || 'bin';
@@ -885,19 +908,33 @@ export class ReferencingService {
   }
 
   // ── AI Document Extraction ────────────────────────────────────────────────
-  async extractDocumentData(file: Express.Multer.File) {
-    if (!file || !file.buffer) {
-      return { success: false, error: 'No document data provided' };
+  async extractDocumentData(file?: Express.Multer.File, body?: any) {
+    let cleanBase64 = '';
+    let cleanMimeType = 'image/jpeg';
+
+    if (file && file.buffer) {
+      cleanBase64 = file.buffer.toString('base64');
+      cleanMimeType = file.mimetype || 'image/jpeg';
+    } else if (body?.base64Data || body?.fileData || body?.base64) {
+      const raw = body.base64Data || body.fileData || body.base64;
+      if (typeof raw === 'string' && raw.includes(',')) {
+        cleanBase64 = raw.split(',')[1];
+        cleanMimeType = raw.split(',')[0].split(':')[1]?.split(';')[0] || body?.mimeType || 'image/jpeg';
+      } else if (typeof raw === 'string') {
+        cleanBase64 = raw;
+        cleanMimeType = body?.mimeType || 'image/jpeg';
+      }
     }
 
-    const cleanBase64 = file.buffer.toString('base64');
-    const cleanMimeType = file.mimetype || 'image/jpeg';
+    if (!cleanBase64) {
+      return { success: false, error: 'No document data provided' };
+    }
 
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     const openRouterKey = process.env.OPENROUTER_API_KEY;
 
     if (geminiKey) {
-      const candidateModels = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+      const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
       for (const model of candidateModels) {
         try {
           const response = await fetch(

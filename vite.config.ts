@@ -173,7 +173,7 @@ export default defineConfig(({ mode = 'development' }) => {
         },
       },
       watch: {
-        usePolling: true,
+        usePolling: process.env.VITE_USE_POLLING === 'true' || process.env.CHOKIDAR_USEPOLLING === 'true',
         interval: 500,
         ignored: [
           '**/node_modules/**',
