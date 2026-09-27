@@ -68,9 +68,7 @@ class PaymentScheduleService {
     const now = new Date();
 
     // Advance currentStart to the period that contains 'now'.
-    // The condition safety === 0 was incorrectly forcing an advance on the
-    // very first iteration regardless of date, which could skip the actual
-    // current period when firstPaymentDate is in the future.
+    let currentStart = firstPayment;
     let safety = 0;
     while (this.addDays(currentStart, intervalDays) <= now && safety < 1000) {
       currentStart = this.addDays(currentStart, intervalDays);

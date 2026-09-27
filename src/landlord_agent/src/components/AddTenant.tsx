@@ -37,7 +37,6 @@ interface AddTenantProps {
   onBackToSelection?: () => void;
   preselectedPropertyId?: string;
   userProfile?: UserProfile | null;
-  initialTenant?: Tenant | null;
 }
 
 // Define form steps for Typeform-style progression
@@ -283,57 +282,20 @@ function formReducer(state: FormState, action: FormAction): FormState {
   }
 }
 
-export function AddTenant({ properties, onSave, onBack, onBackToSelection, preselectedPropertyId, userProfile, initialTenant }: AddTenantProps) {
+export function AddTenant({ properties, onSave, onBack, onBackToSelection, preselectedPropertyId, userProfile }: AddTenantProps) {
   // Phase 4: Replace useState with useReducer for advanced state management
   const [state, dispatch] = useReducer(formReducer, initialFormState);
   const [isGuidelinesExpanded, setIsGuidelinesExpanded] = useState(false);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
-  // Debug: Log initialTenant on mount
-  console.log('🔍 AddTenant mounted with initialTenant:', initialTenant);
-  console.log('🔍 AddTenant - initialTenant?.name:', initialTenant?.name, 'initialTenant?.email:', initialTenant?.email);
-
-  // Helper function to convert Tenant to TenantFormData
-  const tenantToFormData = (tenant: Tenant): Partial<TenantFormData> => {
-    const formatDate = (date: Date | string | undefined): string => {
-      if (!date) return '';
-      const d = date instanceof Date ? date : new Date(date);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
-    const tenantLike = tenant as any;
-
-    return {
-      name: tenant.name || '',
-      email: tenant.email || '',
-      phone: tenant.phone || '',
-      propertyId: tenant.propertyId || '',
-      propertyAddress: tenant.propertyAddress || '',
-      rentAmount: tenant.rentAmount?.toString() || '',
-      paymentFrequency: tenant.paymentFrequency || 'monthly',
-      firstPaymentDate: formatDate(tenant.firstPaymentDate),
-      leaseStart: formatDate(tenant.leaseStart),
-      leaseEnd: formatDate(tenant.leaseEnd),
-      status: tenant.status === 'ended' ? 'inactive' : (tenant.status === 'active' ? 'active' : 'pending'),
-      referencingStatus: tenant.referencingStatus === 'complete' ? 'completed' : (tenant.referencingStatus || 'not-started'),
-      paymentStatus: tenant.paymentStatus === 'payment-plan' ? 'current' : (tenant.paymentStatus === 'overdue' ? 'overdue' : 'current'),
-      emergencyContactName: tenant.emergencyContact?.name || '',
-      emergencyContactPhone: tenant.emergencyContact?.phone || '',
-      emergencyContactRelationship: tenant.emergencyContact?.relationship || '',
-      defaultRiskScore: tenant.defaultRiskScore?.toString() || '',
-      notes: tenantLike.notes || '',
-      employer: tenantLike.employer || '',
-      jobTitle: tenantLike.jobTitle || '',
-      annualIncome: tenantLike.annualIncome?.toString() || tenantLike.annualSalary?.toString() || '',
-      employmentType: tenantLike.employmentType || 'full-time'
-    };
-  };
-
-  // Currency formatting functions
+  // Load saved progress on mount
+  useEffect(() => {
+    const loaded = loadProgress();
+    if (!loaded) {
+      applySmartDefaults(FORM_STEPS[0].id);
+    }
+  }, []);
   const formatCurrency = (value: string) => {
     // Remove all non-numeric characters except decimal point
     const numericValue = value.replace(/[^\d.]/g, '');
@@ -408,18 +370,13 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
     }
   }, [initialTenant]);
 
-  // Auto-save progress with debouncing (skip when editing)
+  // Auto-save progress with debouncing
   useEffect(() => {
-    if (initialTenant) {
-      // Don't auto-save when editing an existing tenant
-      return;
-    }
     const timer = setTimeout(() => {
       saveProgress();
-    }, 1000); // Debounce saves
-
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [state.formData, state.currentStep, state.completedSteps, state.skippedSteps, initialTenant]);
+  }, [state.formData, state.currentStep, state.completedSteps, state.skippedSteps]);
 
   // Auto-expand guidelines on step 1 for 5 seconds
   useEffect(() => {
@@ -434,13 +391,10 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
 
   // Set preselected property on mount
   useEffect(() => {
-    if (initialTenant) {
-      return; // Don't override property when editing
-    }
     if (preselectedPropertyId && !state.formData.propertyId) {
       dispatch({ type: 'UPDATE_FIELD', field: 'propertyId', value: preselectedPropertyId });
     }
-  }, [preselectedPropertyId, initialTenant]);
+  }, [preselectedPropertyId]);
 
   // Update property address when property is selected
   useEffect(() => {
@@ -792,7 +746,7 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
       case 'rent':
         return !isNaN(parseFloat(state.formData.rentAmount)) && parseFloat(state.formData.rentAmount) > 0;
       case 'paymentFrequency':
-        return !!state.formData.paymentFrequency && ['monthly', 'yearly', 'fixed-time'].includes(state.formData.paymentFrequency) && !!state.formData.firstPaymentDate && isTodayOrFuture(state.formData.firstPaymentDate);
+        return !!state.formData.paymentFrequency && ['monthly', 'yearly', 'fixed-time'].includes(state.formData.paymentFrequency) && !!state.formData.firstPaymentDate && !!toDateOnly(state.formData.firstPaymentDate);
       case 'leaseStart':
         return !!state.formData.leaseStart && !!toDateOnly(state.formData.leaseStart);
       case 'leaseEnd': {
@@ -827,19 +781,7 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
       dispatch({ type: 'SET_LOADING', isLoading: true });
       dispatch({ type: 'SET_GLOBAL_ERROR', error: null });
 
-      // Validate all required fields
-      const requiredSteps = FORM_STEPS.filter(step => step.required);
-      let hasErrors = false;
-      const errors: string[] = [];
-
-      for (const step of requiredSteps) {
-        if (!validateStep(step.id)) {
-          hasErrors = true;
-          errors.push(`Please complete the ${step.title} step`);
-        }
-      }
-
-      // Auth guard: if the user is not logged in, show an error and bail out
+      // Auth guard
       if (!userProfile) {
         dispatch({
           type: 'SET_GLOBAL_ERROR',
@@ -848,19 +790,19 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         return;
       }
 
-      if (hasErrors) {
-        // Go to first step with error
-        const firstErrorStep = requiredSteps.find(step => {
-          validateStep(step.id);
-          return state.errors[step.id];
+      // Validate all required steps synchronously — validateStep reads state.formData
+      // directly (no dispatch), so results are immediately accurate.
+      const requiredSteps = FORM_STEPS.filter(step => step.required);
+      const firstFailingStep = requiredSteps.find(step => !validateStep(step.id));
+
+      if (firstFailingStep) {
+        const stepIndex = FORM_STEPS.findIndex(s => s.id === firstFailingStep.id);
+        dispatch({ type: 'SET_CURRENT_STEP', step: stepIndex });
+        dispatch({
+          type: 'SET_GLOBAL_ERROR',
+          error: `Please complete the "${firstFailingStep.title}" step before saving.`
         });
-        
-        if (firstErrorStep) {
-          const stepIndex = FORM_STEPS.findIndex(s => s.id === firstErrorStep.id);
-          dispatch({ type: 'SET_CURRENT_STEP', step: stepIndex });
-          dispatch({ type: 'SET_GLOBAL_ERROR', error: `Please complete all required fields. ${errors.join(', ')}` });
-          return;
-        }
+        return;
       }
 
       // Create tenant object

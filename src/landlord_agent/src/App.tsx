@@ -33,6 +33,7 @@ import { TenantInbox } from './components/TenantInbox';
 import { PropertyPreview } from './components/PropertyPreview';
 import { TenantSelection } from './components/TenantSelection';
 import { AddTenant } from './components/AddTenant';
+import { EditTenant } from './components/EditTenant';
 import { alertService, type Alert } from './services/alertService';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
@@ -297,6 +298,7 @@ export type Screen =
   | 'property-preview'
   | 'tenant-selection'
   | 'add-tenant'
+  | 'edit-tenant'
   | 'invite-tenant'
   | 'select-existing-tenant'
   | 'add-landlord'
@@ -2632,11 +2634,9 @@ export function AppContent() {
                   navigateToScreen('main-app');
                 }}
                 onEdit={(tenant) => {
-                  console.log('🔍 Edit button clicked, tenant:', tenant);
                   setSelectedTenant(tenant);
                   editingTenantRef.current = tenant;
-                  console.log('🔍 selectedTenant set to:', tenant);
-                  navigateToScreen('add-tenant');
+                  navigateToScreen('edit-tenant');
                 }}
                 onTenantUpdate={(updatedTenant) => {
                   setSelectedTenant(updatedTenant);
@@ -3289,18 +3289,12 @@ export function AppContent() {
         );
 
       case 'add-tenant':
-        // Use ref value if available, otherwise fall back to state (for async updates)
-        const tenantToEdit = editingTenantRef.current || selectedTenant;
-        console.log('🔍 Rendering AddTenant with selectedTenant:', selectedTenant, 'ref:', editingTenantRef.current, 'using:', tenantToEdit);
         return (
           <AddTenant
             properties={properties}
             preselectedPropertyId={selectedProperty?.id}
             userProfile={userProfile}
-            initialTenant={tenantToEdit}
             onBackToSelection={() => {
-              setSelectedTenant(null);
-              editingTenantRef.current = null;
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
                 navigateToScreen('property-preview');
@@ -3309,72 +3303,70 @@ export function AppContent() {
               }
             }}
             onSave={async (tenant) => {
-              // Guest user – ask them to sign up before saving to Firebase
               if (!userProfile) {
                 window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'add-tenant' } }, '*');
-                return;
+                throw new Error('Authentication required');
               }
-              const tenantId = editingTenantRef.current?.id || selectedTenant?.id;
-              if (tenantId) {
-                // Update existing tenant
-                try {
-                  const { tenantService } = await import('./services/tenantService');
-                  await tenantService.updateTenant(tenantId, tenant);
-                  // Refresh tenant list and update selected tenant
-                  const updatedTenant = await tenantService.getTenant(tenantId);
-                  if (updatedTenant) {
-                    setTenants(prev => prev.map(t => t.id === tenantId ? updatedTenant : t));
-                    // Keep the updated tenant selected so navigation works correctly
-                    setSelectedTenant(updatedTenant);
-                    editingTenantRef.current = updatedTenant;
-                  }
-                } catch (error) {
-                  console.error('Error updating tenant:', error);
-                  alert('Failed to update tenant. Please try again.');
-                  return;
-                }
-              } else {
-                // Add new tenant — must be awaited so errors surface to the caller
-                try {
-                  await addTenant(tenant);
-                } catch (error) {
-                  console.error('Error creating tenant:', error);
-                  alert('Failed to save tenant. Please try again.');
-                  return;
-                }
-
-                // If coming from property-preview, also store tenant in propertySetupData for preview
-                if (previousScreen === 'property-preview') {
-                  setPropertySetupData(prev => ({
-                    ...prev,
-                    pendingTenants: [...(prev.pendingTenants || []), tenant]
-                  }));
-                  console.log('✅ Stored tenant in propertySetupData.pendingTenants for preview');
-                }
+              // addTenant POSTs to backend, updates local state, and fires loadScopedTenants
+              await addTenant(tenant);
+              // If coming from property-preview, stash tenant for preview context
+              if (previousScreen === 'property-preview') {
+                setPropertySetupData(prev => ({
+                  ...prev,
+                  pendingTenants: [...(prev.pendingTenants || []), tenant]
+                }));
               }
-              // Don't clear selectedTenant here - let the Done button handle navigation
-              // navigateToScreen('main-app');
-              // setNavigationScreen('clients');
             }}
             onBack={() => {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
                 navigateToScreen('property-preview');
-              } else if (editingTenantRef.current) {
-                const tenantToShow = editingTenantRef.current;
-                editingTenantRef.current = null;
-                setSelectedTenant(tenantToShow);
-                navigateToScreen('tenant-details');
-              } else if (selectedTenant) {
-                navigateToScreen('tenant-details');
               } else {
-                // New tenant added — navigate to the client list so the user can see it
+                // "Go to Tenant List" / back after success — go to clients tab
                 navigateToScreen('main-app');
                 setNavigationScreen('clients');
               }
             }}
           />
         );
+
+      case 'edit-tenant': {
+        const tenantToEdit = editingTenantRef.current || selectedTenant;
+        if (!tenantToEdit) {
+          // No tenant to edit — fall back to clients
+          navigateToScreen('main-app');
+          setNavigationScreen('clients');
+          return null;
+        }
+        return (
+          <EditTenant
+            tenant={tenantToEdit}
+            properties={properties}
+            userProfile={userProfile}
+            onSave={async (updates) => {
+              const tenantId = tenantToEdit.id;
+              await tenantService.updateTenant(tenantId, updates as any);
+              // Refresh from backend to get server-canonical data
+              const refreshed = await tenantService.getTenant(tenantId);
+              const updated = refreshed || { ...tenantToEdit, ...updates };
+              setTenants(prev => prev.map(t => t.id === tenantId ? updated as Tenant : t));
+              setSelectedTenant(updated as Tenant);
+              editingTenantRef.current = updated as Tenant;
+              // Reflect property address change on the property list too
+              setProperties(prev => prev.map(p => {
+                if (p.tenant?.id === tenantId) {
+                  return { ...p, tenant: { ...p.tenant, ...updated } };
+                }
+                return p;
+              }));
+            }}
+            onBack={() => {
+              // Return to tenant details so the landlord can review changes
+              navigateToScreen('tenant-details');
+            }}
+          />
+        );
+      }
 
       case 'invite-tenant':
         return (
