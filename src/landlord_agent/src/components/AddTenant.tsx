@@ -330,46 +330,6 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
     return dt.getTime() >= today.getTime();
   };
 
-  // Load progress on component mount or pre-fill with initialTenant
-  useEffect(() => {
-    console.log('🔍 useEffect triggered with initialTenant:', initialTenant);
-    if (initialTenant) {
-      console.log('✅ initialTenant exists, pre-filling form');
-      // Clear any saved progress when editing
-      localStorage.removeItem('tenantFormProgress');
-      
-      // Pre-fill form with tenant data
-      const formData = tenantToFormData(initialTenant);
-      console.log('🔍 Pre-filling form with tenant data:', initialTenant, 'formData:', formData);
-      console.log('🔍 Form data keys:', Object.keys(formData));
-      console.log('🔍 Form data values - name:', formData.name, 'email:', formData.email, 'phone:', formData.phone);
-      
-      // Dispatch each field individually to ensure they're set
-      Object.entries(formData).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          console.log(`🔍 Dispatching UPDATE_FIELD for ${key}:`, value);
-          dispatch({ type: 'UPDATE_FIELD', field: key as keyof TenantFormData, value });
-        }
-      });
-      
-      // Mark steps as completed
-      dispatch({ 
-        type: 'LOAD_STATE', 
-        state: {
-          completedSteps: new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
-        }
-      });
-      
-      console.log('✅ Dispatched all field updates');
-    } else {
-      console.log('⚠️ No initialTenant, loading progress or applying defaults');
-    const loaded = loadProgress();
-    if (!loaded) {
-      applySmartDefaults(FORM_STEPS[0].id);
-    }
-    }
-  }, [initialTenant]);
-
   // Auto-save progress with debouncing
   useEffect(() => {
     const timer = setTimeout(() => {
