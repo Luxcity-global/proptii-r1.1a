@@ -806,18 +806,12 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         employmentType: state.formData.employmentType || ''
       };
 
-      // Call onSave and wait for it to complete (it's async)
-      console.log('📤 [AddTenant] Calling onSave with tenant data:', tenant);
-      try {
-        await onSave(tenant);
-        trackEvent('landlord_tenant_added');
-        console.log('✅ [AddTenant] onSave completed successfully');
-        } catch (error) {
-        console.error('❌ [AddTenant] Error in onSave:', error);
-            throw error;
-      }
+      // POST to backend — throws on failure, so success step is NEVER shown
+      // unless the write confirmed. onSave is wired to addTenant() in App.tsx.
+      await onSave(tenant);
+      trackEvent('landlord_tenant_added');
 
-      // Mark saved and move to success step
+      // Only reached if onSave resolved without throwing — write confirmed.
       setIsSaved(true);
       const successIndex = FORM_STEPS.findIndex(s => s.id === 'success');
       if (successIndex >= 0) {

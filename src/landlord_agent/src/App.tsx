@@ -51,6 +51,7 @@ import { getAccessTokenForApiRequest } from '../../services/msalAccessToken';
 import AuthContext, { useAuth } from '../../contexts/AuthContext';
 import { MessagingProvider } from '../../contexts/MessagingContext';
 import { trackEvent } from '../../utils/analytics';
+import { useTenants } from './hooks/useTenants';
 import {
   AGENT_TEST_COMPANY,
   AGENT_TEST_COMPANY_PROFILE,
@@ -417,13 +418,6 @@ export function AppContent() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [isPortfolioLoading, setIsPortfolioLoading] = useState(true);
   const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  // Stable ref to `properties` so loadScopedTenants can read the latest list
-  // without needing `properties` in its useCallback dependency array.
-  // This breaks the render loop: properties → new loadScopedTenants → effects
-  // re-run → setProperties → properties changes → new loadScopedTenants → …
-  const propertiesRef = React.useRef<Property[]>([]);
-  React.useEffect(() => { propertiesRef.current = properties; }, [properties]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [clientDetailsTab, setClientDetailsTab] = useState('overview');
@@ -472,6 +466,12 @@ export function AppContent() {
     if (userProfile && (userProfile as any).id) return (userProfile as any).id;
     return null;
   }, [hostUser, userProfile]);
+
+  // Tenant list for non-ClientsPage consumers (Dashboard, PropertyDetails, etc.)
+  // ClientsPage has its own useTenants instance so this doesn't drive the Clients tab.
+  const appUserId = resolveManagerId();
+  const appPropertyIds = React.useMemo(() => properties.map(p => p.id), [properties]);
+  const { tenants } = useTenants({ userId: appUserId, propertyIds: appPropertyIds });
 
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
@@ -572,13 +572,11 @@ export function AppContent() {
             ? getAgentDummyProperties()
             : mergeAgentDemoProperties(getAgentDummyProperties(), prev),
         );
-        setTenants((prev) => (prev.length === 0 ? getAgentDummyTenants() : prev));
         setIsPortfolioLoading(false);
       }
     } else {
       setUserProfile(null);
       setProperties([]);
-      setTenants([]);
       setVacancyAlerts([]);
       setArrearsAlerts([]);
       setAlerts([]);
@@ -948,66 +946,13 @@ export function AppContent() {
 
   // Initialize with empty arrays (mock data removed, using Firestore)
   React.useEffect(() => {
-    // Delay tenant load until after initial render; properties will be fetched in another effect
-    (async () => {
-      try {
-        // Initial unscoped load to avoid blocking UI; will be refined in the effect below
-        const initialTenants = await tenantService.getTenants();
-        console.log('[Init] Tenants initially loaded (unscoped):', initialTenants.length);
-        setTenants((prev) => (prev.length > 0 ? prev : initialTenants));
-      } catch (e) {
-        console.warn('Failed initial tenant load, leaving empty list', e);
-        setTenants([]);
-      }
-    })();
-
     console.log('🚫 Using Firestore data scoped to user');
-
-    // Market insights will be loaded from Firestore via useEffect
-    // This allows real-time updates and actual UK market data
     console.log('📊 Market insights will be loaded from Firestore');
-
-    // Alerts will be loaded from Firestore in useEffect below
     console.log('🚫 Alerts will be loaded from Firestore');
     setVacancyAlerts([]);
     setArrearsAlerts([]);
     setAlerts([]);
   }, []);
-
-  // Stable ref for userProfile email — avoids recreating loadScopedTenants on every profile update
-  const userProfileRef = React.useRef<UserProfile | null>(null);
-  React.useEffect(() => { userProfileRef.current = userProfile; }, [userProfile]);
-
-  const loadScopedTenants = React.useCallback(async () => {
-    const userId = resolveManagerId();
-    // Don't fire if we don't have a user yet — avoids token-wait hangs on startup
-    if (!userId && !userProfileRef.current?.email) return;
-    try {
-      let ownedPropertyIds: Set<string> | undefined;
-      
-      if (propertiesRef.current.length > 0) {
-        ownedPropertyIds = new Set(propertiesRef.current.map(p => p.id));
-      }
-      
-      let list = await tenantService.getTenants(userId || undefined, ownedPropertyIds);
-
-      // The fallback filtering is now done directly inside tenantService.getTenants
-      if (isAgentTestAccount(userId, userProfileRef.current?.email)) {
-        list = mergeById(getAgentDummyTenants(), list);
-      }
-      setTenants(list);
-    } catch (e) {
-      console.error('Failed to load tenants:', e);
-      if (isAgentTestAccount(resolveManagerId(), userProfileRef.current?.email)) {
-        setTenants(getAgentDummyTenants());
-      }
-    }
-  }, [resolveManagerId]); // userProfile accessed via userProfileRef to keep callback stable
-
-  // Reload and scope tenants once we know the current user's properties
-  React.useEffect(() => {
-    loadScopedTenants();
-  }, [loadScopedTenants]);
 
   const navigateToScreen = (screen: Screen) => {
     setIsTransitioning(true);
@@ -1159,46 +1104,6 @@ export function AppContent() {
     setArrearsAlerts(arrearsAlertsList);
   };
 
-  // Ensure tenant state reflects arrears alerts for immediate UI feedback
-  React.useEffect(() => {
-    setTenants(prev => {
-      if (prev.length === 0 && arrearsAlerts.length === 0) {
-        return prev;
-      }
-
-      const alertsByTenant = new Map<string, ArrearsAlert>();
-      arrearsAlerts.forEach(alert => {
-        if (alert.tenantId) {
-          alertsByTenant.set(alert.tenantId, alert);
-        }
-      });
-
-      let hasChanges = false;
-      const updated = prev.map(tenant => {
-        const alert = alertsByTenant.get(tenant.id);
-        if (alert) {
-          const overdueAmount = alert.overdueAmount ?? tenant.overdueAmount ?? 0;
-          if (
-            tenant.paymentStatus !== 'overdue' ||
-            tenant.overdueAmount !== overdueAmount ||
-            tenant.lastPaymentDate?.getTime() !== alert.lastPaymentDate?.getTime()
-          ) {
-            hasChanges = true;
-            return {
-              ...tenant,
-              paymentStatus: 'overdue' as const,
-              overdueAmount,
-              lastPaymentDate: alert.lastPaymentDate ?? tenant.lastPaymentDate
-            };
-          }
-        }
-        return tenant;
-      });
-
-      return hasChanges ? updated : prev;
-    });
-  }, [arrearsAlerts]);
-
   // Real-time Firestore listeners for tenants, properties, and alerts
   React.useEffect(() => {
     const currentUserId = getCurrentUserId();
@@ -1252,20 +1157,7 @@ export function AppContent() {
       }, 3000); // 3 seconds delay
     };
 
-    // Start polling since we removed the real-time listeners
-    let isPolling = true;
-    const pollInterval = setInterval(async () => {
-      if (!isPolling) return;
-      try {
-        await loadScopedTenants();
-        const activeAlerts = await alertService.getActiveAlerts(currentUserId);
-        processAlerts(activeAlerts);
-      } catch (err) {
-        console.error('Error during fallback polling:', err);
-      }
-    }, 15000); // 15 seconds polling
-
-    // Initial alert generation and loading
+    // Initial alert generation only — no polling interval
     alertService.generateAlerts(currentUserId)
       .then(() => alertService.getActiveAlerts(currentUserId))
       .then(processAlerts)
@@ -1274,15 +1166,13 @@ export function AppContent() {
     // Cleanup
     return () => {
       if (shouldLogRealtimeDebug) {
-        console.log('🧹 Cleaning up polling timers');
+        console.log('🧹 Cleaning up alert timers');
       }
-      isPolling = false;
-      clearInterval(pollInterval);
       if (alertGenerationTimeout) {
         clearTimeout(alertGenerationTimeout);
       }
     };
-  }, [hostUser?.id, loadScopedTenants]); // hostUser.id is the stable auth signal; userProfile causes excess re-runs
+  }, [hostUser?.id]); // hostUser.id is the stable auth signal
 
   // Load market insights from Firestore
   React.useEffect(() => {
@@ -1512,70 +1402,33 @@ export function AppContent() {
     });
   };
 
-  const addTenant = async (tenant: Omit<Tenant, 'id'>) => {
-    try {
-      console.log('📝 [App] addTenant called with tenant data:', tenant);
-      const currentUserId = resolveManagerId() ?? userProfile?.email ?? '';
-      console.log('📝 [App] Creating tenant with userId:', currentUserId);
+  const addTenant = async (tenant: Omit<Tenant, 'id'>): Promise<string> => {
+    const currentUserId = resolveManagerId() ?? userProfile?.email ?? '';
+    if (!currentUserId) throw new Error('Not authenticated');
 
-      const tenantToCreate = {
-        ...tenant,
-        userId: currentUserId,
-        status: tenant.status || 'active',
-      };
+    const tenantToCreate = {
+      ...tenant,
+      userId: currentUserId,
+      status: tenant.status || 'active',
+    };
 
-      const id = await tenantService.createTenant(tenantToCreate, currentUserId);
-      console.log('✅ [App] Tenant created with id:', id);
+    // POST to backend — throws on failure so success screen is never shown
+    const id = await tenantService.createTenant(tenantToCreate, currentUserId);
 
-      const saved = await tenantService.getTenant(id);
-      const tenantWithUserId: Tenant = saved || ({ ...tenantToCreate, id } as Tenant);
-
-      // Update the backend property status to 'occupied'
-      if (tenantWithUserId.propertyId) {
-        try {
-          console.log(`🔄 Updating property ${tenantWithUserId.propertyId} status to occupied...`);
-          await propertyService.updateProperty(tenantWithUserId.propertyId, { 
-            status: 'occupied',
-            tenantId: tenantWithUserId.id 
-          });
-          // Update local state
-          setProperties(prev => prev.map(p => p.id === tenantWithUserId.propertyId ? { ...p, status: 'occupied', tenantId: tenantWithUserId.id } as Property : p));
-          console.log('✅ Property status updated to occupied');
-        } catch (propError) {
-          console.error('⚠️ Failed to update property status:', propError);
-        }
-      }
-
-      // Trigger alert generation after tenant is created (to check for lease expiry, etc.)
-      try {
-        console.log('🔄 Triggering alert generation after tenant creation...');
-        await alertService.generateAlerts(currentUserId);
-        console.log('✅ Alerts updated after tenant creation');
-      } catch (alertError) {
-        console.warn('⚠️ Failed to generate alerts after tenant creation:', alertError);
-      }
-
-      setTenants(prev => {
-        // Check if tenant already exists (avoid duplicates)
-        if (prev.some(t => t.id === tenantWithUserId.id)) {
-          console.log('[App] Tenant already in list, updating instead');
-          return prev.map(t => t.id === tenantWithUserId.id ? tenantWithUserId : t);
-        }
-        return [...prev, tenantWithUserId];
-      });
-
-      // Keep backend and state perfectly synced
-      loadScopedTenants().catch(err => console.warn('Background reload failed:', err));
-      return;
-    } catch (e) {
-      console.error('❌ [App] addTenant failed:', e);
-      console.error('❌ [App] Error details:', {
-        message: e instanceof Error ? e.message : 'Unknown error',
-        stack: e instanceof Error ? e.stack : undefined
-      });
-      // Re-throw the error so it can be caught by the calling code
-      throw e;
+    // Mark linked property as occupied (best-effort — don't block on failure)
+    if (tenant.propertyId) {
+      propertyService.updateProperty(tenant.propertyId, {
+        status: 'occupied',
+        tenantId: id,
+      } as any).catch(e => console.warn('Failed to mark property occupied:', e));
     }
+
+    // Regenerate alerts after new tenant (best-effort)
+    alertService.generateAlerts(currentUserId).catch(e =>
+      console.warn('Failed to generate alerts after tenant creation:', e)
+    );
+
+    return id;
   };
 
   // addLandlord is handled entirely within AddLandlordWizard via landlordService.createLandlord()
@@ -2198,7 +2051,8 @@ export function AppContent() {
       case 'clients':
         return (
           <ClientsPage
-            tenants={tenants}
+            userId={resolveManagerId()}
+            propertyIds={properties.map(p => p.id)}
             properties={properties}
             arrearsAlerts={arrearsAlerts}
             userRole={userRole}
@@ -2232,31 +2086,21 @@ export function AppContent() {
             }}
             onDeleteTenant={async (tenantId) => {
               try {
-                const tenantToDelete = tenants.find(t => t.id === tenantId);
+                const tenantToDelete = selectedTenant?.id === tenantId ? selectedTenant : null;
                 const propertyId = tenantToDelete?.propertyId;
-                
                 await tenantService.deleteTenant(tenantId);
-                
                 if (propertyId) {
-                  try {
-                    await propertyService.updateProperty(propertyId, { status: 'vacant', tenantId: undefined as any });
-                    setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, status: 'vacant', tenantId: undefined } as Property : p));
-                  } catch (e) {
-                    console.error('Failed to update property status to vacant after tenant deletion', e);
-                  }
+                  propertyService.updateProperty(propertyId, { status: 'vacant', tenantId: undefined as any })
+                    .catch(e => console.warn('Failed to vacate property:', e));
                 }
               } catch (e) {
-                // proceed to update UI regardless; rules are open in dev
+                console.error('Failed to delete tenant:', e);
               }
-              setTenants(prev => prev.filter(t => t.id !== tenantId));
+              // useTenants in ClientsPage will re-fetch via invalidate() called inside ClientsPage
             }}
             onArchiveTenant={async (tenantId) => {
               try {
-                // 'ended' is the correct Tenant.status value for an archived/ended tenancy
                 await tenantService.updateTenant(tenantId, { status: 'ended' });
-                setTenants(prev => prev.map(t =>
-                  t.id === tenantId ? { ...t, status: 'ended' as const } : t
-                ));
               } catch (err) {
                 console.error('Failed to archive tenant:', err);
                 alert('Failed to archive tenant. Please try again.');
@@ -2640,7 +2484,6 @@ export function AppContent() {
                 }}
                 onTenantUpdate={(updatedTenant) => {
                   setSelectedTenant(updatedTenant);
-                  setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
                   setProperties(prev => prev.map(property => {
                     if (property.tenant?.id === updatedTenant.id) {
                       return {
@@ -2762,7 +2605,6 @@ export function AppContent() {
                 // Refresh the tenant data
                 const updatedTenant = await tenantService.getTenant(tenant.id);
                 if (updatedTenant) {
-                  setTenants(prev => prev.map(t => t.id === tenant.id ? updatedTenant : t));
                 }
 
                 // Update the property with tenant data
@@ -2814,7 +2656,6 @@ export function AppContent() {
                 // Refresh tenant data
                 const updatedTenant = await tenantService.getTenant(tenantId);
                 if (updatedTenant) {
-                  setTenants(prev => prev.map(t => t.id === tenantId ? updatedTenant : t));
                   console.log(`✅ Refreshed tenant data for ${tenantId}`);
                 }
 
@@ -2865,7 +2706,6 @@ export function AppContent() {
                   // Refresh current tenant data
                   const updatedCurrentTenant = await tenantService.getTenant(currentTenant.id);
                   if (updatedCurrentTenant) {
-                    setTenants(prev => prev.map(t => t.id === currentTenant.id ? updatedCurrentTenant : t));
                   }
                 }
 
@@ -2884,7 +2724,6 @@ export function AppContent() {
                 // Refresh new tenant data
                 const updatedNewTenant = await tenantService.getTenant(newTenantId);
                 if (updatedNewTenant) {
-                  setTenants(prev => prev.map(t => t.id === newTenantId ? updatedNewTenant : t));
                 }
 
                 // Refresh property data
@@ -3349,16 +3188,8 @@ export function AppContent() {
               // Refresh from backend to get server-canonical data
               const refreshed = await tenantService.getTenant(tenantId);
               const updated = refreshed || { ...tenantToEdit, ...updates };
-              setTenants(prev => prev.map(t => t.id === tenantId ? updated as Tenant : t));
               setSelectedTenant(updated as Tenant);
               editingTenantRef.current = updated as Tenant;
-              // Reflect property address change on the property list too
-              setProperties(prev => prev.map(p => {
-                if (p.tenant?.id === tenantId) {
-                  return { ...p, tenant: { ...p.tenant, ...updated } };
-                }
-                return p;
-              }));
             }}
             onBack={() => {
               // Return to tenant details so the landlord can review changes
@@ -3375,14 +3206,6 @@ export function AppContent() {
             landlordEmail={userProfile?.email}
             landlordId={getCurrentUserId() || undefined}
             onBack={() => navigateToScreen('tenant-selection')}
-            onTenantCreated={(tenant) => {
-              // Add the newly-created pending tenant to state so it shows
-              // immediately in the Clients tab without a page reload.
-              setTenants(prev => {
-                if (prev.some(t => t.id === tenant.id)) return prev;
-                return [...prev, tenant];
-              });
-            }}
             onSuccess={() => {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);

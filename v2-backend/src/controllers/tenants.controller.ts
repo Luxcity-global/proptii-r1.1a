@@ -14,6 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { TenantsService } from '../services/tenants.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { CreateTenantDto } from '../dto/create-tenant.dto';
 
 @ApiTags('Tenants')
 @Controller('tenants')
@@ -26,8 +27,9 @@ export class TenantsController {
   @HttpCode(201)
   @ApiOperation({ summary: 'Create a new tenant under landlord/agent management' })
   @ApiResponse({ status: 201, description: 'Tenant created successfully' })
-  async createTenant(@Req() req: any, @Body() body: any) {
-    const userId = req.user?.uid || req.user?.id || req.user?.email || body.userId;
+  @ApiResponse({ status: 400, description: 'Validation error — required fields missing or invalid' })
+  async createTenant(@Req() req: any, @Body() body: CreateTenantDto) {
+    const userId = req.user?.uid || req.user?.id || req.user?.email || (body as any).userId;
     return this.tenantsService.createTenant(body, userId);
   }
 

@@ -20,6 +20,7 @@ import {
   Briefcase,
   Building2,
   LayoutGrid,
+  Mail,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Tenant, Property, ArrearsAlert, UserRole, UserProfile } from '../App';
@@ -27,10 +28,16 @@ import { referencingService } from '../services/referencingService';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { useLandlords, Landlord } from '../hooks/useLandlords';
+import { useTenants } from '../hooks/useTenants';
+import { invitationService, PendingInvitation } from '../services/invitationService';
+import { tenantService } from '../services/tenantService';
 import '../styles/clientsPage.css';
 
 interface ClientsPageProps {
-  tenants: Tenant[];
+  /** Authenticated landlord/agent Firebase UID — drives useTenants fetch. */
+  userId: string | null;
+  /** IDs of properties owned by this user — broadens the tenant query. */
+  propertyIds?: string[];
   properties: Property[];
   arrearsAlerts: ArrearsAlert[];
   userRole: UserRole;
@@ -194,7 +201,8 @@ function pageButtons(current: number, total: number): (number | 'ellipsis')[] {
 }
 
 export function ClientsPage({
-  tenants,
+  userId,
+  propertyIds = [],
   properties,
   arrearsAlerts,
   userRole,
@@ -230,6 +238,15 @@ export function ClientsPage({
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [referencingStatuses, setReferencingStatuses] = useState<Map<string, 'not-started' | 'in-progress' | 'complete'>>(new Map());
   const [isLoadingReferencingStatuses, setIsLoadingReferencingStatuses] = useState(false);
+  const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
+
+  // ── Data hooks ────────────────────────────────────────────────────────────
+  // useTenants owns all tenant state — no polling, invalidate() after writes
+  const { tenants, isLoading: isTenantsLoading, invalidate: invalidateTenants } = useTenants({
+    userId,
+    propertyIds,
+  });
 
   const { landlords: liveLandlords, isLoading: isLandlordsLoading, refresh: refreshLandlords } = useLandlords();
   const showLandlordTab = userRole === 'agent';
@@ -251,6 +268,25 @@ export function ClientsPage({
 
     fetchReferencingStatuses();
   }, [tenants, userProfile]);
+
+  // Load pending invitations whenever the tab is opened or userId changes
+  useEffect(() => {
+    if (!userId || activeTab !== 'invitations') return;
+    let cancelled = false;
+    const load = async () => {
+      setIsLoadingInvitations(true);
+      try {
+        const list = await invitationService.getInvitations(userId);
+        if (!cancelled) setInvitations(list);
+      } catch {
+        // non-fatal
+      } finally {
+        if (!cancelled) setIsLoadingInvitations(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [userId, activeTab]);
 
   const toggleTenantSelection = (tenantId: string) => {
     setSelectedTenants((prev) =>
@@ -274,6 +310,8 @@ export function ClientsPage({
     if (onDeleteTenant) {
       selectedTenants.forEach((tenantId) => onDeleteTenant(tenantId));
       clearSelection();
+      // Re-fetch after deletes so the list reflects the real server state
+      invalidateTenants();
     }
   };
 
@@ -281,6 +319,7 @@ export function ClientsPage({
     if (onArchiveTenant) {
       selectedTenants.forEach((tenantId) => onArchiveTenant(tenantId));
       clearSelection();
+      invalidateTenants();
     }
   };
 
@@ -603,6 +642,7 @@ export function ClientsPage({
   }
 
   const showingLandlords = showLandlordTab && activeTab === 'landlords';
+  const showingInvitations = activeTab === 'invitations';
 
   return (
     <div className="ll-cl">
@@ -639,8 +679,7 @@ export function ClientsPage({
             >
               <Plus className="w-4 h-4" strokeWidth={2.5} />
               {showingLandlords ? 'Add Landlord' : 'Add Tenant'}
-            </button>
-          </div>
+            </button>          </div>
         </div>
       </header>
 
@@ -654,7 +693,16 @@ export function ClientsPage({
             >
               <Users size={16} />
               <span>Tenants</span>
-              <span className="ll-cl-switcher-count">{(tenants || []).length}</span>
+              <span className="ll-cl-switcher-count">{isTenantsLoading ? '…' : (tenants || []).length}</span>
+            </button>
+            <button
+              type="button"
+              className={`ll-cl-switcher-btn${activeTab === 'invitations' ? ' is-active' : ''}`}
+              onClick={() => setActiveTab('invitations')}
+            >
+              <Mail size={16} />
+              <span>Invitations</span>
+              <span className="ll-cl-switcher-count">{invitations.filter(i => i.status === 'pending').length || ''}</span>
             </button>
             {showLandlordTab && (
               <button
@@ -670,7 +718,7 @@ export function ClientsPage({
           </div>
         </div>
 
-        {!showingLandlords ? (
+        {!showingLandlords && !showingInvitations ? (
           <section className="ll-cl-kpi-grid">
             <article className="ll-cl-kpi is-clickable accent-green" onClick={resetTenantFilters}>
               <div>
@@ -894,6 +942,56 @@ export function ClientsPage({
           </section>
         )}
 
+        {/* ── Pending Invitations Panel ─────────────────────────────────── */}
+        {showingInvitations && (
+          <section className="ll-cl-kpi-grid" style={{ display: 'block' }}>
+            <div style={{ padding: '16px 0' }}>
+              {isLoadingInvitations ? (
+                <p className="ll-cl-muted" style={{ padding: '24px', textAlign: 'center' }}>Loading invitations…</p>
+              ) : invitations.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 24px', color: '#6b7280' }}>
+                  <Mail size={40} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
+                  <p style={{ fontSize: '1rem', fontWeight: 600 }}>No invitations sent yet</p>
+                  <p style={{ fontSize: '0.875rem', marginTop: 8 }}>
+                    Use <strong>+ Add Tenant</strong> → <em>Invite by email</em> to send a tenant invitation.
+                  </p>
+                </div>
+              ) : (
+                <table className="ll-cl-table" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Property</th>
+                      <th>Type</th>
+                      <th>Sent</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invitations.map((inv) => (
+                      <tr key={inv.id}>
+                        <td>{inv.email}</td>
+                        <td>{inv.propertyAddress || '—'}</td>
+                        <td style={{ textTransform: 'capitalize' }}>{(inv.inviteType || '').replace('-', ' ')}</td>
+                        <td>{inv.sentAt ? new Date(inv.sentAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+                        <td>
+                          <span
+                            className={`ll-cl-status-chip ${inv.status === 'accepted' ? 'active' : inv.status === 'expired' ? 'ended' : 'pending'}`}
+                            style={{ textTransform: 'capitalize' }}
+                          >
+                            {inv.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+        )}
+
+        {!showingInvitations && (
         <div className="ll-cl-filters">
           <div className="ll-cl-search">
             <Search size={16} />
@@ -1005,8 +1103,9 @@ export function ClientsPage({
             )}
           </div>
         </div>
+        )} {/* end !showingInvitations filters+table */}
 
-        {showBulkActions && !showingLandlords && selectedTenants.length > 0 && (
+        {showBulkActions && !showingLandlords && !showingInvitations && selectedTenants.length > 0 && (
           <div className="ll-cl-bulk">
             <span className="ll-cl-bulk-label">
               {selectedTenants.length} tenant{selectedTenants.length > 1 ? 's' : ''} selected

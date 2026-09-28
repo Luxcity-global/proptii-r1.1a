@@ -6,12 +6,11 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowLeft, Mail, Send, CheckCircle, AlertCircle, Plus } from 'lucide-react';
-import { Property, Tenant } from '../App';
+import { Property } from '../App';
 import axios from 'axios';
 import { trackEvent } from '../../../utils/analytics';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { invitationService } from '../services/invitationService';
-import { tenantService } from '../services/tenantService';
 
 interface InviteTenantProps {
   properties: Property[];
@@ -19,8 +18,6 @@ interface InviteTenantProps {
   onSuccess: () => void;
   landlordEmail?: string;
   landlordId?: string;
-  /** Called with the newly-created pending tenant so App can update state immediately */
-  onTenantCreated?: (tenant: Tenant) => void;
 }
 
 interface InvitationData {
@@ -30,7 +27,7 @@ interface InvitationData {
   inviteType: 'new-tenant' | 'existing-tenant';
 }
 
-export function InviteTenant({ properties, onBack, onSuccess, landlordEmail, landlordId, onTenantCreated }: InviteTenantProps) {
+export function InviteTenant({ properties, onBack, onSuccess, landlordEmail, landlordId }: InviteTenantProps) {
   const [formData, setFormData] = useState<InvitationData>({
     email: '',
     propertyId: '',
@@ -329,45 +326,10 @@ export function InviteTenant({ properties, onBack, onSuccess, landlordEmail, lan
           inviteType: formData.inviteType,
           customMessage: formData.customMessage || undefined,
         });
-      console.log('✅ Invitation tracked in Firestore');
+        console.log('✅ Invitation tracked in Firestore');
       } catch (trackErr) {
         // Non-fatal — the email was already sent, just log the tracking failure
         console.warn('⚠️ Could not record invitation in Firestore:', trackErr);
-      }
-
-      // Create a pending tenant record so the landlord can see the invite immediately
-      // in the Clients tab — the record will be upgraded to 'active' when the tenant
-      // completes onboarding.
-      try {
-        const invitedProperty = properties.find(p => p.id === formData.propertyId);
-        const pendingTenantData: Omit<Tenant, 'id'> = {
-          name: formData.email.split('@')[0], // placeholder until tenant fills profile
-          email: formData.email,
-          phone: '',
-          propertyId: formData.propertyId,
-          propertyAddress: invitedProperty?.address || '',
-          rentAmount: 0,
-          paymentFrequency: 'monthly',
-          firstPaymentDate: new Date(),
-          leaseStart: new Date(),
-          leaseEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
-          status: 'pending',
-          referencingStatus: 'not-started',
-          paymentStatus: 'paid',
-          emergencyContact: { name: '', phone: '', relationship: '' },
-          defaultRiskScore: 75,
-        };
-        const createdId = await tenantService.createTenant(pendingTenantData, landlordId || '');
-        if (createdId) {
-          const savedTenant = await tenantService.getTenant(createdId);
-          if (savedTenant && onTenantCreated) {
-            onTenantCreated(savedTenant);
-            console.log('✅ Pending tenant record created and added to client list');
-          }
-        }
-      } catch (pendingErr) {
-        // Non-fatal — the invite was sent, the tenant record is optional
-        console.warn('⚠️ Could not create pending tenant record:', pendingErr);
       }
 
       setIsSuccess(true);
