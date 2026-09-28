@@ -29,6 +29,7 @@ import axios from 'axios';
 import { trackEvent } from '../../../utils/analytics';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { invitationService } from '../services/invitationService';
+import { tenantService } from '../services/tenantService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,8 @@ interface InviteTenantProps {
   landlordId?: string;
   /** Pre-filled email from the TenantSelection email-first flow */
   prefillEmail?: string;
+  /** Called immediately after invite is sent so the pending record shows in the list */
+  onTenantCreated?: (tenant: any) => void;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -132,6 +135,7 @@ export function InviteTenant({
   landlordEmail,
   landlordId,
   prefillEmail,
+  onTenantCreated,
 }: InviteTenantProps) {
   const [email, setEmail] = useState(prefillEmail ?? '');
   const [propertyId, setPropertyId] = useState('');
@@ -183,10 +187,13 @@ export function InviteTenant({
             { to: email.trim().toLowerCase(), subject, html },
             { timeout: 45_000, validateStatus: (s) => s < 500 }
           );
+          // Check both HTTP status AND the response body — the endpoint always
+          // returns HTTP 200 but sets success:false when Resend rejects the email
           if (res.status >= 400) {
-            throw new Error(
-              res.data?.message || res.data?.error || `HTTP ${res.status}`
-            );
+            throw new Error(res.data?.message || res.data?.error || `HTTP ${res.status}`);
+          }
+          if (res.data && res.data.success === false) {
+            throw new Error(res.data.error || 'Email service rejected the request');
           }
           break; // success
         } catch (e: any) {
@@ -214,6 +221,38 @@ export function InviteTenant({
         });
       } catch {
         // Non-fatal — invitation email was already sent
+      }
+
+      // 3. Create a pending tenant record so the invitee appears in the Clients
+      //    list immediately under status "pending" rather than being invisible
+      //    until they complete onboarding.
+      try {
+        const now = new Date();
+        const nextYear = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+        const pendingTenantId = await tenantService.createTenant({
+          name: email.trim().split('@')[0], // placeholder name from email prefix
+          email: email.trim().toLowerCase(),
+          phone: '',
+          propertyId,
+          propertyAddress: selectedProperty.address,
+          rentAmount: 0,
+          paymentFrequency: 'monthly',
+          firstPaymentDate: now,
+          leaseStart: now,
+          leaseEnd: nextYear,
+          status: 'pending',
+          referencingStatus: 'not-started',
+          paymentStatus: 'current',
+          emergencyContact: { name: '', phone: '', relationship: '' },
+          defaultRiskScore: 75,
+        } as any, landlordId ?? '');
+
+        if (pendingTenantId && onTenantCreated) {
+          const saved = await tenantService.getTenant(pendingTenantId);
+          if (saved) onTenantCreated(saved);
+        }
+      } catch {
+        // Non-fatal — the invite was sent and recorded; tenant record is best-effort
       }
 
       setSent(true);
