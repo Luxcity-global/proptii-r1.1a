@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -224,6 +224,13 @@ export function ClientsPage({
   onViewNotifications,
 }: ClientsPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search to avoid re-running filter/sort on every keystroke
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchTerm), 200);
+    return () => clearTimeout(id);
+  }, [searchTerm]);
   const [activeTab, setActiveTab] = useState('tenants');
   const [tenantFilter, setTenantFilter] = useState('all');
   const [landlordFilter, setLandlordFilter] = useState('all');
@@ -373,7 +380,7 @@ export function ClientsPage({
     const now = new Date();
     const arrearsByTenantId = new Map<string, ArrearsAlert>();
     arrearsAlerts.forEach((alert) => arrearsByTenantId.set(alert.tenantId, alert));
-    const query = searchTerm.toLowerCase();
+    const query = debouncedSearch.toLowerCase();
 
     let filtered = (tenants || []).filter((tenant) => {
       const matchesSearch =
@@ -470,12 +477,12 @@ export function ClientsPage({
     }
 
     return filtered;
-  }, [tenants, arrearsAlerts, searchTerm, tenantFilter, leaseExpiryFilter, tenantSortBy, propertyFilter]);
+  }, [tenants, arrearsAlerts, debouncedSearch, tenantFilter, leaseExpiryFilter, tenantSortBy, propertyFilter]);
 
   const filteredTenants = filteredAndSortedTenants;
 
   const filteredAndSortedLandlords = useMemo(() => {
-    const query = searchTerm.toLowerCase();
+    const query = debouncedSearch.toLowerCase();
     let filtered = (liveLandlords || []).filter((landlord) => {
       const matchesSearch =
         landlord.name?.toLowerCase().includes(query) ||
@@ -511,7 +518,7 @@ export function ClientsPage({
     }
 
     return filtered;
-  }, [liveLandlords, searchTerm, landlordFilter, landlordSortBy]);
+  }, [liveLandlords, debouncedSearch, landlordFilter, landlordSortBy]);
 
   const filteredLandlords = filteredAndSortedLandlords;
 
@@ -540,7 +547,7 @@ export function ClientsPage({
 
   useEffect(() => {
     setCurrentTenantPage(1);
-  }, [searchTerm, tenantFilter, leaseExpiryFilter, tenantSortBy, propertyFilter, pageSize]);
+  }, [debouncedSearch, tenantFilter, leaseExpiryFilter, tenantSortBy, propertyFilter, pageSize]);
 
   const getArrearsForTenant = (tenantId: string) =>
     (arrearsAlerts || []).find((alert) => alert.tenantId === tenantId);

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { TooltipProvider } from './components/ui/tooltip';
 import { Routes, Route, useLocation, MemoryRouter, useInRouterContext } from 'react-router-dom';
@@ -17,8 +17,6 @@ import { Dashboard } from './components/Dashboard';
 import { PropertyDetails } from './components/PropertyDetails';
 import { DocumentManagement } from './components/DocumentManagement';
 import { PhotoManagement } from './components/PhotoManagement';
-import { PortfolioInsights } from './components/PortfolioInsights';
-import { PropertyInsights } from './components/PropertyInsights';
 import { MainLayout, NavigationScreen } from './components/MainLayout';
 import { PropertiesPage } from './components/PropertiesPage';
 import { DocumentsPage } from './components/DocumentsPage';
@@ -27,8 +25,6 @@ import { TenantDetails } from './components/TenantDetails';
 import { LandlordDetails } from './components/LandlordDetails';
 import { OnboardingOptions } from './components/OnboardingOptions';
 import { CompanyProfileSetup } from './components/CompanyProfileSetup';
-import { VacancyPrevention } from './components/VacancyPrevention';
-import { ArrearsManagement } from './components/ArrearsManagement';
 import { TenantInbox } from './components/TenantInbox';
 import { PropertyPreview } from './components/PropertyPreview';
 import { TenantSelection } from './components/TenantSelection';
@@ -37,15 +33,10 @@ import { EditTenant } from './components/EditTenant';
 import { alertService, type Alert } from './services/alertService';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
-import { AddLandlord } from './components/AddLandlord';
 import { AddLandlordWizard } from './components/AddLandlordWizard';
-import { ReferencingPage } from './components/ReferencingPage';
-import { ContractsPage } from './components/ContractsPage';
 import { propertyService } from './services/propertyService';
 import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
-import ViewingsPage from './components/ViewingsPage';
-import LandlordAgentSettingsPage from './components/LandlordAgentSettingsPage';
 import { getResolvedApiBaseUrl } from '../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../services/msalAccessToken';
 import AuthContext, { useAuth } from '../../contexts/AuthContext';
@@ -61,6 +52,23 @@ import {
   mergeAgentDemoProperties,
   mergeById,
 } from './data/agentTestPersona';
+
+// Heavy page-level components — lazy loaded to cut initial bundle
+const VacancyPrevention = lazy(() => import('./components/VacancyPrevention').then(m => ({ default: m.VacancyPrevention })));
+const ArrearsManagement = lazy(() => import('./components/ArrearsManagement').then(m => ({ default: m.ArrearsManagement })));
+const PortfolioInsights = lazy(() => import('./components/PortfolioInsights').then(m => ({ default: m.PortfolioInsights })));
+const PropertyInsights  = lazy(() => import('./components/PropertyInsights').then(m => ({ default: m.PropertyInsights })));
+const ReferencingPage   = lazy(() => import('./components/ReferencingPage').then(m => ({ default: m.ReferencingPage })));
+const ContractsPage     = lazy(() => import('./components/ContractsPage').then(m => ({ default: m.ContractsPage })));
+const ViewingsPage      = lazy(() => import('./components/ViewingsPage').then(m => ({ default: m.default })));
+const LandlordAgentSettingsPage = lazy(() => import('./components/LandlordAgentSettingsPage').then(m => ({ default: m.default })));
+const AddLandlord       = lazy(() => import('./components/AddLandlord').then(m => ({ default: m.AddLandlord })));
+
+const LazyFallback = () => (
+  <div className="flex items-center justify-center min-h-[200px]">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E65D24]" />
+  </div>
+);
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -383,34 +391,26 @@ export function AppContent() {
     }
   }, [location.pathname]);
   // Wrapper function to log navigation changes and update URL
-  const handleNavigation = (screen: NavigationScreen) => {
+  const handleNavigation = useCallback((screen: NavigationScreen) => {
     trackEvent('landlord_nav_click', { section: screen });
     setCurrentScreen('main-app');
     setNavigationScreen(screen);
 
     const path = SCREEN_TO_PATH[screen] || '/dashboard';
 
-    // Inside the parent iframe, stay on index.html and use hash routing only.
-    // navigate() to /landlord/settings would load the parent SPA in the iframe (blank page).
     if (isEmbeddedInParent()) {
       try {
         const base = `${window.location.pathname}${window.location.search}`;
         window.history.replaceState(null, '', `${base}#${path}`);
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore */ }
       return;
     }
 
-    // Update the browser URL bar without going through the React Router — the
-    // landlord app is wrapped in MemoryRouter so navigate() only updates the
-    // in-memory history, not window.location. pushState keeps the URL in sync
-    // for bookmarking / back-button without triggering a full navigation.
     const targetUrl = `/landlord${path === '/' ? '' : path}`;
     if (window.location.pathname !== targetUrl) {
       window.history.pushState(null, '', targetUrl);
     }
-  };
+  }, []);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('landlord');
@@ -468,7 +468,8 @@ export function AppContent() {
   }, [hostUser, userProfile]);
 
   // Tenant list for non-ClientsPage consumers (Dashboard, PropertyDetails, etc.)
-  // ClientsPage has its own useTenants instance so this doesn't drive the Clients tab.
+  // ClientsPage has its own useTenants instance — these are intentionally separate.
+  // appPropertyIds via useMemo so the ref inside useTenants stays stable.
   const appUserId = resolveManagerId();
   const appPropertyIds = React.useMemo(() => properties.map(p => p.id), [properties]);
   const { tenants } = useTenants({ userId: appUserId, propertyIds: appPropertyIds });
@@ -491,17 +492,16 @@ export function AppContent() {
     pendingTenants: [] // Tenants added before property is published
   });
 
-  // Helper functions to update property setup data
-  const updatePropertySetupData = (updates: Partial<PropertySetupData>) => {
+  const updatePropertySetupData = useCallback((updates: Partial<PropertySetupData>) => {
     setPropertySetupData(prev => ({ ...prev, ...updates }));
-  };
+  }, []);
 
-  const updatePropertyDetails = (updates: Partial<PropertySetupData['propertyDetails']>) => {
+  const updatePropertyDetails = useCallback((updates: Partial<PropertySetupData['propertyDetails']>) => {
     setPropertySetupData(prev => ({
       ...prev,
       propertyDetails: { ...prev.propertyDetails, ...updates }
     }));
-  };
+  }, []);
 
   // Sync with host authentication context
   React.useEffect(() => {
@@ -985,15 +985,12 @@ export function AppContent() {
   };
 
   // Load properties from Firebase when the signed-in identity is known.
-  // Avoid depending on `userProfile` object identity / `loadScopedTenants` —
-  // those recreated often and re-flashed the dashboard skeleton.
   React.useEffect(() => {
     let cancelled = false;
 
     const loadProperties = async () => {
       const currentUserId = resolveManagerId();
-      // Read email from ref to avoid re-running this effect on every profile update
-      const userEmail = userProfileRef.current?.email;
+      const userEmail = userProfile?.email;
 
       if (!currentUserId && !userEmail) {
         if (!hostIsAuthenticated && !hostIsLoading) {
@@ -1003,9 +1000,7 @@ export function AppContent() {
       }
 
       // Only show the full-page skeleton when we have nothing to display yet.
-      // Background refetches keep the current overview mounted.
-      // Agent test persona already has dummy stock, so skip the empty skeleton.
-      if (propertiesRef.current.length === 0 && !isAgentTestAccount(currentUserId, userEmail)) {
+      if (properties.length === 0 && !isAgentTestAccount(currentUserId, userEmail)) {
         setIsPortfolioLoading(true);
       }
 
@@ -1038,17 +1033,14 @@ export function AppContent() {
     };
 
     loadProperties();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [
     hostIsAuthenticated,
     hostIsLoading,
     hostUser?.id,
+    userProfile?.email,
     resolveManagerId,
     portfolioRefreshKey,
-    // userProfile?.email intentionally omitted — read via userProfileRef to prevent
-    // re-fetching on every shallow profile object recreation
   ]);
 
   // Helper function to get current user ID — delegates to resolveManagerId
@@ -1118,7 +1110,7 @@ export function AppContent() {
     if (shouldLogRealtimeDebug) {
       console.log('🔔 Setting up real-time Firestore listeners for userId:', currentUserId);
     }
-    const unsubscribes: Unsubscribe[] = [];
+    const unsubscribes: (() => void)[] = [];
 
     // Track if we're currently generating alerts to prevent feedback loops
     let isGeneratingAlerts = false;
@@ -3146,7 +3138,7 @@ export function AppContent() {
                 window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'add-tenant' } }, '*');
                 throw new Error('Authentication required');
               }
-              // addTenant POSTs to backend, updates local state, and fires loadScopedTenants
+              // addTenant POSTs to backend — useTenants in ClientsPage re-fetches on navigate
               await addTenant(tenant);
               // If coming from property-preview, stash tenant for preview context
               if (previousScreen === 'property-preview') {
@@ -3294,7 +3286,9 @@ export function AppContent() {
               : 'opacity-100'
             }`}
         >
-          {renderScreen()}
+          <Suspense fallback={<LazyFallback />}>
+            {renderScreen()}
+          </Suspense>
         </div>
       </div>
     </AuthContext.Provider>
