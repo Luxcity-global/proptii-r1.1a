@@ -1,211 +1,248 @@
-import React from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ArrowLeft, UserPlus, Mail, Users, Home } from 'lucide-react';
+/**
+ * TenantSelection — smart email-first entry point for adding a tenant.
+ *
+ * Flow:
+ *  1. Landlord types the tenant's email address
+ *  2. System checks in real-time: is this email already in the landlord's tenant list?
+ *     - Match found  → "This person is already your tenant" — offer to reassign to a new property
+ *     - No match     → Two clearly-labelled paths:
+ *       a) "I have their details" → manual add form (AddTenant)
+ *       b) "Send them an invite"  → email invite flow (InviteTenant)
+ *  3. Back button returns to wherever the landlord came from
+ *
+ * This replaces the old three-card selector which required the landlord to
+ * understand abstract mode labels before knowing what to do.
+ */
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Mail, Search, UserPlus, Send, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import type { Tenant, Property } from '../App';
 
 interface TenantSelectionProps {
-  onManualInput: () => void;
-  onInviteEmail: () => void;
-  onSelectExisting: () => void;
+  /** Existing tenants — used to check if the email already belongs to one of this landlord's tenants. */
+  existingTenants: Tenant[];
+  properties: Property[];
+  onManualInput: (prefillEmail?: string) => void;
+  onInviteEmail: (prefillEmail?: string) => void;
   onBack: () => void;
 }
 
-export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting, onBack }: TenantSelectionProps) {
-  // Define distinct colors for each icon
-  const iconColorSets = [
-    { bg: '#E0F7FA', icon: '#06B6D4' }, // Light cyan background, cyan icon - Manual Input
-    { bg: '#EBF4FF', icon: '#2563EB' }, // Light blue background, blue icon - Invite via Email
-    { bg: '#F3E8FF', icon: '#7C3AED' }, // Light purple background, purple icon - Select Existing User
-  ];
+const INPUT_STYLE =
+  'w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base focus:border-[#4E97CC] focus:outline-none transition-colors bg-white placeholder-gray-400';
+const BTN_PRIMARY =
+  'flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold text-white text-sm transition-all hover:opacity-90 active:scale-[0.98]';
+const BTN_OUTLINE =
+  'flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold text-sm border-2 transition-all hover:bg-gray-50 active:scale-[0.98]';
 
-  const options = [
-    {
-      id: 'manual',
-      title: 'Manual Input',
-      description: 'Add tenant details directly when you have all their information',
-      icon: UserPlus,
-      features: [
-        'Complete tenant profile setup',
-        'Direct property assignment',
-        'Immediate tenant creation'
-      ],
-      buttonText: 'Add Manually',
-      onClick: onManualInput,
-      recommended: true,
-      buttonVariant: 'default' as const
-    },
-    {
-      id: 'invite',
-      title: 'Invite via Email',
-      description: 'Send an invitation email when you have limited tenant details',
-      icon: Mail,
-      features: [
-        'Email invitation sent to tenant',
-        'Tenant completes their own profile',
-        'Property verification required'
-      ],
-      buttonText: 'Send Invitation',
-      onClick: onInviteEmail,
-      recommended: false,
-      buttonVariant: 'outline' as const
-    },
-    {
-      id: 'existing',
-      title: 'Select Existing User',
-      description: 'Assign an existing tenant from our database to a property',
-      icon: Users,
-      features: [
-        'Search existing tenant database',
-        'Quick property assignment',
-        'Verification request sent'
-      ],
-      buttonText: 'Select Tenant',
-      onClick: onSelectExisting,
-      recommended: false,
-      buttonVariant: 'outline' as const
+export function TenantSelection({
+  existingTenants,
+  properties,
+  onManualInput,
+  onInviteEmail,
+  onBack,
+}: TenantSelectionProps) {
+  const [email, setEmail] = useState('');
+  const [isChecking, setIsChecking] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [existingMatch, setExistingMatch] = useState<Tenant | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the email input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Check the email against existing tenants with a 400ms debounce
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    const trimmed = email.trim().toLowerCase();
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+
+    if (!trimmed || !isValidEmail) {
+      setChecked(false);
+      setExistingMatch(null);
+      setIsChecking(false);
+      return;
     }
-  ];
+
+    setIsChecking(true);
+    debounceRef.current = setTimeout(() => {
+      const match = existingTenants.find(
+        (t) => (t.email || '').toLowerCase().trim() === trimmed
+      );
+      setExistingMatch(match ?? null);
+      setChecked(true);
+      setIsChecking(false);
+    }, 400);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [email, existingTenants]);
+
+  const trimmedEmail = email.trim();
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
+  const showActions = checked && isValidEmail;
 
   return (
-    <div className="min-h-screen flex flex-col px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
-      <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 px-4 pt-8">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={onBack} className="p-2">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <img 
-              src="/images/proptii-logo.png" 
-              alt="Proptii Logo" 
-              className="h-8 w-auto"
-            />
-          </div>
-        </div>
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ backgroundColor: '#F8FAFC', fontFamily: 'Archivo, sans-serif' }}
+    >
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3">
+        <button
+          onClick={onBack}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-lg font-bold" style={{ color: '#136C9E' }}>
+          Add Tenant
+        </h1>
+      </div>
 
-        {/* Main Content */}
-        <div className="flex-1 py-8">
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center mb-6">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: '#E5FFE5' }}>
-                <UserPlus className="w-8 h-8" style={{ color: '#00AA00' }} />
-              </div>
+      <div className="flex-1 flex flex-col items-center px-4 py-10">
+        <div className="w-full max-w-md space-y-8">
+
+          {/* Hero */}
+          <div className="text-center space-y-3">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
+              style={{ backgroundColor: '#E8F4F8' }}
+            >
+              <UserPlus className="w-8 h-8" style={{ color: '#136C9E' }} />
             </div>
-            <h1 className="text-4xl font-bold mb-4" style={{ color: '#374957' }}>
-              Add New Tenant
-            </h1>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Choose how you'd like to add a tenant to your property
+            <h2 className="text-2xl font-bold" style={{ color: '#374957' }}>
+              Who are you adding?
+            </h2>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Start with their email address. We'll let you know if they're already on Proptii.
             </p>
           </div>
 
-          {/* Options Grid */}
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {options.map((option, index) => {
-              const IconComponent = option.icon;
-              const iconColors = iconColorSets[index];
-              return (
-                <Card
-                  key={option.id}
-                  className={`relative transition-all duration-300 cursor-pointer ${
-                    option.recommended ? 'ring-1 shadow-lg' : 'hover:shadow-md'
-                  }`}
-                  style={{
-                    ...(option.recommended ? { borderColor: '#136C9E', borderWidth: '1px' } : {}),
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-8px)';
-                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(231, 242, 255, 0.8), 0 8px 16px rgba(231, 242, 255, 0.6)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0px)';
-                    e.currentTarget.style.boxShadow = '';
-                  }}
-                  onClick={option.onClick}
-                >
-                  {option.recommended && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <span className="text-white text-xs px-3 py-1 rounded-full font-medium" style={{ backgroundColor: '#136C9E' }}>
-                        Recommended
-                      </span>
-                    </div>
-                  )}
-                  
-                  <CardHeader className="text-center pb-4">
-                    <div className="w-12 h-12 mx-auto mb-4 rounded-lg flex items-center justify-center" style={{ backgroundColor: iconColors.bg }}>
-                      <IconComponent className="w-6 h-6" style={{ color: iconColors.icon }} />
-                    </div>
-                    <CardTitle className="text-xl font-semibold" style={{ color: '#374957' }}>
-                      {option.title}
-                    </CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent className="text-center">
-                    <p className="text-gray-600 mb-6 leading-relaxed">
-                      {option.description}
-                    </p>
-                    
-                    <div className="space-y-2 mb-6 text-center">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Features:</p>
-                      {option.features.map((feature, featureIndex) => (
-                        <div key={featureIndex} className="flex items-center justify-center text-sm text-gray-600">
-                          <div className="w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: '#DC5F12' }} />
-                          <span>{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <Button 
-                      variant={option.buttonVariant}
-                      className="w-full"
-                      size="lg"
-                      style={{ fontFamily: 'Archivo, sans-serif' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        option.onClick();
-                      }}
-                    >
-                      {option.buttonText}
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          {/* Email input */}
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-700" htmlFor="tenant-email">
+              Tenant's email address
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                ref={inputRef}
+                id="tenant-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. james@example.com"
+                className={`${INPUT_STYLE} pl-10 pr-10`}
+                autoComplete="email"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+              {isChecking && (
+                <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
+              )}
+              {checked && isValidEmail && !isChecking && (
+                existingMatch ? (
+                  <AlertCircle className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500" />
+                ) : (
+                  <CheckCircle className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                )
+              )}
+            </div>
           </div>
 
-          {/* Additional Info */}
-          <div className="max-w-4xl mx-auto" style={{ marginTop: '60px' }}>
-            <Card
-              className="relative border rounded-xl overflow-hidden"
-              style={{
-                borderColor: '#BFDBFE',
-                background: 'linear-gradient(180deg, rgba(239,246,255,0.9) 0%, rgba(219,234,254,0.9) 100%)'
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.boxShadow = '0 10px 25px rgba(191,219,254,0.6), 0 6px 12px rgba(0,0,0,0.08)';
-                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.boxShadow = '';
-                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-              }}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#DBEAFE' }}>
-                    <Home className="w-5 h-5" style={{ color: '#2563EB' }} />
+          {/* ── Already a tenant ─────────────────────────────── */}
+          {showActions && existingMatch && (
+            <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-amber-800 text-sm">
+                    {existingMatch.name || trimmedEmail} is already your tenant
+                  </p>
+                  <p className="text-amber-700 text-xs mt-0.5">
+                    Currently assigned to{' '}
+                    <span className="font-medium">{existingMatch.propertyAddress || 'a property'}</span>.
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-amber-700 pl-8">
+                If you want to reassign them to a different property, use the <strong>Edit</strong> option
+                from their tenant card in the Clients tab.
+              </p>
+            </div>
+          )}
+
+          {/* ── New email — show two paths ────────────────────── */}
+          {showActions && !existingMatch && (
+            <div className="space-y-4">
+              {/* "I have their details" path */}
+              <div className="rounded-2xl border-2 border-gray-200 bg-white p-5 space-y-3 hover:border-[#136C9E] transition-colors group">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: '#E8F4F8' }}
+                  >
+                    <UserPlus className="w-4 h-4" style={{ color: '#136C9E' }} />
                   </div>
-                  <div>
-                    <h3 className="font-semibold mb-1" style={{ color: '#1E3A8A' }}>Property Assignment</h3>
-                    <p className="text-sm" style={{ color: '#1D4ED8' }}>
-                      All tenants will need to verify they are occupying the assigned property before being fully added
-                      to your tenant list. This ensures accurate property management.
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800 text-sm">I have their details</p>
+                    <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">
+                      Fill in their name, phone, rent amount, lease dates and emergency contact.
+                      They'll be added to your list immediately.
                     </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <button
+                  onClick={() => onManualInput(trimmedEmail)}
+                  className={BTN_PRIMARY}
+                  style={{ background: 'linear-gradient(135deg, #136C9E, #1a87c4)' }}
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Add details manually
+                </button>
+              </div>
+
+              {/* "Send invite" path */}
+              <div className="rounded-2xl border-2 border-gray-200 bg-white p-5 space-y-3 hover:border-[#DC5F12] transition-colors">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: '#FFF0E8' }}
+                  >
+                    <Send className="w-4 h-4" style={{ color: '#DC5F12' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800 text-sm">Send them an invite</p>
+                    <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">
+                      Email an invitation link. The tenant signs up and completes their own profile.
+                      You'll see the invite under the <strong>Invitations</strong> tab.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onInviteEmail(trimmedEmail)}
+                  className={BTN_OUTLINE}
+                  style={{ borderColor: '#DC5F12', color: '#DC5F12' }}
+                >
+                  <Send className="w-4 h-4" />
+                  Send invite email
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Hint before email is entered ─────────────────── */}
+          {!showActions && !isChecking && (
+            <p className="text-center text-xs text-gray-400">
+              Enter a valid email address to see your options.
+            </p>
+          )}
+
         </div>
       </div>
     </div>

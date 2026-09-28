@@ -422,6 +422,8 @@ export function AppContent() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [clientDetailsTab, setClientDetailsTab] = useState('overview');
   const editingTenantRef = React.useRef<Tenant | null>(null);
+  /** Email typed in TenantSelection — forwarded to AddTenant / InviteTenant as prefill */
+  const prefillEmailRef = React.useRef<string | undefined>(undefined);
   const [selectedLandlord, setSelectedLandlord] = useState<any | null>(null);
   const [selectedVacancyAlert, setSelectedVacancyAlert] = useState<VacancyRiskAlert | null>(null);
   const [selectedArrearsAlert, setSelectedArrearsAlert] = useState<ArrearsAlert | null>(null);
@@ -3100,13 +3102,18 @@ export function AppContent() {
       case 'tenant-selection':
         return (
           <TenantSelection
-            onManualInput={() => {
+            existingTenants={tenants}
+            properties={properties}
+            onManualInput={(email) => {
+              prefillEmailRef.current = email;
               editingTenantRef.current = null;
               setSelectedTenant(null);
               navigateToScreen('add-tenant');
             }}
-            onInviteEmail={() => navigateToScreen('invite-tenant')}
-            onSelectExisting={() => navigateToScreen('select-existing-tenant')}
+            onInviteEmail={(email) => {
+              prefillEmailRef.current = email;
+              navigateToScreen('invite-tenant');
+            }}
             onBack={() => {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
@@ -3124,15 +3131,8 @@ export function AppContent() {
           <AddTenant
             properties={properties}
             preselectedPropertyId={selectedProperty?.id}
+            prefillEmail={prefillEmailRef.current}
             userProfile={userProfile}
-            onBackToSelection={() => {
-              if (previousScreen === 'property-preview') {
-                setPreviousScreen(null);
-                navigateToScreen('property-preview');
-              } else {
-                navigateToScreen('tenant-selection');
-              }
-            }}
             onSave={async (tenant) => {
               if (!userProfile) {
                 window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'add-tenant' } }, '*');
@@ -3140,6 +3140,7 @@ export function AppContent() {
               }
               // addTenant POSTs to backend — useTenants in ClientsPage re-fetches on navigate
               await addTenant(tenant);
+              prefillEmailRef.current = undefined;
               // If coming from property-preview, stash tenant for preview context
               if (previousScreen === 'property-preview') {
                 setPropertySetupData(prev => ({
@@ -3149,11 +3150,11 @@ export function AppContent() {
               }
             }}
             onBack={() => {
+              prefillEmailRef.current = undefined;
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
                 navigateToScreen('property-preview');
               } else {
-                // "Go to Tenant List" / back after success — go to clients tab
                 navigateToScreen('main-app');
                 setNavigationScreen('clients');
               }
@@ -3197,8 +3198,13 @@ export function AppContent() {
             properties={properties}
             landlordEmail={userProfile?.email}
             landlordId={getCurrentUserId() || undefined}
-            onBack={() => navigateToScreen('tenant-selection')}
+            prefillEmail={prefillEmailRef.current}
+            onBack={() => {
+              prefillEmailRef.current = undefined;
+              navigateToScreen('tenant-selection');
+            }}
             onSuccess={() => {
+              prefillEmailRef.current = undefined;
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
                 navigateToScreen('property-preview');

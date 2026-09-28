@@ -1,16 +1,36 @@
-import React, { useState } from 'react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
+/**
+ * InviteTenant — send a branded invitation email to a prospective tenant.
+ *
+ * What it does:
+ *   1. Sends a branded HTML email via POST /api/email/send
+ *   2. Records the invitation in Firestore via POST /api/tenant-invitations
+ *      so it appears under the Invitations tab immediately
+ *
+ * What it does NOT do:
+ *   - Create a partial tenant record (removed — the tenant collection only
+ *     receives complete, active records; pending invites live in tenant_invitations)
+ *
+ * The tenant appears in the landlord's Clients → Invitations tab as "pending"
+ * until they follow the link, create their account, and complete onboarding.
+ */
+import React, { useState, useEffect } from 'react';
+import {
+  ArrowLeft,
+  Mail,
+  Send,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  Info,
+} from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ArrowLeft, Mail, Send, CheckCircle, AlertCircle, Plus } from 'lucide-react';
-import { Property } from '../App';
+import type { Property } from '../App';
 import axios from 'axios';
 import { trackEvent } from '../../../utils/analytics';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { invitationService } from '../services/invitationService';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface InviteTenantProps {
   properties: Property[];
@@ -18,584 +38,417 @@ interface InviteTenantProps {
   onSuccess: () => void;
   landlordEmail?: string;
   landlordId?: string;
+  /** Pre-filled email from the TenantSelection email-first flow */
+  prefillEmail?: string;
 }
 
-interface InvitationData {
-  email: string;
-  propertyId: string;
-  customMessage: string;
-  inviteType: 'new-tenant' | 'existing-tenant';
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const FIELD =
+  'w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#4E97CC] focus:outline-none transition-colors bg-white placeholder-gray-400';
+const FIELD_ERR = 'border-red-400 focus:border-red-400';
+const LABEL = 'block text-sm font-semibold text-gray-700 mb-1.5';
+
+// ─── Email template ───────────────────────────────────────────────────────────
+
+function buildEmailHtml(
+  propertyAddress: string,
+  inviteLink: string,
+  customMessage?: string
+): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; background: #E6F2F8; margin: 0; padding: 20px; }
+    .wrap { max-width: 600px; margin: 0 auto; }
+    .header { background: #E6F2F8; color: #136C9E; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 600; color: #136C9E; }
+    .body { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; }
+    .prop { background: white; padding: 16px 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #136C9E; }
+    .prop h3 { margin: 0 0 4px; color: #374957; font-size: 14px; }
+    .prop p { margin: 0; color: #555; font-size: 14px; }
+    .msg { background: #f5f5f5; padding: 14px; border-radius: 5px; margin: 20px 0; font-style: italic; border-left: 3px solid #136C9E; font-size: 14px; }
+    .cta { text-align: center; margin: 28px 0; }
+    .btn { display: inline-block; background: #DC5F12; color: white !important; padding: 13px 32px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 15px; }
+    .footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #888; text-align: center; }
+    .footer img { height: 36px; }
+    p { font-size: 14px; color: #444; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header"><h1>Tenant Invitation</h1></div>
+    <div class="body">
+      <p>Hello,</p>
+      <p>You have been invited to create your tenant profile on Proptii.</p>
+      <div class="prop">
+        <h3>Property</h3>
+        <p>${propertyAddress}</p>
+      </div>
+      ${customMessage ? `<div class="msg"><strong>Message from your landlord:</strong><br/>${customMessage}</div>` : ''}
+      <p>Click the button below to create your account and complete your tenant profile:</p>
+      <div class="cta">
+        <a href="${inviteLink}" class="btn">Create Account &amp; Complete Profile</a>
+      </div>
+      <p>If you have any questions, please contact your landlord directly.</p>
+      <p>Best regards,<br/>The Proptii Team</p>
+    </div>
+    <div class="footer">
+      <p>This is an automated message from Proptii</p>
+      <img src="https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii" />
+      <p><em>Proptii — the AI platform for tenants, agents and landlords.</em></p>
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
-export function InviteTenant({ properties, onBack, onSuccess, landlordEmail, landlordId }: InviteTenantProps) {
-  const [formData, setFormData] = useState<InvitationData>({
-    email: '',
-    propertyId: '',
-    customMessage: '',
-    inviteType: 'new-tenant'
-  });
-  
+function buildInviteLink(
+  propertyId: string,
+  landlordEmail?: string,
+  landlordId?: string
+): string {
+  const base =
+    typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : (import.meta as any)?.env?.VITE_APP_URL || 'https://proptii.co';
+  const url = new URL('/tenant-onboarding', base);
+  url.searchParams.set('invite', 'true');
+  if (propertyId) url.searchParams.set('propertyId', propertyId);
+  if (landlordEmail) url.searchParams.set('landlordEmail', landlordEmail);
+  if (landlordId) url.searchParams.set('landlordId', landlordId);
+  return url.toString();
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function InviteTenant({
+  properties,
+  onBack,
+  onSuccess,
+  landlordEmail,
+  landlordId,
+  prefillEmail,
+}: InviteTenantProps) {
+  const [email, setEmail] = useState(prefillEmail ?? '');
+  const [propertyId, setPropertyId] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; propertyId?: string; general?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [sent, setSent] = useState(false);
 
-  const handleInputChange = (field: keyof InvitationData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+  // Pre-fill email if it arrives late (e.g. parent re-renders)
+  useEffect(() => {
+    if (prefillEmail && !email) setEmail(prefillEmail);
+  }, [prefillEmail]);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.email) {
-      newErrors.email = 'Email address is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    
-    if (!formData.propertyId) {
-      newErrors.propertyId = 'Please select a property';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const selectedProperty = properties.find((p) => p.id === propertyId);
 
-  const generateInvitationEmailHTML = (property: Property | undefined, landlordEmail?: string, landlordId?: string) => {
-    const propertyAddress = property?.address || 'the property';
-    const invitationTypeText = formData.inviteType === 'new-tenant' 
-      ? 'create a new account and complete your tenant profile'
-      : 'complete your tenant profile';
-    
-    const frontendBaseUrl = (typeof window !== 'undefined' && window.location.origin) 
-      ? window.location.origin 
-      : ((import.meta as any)?.env?.VITE_APP_URL || 'https://proptii.co');
-    const invitePath = formData.inviteType === 'new-tenant' ? '/tenant-onboarding' : '/login';
-    const inviteLink = new URL(invitePath, frontendBaseUrl);
-    inviteLink.searchParams.append('invite', 'true');
-    if (formData.propertyId) inviteLink.searchParams.append('propertyId', formData.propertyId);
-    if (landlordEmail) inviteLink.searchParams.append('landlordEmail', landlordEmail);
-    if (landlordId) inviteLink.searchParams.append('landlordId', landlordId);
-    
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap');
-          body { 
-            font-family: Arial, sans-serif; 
-            line-height: 1.6; 
-            color: #333; 
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #E6F2F8;
-          }
-          .header {
-            background-color: #E6F2F8;
-            color: #136C9E;
-            padding: 30px;
-            text-align: center;
-            border-radius: 8px 8px 0 0;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 24px;
-            font-family: 'Archivo', sans-serif;
-            color: #136C9E;
-            font-weight: 600;
-          }
-          .content {
-            background-color: #f9f9f9;
-            padding: 30px;
-            border: 1px solid #ddd;
-            border-top: none;
-            border-radius: 0 0 8px 8px;
-          }
-          .property-info {
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            margin: 20px 0;
-            border-left: 4px solid #136C9E;
-          }
-          .property-info h3 {
-            margin-top: 0;
-            color: #374957;
-          }
-          .custom-message {
-            background-color: #f5f5f5;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-style: italic;
-            border-left: 3px solid #136C9E;
-          }
-          .cta-button {
-            display: inline-block;
-            background-color: #DC5F12;
-            color: white !important;
-            padding: 12px 30px;
-            text-decoration: none;
-            border-radius: 50px;
-            margin: 20px 0;
-            font-weight: bold;
-          }
-          .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            font-size: 0.9em;
-            color: #666;
-            text-align: center;
-          }
-          .footer-logo {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 16px;
-          }
-          .footer-logo img {
-            height: 40px;
-            margin-right: 10px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Tenant Invitation</h1>
-        </div>
-        <div class="content">
-          <p>Hello,</p>
-          
-          <p>You have been invited to ${invitationTypeText} on Proptii.</p>
-          
-          <div class="property-info">
-            <h3>Property Details</h3>
-            <p><strong>Address:</strong> ${propertyAddress}</p>
-          </div>
-          
-          ${formData.customMessage ? `
-            <div class="custom-message">
-              <strong>Personal Message:</strong><br>
-              ${formData.customMessage}
-            </div>
-          ` : ''}
-          
-          <p>Please click the button below to ${formData.inviteType === 'new-tenant' ? 'create your account and' : ''} complete your tenant profile:</p>
-          
-          <div style="text-align: center;">
-            <a href="${inviteLink.toString()}" class="cta-button">
-              ${formData.inviteType === 'new-tenant' ? 'Create Account & Complete Profile' : 'Complete Your Profile'}
-            </a>
-          </div>
-          
-          <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
-          
-          <p>Best regards,<br>The Proptii Team</p>
-        </div>
-        
-        <div class="footer">
-          <p>This is an automated message from Proptii</p>
-          <div class="footer-logo">
-            <img src="https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
-          </div>
-          <p style="margin-top: 10px;">
-            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions.</em>
-          </p>
-        </div>
-      </body>
-      </html>
-    `;
-  };
+  function validate(): boolean {
+    const e: typeof errors = {};
+    if (!email.trim()) e.email = 'Email address is required';
+    else if (!/\S+@\S+\.\S+/.test(email.trim())) e.email = 'Enter a valid email address';
+    if (!propertyId) e.propertyId = 'Please select a property';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
 
-  const handleSendInvitation = async () => {
-    if (!validateForm()) return;
-    
+  async function handleSend() {
+    if (!validate()) return;
+
     setIsLoading(true);
     setErrors({});
-    
+
     try {
-      const selectedProperty = properties.find(p => p.id === formData.propertyId);
-      
-      if (!selectedProperty) {
-        throw new Error('Selected property not found');
-      }
+      if (!selectedProperty) throw new Error('Selected property not found');
 
-      console.log('🔍 Starting email send process...');
-      console.log('📧 Recipient:', formData.email);
-      console.log('🏠 Property:', selectedProperty.address);
+      const inviteLink = buildInviteLink(propertyId, landlordEmail, landlordId);
+      const html = buildEmailHtml(
+        selectedProperty.address,
+        inviteLink,
+        customMessage.trim() || undefined
+      );
+      const subject = `You've been invited to join as a tenant — ${selectedProperty.address}`;
 
-      const API_BASE_URL = PRIMARY_API_BASE_URL.replace(/\/api$/, '');
-      const emailEndpoint = `${API_BASE_URL}/api/email/send`;
-
-      console.log('📡 API Endpoint:', emailEndpoint);
-
-      // Generate email HTML
-      const emailHTML = generateInvitationEmailHTML(selectedProperty, landlordEmail, landlordId);
-      const emailSubject = `Invitation to join as tenant for ${selectedProperty.address}`;
-
-      console.log('📝 Email generated successfully');
-      console.log('📨 Sending email request...');
-
-      // Send email via API with multiple retry attempts
-      let lastError: any = null;
-      let response: any = null;
-      const maxRetries = 3;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // 1. Send the email (with one retry on network errors)
+      const API_BASE = PRIMARY_API_BASE_URL.replace(/\/api$/, '');
+      let lastErr: any = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          console.log(`🔄 Attempt ${attempt}/${maxRetries}...`);
-          
-          response = await axios.post(
-            emailEndpoint,
-            {
-              to: formData.email,
-              subject: emailSubject,
-              html: emailHTML
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              timeout: 45000, // Increased timeout to 45 seconds
-              validateStatus: (status) => status < 500 // Don't throw on 4xx errors
-            }
+          const res = await axios.post(
+            `${API_BASE}/api/email/send`,
+            { to: email.trim().toLowerCase(), subject, html },
+            { timeout: 45_000, validateStatus: (s) => s < 500 }
           );
-
-          // Check if the request was successful
-          if (response.status >= 200 && response.status < 300) {
-            if (response.data && response.data.success === false) {
-              throw new Error(response.data.error || 'Email service returned failure status');
-            }
-            
-            console.log('✅ Email sent successfully!');
-            trackEvent('landlord_invite_tenant_sent', { property_address: selectedProperty.address });
-            console.log('📬 Message ID:', response.data.messageId);
-            break; // Success - exit retry loop
-          } else {
-            throw new Error(`HTTP ${response.status}: ${response.statusText || 'Request failed'}`);
+          if (res.status >= 400) {
+            throw new Error(
+              res.data?.message || res.data?.error || `HTTP ${res.status}`
+            );
           }
-        } catch (attemptError: any) {
-          lastError = attemptError;
-          console.error(`❌ Attempt ${attempt} failed:`, attemptError.message || attemptError);
-          
-          // If it's the last attempt or a non-retryable error, throw
-          if (attempt === maxRetries) {
-            throw lastError;
-          }
-          
-          // Check if it's a retryable error
-          const isNetworkError = axios.isAxiosError(attemptError) && 
-            (attemptError.code === 'ECONNREFUSED' || 
-             attemptError.code === 'ETIMEDOUT' ||
-             attemptError.code === 'ECONNRESET' ||
-             !attemptError.response);
-          
-          if (!isNetworkError) {
-            // Not a network error, don't retry
-            throw attemptError;
-          }
-          
-          // Wait before retrying (exponential backoff)
-          const waitTime = attempt * 2000; // 2s, 4s
-          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+          break; // success
+        } catch (e: any) {
+          lastErr = e;
+          const retryable =
+            axios.isAxiosError(e) &&
+            (!e.response || ['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET'].includes(e.code ?? ''));
+          if (!retryable || attempt === 2) throw e;
+          await new Promise((r) => setTimeout(r, 2000));
         }
       }
 
-      if (!response || (response.data && response.data.success === false)) {
-        throw lastError || new Error('Failed to send email after all retries');
-      }
+      trackEvent('landlord_invite_tenant_sent', { property_address: selectedProperty.address });
 
-      console.log('🎉 Invitation email sent successfully!');
-      
-      // Track the invitation in Firestore so it shows in the dashboard
+      // 2. Record in Firestore (non-fatal if it fails — email was already sent)
       try {
-        const selectedProperty = properties.find(p => p.id === formData.propertyId);
         await invitationService.createInvitation({
-          email: formData.email,
-          propertyId: formData.propertyId,
-          propertyAddress: selectedProperty?.address || '',
-          landlordId: landlordId || '',
-          landlordEmail: landlordEmail || '',
-          inviteType: formData.inviteType,
-          customMessage: formData.customMessage || undefined,
+          email: email.trim().toLowerCase(),
+          propertyId,
+          propertyAddress: selectedProperty.address,
+          landlordId: landlordId ?? '',
+          landlordEmail: landlordEmail ?? '',
+          inviteType: 'new-tenant',
+          customMessage: customMessage.trim() || undefined,
         });
-        console.log('✅ Invitation tracked in Firestore');
-      } catch (trackErr) {
-        // Non-fatal — the email was already sent, just log the tracking failure
-        console.warn('⚠️ Could not record invitation in Firestore:', trackErr);
+      } catch {
+        // Non-fatal — invitation email was already sent
       }
 
-      setIsSuccess(true);
-      
-      // Auto redirect after 3 seconds
-      setTimeout(() => {
-        onSuccess();
-      }, 3000);
-      
-    } catch (error: any) {
-      console.error('❌ Failed to send invitation:', error);
-      
-      let errorMessage = 'Failed to send invitation. Please try again.';
-      
-      if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNREFUSED') {
-          errorMessage = 'Cannot connect to email server. Please ensure the backend is running and accessible.';
-          console.error('💡 Troubleshooting: Make sure the backend server is running on the correct port');
-        } else if (error.code === 'ETIMEDOUT') {
-          errorMessage = 'Request timed out. The server may be slow or unavailable. Please try again.';
-          console.error('💡 Troubleshooting: Check your internet connection and server status');
-        } else if (error.response?.status === 400) {
-          errorMessage = error.response.data?.message || 'Invalid request. Please check the form data.';
-          console.error('💡 Troubleshooting:', error.response.data);
-        } else if (error.response?.status === 500) {
-          errorMessage = 'Server error. The email service may not be configured correctly.';
-          console.error('💡 Troubleshooting: Check backend logs and email service configuration (SMTP/Resend)');
-        } else if (error.response?.data?.error) {
-          errorMessage = error.response.data.error;
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
+      setSent(true);
+      // Auto-navigate after 3 s
+      setTimeout(() => onSuccess(), 3000);
+    } catch (err: any) {
+      let msg = 'Failed to send invitation. Please try again.';
+      if (axios.isAxiosError(err)) {
+        if (err.code === 'ECONNREFUSED') msg = 'Cannot reach the email server. Is the backend running?';
+        else if (err.code === 'ETIMEDOUT') msg = 'Request timed out. Check your connection and try again.';
+        else if (err.response?.status === 500) msg = 'Server error. Check the email service configuration.';
+        else if (err.response?.data?.message) msg = err.response.data.message;
+        else if (err.message) msg = err.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
       }
-      
-      console.error('📋 Error details:', {
-        message: errorMessage,
-        code: error.code,
-        response: error.response?.data
-      });
-      
-      setErrors({ general: errorMessage });
+      setErrors({ general: msg });
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const selectedProperty = properties.find(p => p.id === formData.propertyId);
+  // ─── Success screen ───────────────────────────────────────────────────────
 
-  if (isSuccess) {
+  if (sent) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="p-8">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+      <div
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{ backgroundColor: '#F8FAFC', fontFamily: 'Archivo, sans-serif' }}
+      >
+        <div className="text-center space-y-5 max-w-sm w-full">
+          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+            <CheckCircle className="w-10 h-10 text-green-500" />
+          </div>
+          <h2 className="text-2xl font-bold" style={{ color: '#136C9E' }}>
+            Invitation sent!
+          </h2>
+          <p className="text-gray-600 text-sm">
+            An invitation email has been sent to <strong>{email}</strong>.
+          </p>
+
+          {/* Clear explanation of what happens next */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left space-y-2">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-blue-800 font-semibold">What happens next?</p>
             </div>
-            <h2 className="text-2xl font-bold mb-4" style={{ color: '#374957' }}>
-              Invitation Sent!
-            </h2>
-            <p className="text-gray-600 mb-6">
-              An invitation email has been sent to <strong>{formData.email}</strong>
-            </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-left">
-                  <p className="text-sm text-blue-800">
-                    The tenant will receive a verification request to confirm they are occupying 
-                    <strong> {selectedProperty?.address}</strong>
-                  </p>
-                </div>
-              </div>
-            </div>
-            <p className="text-sm text-gray-500">
-              Redirecting you back to the tenant list...
-            </p>
-          </CardContent>
-        </Card>
+            <ul className="text-xs text-blue-700 space-y-1 pl-6 list-disc">
+              <li>
+                The invitation appears under <strong>Clients → Invitations</strong> as{' '}
+                <strong>pending</strong>.
+              </li>
+              <li>
+                When the tenant follows the link and creates their account, the invitation updates
+                to <strong>accepted</strong> and they appear in your tenant list.
+              </li>
+              <li>If they don't act, you can resend from the Invitations tab.</li>
+            </ul>
+          </div>
+
+          <p className="text-xs text-gray-400">Returning to your dashboard in 3 seconds…</p>
+        </div>
       </div>
     );
   }
 
+  // ─── Main form ────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen flex flex-col px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
-      <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 px-4 pt-8">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={onBack} className="p-2">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <img 
-              src="/images/proptii-logo.png" 
-              alt="Proptii Logo" 
-              className="h-8 w-auto"
-            />
-          </div>
+    <div
+      className="min-h-screen"
+      style={{ backgroundColor: '#F8FAFC', fontFamily: 'Archivo, sans-serif' }}
+    >
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-lg font-bold" style={{ color: '#136C9E' }}>
+          Invite tenant by email
+        </h1>
+      </div>
+
+      <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+        {/* Info banner */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-blue-700 leading-relaxed">
+            The tenant will receive a link to create their Proptii account and complete their
+            profile. They'll appear under <strong>Invitations</strong> until they accept.
+          </p>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 py-8">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-6">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DC5F12' }}>
-                <Mail className="w-8 h-8 text-white" />
-              </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+          {/* Global error */}
+          {errors.general && (
+            <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-xl">
+              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-red-700">{errors.general}</p>
             </div>
-            <h1 className="text-4xl font-bold mb-4" style={{ color: '#374957' }}>
-              Invite Tenant via Email
-            </h1>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Send an invitation email to the tenant to complete their profile
-            </p>
+          )}
+
+          {/* Email */}
+          <div>
+            <label className={LABEL} htmlFor="inv-email">
+              Tenant's email address <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                id="inv-email"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
+                }}
+                placeholder="tenant@example.com"
+                className={`${FIELD} pl-10 ${errors.email ? FIELD_ERR : ''}`}
+                autoComplete="email"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </div>
+            {errors.email && (
+              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> {errors.email}
+              </p>
+            )}
           </div>
 
-          <div className="max-w-2xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Mail className="w-5 h-5 mr-2" />
-                  Invitation Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {errors.general && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex items-start space-x-3">
-                      <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-red-800 text-sm">{errors.general}</p>
-                        <p className="text-red-600 text-xs mt-2">
-                          💡 <strong>Troubleshooting:</strong> Make sure the backend server is running. 
-                          Check the browser console for detailed error logs.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="tenant@example.com"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className={errors.email ? 'border-red-500' : ''}
-                  />
-                  {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="property">Assign to Property *</Label>
-                  <Select value={formData.propertyId} onValueChange={(value) => handleInputChange('propertyId', value)}>
-                    <SelectTrigger className={errors.propertyId ? 'border-red-500' : ''}>
-                      <SelectValue placeholder="Select a property" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {properties.map((property) => (
-                        <SelectItem key={property.id} value={property.id}>
-                          {property.address}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.propertyId && <p className="text-red-500 text-sm">{errors.propertyId}</p>}
-                </div>
-
-                {/* Invitation Type field hidden per user request */}
-                {/* <div className="space-y-2">
-                  <Label htmlFor="inviteType">Invitation Type</Label>
-                  <Select value={formData.inviteType} onValueChange={(value: 'new-tenant' | 'existing-tenant') => handleInputChange('inviteType', value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new-tenant">New Tenant Registration</SelectItem>
-                      <SelectItem value="existing-tenant">Existing Tenant Assignment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-gray-500">
-                    {formData.inviteType === 'new-tenant' 
-                      ? 'For tenants who need to create a new account'
-                      : 'For tenants who already have an account on the platform'
-                    }
-                  </p>
-                </div> */}
-
-                <div className="space-y-2">
-                  <Label htmlFor="message">Custom Message (Optional)</Label>
-                  <Textarea
-                    id="message"
-                    placeholder="Add a personal message to the invitation..."
-                    value={formData.customMessage}
-                    onChange={(e) => handleInputChange('customMessage', e.target.value)}
-                    rows={4}
-                  />
-                  <p className="text-sm text-gray-500">
-                    This message will be included in the invitation email
-                  </p>
-                </div>
-
-                {/* Preview */}
-                {selectedProperty && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Email Preview:</h4>
-                    <div className="text-sm text-gray-700 space-y-1">
-                      <p><strong>To:</strong> {formData.email}</p>
-                      <p><strong>Subject:</strong> Invitation to join as tenant for {selectedProperty.address}</p>
-                      <p><strong>Property:</strong> {selectedProperty.address}</p>
-                      {formData.customMessage && (
-                        <p><strong>Message:</strong> {formData.customMessage}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="flex justify-between mt-8">
-              <Button variant="outline" onClick={onBack}>
-                Back
-              </Button>
-              <Button 
-                onClick={handleSendInvitation}
-                disabled={isLoading}
-                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto"
-                style={{ 
-                  backgroundColor: '#DC5F12', 
-                  borderColor: '#DC5F12', 
-                  minWidth: '180px',
-                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                    e.currentTarget.style.transform = 'translateY(0px)';
-                  }
-                }}
+          {/* Property */}
+          <div>
+            <label className={LABEL} htmlFor="inv-property">
+              Property <span className="text-red-500">*</span>
+            </label>
+            <Select
+              value={propertyId}
+              onValueChange={(v) => {
+                setPropertyId(v);
+                if (errors.propertyId) setErrors((p) => ({ ...p, propertyId: undefined }));
+              }}
+            >
+              <SelectTrigger
+                id="inv-property"
+                className={`${FIELD} h-auto ${errors.propertyId ? FIELD_ERR : ''}`}
               >
-                {isLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    <span>Sending...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" strokeWidth={2.5} />
-                    <span>Send Invitation</span>
-                  </>
-                )}
-              </Button>
-            </div>
+                <SelectValue placeholder="Select a property" />
+              </SelectTrigger>
+              <SelectContent>
+                {properties.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.address}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.propertyId && (
+              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> {errors.propertyId}
+              </p>
+            )}
           </div>
+
+          {/* Custom message */}
+          <div>
+            <label className={LABEL} htmlFor="inv-msg">
+              Personal message{' '}
+              <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <textarea
+              id="inv-msg"
+              value={customMessage}
+              onChange={(e) => setCustomMessage(e.target.value)}
+              rows={3}
+              placeholder="Add a personal note to the invitation email…"
+              className={`${FIELD} resize-none`}
+            />
+          </div>
+
+          {/* Preview */}
+          {selectedProperty && email && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-1 text-xs text-gray-600">
+              <p className="font-semibold text-gray-700 mb-1.5">Email preview</p>
+              <p>
+                <span className="font-medium">To:</span> {email}
+              </p>
+              <p>
+                <span className="font-medium">Subject:</span> You've been invited to join as a
+                tenant — {selectedProperty.address}
+              </p>
+              <p>
+                <span className="font-medium">Property:</span> {selectedProperty.address}
+              </p>
+              {customMessage && (
+                <p>
+                  <span className="font-medium">Message:</span> {customMessage}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pb-8">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 py-3.5 rounded-xl border-2 border-gray-200 font-semibold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={isLoading}
+            className="flex-1 py-3.5 rounded-xl font-semibold text-sm text-white transition-all disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, #DC5F12, #DC5F12)' }}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Sending…
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Send invitation
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
