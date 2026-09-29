@@ -1,0 +1,3438 @@
+openapi: 3.0.3
+
+info:
+  title: Proptii API
+  description: |
+    Complete reference for the Proptii v2 backend REST API.
+
+    ## Authentication
+    All protected endpoints require a Firebase ID Token passed as a Bearer token:
+    ```
+    Authorization: Bearer <firebase-id-token>
+    ```
+    Tokens are obtained from Firebase Authentication (Azure B2C or Firebase Auth). 
+    The backend verifies them with Firebase Admin SDK and enriches `req.user` with 
+    `uid`, `email`, and `role`.
+
+    ## Rate Limiting
+    A global ThrottlerGuard applies **120 requests / minute** per client IP.
+    Some endpoints have tighter per-route limits (noted per endpoint).
+
+    ## Response envelope
+    Most endpoints return a JSON object. Success responses include a `success: true` field.
+    Error responses follow NestJS default: `{ statusCode, message, error }`.
+
+    ## Base URL
+    Production: `https://proptii-v2-backend.onrender.com/api`
+  version: "1.4.0"
+  contact:
+    name: Proptii Engineering
+    email: tech@proptii.co
+
+servers:
+  - url: https://proptii-v2-backend.onrender.com/api
+    description: Production
+  - url: http://127.0.0.1:3002/api
+    description: Local development
+
+tags:
+  - name: Health
+    description: Service health and liveness probes
+  - name: Auth
+    description: Authentication, identity resolution, and role assignment
+  - name: Properties
+    description: Native property catalogue — create, read, update, delete, search
+  - name: Tenants
+    description: Tenant records, CRUD, and payment schedules
+  - name: Landlords
+    description: Landlord / agent profiles and client directory
+  - name: Tenant Invitations
+    description: Email-based tenant invitation records
+  - name: Payments
+    description: Rent payment periods and bulk schedule writes
+  - name: Contracts
+    description: Tenancy agreement documents, templates, and signing workflow
+  - name: Referencing
+    description: Tenant referencing applications, file uploads, passport sharing, and invite flows
+  - name: Referee & Guarantor
+    description: Referee and guarantor responses linked to referencing applications
+  - name: Viewing Requests
+    description: Property viewing scheduling between tenants and landlords/agents
+  - name: Saved Properties
+    description: Tenant saved / bookmarked property lists
+  - name: Communication
+    description: Conversations and messages between tenants and landlords
+  - name: Alerts
+    description: In-app notification alerts
+  - name: Insights
+    description: Market intelligence and price trend data
+  - name: Billing
+    description: Subscription plans and checkout sessions
+  - name: Email
+    description: Transactional email delivery via Resend
+  - name: Storage
+    description: Firebase Cloud Storage file upload and deletion
+  - name: User Profile
+    description: User profile management and reviews
+  - name: Tenant Dashboard
+    description: Summary stats for tenant-facing dashboard
+  - name: Admin Dashboard
+    description: Internal admin customer management (admin-only)
+  - name: Property Facts
+    description: UK property facts (flags, UPRN, title numbers) from GOV data
+  - name: Property Report
+    description: Streaming property due-diligence report (EPC, flood, crime, heritage)
+  - name: Search Classifier
+    description: AI search intent classifier and query expansion
+  - name: Property Selections
+    description: Property interest tracking (interested, viewing requested, etc.)
+  - name: Homeowner
+    description: Homeowner maintenance tasks and improvement projects
+  - name: Guest Enquiry
+    description: Unauthenticated property enquiries with claim-account flow
+  - name: Sheets
+    description: Google Sheets / waitlist data append and read
+  - name: Leads
+    description: Campaign lead capture and activation
+  - name: Flags
+    description: Runtime feature flags
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Firebase ID token obtained from Firebase Authentication
+
+  schemas:
+
+    # ── Tenant ────────────────────────────────────────────────────────────────
+    Tenant:
+      type: object
+      properties:
+        id:                { type: string, example: "tenant_1740530322105_ka1ryc" }
+        userId:            { type: string, description: "Landlord/agent Firebase UID who manages this tenant", example: "3EKbhObAE5dw0RZ7lP3cK4rYeSp1" }
+        name:              { type: string, example: "James Okafor" }
+        email:             { type: string, format: email, example: "james.okafor@email.com" }
+        phone:             { type: string, example: "+44 7911 123456" }
+        propertyId:        { type: string, example: "G89SK2yhZU4o9GMX5z3o" }
+        propertyAddress:   { type: string, example: "14 Kensington Gardens, London W8 4PT" }
+        rentAmount:        { type: number, example: 1800 }
+        paymentFrequency:
+          type: string
+          enum: [monthly, yearly, fixed-time]
+          example: monthly
+        firstPaymentDate:  { type: string, format: date-time, example: "2026-10-01T12:00:00.000Z" }
+        leaseStart:        { type: string, format: date-time, example: "2026-10-01T12:00:00.000Z" }
+        leaseEnd:          { type: string, format: date-time, example: "2027-10-01T12:00:00.000Z" }
+        status:
+          type: string
+          enum: [active, pending, ended]
+          example: active
+        referencingStatus:
+          type: string
+          enum: [not-started, in-progress, complete]
+          example: not-started
+        paymentStatus:
+          type: string
+          enum: [current, overdue, payment-plan]
+          example: current
+        emergencyContact:
+          type: object
+          properties:
+            name:         { type: string, example: "Amara Okafor" }
+            phone:        { type: string, example: "+44 7922 987654" }
+            relationship: { type: string, example: "Spouse / Partner" }
+        defaultRiskScore: { type: number, example: 75 }
+        notes:            { type: string, example: "Non-smoker, quiet professional." }
+        employer:         { type: string, example: "NHS Trust" }
+        jobTitle:         { type: string, example: "Nurse" }
+        annualIncome:     { type: number, example: 48000 }
+        employmentType:   { type: string, example: "full-time" }
+        createdAt:        { type: string, format: date-time }
+        updatedAt:        { type: string, format: date-time }
+
+    CreateTenantRequest:
+      type: object
+      required: [name, email, phone, propertyId, rentAmount, leaseStart, leaseEnd]
+      properties:
+        name:             { type: string, example: "James Okafor" }
+        email:            { type: string, format: email, example: "james.okafor@email.com" }
+        phone:            { type: string, example: "+44 7911 123456" }
+        propertyId:       { type: string, example: "G89SK2yhZU4o9GMX5z3o" }
+        propertyAddress:  { type: string, example: "14 Kensington Gardens, London W8 4PT" }
+        rentAmount:       { type: number, example: 1800 }
+        paymentFrequency:
+          type: string
+          enum: [monthly, yearly, fixed-time]
+          default: monthly
+        firstPaymentDate: { type: string, format: date, example: "2026-10-01" }
+        leaseStart:       { type: string, format: date, example: "2026-10-01" }
+        leaseEnd:         { type: string, format: date, example: "2027-10-01" }
+        status:
+          type: string
+          enum: [active, pending, ended]
+          default: active
+        emergencyContact:
+          type: object
+          properties:
+            name:         { type: string }
+            phone:        { type: string }
+            relationship: { type: string }
+        notes:            { type: string }
+        employer:         { type: string }
+        annualIncome:     { type: number }
+        employmentType:   { type: string }
+
+    # ── Property ──────────────────────────────────────────────────────────────
+    Property:
+      type: object
+      properties:
+        id:            { type: string, example: "1YSHBc0GT1mbr2LhjEPM" }
+        userId:        { type: string, example: "3EKbhObAE5dw0RZ7lP3cK4rYeSp1" }
+        landlordId:    { type: string, example: "3EKbhObAE5dw0RZ7lP3cK4rYeSp1" }
+        ownerEmail:    { type: string, format: email }
+        title:         { type: string, example: "Modern 2-bed flat in Kensington" }
+        address:       { type: string, example: "14 Kensington Gardens, London W8 4PT" }
+        city:          { type: string, example: "London" }
+        postcode:      { type: string, example: "W8 4PT" }
+        type:          { type: string, example: "flat" }
+        propertyType:  { type: string, example: "flat" }
+        bedrooms:      { type: number, example: 2 }
+        bathrooms:     { type: number, example: 1 }
+        squareFootage: { type: number, example: 750 }
+        rent:          { type: number, example: 2500 }
+        price:         { type: string, example: "£2,500 pcm" }
+        status:
+          type: string
+          enum: [vacant, occupied, under-renovation]
+          example: vacant
+        amenities:
+          type: array
+          items: { type: string }
+          example: ["parking", "balcony", "gym"]
+        photos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:       { type: string }
+              url:      { type: string, format: uri }
+              filename: { type: string }
+              isCover:  { type: boolean }
+              room:     { type: string }
+        notes:         { type: string }
+        tenantId:      { type: string }
+        createdAt:     { type: string, format: date-time }
+        updatedAt:     { type: string, format: date-time }
+
+    NormalizedProperty:
+      type: object
+      description: Normalized search result shape returned by /native-properties/search
+      properties:
+        id:           { type: string }
+        source:       { type: string, enum: [native], example: "native" }
+        landlordId:   { type: string }
+        title:        { type: string }
+        price:        { type: string, example: "£2,500 pcm" }
+        location:     { type: string, example: "14 Kensington Gardens, London W8 4PT" }
+        bedrooms:     { type: number }
+        bathrooms:    { type: number }
+        propertyType: { type: string }
+        description:  { type: string }
+        squareFootage: { type: string }
+        amenities:
+          type: array
+          items: { type: string }
+        imageUrls:
+          type: array
+          items: { type: string, format: uri }
+        agent:
+          type: object
+          properties:
+            id:      { type: string }
+            name:    { type: string }
+            email:   { type: string, format: email }
+            phone:   { type: string }
+            company: { type: string }
+        street:   { type: string }
+        city:     { type: string }
+        postcode: { type: string }
+        status:   { type: string, enum: [vacant, occupied, under-renovation] }
+
+    # ── Payment Period ────────────────────────────────────────────────────────
+    PaymentPeriod:
+      type: object
+      properties:
+        id:          { type: string, example: "tenant_1740530322105_2026-10-01" }
+        tenantId:    { type: string }
+        managerId:   { type: string }
+        amountDue:   { type: number, example: 1800 }
+        periodStart: { type: string, format: date-time }
+        periodEnd:   { type: string, format: date-time }
+        dueDate:     { type: string, format: date-time }
+        status:
+          type: string
+          enum: [pending, paid, overdue]
+          example: pending
+        paidAt:      { type: string, format: date-time, nullable: true }
+        notes:       { type: string }
+        createdAt:   { type: string, format: date-time }
+        updatedAt:   { type: string, format: date-time }
+
+    # ── Contract ──────────────────────────────────────────────────────────────
+    Contract:
+      type: object
+      properties:
+        id:              { type: string }
+        landlordId:      { type: string }
+        landlordEmail:   { type: string, format: email }
+        tenantEmail:     { type: string, format: email }
+        tenantName:      { type: string }
+        propertyId:      { type: string }
+        propertyAddress: { type: string }
+        title:           { type: string }
+        contractName:    { type: string }
+        contractType:    { type: string, example: "tenancy-agreement" }
+        fileName:        { type: string }
+        fileUrl:         { type: string, format: uri }
+        status:
+          type: string
+          enum: [sent, signed, pending, expired, cancelled]
+          example: sent
+        sentDate:    { type: string, format: date-time }
+        signedDate:  { type: string, format: date-time, nullable: true }
+        expiryDate:  { type: string, format: date-time, nullable: true }
+        templateId:  { type: string }
+        additionalInfo: { type: string }
+        createdAt:   { type: string, format: date-time }
+        updatedAt:   { type: string, format: date-time }
+
+    # ── Viewing Request ───────────────────────────────────────────────────────
+    ViewingRequest:
+      type: object
+      properties:
+        id:             { type: string }
+        tenantId:       { type: string }
+        tenantEmail:    { type: string, format: email }
+        propertyId:     { type: string }
+        propertyTitle:  { type: string }
+        requestedDate:  { type: string, format: date, example: "2026-10-15" }
+        requestedTime:  { type: string, example: "14:00" }
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed]
+          example: pending
+        notes:          { type: string }
+        landlordId:     { type: string }
+        createdAt:      { type: string, format: date-time }
+        updatedAt:      { type: string, format: date-time }
+
+    # ── ClassifierResult ──────────────────────────────────────────────────────
+    ClassifierResult:
+      type: object
+      properties:
+        intent:
+          type: string
+          enum: [property_search, specific_address, general_answerable, general_too_broad, off_topic]
+          example: property_search
+        audience:
+          type: string
+          enum: [buyer, tenant, landlord, agent, homeowner]
+          example: tenant
+        entities:
+          type: object
+          properties:
+            location:          { type: string, example: "Hackney, London" }
+            channel:           { type: string, enum: [rent, sale], example: rent }
+            bedrooms:          { type: string, example: "2" }
+            minBeds:           { type: number, nullable: true, example: 2 }
+            maxBeds:           { type: number, nullable: true, example: 2 }
+            minPrice:          { type: number, nullable: true, example: 1500 }
+            maxPrice:          { type: number, nullable: true, example: 2400 }
+            propertyType:      { type: string, example: "flat" }
+            radius:            { type: number, nullable: true }
+            furnishing:        { type: string, example: "furnished" }
+            intentSummary:     { type: string, example: "2-bed flat in Hackney under £2,400" }
+            expandedKeywords:
+              type: array
+              items: { type: string }
+              example: ["station", "tube", "underground", "commute"]
+            amenities:
+              type: array
+              items: { type: string }
+              example: ["near_station", "balcony_or_garden"]
+        confidence: { type: number, minimum: 0, maximum: 1, example: 0.95 }
+        fallback:   { type: boolean, example: false }
+        cacheHit:   { type: boolean, example: false }
+
+    # ── Alert ─────────────────────────────────────────────────────────────────
+    Alert:
+      type: object
+      properties:
+        id:        { type: string }
+        userId:    { type: string }
+        isRead:    { type: boolean, example: false }
+        createdAt: { type: string, format: date-time }
+        type:      { type: string, example: "lease-expiry" }
+        message:   { type: string }
+        propertyId:     { type: string }
+        propertyAddress: { type: string }
+        tenantId:       { type: string }
+        tenantName:     { type: string }
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        daysUntilExpiry: { type: number }
+        leaseExpiryDate: { type: string, format: date-time }
+        overdueAmount:   { type: number }
+        daysPastDue:     { type: number }
+        lastPaymentDate: { type: string, format: date-time }
+
+    # ── Error ─────────────────────────────────────────────────────────────────
+    Error:
+      type: object
+      properties:
+        statusCode: { type: integer, example: 400 }
+        message:    { type: string, example: "Validation failed" }
+        error:      { type: string, example: "Bad Request" }
+
+    SuccessResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────────────────────────────────────
+paths:
+
+  # ═══════════════════════════════════════════════════════════════
+  # HEALTH
+  # ═══════════════════════════════════════════════════════════════
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Returns `ok` with a server timestamp. No auth required. Used by Render health checks every 5 s.
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:    { type: string, example: "ok" }
+                  timestamp: { type: string, format: date-time }
+                  service:   { type: string, example: "proptii-v2-backend" }
+
+  /ping:
+    get:
+      tags: [Health]
+      summary: Alias liveness probe
+      description: Identical to /health — same response shape.
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:    { type: string, example: "ok" }
+                  timestamp: { type: string, format: date-time }
+                  service:   { type: string, example: "proptii-v2-backend" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # FLAGS
+  # ═══════════════════════════════════════════════════════════════
+
+  /flags:
+    get:
+      tags: [Flags]
+      summary: Get runtime feature flags
+      description: |
+        Returns current runtime feature flag state, cached in Redis for 60 s.
+        No auth required. Used by the frontend to gate features at runtime
+        without a redeploy.
+      responses:
+        "200":
+          description: Feature flags
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gov_data_layer:
+                    type: boolean
+                    description: Whether the GOV.UK data enrichment layer is enabled
+                    example: true
+
+  # ═══════════════════════════════════════════════════════════════
+  # AUTH
+  # ═══════════════════════════════════════════════════════════════
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user identity
+      description: Returns the authenticated user's uid, email, and resolved role.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Authenticated user identity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:   { type: string, example: "3EKbhObAE5dw0RZ7lP3cK4rYeSp1" }
+                  email: { type: string, format: email, example: "landlord@proptii.co" }
+                  role:  { type: string, nullable: true, example: "landlord" }
+        "401":
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Auth]
+      summary: Get current user identity (POST alias)
+      description: Identical to GET /auth/me — accepts POST for clients that prefer it.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Authenticated user identity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:   { type: string }
+                  email: { type: string, format: email }
+                  role:  { type: string, nullable: true }
+
+  /auth/role:
+    post:
+      tags: [Auth]
+      summary: Assign role to authenticated user
+      description: |
+        Sets the user's role in Firestore `users` collection and as a Firebase custom claim.
+        Rules:
+        - Valid roles: `tenant`, `landlord`, `agent`
+        - A user with an existing `landlord` or `agent` role cannot downgrade to `tenant` (throws 403)
+        - Optionally accepts a `source` string (e.g. `'onboarding'`) for audit logging
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [tenant, landlord, agent]
+                  example: landlord
+                source:
+                  type: string
+                  description: Optional audit source identifier
+                  example: onboarding
+      responses:
+        "201":
+          description: Role assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  role:    { type: string, example: "landlord" }
+        "400":
+          description: Invalid role value
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: Tenant cannot be downgraded to landlord/agent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # NATIVE PROPERTIES
+  # ═══════════════════════════════════════════════════════════════
+
+  /native-properties/search:
+    get:
+      tags: [Properties]
+      summary: Public property search
+      description: |
+        Full-text search across the native property catalogue. No auth required.
+        Results are normalized into a consistent shape regardless of source.
+        Supports up to 200 results per request.
+      parameters:
+        - name: q
+          in: query
+          description: Search term (address, city, postcode, title)
+          schema: { type: string, example: "2 bed flat Hackney" }
+        - name: status
+          in: query
+          description: Filter by property status (default 'vacant')
+          schema: { type: string, enum: [vacant, occupied, under-renovation], default: vacant }
+        - name: limit
+          in: query
+          description: Maximum number of results (1–200, default 50)
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Matching normalized properties
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: "#/components/schemas/NormalizedProperty" }
+                  total:  { type: integer, example: 5 }
+                  query:  { type: string, example: "2 bed flat Hackney" }
+
+  /native-properties:
+    get:
+      tags: [Properties]
+      summary: List properties by owner
+      description: |
+        Returns all properties belonging to the given userId or ownerEmail. 
+        No auth required but caller must provide at least one query param.
+        Performs a Firestore OR-style dual query (by userId + by ownerEmail),
+        de-duplicated via a Map.
+      parameters:
+        - name: userId
+          in: query
+          description: Owner's Firebase UID
+          schema: { type: string, example: "3EKbhObAE5dw0RZ7lP3cK4rYeSp1" }
+        - name: email
+          in: query
+          description: Owner's email address
+          schema: { type: string, format: email, example: "landlord@proptii.co" }
+      responses:
+        "200":
+          description: Array of property documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Property" }
+
+    post:
+      tags: [Properties]
+      summary: Create property listing
+      description: |
+        Creates a new property in the landlord's portfolio. Requires authentication
+        and role must be `landlord`, `agent`, or `homeowner`.
+        The `userId`, `ownerEmail`, and `landlordId` are auto-set from the JWT.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address, type, bedrooms]
+              properties:
+                title:        { type: string, example: "Modern 2-bed in Hackney" }
+                address:      { type: string, example: "14 Well Street, London E9 7PX" }
+                city:         { type: string, example: "London" }
+                postcode:     { type: string, example: "E9 7PX" }
+                type:         { type: string, example: "flat" }
+                bedrooms:     { type: integer, example: 2 }
+                bathrooms:    { type: integer, example: 1 }
+                squareFootage: { type: number, example: 750 }
+                rent:         { type: number, example: 2000 }
+                price:        { type: string, example: "£2,000 pcm" }
+                status:
+                  type: string
+                  enum: [vacant, occupied, under-renovation]
+                  default: vacant
+                amenities:
+                  type: array
+                  items: { type: string }
+                  example: ["parking", "garden"]
+                notes: { type: string }
+                photos:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:       { type: string }
+                      url:      { type: string, format: uri }
+                      filename: { type: string }
+                      isCover:  { type: boolean }
+      responses:
+        "201":
+          description: Property created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Property" }
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Unauthorized
+        "403":
+          description: Role not permitted (not landlord/agent/homeowner)
+
+  /native-properties/{id}:
+    get:
+      tags: [Properties]
+      summary: Get property by ID
+      description: Returns a single property document by Firestore document ID. No auth required.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: "1YSHBc0GT1mbr2LhjEPM" }
+      responses:
+        "200":
+          description: Property document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Property" }
+        "404":
+          description: Property not found
+
+    put:
+      tags: [Properties]
+      summary: Update property listing
+      description: |
+        Updates fields on an existing property. Ownership is verified — the caller's
+        UID must match `userId`, `landlordId`, or `ownerEmail` on the document.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Any subset of property fields to update
+              example:
+                status: occupied
+                tenantId: "tenant_1740530322105_ka1ryc"
+                rent: 2200
+      responses:
+        "200":
+          description: Property updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Property" }
+        "401": { description: Unauthorized }
+        "403": { description: Role not permitted }
+        "404": { description: Property not found or not owned by caller }
+
+    delete:
+      tags: [Properties]
+      summary: Delete property listing
+      description: Permanently deletes a property. Same ownership check as PUT.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Property deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: "Property deleted" }
+        "404": { description: Property not found or not owned }
+
+  # ═══════════════════════════════════════════════════════════════
+  # TENANTS
+  # ═══════════════════════════════════════════════════════════════
+
+  /tenants:
+    post:
+      tags: [Tenants]
+      summary: Create tenant record
+      description: |
+        Creates a new tenant in the `tenants` Firestore collection.
+        The caller's Firebase UID is stamped as `userId` (overrides any value in the body).
+        If `propertyId` is provided, the linked property document is also updated to
+        `status: occupied` and `tenantId: <new-id>`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTenantRequest" }
+            example:
+              name: "James Okafor"
+              email: "james.okafor@email.com"
+              phone: "+44 7911 123456"
+              propertyId: "G89SK2yhZU4o9GMX5z3o"
+              propertyAddress: "14 Kensington Gardens, London W8 4PT"
+              rentAmount: 1800
+              paymentFrequency: monthly
+              firstPaymentDate: "2026-10-01"
+              leaseStart: "2026-10-01"
+              leaseEnd: "2027-10-01"
+              status: active
+              emergencyContact:
+                name: "Amara Okafor"
+                phone: "+44 7922 987654"
+                relationship: "Spouse / Partner"
+      responses:
+        "201":
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  id:      { type: string, example: "tenant_1740530322105_ka1ryc" }
+                  tenant:  { $ref: "#/components/schemas/Tenant" }
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { description: Unauthorized }
+
+    get:
+      tags: [Tenants]
+      summary: List tenants for authenticated landlord
+      description: |
+        Returns all tenants managed by the authenticated landlord/agent.
+        The backend runs up to 4 parallel Firestore queries:
+        1. by `userId` (JWT UID)
+        2. by `userId` matching caller email (for email-keyed legacy records)
+        3. by `userId` matching the optional `?userId` query param (email fallback)
+        4. by `propertyId` (batched in groups of 30)
+        Results are de-duplicated by document ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ownedPropertyIds
+          in: query
+          description: Comma-separated list of property IDs to query tenants for
+          schema: { type: string, example: "G89SK2yhZU4o9GMX5z3o,i4gWmGOHXTI4bdeityST" }
+        - name: userId
+          in: query
+          description: Optional extra userId (email) for legacy records stored with email as userId
+          schema: { type: string, format: email, example: "landlord@proptii.co" }
+      responses:
+        "200":
+          description: Tenant list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  tenants:
+                    type: array
+                    items: { $ref: "#/components/schemas/Tenant" }
+
+  /tenants/{id}:
+    get:
+      tags: [Tenants]
+      summary: Get single tenant by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: "tenant_1740530322105_ka1ryc" }
+      responses:
+        "200":
+          description: Tenant document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  tenant:  { $ref: "#/components/schemas/Tenant" }
+        "404": { description: Tenant not found }
+
+    put:
+      tags: [Tenants]
+      summary: Update tenant record
+      description: Merges the provided fields into the tenant document using Firestore set+merge.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Any subset of tenant fields to update
+              example:
+                rentAmount: 2000
+                status: active
+                paymentStatus: current
+      responses:
+        "200":
+          description: Tenant updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+    delete:
+      tags: [Tenants]
+      summary: Delete tenant record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Tenant deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # PAYMENTS
+  # ═══════════════════════════════════════════════════════════════
+
+  /payments/bulk:
+    post:
+      tags: [Payments]
+      summary: Save or update bulk payment periods
+      description: |
+        Writes multiple rent payment period documents in a single Firestore batch.
+        Used by the frontend to generate and sync payment schedules for a tenant.
+        Each write is an upsert (set with merge). If `id` is not provided in a 
+        write, one is generated as `{tenantId}_{timestamp}_{random}`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [writes]
+              properties:
+                writes:
+                  type: array
+                  description: Array of payment period documents to write
+                  items:
+                    type: object
+                    required: [tenantId, amountDue, periodStart, periodEnd, dueDate, status]
+                    properties:
+                      id:          { type: string, description: "Optional — generated if omitted" }
+                      tenantId:    { type: string, example: "tenant_1740530322105_ka1ryc" }
+                      managerId:   { type: string, example: "3EKbhObAE5dw0RZ7lP3cK4rYeSp1" }
+                      amountDue:   { type: number, example: 1800 }
+                      periodStart: { type: string, format: date-time }
+                      periodEnd:   { type: string, format: date-time }
+                      dueDate:     { type: string, format: date-time }
+                      status:      { type: string, enum: [pending, paid, overdue] }
+                      paidAt:      { type: string, format: date-time, nullable: true }
+                      notes:       { type: string }
+                      createdAt:   { type: string, format: date-time }
+            example:
+              writes:
+                - tenantId: "tenant_1740530322105_ka1ryc"
+                  managerId: "3EKbhObAE5dw0RZ7lP3cK4rYeSp1"
+                  amountDue: 1800
+                  periodStart: "2026-10-01T00:00:00.000Z"
+                  periodEnd: "2026-10-31T23:59:59.999Z"
+                  dueDate: "2026-10-01T00:00:00.000Z"
+                  status: pending
+                  createdAt: "2026-09-28T10:00:00.000Z"
+      responses:
+        "201":
+          description: Batch committed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  count:   { type: integer, example: 18 }
+
+  /payments/tenant/{tenantId}:
+    get:
+      tags: [Payments]
+      summary: Get all payment periods for a tenant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, example: "tenant_1740530322105_ka1ryc" }
+      responses:
+        "200":
+          description: Payment periods
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  payments:
+                    type: array
+                    items: { $ref: "#/components/schemas/PaymentPeriod" }
+
+  /payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Get single payment period by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: "tenant_1740530322105_2026-10-01" }
+      responses:
+        "200":
+          description: Payment period
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  period:  { $ref: "#/components/schemas/PaymentPeriod" }
+        "404": { description: Payment period not found }
+
+  /payments/{id}/status:
+    put:
+      tags: [Payments]
+      summary: Update payment period status
+      description: |
+        Updates the `status` field of a payment period.
+        When status is set to `paid`, `paidAt` is automatically stamped with the current ISO timestamp.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, paid, overdue]
+                  example: paid
+                options:
+                  type: object
+                  properties:
+                    paidAt: { type: string, format: date-time }
+                    notes:  { type: string }
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # TENANT INVITATIONS
+  # ═══════════════════════════════════════════════════════════════
+
+  /tenant-invitations:
+    post:
+      tags: [Tenant Invitations]
+      summary: Record a tenant invitation
+      description: |
+        Saves an invitation record in the `tenant_invitations` Firestore collection.
+        Called after a landlord sends an invite email, so the invitation shows in the
+        Clients → Invitations tab.
+        `landlordId` and `sentAt` are auto-stamped from the JWT and server time if not provided.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, propertyId]
+              properties:
+                email:           { type: string, format: email, example: "james.okafor@email.com" }
+                propertyId:      { type: string, example: "G89SK2yhZU4o9GMX5z3o" }
+                propertyAddress: { type: string, example: "14 Kensington Gardens, London W8 4PT" }
+                landlordEmail:   { type: string, format: email }
+                inviteType:      { type: string, enum: [new-tenant, existing-tenant], default: new-tenant }
+                customMessage:   { type: string }
+                status:          { type: string, enum: [pending, accepted, expired], default: pending }
+                sentAt:          { type: string, format: date-time }
+      responses:
+        "200":
+          description: Invitation recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  id:      { type: string, example: "inv_3EKbhObAE5dw_1790530322105" }
+
+    get:
+      tags: [Tenant Invitations]
+      summary: List invitations for landlord
+      description: Returns all invitations sent by the authenticated landlord, ordered by sentAt descending (limit 100).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: landlordId
+          in: query
+          description: Override landlordId (defaults to JWT uid)
+          schema: { type: string }
+      responses:
+        "200":
+          description: Invitation list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invitations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:              { type: string }
+                        email:           { type: string, format: email }
+                        propertyId:      { type: string }
+                        propertyAddress: { type: string }
+                        landlordId:      { type: string }
+                        landlordEmail:   { type: string }
+                        inviteType:      { type: string }
+                        customMessage:   { type: string }
+                        status:          { type: string }
+                        sentAt:          { type: string, format: date-time }
+                        updatedAt:       { type: string, format: date-time }
+
+  /tenant-invitations/{id}:
+    put:
+      tags: [Tenant Invitations]
+      summary: Update invitation status
+      description: Updates the `status` field of an invitation (e.g. from `pending` to `accepted`).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, accepted, expired]
+                  example: accepted
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # LANDLORDS
+  # ═══════════════════════════════════════════════════════════════
+
+  /landlords:
+    get:
+      tags: [Landlords]
+      summary: List all landlords and agents
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Landlord/agent user records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:        { type: string }
+                        email:     { type: string, format: email }
+                        role:      { type: string, enum: [landlord, agent] }
+                        name:      { type: string }
+                        createdAt: { type: string, format: date-time }
+                        updatedAt: { type: string, format: date-time }
+
+  /landlords/check:
+    get:
+      tags: [Landlords]
+      summary: Check if an email belongs to a landlord or agent
+      description: No auth required. Used by onboarding to verify landlord status before login.
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema: { type: string, format: email, example: "landlord@proptii.co" }
+      responses:
+        "200":
+          description: Landlord check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists: { type: boolean, example: true }
+                  user:
+                    type: object
+                    nullable: true
+                    description: Present only when exists is true
+
+  /landlords/register:
+    post:
+      tags: [Landlords]
+      summary: Register a new landlord profile
+      description: "No auth required. Creates a user document in Firestore users collection with role landlord."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:       { type: string, format: email, example: "landlord@proptii.co" }
+                name:        { type: string }
+                phone:       { type: string }
+                role:        { type: string, default: landlord }
+                companyName: { type: string }
+      responses:
+        "201":
+          description: Landlord registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  id:      { type: string }
+                  email:   { type: string, format: email }
+                  role:    { type: string, example: "landlord" }
+
+  /clients/landlords:
+    get:
+      tags: [Landlords]
+      summary: List client landlords (frontend alias)
+      description: Alias for GET /landlords — used by the frontend landlord service.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Landlord records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items: { type: object }
+
+    post:
+      tags: [Landlords]
+      summary: Create landlord record (frontend alias)
+      description: Alias for POST /landlords/register with auth.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                name:  { type: string }
+                phone: { type: string }
+      responses:
+        "201":
+          description: Landlord created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  id:      { type: string }
+
+  /clients/landlords/{id}:
+    get:
+      tags: [Landlords]
+      summary: Get single landlord by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Landlord record
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  user:    { type: object, nullable: true }
+
+    put:
+      tags: [Landlords]
+      summary: Update landlord record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+    delete:
+      tags: [Landlords]
+      summary: Delete landlord record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # ALERTS
+  # ═══════════════════════════════════════════════════════════════
+
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: List in-app alerts for authenticated user
+      description: |
+        Returns all alerts for the authenticated user from the `alerts` Firestore collection,
+        ordered by `createdAt` descending. Alert types include `lease-expiry`, `rent-arrears`,
+        `maintenance`, and custom types.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Alert" }
+
+    post:
+      tags: [Alerts]
+      summary: Create alert
+      description: Creates a new alert for the authenticated user. Also emits an `alert_created` SSE event to connected clients.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:            { type: string, example: "lease-expiry" }
+                message:         { type: string }
+                propertyId:      { type: string }
+                propertyAddress: { type: string }
+                tenantId:        { type: string }
+                tenantName:      { type: string }
+                severity:        { type: string, enum: [low, medium, high, critical] }
+                daysUntilExpiry: { type: number }
+                leaseExpiryDate: { type: string, format: date-time }
+                overdueAmount:   { type: number }
+                daysPastDue:     { type: number }
+      responses:
+        "201":
+          description: Alert created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Alert" }
+
+  /alerts/events:
+    get:
+      tags: [Alerts]
+      summary: Subscribe to real-time alert events (SSE)
+      description: |
+        Server-Sent Events stream for real-time alert push notifications.
+        The client receives events when alerts are created, read, or deleted.
+        Keep the connection open — the server sends a keepalive `: ping` every 25 s.
+        **Response is `text/event-stream`, not JSON.**
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: SSE stream (text/event-stream)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  data: {"type":"alert_created","alertId":"abc123","userId":"uid123"}
+
+  /alerts/{id}/read:
+    patch:
+      tags: [Alerts]
+      summary: Mark alert as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+  /alerts/{id}:
+    delete:
+      tags: [Alerts]
+      summary: Delete alert
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Alert deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # VIEWING REQUESTS
+  # ═══════════════════════════════════════════════════════════════
+
+  /viewing-requests:
+    post:
+      tags: [Viewing Requests]
+      summary: Create viewing request
+      description: |
+        Tenant creates a viewing request for a property. 
+        `tenantId` and `tenantEmail` are auto-set from the JWT.
+        Status defaults to `pending`. Also emits a `viewing_created` SSE event.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [propertyId, requestedDate]
+              properties:
+                propertyId:     { type: string, example: "G89SK2yhZU4o9GMX5z3o" }
+                propertyTitle:  { type: string, example: "2-bed flat in Hackney" }
+                requestedDate:  { type: string, format: date, example: "2026-10-15" }
+                requestedTime:  { type: string, example: "14:00" }
+                notes:          { type: string }
+                landlordId:     { type: string }
+                agentId:        { type: string }
+                agentEmail:     { type: string, format: email }
+      responses:
+        "201":
+          description: Viewing request created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ViewingRequest" }
+
+    get:
+      tags: [Viewing Requests]
+      summary: List viewing requests
+      description: |
+        Returns viewing requests relevant to the authenticated user.
+        Landlords/agents see requests for their properties.
+        Tenants see their own requests.
+        Filtering is done in Firestore based on the caller's role.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Viewing requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ViewingRequest" }
+
+  /viewing-requests/{id}:
+    get:
+      tags: [Viewing Requests]
+      summary: Get single viewing request
+      description: Returns viewing request details. Throws 403 if caller is not a participant.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Viewing request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ViewingRequest" }
+        "403": { description: Not a participant }
+        "404": { description: Not found }
+
+    put:
+      tags: [Viewing Requests]
+      summary: Update viewing request status
+      description: |
+        Updates the status of a viewing request (e.g. landlord confirms or cancels).
+        Emits a `viewing_updated` SSE event to all participants.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, confirmed, cancelled, completed]
+                  example: confirmed
+                notes: { type: string }
+      responses:
+        "200":
+          description: Updated viewing request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ViewingRequest" }
+
+    delete:
+      tags: [Viewing Requests]
+      summary: Cancel viewing request
+      description: Sets status to `cancelled`. Emits `viewing_deleted` SSE event.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Viewing cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: "Viewing request cancelled" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # SAVED PROPERTIES
+  # ═══════════════════════════════════════════════════════════════
+
+  /saved-properties:
+    get:
+      tags: [Saved Properties]
+      summary: Get saved properties for authenticated user
+      description: |
+        Returns all saved properties for the tenant. Also available at `/users/me/saved-properties`.
+        Supports cursor-based pagination using `lastVisible` (document ID of last item from previous page).
+        `allIds` always contains the complete list of all saved property IDs (unpaginated).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, example: 6 }
+        - name: lastVisible
+          in: query
+          description: Pagination cursor — pass the `lastVisible` from the previous response
+          schema: { type: string }
+      responses:
+        "200":
+          description: Saved property list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { type: object, description: "Full saved property document" }
+                  allIds:
+                    type: array
+                    items: { type: string }
+                    description: Complete list of all saved property IDs (not paginated)
+                  lastVisible: { type: string, nullable: true }
+                  hasMore:     { type: boolean }
+
+    post:
+      tags: [Saved Properties]
+      summary: Save a property
+      description: |
+        Adds a property to the user's saved list.
+        Doc ID is `{userId}_{encodeURIComponent(propertyId)}`.
+        If the property is already saved, it is overwritten (idempotent).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                propertyId: { type: string, example: "1YSHBc0GT1mbr2LhjEPM" }
+                id:         { type: string, description: "Alias for propertyId" }
+                property:   { type: object, description: "Full property snapshot to denormalize" }
+      responses:
+        "201":
+          description: Property saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:         { type: string }
+                  docId:      { type: string }
+                  userId:     { type: string }
+                  propertyId: { type: string }
+                  savedAt:    { type: string, format: date-time }
+
+  /saved-properties/{propertyId}:
+    delete:
+      tags: [Saved Properties]
+      summary: Unsave a property
+      description: Removes the property from the user's saved list.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema: { type: string, example: "1YSHBc0GT1mbr2LhjEPM" }
+      responses:
+        "200":
+          description: Property unsaved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: "Property unsaved successfully" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # CONTRACTS
+  # ═══════════════════════════════════════════════════════════════
+
+  /contracts:
+    get:
+      tags: [Contracts]
+      summary: List contracts for authenticated user (tenant view)
+      description: Returns all contracts where the caller's email matches `tenantEmail`, sorted by `sentDate` descending.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Contracts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Contract" }
+
+    post:
+      tags: [Contracts]
+      summary: Save signed contract record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tenantEmail:     { type: string, format: email }
+                landlordEmail:   { type: string, format: email }
+                title:           { type: string }
+                contractName:    { type: string }
+                propertyAddress: { type: string }
+                fileUrl:         { type: string, format: uri }
+                status:          { type: string, default: signed }
+      responses:
+        "201":
+          description: Contract saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:    { type: boolean }
+                  id:         { type: string }
+                  contractId: { type: string }
+
+  /contracts/landlord:
+    get:
+      tags: [Contracts]
+      summary: List contracts for landlord/agent
+      description: Returns contracts matching the caller's userId and/or email. Supports optional filtering by status and propertyId.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: string }
+        - name: landlordEmail
+          in: query
+          schema: { type: string, format: email }
+        - name: status
+          in: query
+          schema: { type: string, enum: [sent, signed, pending, expired, cancelled] }
+        - name: propertyId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Landlord contracts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  contracts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Contract" }
+
+    post:
+      tags: [Contracts]
+      summary: Send contract to tenant
+      description: |
+        Creates and stores a contract record. Supports both JSON and multipart/form-data.
+        When sending via multipart, include the PDF as `file` and any JSON fields in `contractData` (stringified JSON).
+        Emits a `contract_sent` SSE event.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantEmail, title]
+              properties:
+                tenantEmail:     { type: string, format: email, example: "james.okafor@email.com" }
+                tenantName:      { type: string }
+                landlordEmail:   { type: string, format: email }
+                propertyId:      { type: string }
+                propertyAddress: { type: string }
+                title:           { type: string, example: "Assured Shorthold Tenancy Agreement" }
+                contractName:    { type: string }
+                contractType:    { type: string, default: "tenancy-agreement" }
+                fileUrl:         { type: string, format: uri }
+                fileBase64:      { type: string, description: "Base64 encoded PDF" }
+                status:          { type: string, default: sent }
+                sentDate:        { type: string, format: date-time }
+                expiryDate:      { type: string, format: date-time }
+      responses:
+        "201":
+          description: Contract sent and stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:    { type: boolean }
+                  id:         { type: string }
+                  contractId: { type: string }
+
+  /contracts/landlord/{id}:
+    get:
+      tags: [Contracts]
+      summary: Get single landlord contract
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Contract
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:  { type: boolean }
+                  contract: { $ref: "#/components/schemas/Contract" }
+
+    put:
+      tags: [Contracts]
+      summary: Update contract status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:     { type: string }
+                signedDate: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+    delete:
+      tags: [Contracts]
+      summary: Delete contract
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessResponse" }
+
+  /contracts/templates:
+    get:
+      tags: [Contracts]
+      summary: List contract templates
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, default: active }
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:   { type: boolean }
+                  templates: { type: array, items: { type: object } }
+
+    post:
+      tags: [Contracts]
+      summary: Save contract template
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:    { type: string }
+                content: { type: string }
+                type:    { type: string }
+                status:  { type: string, default: active }
+      responses:
+        "201":
+          description: Template saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:    { type: boolean }
+                  templateId: { type: string }
+
+  /contracts/send-signed-contract:
+    post:
+      tags: [Contracts]
+      summary: Email signed contract PDF to recipient
+      description: |
+        Sends the signed contract PDF as an email attachment via Resend.
+        Accepts multipart/form-data with the PDF as `attachment` field.
+        25 MB file size limit.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [to, contractName]
+              properties:
+                to:            { type: string, format: email }
+                recipientName: { type: string }
+                contractName:  { type: string }
+                attachment:
+                  type: string
+                  format: binary
+                  description: Signed PDF file
+                htmlContent:   { type: string }
+      responses:
+        "200":
+          description: Email dispatched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:   { type: boolean }
+                  message:   { type: string }
+                  messageId: { type: string }
+
+  # ═══════════════════════════════════════════════════════════════
+  # EMAIL
+  # ═══════════════════════════════════════════════════════════════
+
+  /email/send:
+    post:
+      tags: [Email]
+      summary: Send transactional email via Resend
+      description: |
+        Sends a transactional email using the Resend API. No authentication required.
+        The `from` address is always `Proptii <noreply@mail.proptii.co>` (configured via `EMAIL_FROM_ADDRESS` env var).
+        
+        **Important:** The endpoint always returns HTTP 200 even on Resend API errors.
+        Check `response.success` to determine if the email was actually sent.
+        
+        Accepts either `application/json` or `multipart/form-data` (for attachment).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to:
+                  type: string
+                  format: email
+                  example: "james.okafor@email.com"
+                subject:
+                  type: string
+                  default: "Notification from Proptii"
+                  example: "You've been invited as a tenant"
+                html:
+                  type: string
+                  description: Full HTML email body
+                  example: "<h1>Welcome</h1><p>You have been invited...</p>"
+            example:
+              to: "james.okafor@email.com"
+              subject: "Tenant invitation — 14 Kensington Gardens"
+              html: "<p>You have been invited to create your tenant profile...</p>"
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                to:          { type: string, format: email }
+                subject:     { type: string }
+                html:        { type: string }
+                attachments:
+                  type: string
+                  format: binary
+                  description: Optional file attachment (max 25 MB)
+      responses:
+        "200":
+          description: |
+            Always HTTP 200. Check `success` field in the response body.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:   { type: boolean }
+                  messageId: { type: string, description: "Resend message ID (present when success: true)" }
+                  error:     { type: string, description: "Error message (present when success: false)" }
+              examples:
+                success:
+                  value: { success: true, messageId: "01a0e7b1-a982-75fa-9740-faa71838925a" }
+                failure:
+                  value: { success: false, error: "Invalid 'to' field. Please use our testing email address." }
+
+  /email/send-base64:
+    post:
+      tags: [Email]
+      summary: Send email with base64-encoded attachment
+      description: Same as /email/send but accepts attachment as a base64 string in the JSON body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to:                  { type: string, format: email }
+                subject:             { type: string }
+                html:                { type: string }
+                attachmentBase64:    { type: string, description: "Base64 encoded file content" }
+                attachmentFilename:  { type: string, example: "contract.pdf" }
+                attachmentMimeType:  { type: string, example: "application/pdf" }
+      responses:
+        "200":
+          description: Email dispatched (check success field)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:   { type: boolean }
+                  messageId: { type: string }
+                  error:     { type: string }
+
+  # ═══════════════════════════════════════════════════════════════
+  # STORAGE
+  # ═══════════════════════════════════════════════════════════════
+
+  /storage/upload:
+    post:
+      tags: [Storage]
+      summary: Upload file to Firebase Cloud Storage
+      description: |
+        Uploads a file to Firebase Cloud Storage. Returns a permanent download URL
+        with a `firebaseStorageDownloadTokens` metadata token.
+        
+        Auth is optional — unauthenticated uploads are permitted for referencing document flows.
+        Authenticated uploads are scoped to `{folder}/{userId}/` automatically.
+        Maximum file size: 25 MB.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: folder
+          in: query
+          description: Storage folder path (e.g. 'properties', 'referencing')
+          schema: { type: string, example: "properties" }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload (max 25 MB)
+                folder:
+                  type: string
+                  description: Target folder (can also pass via query param)
+      responses:
+        "201":
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:  { type: boolean, example: true }
+                  url:      { type: string, format: uri, example: "https://firebasestorage.googleapis.com/v0/b/proptii-16946.appspot.com/o/properties%2Fphoto.jpg?alt=media&token=abc123" }
+                  fileName: { type: string, example: "photo.jpg" }
+                  fullPath: { type: string, example: "properties/3EKbhObAE5dw0RZ7lP3cK4rYeSp1/photo.jpg" }
+
+  /storage/file:
+    delete:
+      tags: [Storage]
+      summary: Delete file from Firebase Cloud Storage
+      description: |
+        Deletes a file by its storage path. Ownership is enforced — the path
+        must contain the caller's UID unless the user has admin role.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: path
+          in: query
+          description: Full storage path of the file to delete
+          schema: { type: string, example: "properties/3EKbhObAE5dw0RZ7lP3cK4rYeSp1/photo.jpg" }
+      responses:
+        "200":
+          description: File deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  # ═══════════════════════════════════════════════════════════════
+  # USER PROFILE
+  # ═══════════════════════════════════════════════════════════════
+
+  /users/profile:
+    get:
+      tags: [User Profile]
+      summary: Get authenticated user profile
+      description: Returns the full user profile document from the `users` Firestore collection.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:         { type: string }
+                  email:       { type: string, format: email }
+                  name:        { type: string }
+                  phone:       { type: string }
+                  role:        { type: string }
+                  companyName: { type: string }
+                  photoURL:    { type: string, format: uri }
+                  createdAt:   { type: string, format: date-time }
+                  updatedAt:   { type: string, format: date-time }
+
+    put:
+      tags: [User Profile]
+      summary: Update user profile
+      description: |
+        Merges the provided fields into the user's profile document.
+        Sensitive fields (`role`, `admin`, `uid`) are stripped for non-admin callers.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:        { type: string }
+                phone:       { type: string }
+                companyName: { type: string }
+                photoURL:    { type: string, format: uri }
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:       { type: string }
+                  updatedAt: { type: string, format: date-time }
+
+  /reviews:
+    get:
+      tags: [User Profile]
+      summary: List property reviews
+      description: No auth required.
+      parameters:
+        - name: propertyId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:         { type: string }
+                    userId:     { type: string }
+                    propertyId: { type: string }
+                    rating:     { type: number, minimum: 1, maximum: 5 }
+                    comment:    { type: string }
+                    createdAt:  { type: string, format: date-time }
+
+    post:
+      tags: [User Profile]
+      summary: Create property review
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [propertyId, rating]
+              properties:
+                propertyId: { type: string }
+                rating:     { type: number, minimum: 1, maximum: 5 }
+                comment:    { type: string }
+      responses:
+        "201":
+          description: Review created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:        { type: string }
+                  userId:    { type: string }
+                  createdAt: { type: string, format: date-time }
+
+  /reviews/stats:
+    get:
+      tags: [User Profile]
+      summary: Get review statistics
+      description: No auth required.
+      parameters:
+        - name: propertyId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Review stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:     { type: integer }
+                  average:   { type: number }
+                  breakdown:
+                    type: object
+                    description: "Count per rating value (1–5)"
+                    example: { "5": 12, "4": 5, "3": 2, "2": 0, "1": 1 }
+
+  # ═══════════════════════════════════════════════════════════════
+  # INSIGHTS
+  # ═══════════════════════════════════════════════════════════════
+
+  /insights:
+    get:
+      tags: [Insights]
+      summary: Get market insights
+      description: Returns market intelligence data from the `market_insights` Firestore collection. Falls back to static data if empty.
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: location
+          in: query
+          schema: { type: string, example: "London" }
+      responses:
+        "200":
+          description: Market insights
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { type: object }
+                  source: { type: string, enum: [cache, static] }
+
+  /insights/price-trends:
+    get:
+      tags: [Insights]
+      summary: Get price trend data by postcode
+      parameters:
+        - name: postcode
+          in: query
+          schema: { type: string, example: "E9 7PX" }
+      responses:
+        "200":
+          description: Price trends
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      postcode:          { type: string }
+                      avgPricePerSqFt:   { type: number }
+                      yearOnYearChange:  { type: number }
+                      quarterlyChange:   { type: number }
+                      medianRent:        { type: number }
+                      rentalYield:       { type: number }
+
+  /insights/demand:
+    get:
+      tags: [Insights]
+      summary: Get demand metrics by location
+      parameters:
+        - name: location
+          in: query
+          schema: { type: string, example: "Hackney" }
+      responses:
+        "200":
+          description: Demand metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      location:               { type: string }
+                      searchesPerProperty:    { type: number }
+                      avgTimeToRent:          { type: number, description: "Average days on market" }
+                      competitivenessScore:   { type: number, minimum: 0, maximum: 100 }
+                      demandTrend:            { type: string, enum: [rising, stable, falling] }
+
+  # ═══════════════════════════════════════════════════════════════
+  # BILLING
+  # ═══════════════════════════════════════════════════════════════
+
+  /billing/plans:
+    get:
+      tags: [Billing]
+      summary: Get available subscription plans
+      description: No auth required. Returns the three plans (free, renter_pro, landlord_pro).
+      responses:
+        "200":
+          description: Plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:           { type: string, example: "landlord_pro" }
+                    name:         { type: string, example: "Landlord Pro" }
+                    priceMonthly: { type: number, example: 29 }
+                    priceAnnual:  { type: number, example: 290 }
+                    features:
+                      type: array
+                      items: { type: string }
+
+  /billing/status:
+    get:
+      tags: [Billing]
+      summary: Get subscription status for authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Subscription status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasActiveSubscription: { type: boolean }
+                  planId:                { type: string }
+                  status:                { type: string }
+                  currentPeriodEnd:      { type: string, format: date-time }
+
+  /billing/checkout:
+    post:
+      tags: [Billing]
+      summary: Create checkout session
+      description: Initiates a subscription checkout. Currently returns a mock session — live Stripe integration pending.
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                planId: { type: string, example: "landlord_pro" }
+                cycle:  { type: string, enum: [monthly, annual], example: "monthly" }
+      responses:
+        "201":
+          description: Checkout session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:   { type: string, example: "cs_mock_1790530322105" }
+                  url:         { type: string, format: uri }
+                  checkoutUrl: { type: string, format: uri }
+
+  # ═══════════════════════════════════════════════════════════════
+  # SEARCH CLASSIFIER
+  # ═══════════════════════════════════════════════════════════════
+
+  /search/classify:
+    post:
+      tags: [Search Classifier]
+      summary: Classify search query intent and extract entities
+      description: |
+        AI-powered search intent classifier. Takes a free-text property search query and returns:
+        - The intent (property_search, specific_address, general_answerable, etc.)
+        - The likely audience (buyer, tenant, landlord, agent, homeowner)
+        - Extracted entities (location, bedrooms, price range, property type, amenities)
+        - Expanded keywords for improved search matching
+        
+        **Performance guarantees (PRD §1.3):**
+        - Hard timeout: 2,500 ms — returns a safe fallback on breach (never blocks a search)
+        - Redis cache: 24-hour TTL per normalised query — `cacheHit: true` in response
+        - Rate limit: 15 requests / minute / IP
+        
+        Uses Gemini (primary) → OpenRouter (fallback). If neither key is configured,
+        returns `{ intent: 'property_search', fallback: true }` on every call.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  maxLength: 500
+                  example: "2 bed flat near good schools in Bristol under £1,500 pcm"
+      responses:
+        "200":
+          description: Classification result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClassifierResult" }
+              examples:
+                property_search:
+                  summary: Typical rental search
+                  value:
+                    intent: property_search
+                    audience: tenant
+                    entities:
+                      location: "Bristol"
+                      channel: rent
+                      bedrooms: "2"
+                      minBeds: 2
+                      maxBeds: 2
+                      maxPrice: 1500
+                      propertyType: flat
+                      intentSummary: "2-bed flat in Bristol under £1,500 with good local schools"
+                      expandedKeywords: ["school", "catchment", "primary", "secondary", "ofsted"]
+                      amenities: []
+                    confidence: 0.92
+                    fallback: false
+                    cacheHit: false
+                fallback:
+                  summary: Timeout / AI unavailable fallback
+                  value:
+                    intent: property_search
+                    audience: buyer
+                    entities: {}
+                    confidence: 0
+                    fallback: true
+                    cacheHit: false
+        "429":
+          description: Rate limit exceeded (15 req/min/IP)
+
+  # ═══════════════════════════════════════════════════════════════
+  # PROPERTY FACTS
+  # ═══════════════════════════════════════════════════════════════
+
+  /properties/facts:
+    post:
+      tags: [Property Facts]
+      summary: Batch-fetch property facts by listing IDs or UPRNs
+      description: |
+        Returns GOV.UK property facts (title numbers, flags, UPRN) for a batch of listings.
+        Missing keys in the response mean the property is unresolved — never null-filled (PRD rule).
+        Rate limited to 20 requests / minute / IP.
+        Maximum 50 listing IDs and 50 UPRNs per request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                listingIds:
+                  type: array
+                  items: { type: string }
+                  maxItems: 50
+                  example: ["h5ahgu", "h1ejqwg", "hqf2eb1"]
+                uprns:
+                  type: array
+                  items: { type: string }
+                  maxItems: 50
+                  example: ["10014050498", "10014050499"]
+      responses:
+        "200":
+          description: Map of listingId/uprn → PropertyFactsDoc (absent key = unresolved)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    uprn:         { type: string }
+                    titleNumber:  { type: string, example: "TGL123456" }
+                    flags:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:    { type: string }
+                          label: { type: string }
+                          value: { type: string }
+                    match: { type: string, enum: [exact, partial, none] }
+
+  /properties/{listingId}/facts:
+    get:
+      tags: [Property Facts]
+      summary: Get property facts for single listing
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema: { type: string, example: "h5ahgu" }
+        - name: uprn
+          in: query
+          description: Optional explicit UPRN to look up
+          schema: { type: string }
+      responses:
+        "200":
+          description: Property facts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  listingId:   { type: string }
+                  uprn:        { type: string }
+                  titleNumber: { type: string }
+                  flags:       { type: array, items: { type: object } }
+                  match:       { type: string, enum: [exact, partial, none] }
+        "404": { description: Property facts not found }
+
+  # ═══════════════════════════════════════════════════════════════
+  # PROPERTY REPORT (STREAMING)
+  # ═══════════════════════════════════════════════════════════════
+
+  /properties/report:
+    post:
+      tags: [Property Report]
+      summary: Generate streaming property due-diligence report
+      description: |
+        Generates a comprehensive property report for a UK address. The response is
+        streamed as newline-delimited JSON (`application/x-ndjson`).
+        
+        **Stream format:**
+        - First chunk: `{ "type": "initial", "data": { ...full report skeleton } }`
+        - Subsequent chunks: `{ "type": "chunk", "module": "epc|flood|crime|heritage", "data": {...} }`
+        
+        **Postcode resolution:** Attempted in order:
+        1. Regex extraction from `address.display`
+        2. `postcodes.io` lookup from `address.coordinates`
+        3. OpenStreetMap geocoding
+        4. `postcodes.io` from resolved coordinates
+        Returns HTTP 400 if postcode cannot be resolved.
+        
+        Rate limited to 20 requests / minute / IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listingId, address]
+              properties:
+                listingId:
+                  type: string
+                  example: "h5ahgu"
+                address:
+                  type: object
+                  required: [display]
+                  properties:
+                    display:
+                      type: string
+                      example: "14 Well Street, London E9 7PX"
+                    street:
+                      type: string
+                      example: "14 Well Street"
+                    postcode:
+                      type: string
+                      example: "E9 7PX"
+                    coordinates:
+                      type: object
+                      properties:
+                        lat: { type: number, example: 51.5365 }
+                        lng: { type: number, example: -0.0546 }
+                listingPrice:  { type: number, example: 400000 }
+                rent:          { type: number, example: 2000 }
+      responses:
+        "200":
+          description: Streaming NDJSON report
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                description: Newline-delimited JSON stream. Each line is a JSON object.
+                example: |
+                  {"type":"initial","data":{"sources":[...],"local":{"flood":null,"crime":null}}}
+                  {"type":"chunk","module":"epc","data":{"rating":"B","score":82}}
+                  {"type":"chunk","module":"flood","data":{"risk":"very-low"}}
+        "400": { description: Postcode could not be resolved from provided address }
+
+  # ═══════════════════════════════════════════════════════════════
+  # TENANT DASHBOARD
+  # ═══════════════════════════════════════════════════════════════
+
+  /tenant-dashboard/summary:
+    get:
+      tags: [Tenant Dashboard]
+      summary: Get tenant dashboard summary stats
+      description: Returns counts of saved properties, viewing requests, and referencing applications for the tenant.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  savedCount:       { type: integer, example: 5 }
+                  viewingsCount:    { type: integer, example: 2 }
+                  referencingCount: { type: integer, example: 1 }
+                  user:
+                    type: object
+                    properties:
+                      uid:   { type: string }
+                      email: { type: string }
+                      role:  { type: string }
+
+  # ═══════════════════════════════════════════════════════════════
+  # REFERENCING — key endpoints
+  # ═══════════════════════════════════════════════════════════════
+
+  /referencing/status/{tenantEmail}:
+    get:
+      tags: [Referencing]
+      summary: Check referencing status by tenant email
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantEmail
+          in: path
+          required: true
+          schema: { type: string, format: email, example: "james.okafor@email.com" }
+      responses:
+        "200":
+          description: Referencing status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [none, draft, submitted]
+                  submissionId:
+                    type: string
+                    nullable: true
+
+  /referencing/identity:
+    post:
+      tags: [Referencing]
+      summary: Save identity section
+      description: |
+        Saves the identity section of a referencing application. Also accepts
+        `PUT /applications/:id/identity`. Auth is optional.
+        
+        Any base64-encoded images in `identityProof`, `identityDocument` fields are
+        automatically uploaded to Firebase Storage and replaced with a URL object.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:  { type: string }
+                lastName:   { type: string }
+                dateOfBirth: { type: string, format: date }
+                nationality: { type: string }
+                identityProof:
+                  type: object
+                  description: "Either { url, storagePath } or base64 data that will be auto-uploaded"
+      responses:
+        "200":
+          description: Section saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  section: { type: string, example: "identity" }
+                  data:    { type: object }
+
+  /referencing/shares:
+    post:
+      tags: [Referencing]
+      summary: Share referencing passport with a landlord/agent
+      description: Creates a shareable view link and a claim token for a landlord to access the passport.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipientEmail]
+              properties:
+                recipientEmail:   { type: string, format: email }
+                recipientName:    { type: string }
+                recipientRole:    { type: string, enum: [landlord, agent] }
+                tenantName:       { type: string }
+                propertyAddress:  { type: string }
+                notes:            { type: string }
+                agencyName:       { type: string }
+      responses:
+        "200":
+          description: Share created with view and claim tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:    { type: boolean }
+                  share:      { type: object }
+                  viewToken:  { type: string, description: "Token for public passport view URL" }
+                  claimToken: { type: string, description: "Token for landlord to claim the passport" }
+                  expiresAt:  { type: string, format: date-time }
+
+  /referencing/public/{viewToken}:
+    get:
+      tags: [Referencing]
+      summary: View public referencing passport (no auth)
+      description: Publicly accessible passport view using the share token. No authentication required.
+      parameters:
+        - name: viewToken
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Passport view data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  share:
+                    type: object
+                    properties:
+                      tenantName:      { type: string }
+                      recipientName:   { type: string }
+                      propertyAddress: { type: string }
+                      notes:           { type: string }
+                      status:          { type: string }
+                      expiresAt:       { type: string, format: date-time }
+                      claimToken:      { type: string }
+                  formData: { type: object, description: "Tenant referencing data with base64 stripped" }
+        "200 (expired)":
+          description: Link expired
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: false }
+                  expired: { type: boolean, example: true }
+                  message: { type: string }
+        "404": { description: Invalid or not found }
+
+  /referencing/request:
+    post:
+      tags: [Referencing]
+      summary: Send referencing invite email to tenant
+      description: Landlord/agent sends a referencing request to a tenant, including a link to start their application.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantEmail]
+              properties:
+                tenantEmail:     { type: string, format: email }
+                tenantName:      { type: string }
+                propertyAddress: { type: string }
+                landlordName:    { type: string }
+      responses:
+        "200":
+          description: Request email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string, example: "Request email sent" }
+
+  # ═══════════════════════════════════════════════════════════════
+  # REFEREE & GUARANTOR
+  # ═══════════════════════════════════════════════════════════════
+
+  /referee-guarantor-responses:
+    get:
+      tags: [Referee & Guarantor]
+      summary: List referee/guarantor responses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Responses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  responses:
+                    type: array
+                    items: { type: object }
+
+    post:
+      tags: [Referee & Guarantor]
+      summary: Submit referee or guarantor response
+      description: |
+        No auth required — referee/guarantors submit this from email links.
+        If `type` is `guarantor`, the service also:
+        1. Reflects the guarantor status back into the referencing application
+        2. Sends completion emails to both tenant and landlord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tenantId:       { type: string }
+                tenantEmail:    { type: string, format: email }
+                refereeEmail:   { type: string, format: email }
+                refereeName:    { type: string }
+                type:           { type: string, enum: [referee, guarantor] }
+                status:         { type: string, enum: [approved, declined, pending] }
+                comments:       { type: string }
+                token:          { type: string }
+      responses:
+        "201":
+          description: Response saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  id:      { type: string }
+
+  /referencing/invite-guarantor:
+    post:
+      tags: [Referee & Guarantor]
+      summary: Send guarantor invitation
+      description: Sends an email to a guarantor with a link to submit their details. No auth required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [guarantorName, guarantorEmail]
+              properties:
+                guarantorName:  { type: string, example: "Mrs Helen Okafor" }
+                guarantorEmail: { type: string, format: email }
+                guarantorPhone: { type: string }
+                message:        { type: string }
+                tenantName:     { type: string }
+                tenantEmail:    { type: string, format: email }
+                tenantId:       { type: string }
+      responses:
+        "200":
+          description: Guarantor invited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:   { type: boolean }
+                  emailSent: { type: boolean }
+                  token:     { type: string }
+                  formUrl:   { type: string, format: uri }
+
+  # ═══════════════════════════════════════════════════════════════
+  # PROPERTY SELECTIONS
+  # ═══════════════════════════════════════════════════════════════
+
+  /property-selections:
+    get:
+      tags: [Property Selections]
+      summary: List property selections for tenant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [interested, viewing_requested, viewing_scheduled, viewing_completed, rejected]
+      responses:
+        "200":
+          description: Selections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  selections:
+                    type: array
+                    items: { type: object }
+
+    post:
+      tags: [Property Selections]
+      summary: Mark interest in a property
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                propertyId:      { type: string }
+                propertyAddress: { type: string }
+                listingId:       { type: string }
+      responses:
+        "201":
+          description: Selection created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  id:      { type: string }
+                  status:  { type: string, example: "interested" }
+
+  /property-selections/stats:
+    get:
+      tags: [Property Selections]
+      summary: Get selection funnel stats for tenant
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+                    properties:
+                      total:              { type: integer }
+                      interested:         { type: integer }
+                      viewingRequested:   { type: integer }
+                      viewingScheduled:   { type: integer }
+                      viewingCompleted:   { type: integer }
+                      rejected:           { type: integer }
+
+  # ═══════════════════════════════════════════════════════════════
+  # HOMEOWNER
+  # ═══════════════════════════════════════════════════════════════
+
+  /homeowner-maintenance:
+    get:
+      tags: [Homeowner]
+      summary: List maintenance tasks
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Maintenance tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items: { type: object }
+
+    post:
+      tags: [Homeowner]
+      summary: Create maintenance task
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:       { type: string }
+                description: { type: string }
+                priority:    { type: string, enum: [low, medium, high, urgent] }
+                status:      { type: string, enum: [pending, in-progress, completed] }
+                dueDate:     { type: string, format: date }
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema: { type: object }
+
+  # ═══════════════════════════════════════════════════════════════
+  # GUEST ENQUIRY
+  # ═══════════════════════════════════════════════════════════════
+
+  /guest/enquiry:
+    post:
+      tags: [Guest Enquiry]
+      summary: Submit property enquiry as a guest
+      description: |
+        Creates a guest conversation thread for an unauthenticated enquiry.
+        Returns a `threadToken` which the guest uses to view and reply to messages.
+        Also sends an email confirmation to the enquirer and a notification to the agent/landlord.
+        No auth required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listingId, name, email, message]
+              properties:
+                listingId:    { type: string }
+                listingTitle: { type: string }
+                landlordId:   { type: string }
+                name:         { type: string, example: "James Okafor" }
+                email:        { type: string, format: email, example: "james.okafor@email.com" }
+                message:      { type: string, example: "Is this property still available?" }
+                agentEmail:   { type: string, format: email }
+      responses:
+        "201":
+          description: Enquiry submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      threadToken:      { type: string }
+                      ghostTenantId:    { type: string }
+                      confirmationSent: { type: boolean }
+                      agentDelivery:    { type: boolean }
+
+  # ═══════════════════════════════════════════════════════════════
+  # COMMUNICATION
+  # ═══════════════════════════════════════════════════════════════
+
+  /communication/conversations:
+    get:
+      tags: [Communication]
+      summary: List conversations for authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:            { type: string }
+                        propertyId:    { type: string }
+                        tenantId:      { type: string }
+                        landlordId:    { type: string }
+                        propertyTitle: { type: string }
+                        tenantName:    { type: string }
+                        createdAt:     { type: string, format: date-time }
+                        lastMessageAt: { type: string, format: date-time }
+                        messages:      { type: array, items: { type: object } }
+
+    post:
+      tags: [Communication]
+      summary: Get or create conversation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [propertyId]
+              properties:
+                propertyId:    { type: string }
+                tenantId:      { type: string }
+                landlordId:    { type: string }
+                propertyTitle: { type: string }
+                tenantName:    { type: string }
+      responses:
+        "201":
+          description: Conversation created or retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+
+  /communication/conversations/{id}/messages:
+    get:
+      tags: [Communication]
+      summary: Get messages in a conversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:             { type: string }
+                        conversationId: { type: string }
+                        senderId:       { type: string }
+                        body:           { type: string }
+                        senderRole:     { type: string }
+                        sentAt:         { type: string, format: date-time }
+                        readAt:         { type: string, format: date-time, nullable: true }
+                        attachmentIds:
+                          type: array
+                          items: { type: string }
+
+    post:
+      tags: [Communication]
+      summary: Send message in conversation
+      description: Sends a message and emits a `message_new` SSE event. Also triggers an email notification to the recipient.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:          { type: string, example: "Is the property still available?" }
+                attachmentIds: { type: array, items: { type: string } }
+                senderRole:    { type: string, enum: [tenant, landlord, agent] }
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+
+  # ═══════════════════════════════════════════════════════════════
+  # ADMIN DASHBOARD
+  # ═══════════════════════════════════════════════════════════════
+
+  /admin/customers:
+    get:
+      tags: [Admin Dashboard]
+      summary: List all customers (admin only)
+      description: |
+        Returns all users with their subscription, billing, and activity data.
+        Access is restricted to users with admin role or whose email is in
+        the `ADMIN_EMAILS` environment variable.
+        Results are cached in-memory for 60 seconds.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customers:
+                    type: array
+                    items:
+                      type: object
+                      description: AdminCustomerRow — full user + subscription + activity summary
+                  generatedAt: { type: string, format: date-time }
+        "403": { description: Not an admin }
+
+  /admin/overview:
+    get:
+      tags: [Admin Dashboard]
+      summary: Get platform overview stats (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Platform overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totals:            { type: object }
+                  funnel:            { type: object }
+                  trialConversion:   { type: object }
+                  tierDistribution:  { type: object }
+                  accountStatus:     { type: object }
+                  billingStatus:     { type: object }
+                  cohorts:           { type: array, items: { type: object } }
+
+  # ═══════════════════════════════════════════════════════════════
+  # LEADS
+  # ═══════════════════════════════════════════════════════════════
+
+  /leads:
+    post:
+      tags: [Leads]
+      summary: Submit campaign lead
+      description: Rate limited to 5 submissions per 10 minutes per IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:   { type: string }
+                email:  { type: string, format: email }
+                phone:  { type: string }
+                source: { type: string }
+      responses:
+        "201":
+          description: Lead submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:  { type: string }
+                  leadId: { type: string }
+
+  /leads/session:
+    get:
+      tags: [Leads]
+      summary: Get personalised lead session data
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Lead session data
+          content:
+            application/json:
+              schema: { type: object }
+
+  /leads/export:
+    get:
+      tags: [Leads]
+      summary: Export all leads as CSV (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  # ═══════════════════════════════════════════════════════════════
+  # SHEETS
+  # ═══════════════════════════════════════════════════════════════
+
+  /sheets:
+    post:
+      tags: [Sheets]
+      summary: Append row to Google Sheet (waitlist or other)
+      description: No auth required. Used by campaign landing pages to collect signups.
+      parameters:
+        - name: sheetId
+          in: query
+          schema: { type: string, default: waitlist }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Any key-value pairs to append as a new row
+              example:
+                name: "James Okafor"
+                email: "james@example.com"
+                source: "campaign-page"
+      responses:
+        "201":
+          description: Row appended
+
+  /sheets/{sheetId}:
+    get:
+      tags: [Sheets]
+      summary: Read sheet data (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sheetId
+          in: path
+          required: true
+          schema: { type: string, example: waitlist }
+      responses:
+        "200":
+          description: Sheet data
+          content:
+            application/json:
+              schema: { type: object }

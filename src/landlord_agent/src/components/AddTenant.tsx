@@ -157,6 +157,105 @@ function StepItem({step,current,done,onClick}:{
   );
 }
 
+// ─── Shell layout (MUST be defined outside AddTenant so React sees a stable
+//     component identity across renders. Defining it inside the component body
+//     causes the entire form tree to remount on every keystroke, stealing focus.) ──
+
+interface ShellProps {
+  title: string;
+  sub: string;
+  view: View;
+  stepIndex: number;
+  done: Record<'step1'|'step2'|'step3', boolean>;
+  onBack: () => void;
+  onNavStep: (i: number) => void;
+  onClose: () => void;
+  globalError: string | null;
+  children: React.ReactNode;
+}
+
+function Shell({ title, sub, view, stepIndex, done, onBack, onNavStep, onClose, globalError, children }: ShellProps) {
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background:'#f7fafc', fontFamily:'Nunito Sans,sans-serif' }}>
+      {/* Navbar */}
+      <header className="h-[68px] px-6 flex items-center justify-between sticky top-0 z-50"
+        style={{ backdropFilter:'blur(12px)', background:'rgba(255,255,255,0.72)', borderBottom:'1px solid rgba(226,232,240,0.65)' }}>
+        <div className="flex items-center gap-4">
+          <button type="button" onClick={onBack}
+            className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all">
+            <ArrowLeft size={16} strokeWidth={2.5}/>
+          </button>
+          <nav className="hidden sm:flex items-center gap-2 text-[13px] text-[#64748b] font-medium" style={{fontFamily:'Nunito Sans,sans-serif'}}>
+            <span className="text-[#94a3b8] text-[11px]">/</span>
+            <span className="font-bold text-[#1e293b]" style={{fontFamily:'Archivo,sans-serif'}}>Add New Tenant</span>
+          </nav>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-[#64748b] font-medium" style={{fontFamily:'Archivo,sans-serif'}}>
+            {view==='summary' ? 'Review' : view==='success' ? 'Done' : `Step ${stepIndex+1} of 3`}
+          </span>
+          <button type="button" onClick={onClose}
+            className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
+            title="Cancel and exit">
+            ✕
+          </button>
+        </div>
+      </header>
+
+      {/* Body */}
+      <main className="flex-1 flex items-start justify-center px-4 pt-10 pb-16">
+        <div className="flex items-start justify-center gap-9 w-full max-w-[1060px]">
+
+          {/* Stepper sidebar — hidden on summary/success */}
+          {view !== 'success' && (
+            <aside className="hidden md:block w-[280px] shrink-0 sticky top-[88px]"
+              style={{ background:'white', borderRadius:28, boxShadow:'0 20px 45px -12px rgba(19,108,158,0.08),0 4px 16px -2px rgba(0,0,0,0.04)', padding:'24px 16px' }}>
+              <div className="px-3 pb-4 mb-3" style={{borderBottom:'1px solid #f1f5f9'}}>
+                <p className="text-[15px] font-bold text-[#1e293b]" style={{fontFamily:'Archivo,sans-serif'}}>Add Tenant</p>
+                <p className="text-[12px] text-[#64748b] mt-0.5">3 simple steps to assign tenant</p>
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {STEPS.map((s, i) => (
+                  <StepItem
+                    key={s.view} step={s}
+                    current={view===s.view||(view==='summary'&&i===2)}
+                    done={done[s.view as keyof typeof done]}
+                    onClick={() => onNavStep(i)}
+                  />
+                ))}
+              </div>
+            </aside>
+          )}
+
+          {/* Form card */}
+          <section style={{
+            width: view==='success' ? 480 : 530,
+            maxWidth:'100%',
+            background:'white',
+            borderRadius: 28,
+            boxShadow:'0 20px 45px -12px rgba(19,108,158,0.08),0 4px 16px -2px rgba(0,0,0,0.04)',
+            padding: '40px 42px 44px',
+          }}>
+            <h1 className="text-[24px] font-bold text-center mb-1 tracking-[-0.02em]"
+              style={{ fontFamily:'Archivo,sans-serif', color:'#1e293b' }}>{title}</h1>
+            <p className="text-[13.5px] text-[#64748b] text-center mb-7">{sub}</p>
+
+            {/* Global error */}
+            {globalError && (
+              <div className="flex items-start gap-2 p-3 rounded-xl border border-red-200 bg-red-50 mb-5">
+                <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0"/>
+                <p className="text-[13px] text-red-700">{globalError}</p>
+              </div>
+            )}
+
+            {children}
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, prefillEmail, userProfile }: AddTenantProps) {
@@ -268,100 +367,31 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, p
     }
   }
 
-  // ─── Page shell ───────────────────────────────────────────────────────────
+  // ─── Page shell helpers ───────────────────────────────────────────────────
 
   const stepIndex = { step1:0, step2:1, step3:2, summary:2, success:3 }[view] ?? 0;
 
-  const Shell = ({ title, sub, children }: { title:string; sub:string; children:React.ReactNode }) => (
-    <div className="min-h-screen flex flex-col" style={{ background:'#f7fafc', fontFamily:'Nunito Sans,sans-serif' }}>
-      {/* Navbar */}
-      <header className="h-[68px] px-6 flex items-center justify-between sticky top-0 z-50"
-        style={{ backdropFilter:'blur(12px)', background:'rgba(255,255,255,0.72)', borderBottom:'1px solid rgba(226,232,240,0.65)' }}>
-        <div className="flex items-center gap-4">
-          <button type="button" onClick={view==='step1'||view==='success' ? onBack : ()=>setView(view==='step2'?'step1':view==='step3'?'step2':view==='summary'?'step3':'step1')}
-            className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all">
-            <ArrowLeft size={16} strokeWidth={2.5}/>
-          </button>
-          <nav className="hidden sm:flex items-center gap-2 text-[13px] text-[#64748b] font-medium" style={{fontFamily:'Nunito Sans,sans-serif'}}>
-            <span className="text-[#94a3b8] text-[11px]">/</span>
-            <span className="font-bold text-[#1e293b]" style={{fontFamily:'Archivo,sans-serif'}}>Add New Tenant</span>
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[12px] text-[#64748b] font-medium" style={{fontFamily:'Archivo,sans-serif'}}>
-            {view==='summary' ? 'Review' : view==='success' ? 'Done' : `Step ${stepIndex+1} of 3`}
-          </span>
-          <button type="button" onClick={onBack}
-            className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
-            title="Cancel and exit">
-            ✕
-          </button>
-        </div>
-      </header>
+  const shellBack = () => {
+    if (view==='step1' || view==='success') { onBack(); return; }
+    if (view==='step2') setView('step1');
+    else if (view==='step3') setView('step2');
+    else if (view==='summary') setView('step3');
+  };
 
-      {/* Body */}
-      <main className="flex-1 flex items-start justify-center px-4 pt-10 pb-16">
-        <div className="flex items-start justify-center gap-9 w-full max-w-[1060px]">
-
-          {/* Stepper sidebar — hidden on summary/success */}
-          {view !== 'success' && (
-            <aside className="hidden md:block w-[280px] shrink-0 sticky top-[88px]"
-              style={{ background:'white', borderRadius:28, boxShadow:'0 20px 45px -12px rgba(19,108,158,0.08),0 4px 16px -2px rgba(0,0,0,0.04)', padding:'24px 16px' }}>
-              <div className="px-3 pb-4 mb-3" style={{borderBottom:'1px solid #f1f5f9'}}>
-                <p className="text-[15px] font-bold text-[#1e293b]" style={{fontFamily:'Archivo,sans-serif'}}>Add Tenant</p>
-                <p className="text-[12px] text-[#64748b] mt-0.5">3 simple steps to assign tenant</p>
-              </div>
-              <div className="flex flex-col gap-2.5">
-                {STEPS.map((s, i) => (
-                  <StepItem
-                    key={s.view} step={s}
-                    current={view===s.view||(view==='summary'&&i===2)}
-                    done={done[s.view as keyof typeof done]}
-                    onClick={() => {
-                      if (i===0) setView('step1');
-                      else if (i===1 && (done.step1||view==='step2'||view==='step3'||view==='summary')) setView('step2');
-                      else if (i===2 && (done.step2||view==='step3'||view==='summary')) setView('step3');
-                    }}
-                  />
-                ))}
-              </div>
-            </aside>
-          )}
-
-          {/* Form card */}
-          <section style={{
-            width: view==='success' ? 480 : 530,
-            maxWidth:'100%',
-            background:'white',
-            borderRadius: 28,
-            boxShadow:'0 20px 45px -12px rgba(19,108,158,0.08),0 4px 16px -2px rgba(0,0,0,0.04)',
-            padding: '40px 42px 44px',
-          }}>
-            <h1 className="text-[24px] font-bold text-center mb-1 tracking-[-0.02em]"
-              style={{ fontFamily:'Archivo,sans-serif', color:'#1e293b' }}>{title}</h1>
-            <p className="text-[13.5px] text-[#64748b] text-center mb-7">{sub}</p>
-
-            {/* Global error */}
-            {globalError && (
-              <div className="flex items-start gap-2 p-3 rounded-xl border border-red-200 bg-red-50 mb-5">
-                <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0"/>
-                <p className="text-[13px] text-red-700">{globalError}</p>
-              </div>
-            )}
-
-            {children}
-          </section>
-        </div>
-      </main>
-    </div>
-  );
+  const shellNavStep = (i: number) => {
+    if (i===0) setView('step1');
+    else if (i===1 && (done.step1||view==='step2'||view==='step3'||view==='summary')) setView('step2');
+    else if (i===2 && (done.step2||view==='step3'||view==='summary')) setView('step3');
+  };
 
   // ─── Success ──────────────────────────────────────────────────────────────
 
   if (view === 'success') {
     const property = properties.find(p => p.id === form.propertyId);
     return (
-      <Shell title="Tenant Saved Successfully!" sub="The tenancy record has been created.">
+      <Shell title="Tenant Saved Successfully!" sub="The tenancy record has been created."
+        view={view} stepIndex={stepIndex} done={done}
+        onBack={shellBack} onNavStep={shellNavStep} onClose={onBack} globalError={globalError}>
         <div className="text-center">
           <div className="w-[72px] h-[72px] rounded-full bg-[#dcfce7] flex items-center justify-center mx-auto mb-5"
             style={{boxShadow:'0 6px 20px rgba(22,163,74,0.18)'}}>
@@ -420,7 +450,9 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, p
     const property = properties.find(p => p.id === form.propertyId);
     const freqMap: Record<string,string> = { monthly:'Monthly', yearly:'Yearly', 'fixed-time':'Fixed Time' };
     return (
-      <Shell title="Review Before Adding" sub="Check all details carefully before confirming">
+      <Shell title="Review Before Adding" sub="Check all details carefully before confirming"
+        view={view} stepIndex={stepIndex} done={done}
+        onBack={shellBack} onNavStep={shellNavStep} onClose={onBack} globalError={globalError}>
         {/* Dossier box */}
         <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[18px] p-5 text-left mb-6">
           <div className="flex items-center gap-3.5 pb-4 mb-4" style={{borderBottom:'1px solid #e2e8f0'}}>
@@ -514,6 +546,8 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, p
     <Shell
       title={ view==='step1' ? "Who is the tenant?" : view==='step2' ? "Tenancy terms" : "Additional details" }
       sub={ view==='step1' ? "Personal details" : view==='step2' ? "Lease and payment details" : "Optional — skip if unknown" }
+      view={view} stepIndex={stepIndex} done={done}
+      onBack={shellBack} onNavStep={shellNavStep} onClose={onBack} globalError={globalError}
     >
 
       {/* ── Step 1 ─────────────────────────────────────────── */}
