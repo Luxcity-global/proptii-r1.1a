@@ -251,6 +251,67 @@ async function bootstrap() {
     res.json(document);
   });
 
+  // ── Hand-authored comprehensive API reference (YAML) ─────────────────────
+  // Serves the full api-reference.yaml at /api/docs-yaml (raw download)
+  // and a Swagger UI viewer at /api/docs-full that reads from it.
+  const fs = require('fs');
+  const path = require('path');
+
+  const yamlCandidates = [
+    path.join(__dirname, 'docs', 'api-reference.yaml'),          // dist/docs/
+    path.join(__dirname, '..', 'docs', 'api-reference.yaml'),   // project root /docs/
+  ];
+  const yamlPath = yamlCandidates.find(p => fs.existsSync(p));
+
+  if (yamlPath) {
+    // Raw YAML download
+    app.getHttpAdapter().get('/api/docs-yaml', (_req: any, res: any) => {
+      res.setHeader('Content-Type', 'application/yaml; charset=utf-8');
+      res.setHeader('Content-Disposition', 'inline; filename="proptii-api-reference.yaml"');
+      res.send(fs.readFileSync(yamlPath, 'utf8'));
+    });
+
+    // Swagger UI pointing at the YAML file — shareable interactive docs
+    app.getHttpAdapter().get('/api/docs-full', (_req: any, res: any) => {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Proptii API Reference</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"/>
+  <style>
+    body { margin: 0; background: #fafafa; }
+    .swagger-ui .topbar { background: #136C9E; }
+    .swagger-ui .topbar .download-url-wrapper { display: none; }
+    .swagger-ui .info .title { color: #136C9E; }
+  </style>
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+  SwaggerUIBundle({
+    url: '/api/docs-yaml',
+    dom_id: '#swagger-ui',
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+    layout: 'BaseLayout',
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    defaultModelsExpandDepth: 1,
+    defaultModelExpandDepth: 2,
+    tryItOutEnabled: true,
+  });
+</script>
+</body>
+</html>`);
+    });
+
+    console.log('📄 API reference YAML available at /api/docs-yaml');
+    console.log('📖 Full API docs (Swagger UI) available at /api/docs-full');
+  }
+
   // Set safe body size limit (5mb max) to prevent memory exhaustion DoS
   app.use(json({ limit: '5mb' }));
   app.use(urlencoded({ extended: true, limit: '5mb' }));

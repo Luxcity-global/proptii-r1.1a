@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "nest start --watch",
-    "build": "nest build && cp -r public dist/",
+    "build": "nest build && cp -r public dist/ && mkdir -p dist/docs && cp docs/api-reference.yaml dist/docs/",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
