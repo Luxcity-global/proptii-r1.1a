@@ -5,7 +5,7 @@
 
 ## What problem does this solve?
 
-Right now, landlords can only add **one tenant** or **one property** at a time. If a landlord has 20 tenants on a spreadsheet from a previous system, they have to manually fill in the same form 20 times. That's slow, frustrating, and error-prone.
+Right now, landlords can only add **one tenant** or **one property** at a time. If a landlord has 20 tenants on a spreadsheet from a previous system, they have to manually fill in the same form 20 times.
 
 This feature lets landlords:
 1. **Add many tenants at once** by uploading a spreadsheet

@@ -269,7 +269,7 @@ export class ContractController {
     return await this.contractService.getContractById(id);
   }
 
-  @Put('landlord/:id/status')
+  @Put(['landlord/:id', 'landlord/:id/status'])
   @UseGuards(FirebaseAuthGuard)
   @ApiOperation({ summary: 'Update landlord contract status' })
   @ApiParam({ name: 'id', description: 'Contract ID' })
