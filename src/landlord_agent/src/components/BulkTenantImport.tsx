@@ -38,6 +38,10 @@ export interface BulkTenantRow {
   employer?: string;
   annualIncome?: string;
   notes?: string;
+  /** Resolved at parse time — ID of matched existing property */
+  _matchedPropertyId?: string;
+  /** Resolved at parse time — display address of matched property */
+  _matchedPropertyDisplay?: string;
   _errors?: string[];
   _status?: 'pending' | 'success' | 'error';
   _resultMessage?: string;
@@ -68,6 +72,46 @@ function validateRow(row: BulkTenantRow): string[] {
   if (!row.leaseEnd || isNaN(Date.parse(row.leaseEnd))) errs.push('Lease end invalid (YYYY-MM-DD)');
   else if (row.leaseStart && new Date(row.leaseEnd) <= new Date(row.leaseStart)) errs.push('End must be after start');
   return errs;
+}
+
+/**
+ * Fuzzy address match — normalise both strings (lowercase, strip punctuation,
+ * collapse whitespace) then check:
+ *   1. Exact normalised match
+ *   2. One contains the other (handles truncated CSV addresses)
+ *   3. First word (house number) + first meaningful token match
+ */
+function normaliseAddr(s: string): string {
+  return s.toLowerCase().replace(/[.,\/#!$%^&*;:{}=\-_`~()]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function fuzzyMatchProperty(csvAddr: string, properties: Property[]): Property | null {
+  if (!csvAddr?.trim()) return null;
+  const norm = normaliseAddr(csvAddr);
+
+  // 1. Exact normalised match
+  let match = properties.find(p => normaliseAddr(p.address) === norm);
+  if (match) return match;
+
+  // 2. Contains — csv address is a prefix/substring of stored address or vice versa
+  match = properties.find(p => {
+    const pa = normaliseAddr(p.address);
+    return pa.includes(norm) || norm.includes(pa);
+  });
+  if (match) return match;
+
+  // 3. First token match (house number + street name first word)
+  const csvTokens = norm.split(' ').filter(Boolean);
+  if (csvTokens.length >= 2) {
+    const csvPrefix = csvTokens.slice(0, 2).join(' ');
+    match = properties.find(p => {
+      const pTokens = normaliseAddr(p.address).split(' ').filter(Boolean);
+      return pTokens.length >= 2 && pTokens.slice(0, 2).join(' ') === csvPrefix;
+    });
+    if (match) return match;
+  }
+
+  return null;
 }
 
 function fmtDate(s?: string): string {
@@ -156,6 +200,15 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
             notes:            (raw.notes || '').trim(),
             _status: 'pending',
           };
+          // Fuzzy-match against existing properties at parse time
+          const csvAddr = (raw.propertyAddress || '').trim();
+          if (csvAddr) {
+            const matched = fuzzyMatchProperty(csvAddr, properties);
+            if (matched) {
+              row._matchedPropertyId      = matched.id;
+              row._matchedPropertyDisplay = matched.address;
+            }
+          }
           row._errors = validateRow(row);
           return row;
         });
@@ -191,9 +244,9 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
         continue;
       }
       try {
-        const matchedProp = properties.find(p =>
-          p.address.toLowerCase().trim() === (row.propertyAddress || '').toLowerCase().trim()
-        );
+        const matchedProp = row._matchedPropertyId
+          ? properties.find(p => p.id === row._matchedPropertyId)
+          : fuzzyMatchProperty(row.propertyAddress || '', properties);
         const payload: any = {
           name:             row.name,
           email:            row.email,
@@ -242,6 +295,18 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
     setRows(prev => prev.map((r, i) => {
       if (i !== idx) return r;
       const u = { ...r, [field]: value };
+      // Re-run property fuzzy match when address changes
+      if (field === 'propertyAddress') {
+        const matched = value.trim() ? fuzzyMatchProperty(value, properties) : null;
+        u._matchedPropertyId      = matched?.id;
+        u._matchedPropertyDisplay = matched?.address;
+      }
+      // Allow manual property selection via a special synthetic field
+      if (field === '_matchedPropertyId') {
+        const prop = properties.find(p => p.id === value);
+        u._matchedPropertyDisplay = prop?.address;
+        u.propertyAddress = prop?.address || r.propertyAddress;
+      }
       u._errors = validateRow(u);
       return u;
     }));
@@ -408,7 +473,7 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12.5 }}>
                     <thead>
                       <tr style={{ background: '#f8fafc' }}>
-                        {['#', 'Tenant Name', 'Email & Phone', 'Rent', 'Lease Period', 'Status', ''].map(h => (
+                        {['#', 'Tenant Name', 'Email & Phone', 'Rent', 'Lease Period', 'Property Match', 'Status', ''].map(h => (
                           <th key={h} style={{ padding: '10px 14px', fontSize: 11.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', fontFamily: FONT_HEADING, position: 'sticky', top: 0, background: '#f8fafc', zIndex: 2 }}>{h}</th>
                         ))}
                       </tr>
@@ -417,6 +482,8 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                       {rows.map((row, idx) => {
                         const hasErr = (row._errors?.length || 0) > 0;
                         const isExpanded = expandedRow === idx;
+                        const hasAddr = !!row.propertyAddress?.trim();
+                        const isMatched = !!row._matchedPropertyId;
                         return (
                           <React.Fragment key={idx}>
                             <tr style={{ background: hasErr ? '#fff8f8' : '#fff', borderBottom: '1px solid #f1f5f9' }}>
@@ -445,6 +512,24 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                               <td style={{ padding: '10px 14px', fontSize: 11.5, color: '#64748b' }}>
                                 {fmtDate(row.leaseStart)} – {fmtDate(row.leaseEnd)}
                               </td>
+
+                              {/* ── Property match column ── */}
+                              <td style={{ padding: '10px 14px', maxWidth: 160 }}>
+                                {!hasAddr ? (
+                                  <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>No address given</span>
+                                ) : isMatched ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 4, color: '#059669', fontSize: 11.5 }}>
+                                    <CheckCircle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+                                    <span style={{ fontWeight: 600, lineHeight: 1.3, wordBreak: 'break-word' }}>{row._matchedPropertyDisplay?.split(',')[0]}</span>
+                                  </span>
+                                ) : (
+                                  <span style={{ display: 'inline-flex', alignItems: 'flex-start', gap: 4, color: '#b45309', fontSize: 11.5 }}>
+                                    <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+                                    <span style={{ lineHeight: 1.3, wordBreak: 'break-word' }}>No match<br/><span style={{ fontSize: 10, color: '#94a3b8' }}>Expand to assign</span></span>
+                                  </span>
+                                )}
+                              </td>
+
                               <td style={{ padding: '10px 14px' }}>
                                 {hasErr
                                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}><XCircle size={11} /> {row._errors!.length} error{row._errors!.length > 1 ? 's' : ''}</span>
@@ -452,22 +537,20 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                               </td>
                               <td style={{ padding: '10px 14px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  {hasErr && (
-                                    <button type="button" onClick={() => setExpandedRow(expandedRow === idx ? null : idx)} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                    </button>
-                                  )}
+                                  <button type="button" onClick={() => setExpandedRow(expandedRow === idx ? null : idx)} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                  </button>
                                   <button type="button" onClick={() => removeRow(idx)} style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <X size={14} />
                                   </button>
                                 </div>
                               </td>
                             </tr>
-                            {isExpanded && hasErr && (
-                              <tr style={{ background: '#fff8f8', borderBottom: '1px solid #f1f5f9' }}>
-                                <td colSpan={7} style={{ padding: '8px 14px 12px' }}>
-                                  {row._errors!.map((e, i) => (
-                                    <p key={i} style={{ fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0' }}><AlertTriangle size={11} /> {e}</p>
+                            {isExpanded && (
+                              <tr style={{ background: hasErr ? '#fff8f8' : '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                                <td colSpan={8} style={{ padding: '8px 14px 14px' }}>
+                                  {hasErr && row._errors!.map((e, i) => (
+                                    <p key={i} style={{ fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 4px' }}><AlertTriangle size={11} /> {e}</p>
                                   ))}
                                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
                                     <div>
@@ -478,6 +561,41 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                                       <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Lease End</label>
                                       <input type="date" value={row.leaseEnd} onChange={e => editRow(idx, 'leaseEnd', e.target.value)} style={{ ...inputStyle, height: 36, fontSize: 12 }} />
                                     </div>
+                                  </div>
+                                  {/* Property assignment — show for ALL rows (not just errors) */}
+                                  <div style={{ marginTop: 10 }}>
+                                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
+                                      Assign to Property
+                                      {row._matchedPropertyId && (
+                                        <span style={{ marginLeft: 8, color: '#059669', fontWeight: 400 }}>
+                                          ✓ Auto-matched
+                                        </span>
+                                      )}
+                                    </label>
+                                    <select
+                                      value={row._matchedPropertyId || ''}
+                                      onChange={e => editRow(idx, '_matchedPropertyId', e.target.value)}
+                                      style={{ ...inputStyle, height: 36, fontSize: 12, appearance: 'none', cursor: 'pointer',
+                                        borderColor: row._matchedPropertyId ? '#86efac' : '#e2e8f0',
+                                        background: row._matchedPropertyId ? '#f0fdf4' : '#fff' }}
+                                    >
+                                      <option value="">— No property (assign later) —</option>
+                                      {properties.map(p => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.address}{p.status === 'vacant' ? ' · Vacant' : p.status === 'occupied' ? ' · Occupied' : ''}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {row._matchedPropertyId && (
+                                      <p style={{ fontSize: 11, color: '#059669', marginTop: 3 }}>
+                                        Matched to: {row._matchedPropertyDisplay}
+                                      </p>
+                                    )}
+                                    {!row._matchedPropertyId && row.propertyAddress?.trim() && (
+                                      <p style={{ fontSize: 11, color: '#b45309', marginTop: 3 }}>
+                                        "{row.propertyAddress}" wasn't matched — select a property above or leave blank
+                                      </p>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
