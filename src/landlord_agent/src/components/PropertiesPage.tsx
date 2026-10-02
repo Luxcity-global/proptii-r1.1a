@@ -52,6 +52,8 @@ interface PropertiesPageProps {
   onDuplicateProperty?: (property: Property) => void;
   onExportProperties?: (properties: Property[], format: string) => void;
   onImportProperties?: (properties: Property[]) => void;
+  onBulkImportProperties?: () => void;
+  onBulkAssignTenants?: () => void;
   onViewInsights?: () => void;
   onRefresh?: () => void;
   onViewSettings?: () => void;
@@ -185,6 +187,8 @@ export function PropertiesPage({
   onDuplicateProperty,
   onExportProperties,
   onImportProperties: handleImportProperties,
+  onBulkImportProperties,
+  onBulkAssignTenants,
   onViewInsights,
   onRefresh,
   onViewSettings,
@@ -702,6 +706,32 @@ export function PropertiesPage({
                   <Sparkles size={12} />
                 </span>
                 Portfolio Insights
+              </button>
+            )}
+            {onBulkAssignTenants && (
+              <button
+                type="button"
+                className="ll-props-btn-insights"
+                onClick={onBulkAssignTenants}
+                title="Assign multiple tenants to properties at once"
+              >
+                <span className="ll-props-insights-icon">
+                  <Users size={12} />
+                </span>
+                Assign Tenants
+              </button>
+            )}
+            {onBulkImportProperties && (
+              <button
+                type="button"
+                className="ll-props-btn-insights"
+                onClick={onBulkImportProperties}
+                title="Import multiple properties from a CSV file"
+              >
+                <span className="ll-props-insights-icon">
+                  <Download size={12} />
+                </span>
+                Bulk Import
               </button>
             )}
             <button type="button" className="ll-props-btn-add" onClick={onAddProperty}>

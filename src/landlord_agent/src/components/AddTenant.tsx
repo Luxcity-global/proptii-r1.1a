@@ -6,6 +6,7 @@
  * Colours: --primary-blue #136C9E, --primary-orange #DC5F12.
  *
  * Flow:
+ *   Step 0 — Mode select        (single vs bulk)
  *   Step 1 — Personal details   (name / email / phone)
  *   Step 2 — Tenancy terms      (property / rent / dates)
  *   Step 3 — Additional details (emergency / employment / notes, skippable)
@@ -17,6 +18,7 @@ import {
   ArrowLeft, ArrowRight,
   User, Mail, Phone, Home, PoundSterling, Calendar,
   Users, Briefcase, FileText, CheckCircle, AlertTriangle, Loader2, UserPlus,
+  Upload, UsersRound,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import type { Property, Tenant, UserProfile } from '../App';
@@ -27,6 +29,7 @@ interface AddTenantProps {
   properties:              Property[];
   onSave:                  (tenant: Omit<Tenant, 'id'>) => Promise<void>;
   onBack:                  () => void;
+  onBulkImport?:           () => void;
   preselectedPropertyId?:  string;
   prefillEmail?:           string;
   userProfile?:            UserProfile | null;
@@ -42,7 +45,7 @@ interface FormData {
 }
 
 type FieldErrors = Partial<Record<keyof FormData, string>>;
-type View = 'step1' | 'step2' | 'step3' | 'summary' | 'success';
+type View = 'mode' | 'step1' | 'step2' | 'step3' | 'summary' | 'success';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -258,12 +261,12 @@ function Shell({ title, sub, view, stepIndex, done, onBack, onNavStep, onClose, 
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, prefillEmail, userProfile }: AddTenantProps) {
+export function AddTenant({ properties, onSave, onBack, onBulkImport, preselectedPropertyId, prefillEmail, userProfile }: AddTenantProps) {
   const [form, setForm]           = useState<FormData>(() => blank(prefillEmail, preselectedPropertyId));
   const [errors, setErrors]       = useState<FieldErrors>({});
   const [globalError, setGE]      = useState<string|null>(null);
   const [isLoading, setLoading]   = useState(false);
-  const [view, setView]           = useState<View>('step1');
+  const [view, setView]           = useState<View>(() => 'mode');
 
   // track which steps are done for the stepper badges
   const [done, setDone] = useState<Record<'step1'|'step2'|'step3', boolean>>({ step1:false, step2:false, step3:false });
@@ -369,11 +372,12 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, p
 
   // ─── Page shell helpers ───────────────────────────────────────────────────
 
-  const stepIndex = { step1:0, step2:1, step3:2, summary:2, success:3 }[view] ?? 0;
+  const stepIndex = { mode:0, step1:0, step2:1, step3:2, summary:2, success:3 }[view] ?? 0;
 
   const shellBack = () => {
-    if (view==='step1' || view==='success') { onBack(); return; }
-    if (view==='step2') setView('step1');
+    if (view==='mode' || view==='success') { onBack(); return; }
+    if (view==='step1') setView('mode');
+    else if (view==='step2') setView('step1');
     else if (view==='step3') setView('step2');
     else if (view==='summary') setView('step3');
   };
@@ -383,6 +387,83 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, p
     else if (i===1 && (done.step1||view==='step2'||view==='step3'||view==='summary')) setView('step2');
     else if (i===2 && (done.step2||view==='step3'||view==='summary')) setView('step3');
   };
+
+  // ─── Mode select (Step 0) ─────────────────────────────────────────────────
+
+  if (view === 'mode') {
+    return (
+      <div className="min-h-screen flex flex-col" style={{ background: '#f7fafc', fontFamily: 'Nunito Sans,sans-serif' }}>
+        {/* Navbar */}
+        <header className="h-[68px] px-6 flex items-center justify-between sticky top-0 z-50"
+          style={{ backdropFilter: 'blur(12px)', background: 'rgba(255,255,255,0.72)', borderBottom: '1px solid rgba(226,232,240,0.65)' }}>
+          <div className="flex items-center gap-4">
+            <button type="button" onClick={onBack}
+              className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all">
+              <ArrowLeft size={16} strokeWidth={2.5}/>
+            </button>
+            <span className="font-bold text-[#1e293b]" style={{ fontFamily: 'Archivo,sans-serif', fontSize: 15 }}>Add Tenant</span>
+          </div>
+        </header>
+
+        {/* Body */}
+        <main className="flex-1 flex items-center justify-center px-4 py-16">
+          <div className="w-full max-w-[520px]">
+            <div style={{ background: 'white', borderRadius: 28, boxShadow: '0 20px 45px -12px rgba(19,108,158,0.08),0 4px 16px -2px rgba(0,0,0,0.04)', padding: '48px 44px 52px' }}>
+              <h1 className="text-[24px] font-bold text-center mb-2" style={{ fontFamily: 'Archivo,sans-serif', color: '#1e293b' }}>
+                How would you like to add tenants?
+              </h1>
+              <p className="text-[13.5px] text-[#64748b] text-center mb-9">
+                Add a single tenant manually, or import many tenants at once from a CSV file.
+              </p>
+
+              <div className="flex flex-col gap-4">
+                {/* Single */}
+                <button
+                  type="button"
+                  onClick={() => setView('step1')}
+                  className="w-full text-left flex items-center gap-4 p-5 rounded-[20px] border-2 transition-all hover:-translate-y-0.5 group"
+                  style={{ borderColor: '#136C9E', background: 'white' }}
+                >
+                  <div className="w-14 h-14 rounded-[16px] flex items-center justify-center shrink-0 transition-all group-hover:scale-105"
+                    style={{ background: '#dcf1fc' }}>
+                    <User size={24} style={{ color: '#136C9E' }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[16px] font-bold text-[#1e293b]" style={{ fontFamily: 'Archivo,sans-serif' }}>Single Tenant</p>
+                    <p className="text-[13px] text-[#64748b] mt-0.5">Fill in details step by step for one tenant</p>
+                  </div>
+                  <ArrowRight size={18} className="text-[#136C9E] shrink-0" />
+                </button>
+
+                {/* Bulk */}
+                <button
+                  type="button"
+                  onClick={() => onBulkImport?.()}
+                  disabled={!onBulkImport}
+                  className="w-full text-left flex items-center gap-4 p-5 rounded-[20px] border-2 transition-all hover:-translate-y-0.5 group disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ borderColor: '#DC5F12', background: 'white' }}
+                >
+                  <div className="w-14 h-14 rounded-[16px] flex items-center justify-center shrink-0 transition-all group-hover:scale-105"
+                    style={{ background: '#fff3ed' }}>
+                    <Upload size={24} style={{ color: '#DC5F12' }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[16px] font-bold text-[#1e293b]" style={{ fontFamily: 'Archivo,sans-serif' }}>Bulk Import via CSV</p>
+                    <p className="text-[13px] text-[#64748b] mt-0.5">Upload a spreadsheet to add up to 500 tenants at once</p>
+                  </div>
+                  <ArrowRight size={18} className="text-[#DC5F12] shrink-0" />
+                </button>
+              </div>
+
+              <p className="text-[12px] text-[#94a3b8] text-center mt-7">
+                You can assign tenants to properties after import using Bulk Assign on the Properties page.
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // ─── Success ──────────────────────────────────────────────────────────────
 

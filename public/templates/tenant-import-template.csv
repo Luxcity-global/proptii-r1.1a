@@ -1,0 +1,3 @@
+name,email,phone,propertyAddress,rentAmount,paymentFrequency,leaseStart,leaseEnd,firstPaymentDate,emergencyName,emergencyPhone,emergencyRelationship,employmentType,employer,annualIncome,notes
+James Okafor,james@example.com,+44 7700 900001,12 Baker Street London W1U 6TY,1500,monthly,2024-02-01,2025-01-31,2024-02-01,Sarah Okafor,+44 7700 900002,Spouse,Full-time,Acme Corp,45000,
+Amina Hassan,amina@example.com,+44 7700 900003,45 Park Lane London W1K 1PN,2200,monthly,2024-03-01,2025-02-28,2024-03-01,,,,Self-employed,,60000,

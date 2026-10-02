@@ -34,6 +34,10 @@ import { alertService, type Alert } from './services/alertService';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
 import { AddLandlordWizard } from './components/AddLandlordWizard';
+import { BulkTenantImport } from './components/BulkTenantImport';
+import { BulkPropertyImport } from './components/BulkPropertyImport';
+import { BulkAssignTable } from './components/BulkAssignTable';
+import { PropertyEnrichmentQueue } from './components/PropertyEnrichmentQueue';
 import { propertyService } from './services/propertyService';
 import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
@@ -311,7 +315,11 @@ export type Screen =
   | 'invite-tenant'
   | 'select-existing-tenant'
   | 'add-landlord'
-  | 'landlord-details';
+  | 'landlord-details'
+  | 'bulk-import-tenant'
+  | 'bulk-import-property'
+  | 'bulk-assign'
+  | 'property-enrichment-queue';
 
 // Property setup data interface
 interface PropertySetupData {
@@ -437,6 +445,8 @@ export function AppContent() {
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
+  /** IDs returned from a completed bulk property import — passed to the enrichment queue */
+  const importedPropertyIdsRef = React.useRef<string[]>([]);
 
   const clearSignInQueryParam = useCallback(() => {
     try {
@@ -1748,6 +1758,8 @@ export function AppContent() {
             onDuplicateProperty={duplicateProperty}
             onExportProperties={exportProperties}
             onImportProperties={importProperties}
+            onBulkImportProperties={() => navigateToScreen('bulk-import-property')}
+            onBulkAssignTenants={() => navigateToScreen('bulk-assign')}
             userProfile={userProfile}
           />
         );
@@ -3133,6 +3145,7 @@ export function AppContent() {
             preselectedPropertyId={selectedProperty?.id}
             prefillEmail={prefillEmailRef.current}
             userProfile={userProfile}
+            onBulkImport={() => navigateToScreen('bulk-import-tenant')}
             onSave={async (tenant) => {
               if (!userProfile) {
                 window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'add-tenant' } }, '*');
@@ -3258,6 +3271,113 @@ export function AppContent() {
               // re-fetch when mounted, so no extra state management needed here.
               navigateToScreen('main-app');
               setNavigationScreen('clients');
+            }}
+          />
+        );
+
+      case 'bulk-import-tenant':
+        return (
+          <BulkTenantImport
+            properties={properties}
+            userProfile={userProfile}
+            userId={resolveManagerId() || ''}
+            onBack={() => navigateToScreen('add-tenant')}
+            onComplete={() => {
+              navigateToScreen('main-app');
+              setNavigationScreen('clients');
+              setPortfolioRefreshKey(k => k + 1);
+            }}
+          />
+        );
+
+      case 'bulk-import-property':
+        return (
+          <BulkPropertyImport
+            userProfile={userProfile}
+            userId={resolveManagerId() || ''}
+            userEmail={userProfile?.email}
+            onBack={() => {
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
+            }}
+            onComplete={() => {
+              setPortfolioRefreshKey(k => k + 1);
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
+            }}
+            onEnrich={(ids) => {
+              importedPropertyIdsRef.current = ids;
+              // Refresh properties so the enrichment queue has fresh data
+              setPortfolioRefreshKey(k => k + 1);
+              navigateToScreen('property-enrichment-queue');
+            }}
+          />
+        );
+
+      case 'bulk-assign':
+        return (
+          <BulkAssignTable
+            tenants={tenants}
+            properties={properties}
+            onBack={() => {
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
+            }}
+            onComplete={() => {
+              setPortfolioRefreshKey(k => k + 1);
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
+            }}
+          />
+        );
+
+      case 'property-enrichment-queue':
+        return (
+          <PropertyEnrichmentQueue
+            importedPropertyIds={importedPropertyIdsRef.current}
+            properties={properties}
+            onBack={() => navigateToScreen('bulk-import-property')}
+            onAddPhotos={(property) => {
+              selectProperty(property);
+              navigateToScreen('photo-management');
+            }}
+            onUploadDocs={(property) => {
+              selectProperty(property);
+              navigateToScreen('document-management');
+            }}
+            onEditDetails={(property) => {
+              selectProperty(property);
+              setIsEditing(true);
+              setEditingPropertyId(property.id);
+              setPropertySetupData({
+                propertyType: property.type || null,
+                propertyDetails: {
+                  address: property.address || '',
+                  monthlyRent: String(property.rent ?? ''),
+                  bedrooms: String(property.bedrooms ?? ''),
+                  bathrooms: String((property as any).bathrooms ?? ''),
+                  squareFootage: String((property as any).squareFootage ?? ''),
+                  uploadedDocuments: [],
+                },
+                amenities: property.amenities || [],
+                images: (property.photos || []).map(p => p.url),
+                imageFiles: [],
+                additionalNotes: property.notes || '',
+                status: property.status,
+              });
+              // After editing, come back to the enrichment queue
+              setPreviousScreen('property-enrichment-queue');
+              navigateToScreen('property-setup-step1');
+            }}
+            onViewProperty={(property) => {
+              selectProperty(property);
+              navigateToScreen('property-details');
+            }}
+            onDone={() => {
+              importedPropertyIdsRef.current = [];
+              setPortfolioRefreshKey(k => k + 1);
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
             }}
           />
         );

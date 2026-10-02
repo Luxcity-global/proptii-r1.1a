@@ -33,6 +33,104 @@ export class TenantsController {
     return this.tenantsService.createTenant(body, userId);
   }
 
+  /**
+   * POST /api/tenants/bulk
+   * Import up to 500 tenants at once. Continues on individual failures — never stops early.
+   * Returns { total, succeeded, failed, results[] } with per-row status.
+   */
+  @Post('bulk')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Bulk import up to 500 tenants — continues and reports all errors' })
+  @ApiResponse({ status: 200, description: 'Bulk import result with per-row success/failure detail' })
+  async bulkCreateTenants(@Req() req: any, @Body() body: { tenants: any[] }) {
+    const userId = req.user?.uid || req.user?.id || req.user?.email;
+    const rows: any[] = Array.isArray(body?.tenants) ? body.tenants : [];
+
+    const results: { index: number; success: boolean; id?: string; error?: string }[] = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      try {
+        const result = await this.tenantsService.createTenant(rows[i], userId);
+        results.push({ index: i, success: true, id: result.id });
+        succeeded++;
+      } catch (err: any) {
+        results.push({ index: i, success: false, error: err?.message || 'Unknown error' });
+        failed++;
+      }
+      // 50ms delay between writes to avoid Firestore rate-limiting
+      if (i < rows.length - 1) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+    }
+
+    return { total: rows.length, succeeded, failed, results };
+  }
+
+  /**
+   * POST /api/tenants/bulk-assign
+   * Assign multiple tenants to properties. Continues on individual failures.
+   */
+  @Post('bulk-assign')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Bulk assign tenants to properties — continues and reports all errors' })
+  @ApiResponse({ status: 200, description: 'Bulk assignment result with per-row success/failure detail' })
+  async bulkAssignTenants(@Req() req: any, @Body() body: { assignments: any[] }) {
+    const rows: any[] = Array.isArray(body?.assignments) ? body.assignments : [];
+
+    const results: { index: number; tenantId: string; success: boolean; error?: string }[] = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const { tenantId, propertyId, rentAmount, leaseStart, leaseEnd,
+              firstPaymentDate, paymentFrequency } = rows[i];
+      try {
+        // Update tenant with new property assignment
+        await this.tenantsService.updateTenant(tenantId, {
+          propertyId,
+          rentAmount,
+          leaseStart,
+          leaseEnd,
+          firstPaymentDate: firstPaymentDate || leaseStart,
+          paymentFrequency: paymentFrequency || 'monthly',
+          status: 'active',
+        });
+
+        // Mark property as occupied (best-effort — failure here doesn't block the assignment)
+        const db = (this.tenantsService as any).db;
+        if (db && propertyId) {
+          try {
+            await db.collection('properties').doc(propertyId).set(
+              {
+                status: 'occupied',
+                tenantId,
+                updatedAt: require('firebase-admin').firestore.FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
+          } catch { /* best-effort */ }
+        }
+
+        results.push({ index: i, tenantId, success: true });
+        succeeded++;
+      } catch (err: any) {
+        results.push({ index: i, tenantId, success: false, error: err?.message || 'Unknown error' });
+        failed++;
+      }
+      if (i < rows.length - 1) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+    }
+
+    return { total: rows.length, succeeded, failed, results };
+  }
+
   @Get()
   @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')

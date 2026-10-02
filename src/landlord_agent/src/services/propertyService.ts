@@ -157,6 +157,51 @@ class PropertyService {
         if (!res.ok) throw new Error(`Failed to delete property (${res.status})`);
     }
 
+    async bulkCreateProperties(
+        propertiesData: Omit<Property, 'id' | 'createdAt' | 'tenant'>[],
+        ownerUserId: string,
+        ownerEmail?: string,
+    ): Promise<{
+        total: number; succeeded: number; failed: number;
+        results: { index: number; success: boolean; id?: string; error?: string }[];
+    }> {
+        const headers = await authHeaders();
+        try {
+            const res = await fetch(`${API_BASE}/api/native-properties/bulk`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    properties: propertiesData.map(p => ({
+                        ...mapToApi(p),
+                        userId: ownerUserId,
+                        ownerEmail: ownerEmail || '',
+                        landlordId: ownerUserId,
+                    })),
+                }),
+            });
+            if (res.ok) {
+                return await res.json();
+            }
+        } catch { /* fall through to sequential fallback */ }
+
+        // Fallback: sequential individual creates
+        const results: { index: number; success: boolean; id?: string; error?: string }[] = [];
+        let succeeded = 0;
+        let failed = 0;
+        for (let i = 0; i < propertiesData.length; i++) {
+            try {
+                const id = await this.createProperty(propertiesData[i], ownerUserId, ownerEmail);
+                results.push({ index: i, success: true, id });
+                succeeded++;
+            } catch (err: any) {
+                results.push({ index: i, success: false, error: err?.message || 'Unknown error' });
+                failed++;
+            }
+            if (i < propertiesData.length - 1) await new Promise(r => setTimeout(r, 50));
+        }
+        return { total: propertiesData.length, succeeded, failed, results };
+    }
+
     // Stub — used by DocumentManagement component; images live in Firebase Storage, only URL stored
     async addDocumentToProperty(propertyId: string, document: Omit<PropertyDocument, 'id'>): Promise<void> {
         const existing = await this.getProperty(propertyId);

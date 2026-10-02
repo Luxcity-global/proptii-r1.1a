@@ -104,6 +104,49 @@ export class NativePropertiesController {
     });
   }
 
+  /**
+   * POST /api/native-properties/bulk
+   * Import up to 500 properties. Continues on individual failures — never stops early.
+   * Returns { total, succeeded, failed, results[] } with per-row status.
+   */
+  @Post('bulk')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('landlord', 'agent', 'homeowner')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Bulk import up to 500 properties — continues and reports all errors' })
+  @ApiResponse({ status: 200, description: 'Bulk import result with per-row success/failure detail' })
+  async bulkCreate(@Req() req: any, @Body() body: { properties: any[] }) {
+    const email = (req.user?.email || '').toLowerCase().trim();
+    const userId = req.user?.uid;
+    const rows: any[] = Array.isArray(body?.properties) ? body.properties : [];
+
+    const results: { index: number; success: boolean; id?: string; error?: string }[] = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      try {
+        const result = await this.propertiesService.create({
+          ...rows[i],
+          userId,
+          ownerEmail: email,
+          landlordId: userId,
+        });
+        results.push({ index: i, success: true, id: (result as any)?.id || (result as any)?._id });
+        succeeded++;
+      } catch (err: any) {
+        results.push({ index: i, success: false, error: err?.message || 'Unknown error' });
+        failed++;
+      }
+      // 50ms delay between writes to avoid Firestore rate-limiting
+      if (i < rows.length - 1) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+    }
+
+    return { total: rows.length, succeeded, failed, results };
+  }
+
   @Put(':id')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
   @Roles('landlord', 'agent', 'homeowner')

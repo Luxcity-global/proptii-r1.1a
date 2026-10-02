@@ -113,6 +113,34 @@ class TenantService {
     await apiService.delete(`/tenants/${id}`);
   }
 
+  async bulkCreateTenants(tenants: Omit<Tenant, 'id'>[], ownerUserId: string): Promise<{
+    total: number; succeeded: number; failed: number;
+    results: { index: number; success: boolean; id?: string; error?: string }[];
+  }> {
+    try {
+      const response = await apiService.post('/tenants/bulk', { tenants: tenants.map(t => ({ ...t, userId: ownerUserId })) });
+      const data = (response as any).data ?? response;
+      return data;
+    } catch (error: any) {
+      // Fallback: sequential individual creates if bulk endpoint unavailable
+      const results: { index: number; success: boolean; id?: string; error?: string }[] = [];
+      let succeeded = 0;
+      let failed = 0;
+      for (let i = 0; i < tenants.length; i++) {
+        try {
+          const id = await this.createTenant(tenants[i], ownerUserId);
+          results.push({ index: i, success: true, id });
+          succeeded++;
+        } catch (err: any) {
+          results.push({ index: i, success: false, error: err?.message || 'Unknown error' });
+          failed++;
+        }
+        if (i < tenants.length - 1) await new Promise(r => setTimeout(r, 50));
+      }
+      return { total: tenants.length, succeeded, failed, results };
+    }
+  }
+
   private mapTenant(data: any): Tenant {
     const tenant: Tenant & { userId?: string } = {
       id: data.id,
