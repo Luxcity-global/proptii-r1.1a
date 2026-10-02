@@ -54,6 +54,7 @@ interface PropertiesPageProps {
   onImportProperties?: (properties: Property[]) => void;
   onBulkImportProperties?: () => void;
   onBulkAssignTenants?: () => void;
+  onEnrichProperties?: () => void;
   onViewInsights?: () => void;
   onRefresh?: () => void;
   onViewSettings?: () => void;
@@ -189,6 +190,7 @@ export function PropertiesPage({
   onImportProperties: handleImportProperties,
   onBulkImportProperties,
   onBulkAssignTenants,
+  onEnrichProperties,
   onViewInsights,
   onRefresh,
   onViewSettings,
@@ -721,8 +723,21 @@ export function PropertiesPage({
                 Assign Tenants
               </button>
             )}
+            {onEnrichProperties && (
+              <button
+                type="button"
+                className="ll-props-btn-insights"
+                onClick={onEnrichProperties}
+                title="Review and enrich your property listings — add photos, documents and missing details"
+              >
+                <span className="ll-props-insights-icon">
+                  <Sparkles size={12} />
+                </span>
+                Enrich Properties
+              </button>
+            )}
             <button type="button" className="ll-props-btn-add" onClick={onAddProperty}>
-          <Plus className="w-4 h-4" strokeWidth={2.5} />
+              <Plus className="w-4 h-4" strokeWidth={2.5} />
               Add Property
             </button>
       </div>

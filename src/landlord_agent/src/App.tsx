@@ -1760,6 +1760,11 @@ export function AppContent() {
             onImportProperties={importProperties}
             onBulkImportProperties={() => navigateToScreen('bulk-import-property')}
             onBulkAssignTenants={() => navigateToScreen('bulk-assign')}
+            onEnrichProperties={() => {
+              // Standalone enrichment — show all properties
+              importedPropertyIdsRef.current = properties.map(p => p.id);
+              navigateToScreen('property-enrichment-queue');
+            }}
             userProfile={userProfile}
           />
         );
