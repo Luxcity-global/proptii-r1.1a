@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload } from 'lucide-react';
 
 interface PropertySetupStep1Props {
   onNext: () => void;
@@ -10,9 +10,10 @@ interface PropertySetupStep1Props {
   onSection2: () => void;
   onSection3: () => void;
   onSection4: () => void;
+  onBulkImport?: () => void;
 }
 
-export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSection2, onSection3, onSection4 }: PropertySetupStep1Props) {
+export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSection2, onSection3, onSection4, onBulkImport }: PropertySetupStep1Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   
@@ -238,6 +239,41 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
                   <span className="font-semibold text-gray-900 text-sm md:text-base">Section 4: Images and Additional Notes</span>
                 </div>
               </Button>
+
+              {/* Bulk Import option */}
+              {onBulkImport && (
+                <>
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-xs text-gray-400 font-medium whitespace-nowrap">or import multiple properties</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left h-16 md:h-20 px-4 border-dashed border-2 transition-all duration-300"
+                    style={{ borderColor: '#DC5F12', boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}
+                    onClick={onBulkImport}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#FFF7F3';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'white';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#FFF0E8' }}>
+                        <Upload className="w-4 h-4" style={{ color: '#DC5F12' }} />
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <span className="font-semibold text-sm md:text-base" style={{ color: '#DC5F12' }}>Bulk Import via CSV</span>
+                        <span className="text-xs text-gray-500 font-normal">Add up to 500 properties at once from a spreadsheet</span>
+                      </div>
+                    </div>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 

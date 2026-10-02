@@ -2380,6 +2380,7 @@ export function AppContent() {
             onSection2={() => navigateToScreen('property-details-selection')}
             onSection3={() => navigateToScreen('amenities-selection')}
             onSection4={() => navigateToScreen('images-notes-selection')}
+            onBulkImport={!isEditing ? () => navigateToScreen('bulk-import-property') : undefined}
           />
         );
 
@@ -3126,6 +3127,7 @@ export function AppContent() {
               prefillEmailRef.current = email;
               navigateToScreen('invite-tenant');
             }}
+            onBulkImport={() => navigateToScreen('bulk-import-tenant')}
             onBack={() => {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);

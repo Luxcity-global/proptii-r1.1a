@@ -721,19 +721,6 @@ export function PropertiesPage({
                 Assign Tenants
               </button>
             )}
-            {onBulkImportProperties && (
-              <button
-                type="button"
-                className="ll-props-btn-insights"
-                onClick={onBulkImportProperties}
-                title="Import multiple properties from a CSV file"
-              >
-                <span className="ll-props-insights-icon">
-                  <Download size={12} />
-                </span>
-                Bulk Import
-              </button>
-            )}
             <button type="button" className="ll-props-btn-add" onClick={onAddProperty}>
           <Plus className="w-4 h-4" strokeWidth={2.5} />
               Add Property

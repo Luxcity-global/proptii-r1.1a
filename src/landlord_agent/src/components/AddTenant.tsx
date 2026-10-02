@@ -266,7 +266,7 @@ export function AddTenant({ properties, onSave, onBack, onBulkImport, preselecte
   const [errors, setErrors]       = useState<FieldErrors>({});
   const [globalError, setGE]      = useState<string|null>(null);
   const [isLoading, setLoading]   = useState(false);
-  const [view, setView]           = useState<View>(() => 'mode');
+  const [view, setView]           = useState<View>(() => 'step1');
 
   // track which steps are done for the stepper badges
   const [done, setDone] = useState<Record<'step1'|'step2'|'step3', boolean>>({ step1:false, step2:false, step3:false });

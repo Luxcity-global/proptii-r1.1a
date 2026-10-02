@@ -2,27 +2,22 @@
  * TenantSelection — smart email-first entry point for adding a tenant.
  *
  * Flow:
+ *  0. Mode select — Single tenant (email-first below) OR Bulk CSV import
  *  1. Landlord types the tenant's email address
  *  2. System checks in real-time: is this email already in the landlord's tenant list?
- *     - Match found  → "This person is already your tenant" — offer to reassign to a new property
- *     - No match     → Two clearly-labelled paths:
- *       a) "I have their details" → manual add form (AddTenant)
- *       b) "Send them an invite"  → email invite flow (InviteTenant)
- *  3. Back button returns to wherever the landlord came from
- *
- * This replaces the old three-card selector which required the landlord to
- * understand abstract mode labels before knowing what to do.
+ *     - Match found  → "This person is already your tenant" — offer to reassign
+ *     - No match     → Two paths: manual add or send invite
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Mail, Search, UserPlus, Send, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Mail, UserPlus, Send, CheckCircle, AlertCircle, Loader2, Upload, Users } from 'lucide-react';
 import type { Tenant, Property } from '../App';
 
 interface TenantSelectionProps {
-  /** Existing tenants — used to check if the email already belongs to one of this landlord's tenants. */
   existingTenants: Tenant[];
   properties: Property[];
   onManualInput: (prefillEmail?: string) => void;
   onInviteEmail: (prefillEmail?: string) => void;
+  onBulkImport?: () => void;
   onBack: () => void;
 }
 
@@ -38,6 +33,7 @@ export function TenantSelection({
   properties,
   onManualInput,
   onInviteEmail,
+  onBulkImport,
   onBack,
 }: TenantSelectionProps) {
   const [email, setEmail] = useState('');
@@ -122,6 +118,40 @@ export function TenantSelection({
               Start with their email address. We'll let you know if they're already on Proptii.
             </p>
           </div>
+
+          {/* Bulk import option */}
+          {onBulkImport && (
+            <div className="rounded-2xl border-2 border-gray-200 bg-white p-5 space-y-3 hover:border-[#DC5F12] transition-colors">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#FFF0E8' }}>
+                  <Upload className="w-4 h-4" style={{ color: '#DC5F12' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 text-sm">Import multiple tenants via CSV</p>
+                  <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">
+                    Upload a spreadsheet to add up to 500 tenants at once. Property assignment is optional — you can bulk assign after import.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onBulkImport}
+                className={BTN_OUTLINE}
+                style={{ borderColor: '#DC5F12', color: '#DC5F12' }}
+              >
+                <Upload className="w-4 h-4" />
+                Bulk import via CSV
+              </button>
+            </div>
+          )}
+
+          {/* Divider */}
+          {onBulkImport && (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400 font-medium">or add a single tenant</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+          )}
 
           {/* Email input */}
           <div className="space-y-2">
