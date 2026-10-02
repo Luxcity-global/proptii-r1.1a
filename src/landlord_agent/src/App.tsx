@@ -1421,12 +1421,28 @@ export function AppContent() {
     // POST to backend — throws on failure so success screen is never shown
     const id = await tenantService.createTenant(tenantToCreate, currentUserId);
 
-    // Mark linked property as occupied (best-effort — don't block on failure)
+    // Mark linked property as occupied in both Firestore and local state immediately
     if (tenant.propertyId) {
       propertyService.updateProperty(tenant.propertyId, {
         status: 'occupied',
         tenantId: id,
-      } as any).catch(e => console.warn('Failed to mark property occupied:', e));
+      } as any).then(() => {
+        // Patch local properties array — no network round-trip needed
+        setProperties(prev =>
+          prev.map(p =>
+            p.id === tenant.propertyId
+              ? { ...p, status: 'occupied' as const, tenantId: id }
+              : p
+          )
+        );
+        // Also patch selectedProperty so PropertyDetails reflects the change
+        // without needing a full page refresh
+        setSelectedProperty(prev =>
+          prev?.id === tenant.propertyId
+            ? { ...prev, status: 'occupied' as const, tenantId: id }
+            : prev
+        );
+      }).catch(e => console.warn('Failed to mark property occupied:', e));
     }
 
     // Regenerate alerts after new tenant (best-effort)
@@ -3164,6 +3180,9 @@ export function AppContent() {
               // addTenant POSTs to backend — useTenants in ClientsPage re-fetches on navigate
               await addTenant(tenant);
               prefillEmailRef.current = undefined;
+              // Increment refresh key so properties re-fetch from Firestore in the background
+              // (tenant list in ClientsPage re-fetches via useTenants on next mount)
+              setPortfolioRefreshKey(k => k + 1);
               // If coming from property-preview, stash tenant for preview context
               if (previousScreen === 'property-preview') {
                 setPropertySetupData(prev => ({
