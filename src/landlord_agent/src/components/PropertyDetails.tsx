@@ -374,9 +374,18 @@ export function PropertyDetails({
                           <h3 className="mb-2">Amenities</h3>
                           <div className="flex flex-wrap gap-2">
                             {property.amenities.map((amenity) => (
-                              <Badge key={amenity} variant="secondary">
+                              <span
+                                key={amenity}
+                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold capitalize"
+                                style={{
+                                  background: '#eaf3f8',
+                                  color: '#136C9E',
+                                  border: '1px solid rgba(19,108,158,0.18)',
+                                  fontFamily: 'Nunito Sans, sans-serif',
+                                }}
+                              >
                                 {amenity}
-                              </Badge>
+                              </span>
                             ))}
                           </div>
                         </div>

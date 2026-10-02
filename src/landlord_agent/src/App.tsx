@@ -447,6 +447,8 @@ export function AppContent() {
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
   /** IDs returned from a completed bulk property import — passed to the enrichment queue */
   const importedPropertyIdsRef = React.useRef<string[]>([]);
+  /** Where the enrichment queue was launched from: 'import' (post-CSV) or 'direct' (Properties page button) */
+  const enrichmentSourceRef = React.useRef<'import' | 'direct'>('direct');
 
   const clearSignInQueryParam = useCallback(() => {
     try {
@@ -1763,6 +1765,7 @@ export function AppContent() {
             onEnrichProperties={() => {
               // Standalone enrichment — show all properties
               importedPropertyIdsRef.current = properties.map(p => p.id);
+              enrichmentSourceRef.current = 'direct';
               navigateToScreen('property-enrichment-queue');
             }}
             userProfile={userProfile}
@@ -3314,6 +3317,7 @@ export function AppContent() {
             }}
             onEnrich={(ids) => {
               importedPropertyIdsRef.current = ids;
+              enrichmentSourceRef.current = 'import';
               // Refresh properties so the enrichment queue has fresh data
               setPortfolioRefreshKey(k => k + 1);
               navigateToScreen('property-enrichment-queue');
@@ -3343,7 +3347,14 @@ export function AppContent() {
           <PropertyEnrichmentQueue
             importedPropertyIds={importedPropertyIdsRef.current}
             properties={properties}
-            onBack={() => navigateToScreen('bulk-import-property')}
+            onBack={() => {
+              if (enrichmentSourceRef.current === 'import') {
+                navigateToScreen('bulk-import-property');
+              } else {
+                navigateToScreen('main-app');
+                setNavigationScreen('properties');
+              }
+            }}
             onAddPhotos={(property) => {
               selectProperty(property);
               navigateToScreen('photo-management');

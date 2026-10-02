@@ -90,6 +90,52 @@ function cityFromAddress(address: string): string {
   return parts.length > 1 ? parts[parts.length - 1] : '';
 }
 
+/**
+ * PropImg — property cover image with shimmer skeleton, lazy loading,
+ * blur-up fade-in, and onError fallback. Zero external dependencies.
+ */
+function PropImg({ src, alt }: { src: string; alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+  const fallback = '/assets/property-placeholder.jpg';
+  const effectiveSrc = errored ? fallback : src;
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {/* Shimmer skeleton — visible until image loads */}
+      {!loaded && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(90deg, #e8eef4 25%, #f3f6f9 50%, #e8eef4 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'propImgShimmer 1.4s ease-in-out infinite',
+          }}
+        />
+      )}
+      <img
+        src={effectiveSrc}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        style={{
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+          opacity: loaded ? 1 : 0,
+          transition: 'opacity 0.35s ease',
+          display: 'block',
+        }}
+        onLoad={() => setLoaded(true)}
+        onError={() => {
+          if (!errored) { setErrored(true); setLoaded(false); }
+          else setLoaded(true); // show fallback even if it also fails
+        }}
+      />
+    </div>
+  );
+}
+
 function timeAgo(date?: Date | string | number | null): string {
   const d = asDate(date);
   if (!d) return '';
@@ -1211,7 +1257,7 @@ export function PropertiesPage({
                 <article key={property.id} className="ll-props-card">
                   <div className="ll-props-card-img">
                     {img ? (
-                      <img src={img} alt={property.address} />
+                      <PropImg src={img} alt={property.address} />
                     ) : (
                       <div className="ll-props-card-img-empty">
                         <Building2 size={36} />
