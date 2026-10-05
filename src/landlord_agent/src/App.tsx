@@ -38,6 +38,8 @@ import { BulkTenantImport } from './components/BulkTenantImport';
 import { BulkPropertyImport } from './components/BulkPropertyImport';
 import { BulkAssignTable } from './components/BulkAssignTable';
 import { PropertyEnrichmentQueue } from './components/PropertyEnrichmentQueue';
+import { documentService } from './services/documentService';
+import type { LandlordDocument } from './services/documentService';
 import { propertyService } from './services/propertyService';
 import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
@@ -319,7 +321,8 @@ export type Screen =
   | 'bulk-import-tenant'
   | 'bulk-import-property'
   | 'bulk-assign'
-  | 'property-enrichment-queue';
+  | 'property-enrichment-queue'
+  | 'document-management-vault';
 
 // Property setup data interface
 interface PropertySetupData {
@@ -449,6 +452,8 @@ export function AppContent() {
   const importedPropertyIdsRef = React.useRef<string[]>([]);
   /** Where the enrichment queue was launched from: 'import' (post-CSV) or 'direct' (Properties page button) */
   const enrichmentSourceRef = React.useRef<'import' | 'direct'>('direct');
+  /** Vault documents (no property) — loaded lazily when Documents screen is first opened */
+  const [unassignedDocuments, setUnassignedDocuments] = React.useState<LandlordDocument[]>([]);
 
   const clearSignInQueryParam = useCallback(() => {
     try {
@@ -1792,6 +1797,7 @@ export function AppContent() {
         return (
           <DocumentsPage
             properties={properties}
+            unassignedDocuments={unassignedDocuments}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -1805,6 +1811,7 @@ export function AppContent() {
               selectProperty(property);
               navigateToScreen('document-management');
             }}
+            onUploadToVault={() => navigateToScreen('document-management-vault')}
             onDeleteDocuments={async (documentIds) => {
               try {
                 // Group documents by property
@@ -2783,8 +2790,33 @@ export function AppContent() {
         return (
           <DocumentManagement
             property={selectedProperty}
+            availableProperties={properties}
+            userId={resolveManagerId() || ''}
             onBack={() => navigateToScreen('property-details')}
             onDocumentAdd={addDocumentToProperty}
+          />
+        );
+
+      case 'document-management-vault':
+        return (
+          <DocumentManagement
+            property={null}
+            availableProperties={properties}
+            userId={resolveManagerId() || ''}
+            onBack={() => {
+              setNavigationScreen('documents');
+              navigateToScreen('main-app');
+            }}
+            onDocumentAdd={addDocumentToProperty}
+            onVaultDocumentAdded={(doc) => {
+              setUnassignedDocuments(prev => {
+                // Only keep unassigned ones (propertyId null)
+                if (doc.propertyId) return prev;
+                const already = prev.find(d => d.id === doc.id);
+                if (already) return prev;
+                return [doc, ...prev];
+              });
+            }}
           />
         );
 

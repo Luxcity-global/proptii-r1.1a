@@ -1,3 +1,13 @@
+/**
+ * DocumentManagement
+ *
+ * Two modes:
+ *  - Property mode  (property != null): existing behaviour — saves to property.documents[]
+ *  - Vault mode     (property == null): saves to landlord_documents collection via documentService;
+ *                   shows an optional "Assign to property" picker after each upload.
+ *
+ * In both modes the file is uploaded via POST /api/storage/upload first to get a URL.
+ */
 import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -6,10 +16,10 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Badge } from './ui/badge';
-import { 
-  ArrowLeft, 
-  Upload, 
-  FileText, 
+import {
+  ArrowLeft,
+  Upload,
+  FileText,
   Calendar,
   AlertTriangle,
   CheckCircle,
@@ -18,13 +28,14 @@ import {
   X,
   Search,
   Filter,
-  Plus
+  Plus,
+  Building2,
+  FolderOpen,
 } from 'lucide-react';
 import { Property, PropertyDocument } from '../App';
 import { propertyService } from '../services/propertyService';
+import { documentService, LandlordDocument } from '../services/documentService';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
-import axios from 'axios';
-import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 
@@ -38,296 +49,279 @@ interface SelectedDocumentForm {
 
 interface DocumentManagementProps {
   property: Property | null;
+  /** Available properties — used for the "assign to property" picker in vault mode */
+  availableProperties?: Property[];
+  userId?: string;
   onBack: () => void;
   onDocumentAdd: (propertyId: string, document: Omit<PropertyDocument, 'id'>) => void;
   onDocumentDelete?: (propertyId: string, documentId: string) => Promise<void>;
+  /** Called when a vault document is assigned to a property (vault mode only) */
+  onVaultDocumentAdded?: (doc: LandlordDocument) => void;
 }
 
-export function DocumentManagement({ property, onBack, onDocumentAdd, onDocumentDelete }: DocumentManagementProps) {
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedDocuments, setSelectedDocuments] = useState<SelectedDocumentForm[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+const DOCUMENT_TYPES = [
+  { value: 'epc',                label: 'EPC Certificate' },
+  { value: 'gas-cert',           label: 'Gas Safety Certificate' },
+  { value: 'tenancy-agreement',  label: 'Tenancy Agreement' },
+  { value: 'insurance',          label: 'Insurance Policy' },
+  { value: 'other',              label: 'Other Document' },
+];
 
-  if (!property) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="mb-4">Property not found</h2>
-          <Button onClick={onBack}>Back to Dashboard</Button>
-        </div>
-      </div>
-    );
-  }
+function computeStatus(expiryDate?: Date | null): PropertyDocument['status'] {
+  if (!expiryDate) return 'valid';
+  const days = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+  if (days < 0) return 'expired';
+  if (days <= 30) return 'expiring-soon';
+  return 'valid';
+}
 
-  const documentTypes = [
-    { value: 'epc', label: 'EPC Certificate' },
-    { value: 'gas-cert', label: 'Gas Safety Certificate' },
-    { value: 'tenancy-agreement', label: 'Tenancy Agreement' },
-    { value: 'insurance', label: 'Insurance Policy' },
-    { value: 'other', label: 'Other Document' }
-  ];
+function safeDate(v: any): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  const secs = v._seconds ?? v.seconds;
+  if (typeof secs === 'number') return new Date(secs * 1000);
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
 
-  const getDocumentStatus = (document: PropertyDocument): PropertyDocument['status'] => {
-    if (!document.expiryDate) return 'valid';
-    
-    const now = new Date();
-    const expiry = new Date(document.expiryDate);
-    const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (daysUntilExpiry < 0) return 'expired';
-    if (daysUntilExpiry <= 30) return 'expiring-soon';
-    return 'valid';
-  };
+function formatDate(v: any): string {
+  const d = safeDate(v);
+  if (!d) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
-  const getStatusIcon = (status: PropertyDocument['status']) => {
-    switch (status) {
-      case 'valid':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'expiring-soon':
-        return <Clock className="w-4 h-4 text-orange-600" />;
-      case 'expired':
-        return <AlertTriangle className="w-4 h-4 text-red-600" />;
-      default:
-        return <Clock className="w-4 h-4 text-gray-600" />;
-    }
-  };
+function typeLabel(t: string) {
+  return DOCUMENT_TYPES.find(x => x.value === t)?.label || t;
+}
 
-  const getStatusBadge = (status: PropertyDocument['status']) => {
-    switch (status) {
-      case 'valid':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Valid</Badge>;
-      case 'expiring-soon':
-        return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Expiring Soon</Badge>;
-      case 'expired':
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Expired</Badge>;
-      default:
-        return <Badge variant="secondary">Unknown</Badge>;
-    }
-  };
+// ─── Component ────────────────────────────────────────────────────────────────
 
-  const handleDeleteDocument = async (documentId: string) => {
-    if (!property) return;
-    if (!window.confirm('Delete this document? This action cannot be undone.')) return;
+export function DocumentManagement({
+  property,
+  availableProperties = [],
+  userId,
+  onBack,
+  onDocumentAdd,
+  onDocumentDelete,
+  onVaultDocumentAdded,
+}: DocumentManagementProps) {
+  const isVaultMode = !property;
 
-    setDeletingId(documentId);
-    try {
-      if (onDocumentDelete) {
-        await onDocumentDelete(property.id, documentId);
-      } else {
-        // Fallback: update property documents directly
-        const updatedDocuments = property.documents.filter(d => d.id !== documentId);
-        await propertyService.updateProperty(property.id, { documents: updatedDocuments } as any);
-        // Parent won't receive the callback, but at least the backend is updated
-        console.warn('[DocumentManagement] onDocumentDelete not provided — backend updated but local state not refreshed.');
-      }
-    } catch (error) {
-      console.error('[DocumentManagement] Delete failed:', error);
-      alert(`Failed to delete document: ${(error as any)?.message || 'Unknown error'}`);
-    } finally {
-      setDeletingId(null);
-    }
-  };
+  const [isUploadOpen,        setIsUploadOpen]        = useState(false);
+  const [searchTerm,          setSearchTerm]           = useState('');
+  const [typeFilter,          setTypeFilter]           = useState('all');
+  const [statusFilter,        setStatusFilter]         = useState('all');
+  const [selectedForms,       setSelectedForms]        = useState<SelectedDocumentForm[]>([]);
+  const [isUploading,         setIsUploading]          = useState(false);
+  const [deletingId,          setDeletingId]           = useState<string | null>(null);
+  /** Vault mode: documents returned from the backend */
+  const [vaultDocs,           setVaultDocs]            = useState<LandlordDocument[]>([]);
+  const [vaultLoaded,         setVaultLoaded]          = useState(false);
+  const [loadingVault,        setLoadingVault]         = useState(false);
+  /** After upload in vault mode — pick a property to assign to */
+  const [assignModalDoc,      setAssignModalDoc]       = useState<LandlordDocument | null>(null);
+  const [assignPropertyId,    setAssignPropertyId]     = useState('');
+  const [isAssigning,         setIsAssigning]          = useState(false);
+
+  // ── Load vault docs on first open (vault mode only) ──────────────────────
+
+  React.useEffect(() => {
+    if (!isVaultMode || vaultLoaded) return;
+    setLoadingVault(true);
+    documentService.getUnassignedDocuments()
+      .then(docs => { setVaultDocs(docs); setVaultLoaded(true); })
+      .catch(err => console.error('[DocumentManagement] vault load error:', err))
+      .finally(() => setLoadingVault(false));
+  }, [isVaultMode, vaultLoaded]);
+
+  // ── Document list for display ─────────────────────────────────────────────
+
+  const displayDocs: Array<PropertyDocument | LandlordDocument> = isVaultMode
+    ? vaultDocs
+    : (property?.documents ?? []);
+
+  const filteredDocs = displayDocs.filter(doc => {
+    const haystack = [doc.name, typeLabel(doc.type)].join(' ').toLowerCase();
+    const matchesSearch = !searchTerm || haystack.includes(searchTerm.toLowerCase());
+    const matchesType   = typeFilter   === 'all' || doc.type   === typeFilter;
+    const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // ── Upload ────────────────────────────────────────────────────────────────
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
-    if (!files.length) {
-      return;
-    }
-
-    setSelectedDocuments(prev => [
+    setSelectedForms(prev => [
       ...prev,
-      ...files.map(file => ({
-        file,
-        name: file.name.replace(/\.[^/.]+$/, ''),
-        type: '',
-        issueDate: '',
-        expiryDate: ''
-      }))
+      ...files.map(f => ({ file: f, name: f.name.replace(/\.[^/.]+$/, ''), type: '', issueDate: '', expiryDate: '' })),
     ]);
-
-    // Reset the input to allow re-selecting the same files if needed
     e.target.value = '';
   };
 
-  const handleDocumentFieldChange = <K extends keyof SelectedDocumentForm>(
-    index: number,
-    key: K,
-    value: SelectedDocumentForm[K]
-  ) => {
-    setSelectedDocuments(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [key]: value };
-      return updated;
-    });
-  };
-
-  const handleRemoveSelectedDocument = (index: number) => {
-    setSelectedDocuments(prev => prev.filter((_, idx) => idx !== index));
-  };
+  const updateForm = <K extends keyof SelectedDocumentForm>(i: number, k: K, v: SelectedDocumentForm[K]) =>
+    setSelectedForms(prev => { const u = [...prev]; u[i] = { ...u[i], [k]: v }; return u; });
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!selectedDocuments.length) {
-      alert('Please select at least one document to upload');
-      return;
-    }
-
-    const incompleteDoc = selectedDocuments.find(
-      doc => !doc.name || !doc.type || !doc.issueDate
-    );
-
-    if (incompleteDoc) {
-      alert('Please complete all required fields for each document');
-      return;
-    }
+    if (!selectedForms.length) { alert('Select at least one document'); return; }
+    const incomplete = selectedForms.find(d => !d.name || !d.type || !d.issueDate);
+    if (incomplete) { alert('Fill in all required fields for each document'); return; }
 
     setIsUploading(true);
+    const apiBase = getResolvedApiBaseUrl();
 
     try {
-      // Upload files through the v2-backend storage endpoint — no client-side Firebase SDK fallback.
-      const apiBase = getResolvedApiBaseUrl();
-      const uploadedCount = selectedDocuments.length;
-
-      for (const docForm of selectedDocuments) {
-        console.log('Uploading document via backend storage:', docForm.file.name);
-
-        let documentUrl = '';
-
+      for (const form of selectedForms) {
+        // 1. Upload file to Firebase Storage via backend
+        let url = '';
         try {
-          const formData = new FormData();
-          formData.append('file', docForm.file, docForm.file.name);
-          formData.append('folder', 'properties/documents');
-
+          const fd = new FormData();
+          fd.append('file', form.file, form.file.name);
+          fd.append('folder', 'properties/documents');
           const token = await getAccessTokenForApiRequest().catch(() => null);
-          const headers: Record<string, string> = {};
-          if (token) headers['Authorization'] = `Bearer ${token}`;
-
-          const res = await fetch(`${apiBase}/storage/upload`, {
-            method: 'POST',
-            headers,
-            body: formData,
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data.url) {
-              documentUrl = data.url;
-              console.log('✅ Document uploaded successfully via backend storage:', documentUrl);
-            } else {
-              throw new Error('Backend storage upload returned no URL');
-            }
-          } else {
-            const errText = await res.text().catch(() => '');
-            throw new Error(`Backend storage upload failed (${res.status}): ${errText}`);
-          }
-        } catch (uploadErr) {
-          console.error('❌ Document upload failed for', docForm.file.name, uploadErr);
-          alert(`Failed to upload ${docForm.file.name}: ${(uploadErr as Error).message}`);
+          const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+          const res = await fetch(`${apiBase}/storage/upload`, { method: 'POST', headers, body: fd });
+          if (!res.ok) throw new Error(`Storage upload failed (${res.status})`);
+          const data = await res.json();
+          if (!data.url) throw new Error('No URL returned from storage');
+          url = data.url;
+        } catch (err) {
+          alert(`Upload failed for ${form.file.name}: ${(err as Error).message}`);
           continue;
         }
 
-        const newDocument: Omit<PropertyDocument, 'id'> = {
-          name: docForm.name,
-          type: docForm.type as PropertyDocument['type'],
-          url: documentUrl,
-          issueDate: new Date(docForm.issueDate),
-          expiryDate: docForm.expiryDate ? new Date(docForm.expiryDate) : undefined,
-          status: 'valid'
-        };
+        const issueDate = new Date(form.issueDate);
+        const expiryDate = form.expiryDate ? new Date(form.expiryDate) : undefined;
+        const status = computeStatus(expiryDate ?? null);
 
-        // Update status based on expiry date
-        if (newDocument.expiryDate) {
-          const tempDoc = { ...newDocument, id: 'temp' } as PropertyDocument;
-          newDocument.status = getDocumentStatus(tempDoc);
+        if (isVaultMode) {
+          // 2a. Save to landlord_documents collection — no property yet
+          const doc = await documentService.createDocument({
+            name: form.name,
+            type: form.type,
+            url,
+            issueDate,
+            expiryDate: expiryDate ?? null,
+            propertyId: null,
+          });
+          setVaultDocs(prev => [doc, ...prev]);
+          onVaultDocumentAdded?.(doc);
+          // Offer to assign immediately
+          setAssignModalDoc(doc);
+        } else {
+          // 2b. Property mode — save to property.documents[]
+          const newDoc: Omit<PropertyDocument, 'id'> = {
+            name: form.name,
+            type: form.type as PropertyDocument['type'],
+            url,
+            issueDate,
+            expiryDate,
+            status,
+          };
+          await propertyService.addDocumentToProperty(property!.id, newDoc);
+          onDocumentAdd(property!.id, newDoc);
         }
-
-        // Save to Firestore
-        await propertyService.addDocumentToProperty(property.id, newDocument);
-
-        // Call the callback for UI updates
-        onDocumentAdd(property.id, newDocument);
       }
 
-      // Reset form
-      setSelectedDocuments([]);
+      setSelectedForms([]);
       setIsUploadOpen(false);
-      
-      alert(`Uploaded ${uploadedCount} document${uploadedCount > 1 ? 's' : ''} successfully!`);
-    } catch (error: any) {
-      console.error('Error uploading document:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to upload document. Please try again.';
-      alert(`Failed to upload document: ${errorMessage}`);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const filteredDocuments = property.documents.filter(doc => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         documentTypes.find(t => t.value === doc.type)?.label.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === 'all' || doc.type === typeFilter;
-    const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
+  // ── Assign to property (vault mode) ──────────────────────────────────────
 
-  const formatDate = (date: Date | string | null | undefined): string => {
-    if (!date) return '—';
-    const d = date instanceof Date ? date : new Date(date as any);
-    if (isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+  const handleAssign = async () => {
+    if (!assignModalDoc || !assignPropertyId) return;
+    setIsAssigning(true);
+    try {
+      const updated = await documentService.assignToProperty(assignModalDoc.id, assignPropertyId);
+      // Remove from unassigned list since it now belongs to a property
+      setVaultDocs(prev => prev.filter(d => d.id !== updated.id));
+      // Tell parent so PropertyDetails can show it
+      const prop = availableProperties.find(p => p.id === assignPropertyId);
+      if (prop) {
+        const asPropertyDoc: Omit<PropertyDocument, 'id'> = {
+          name:       updated.name,
+          type:       updated.type as PropertyDocument['type'],
+          url:        updated.url,
+          issueDate:  new Date(updated.issueDate),
+          expiryDate: updated.expiryDate ? new Date(updated.expiryDate) : undefined,
+          status:     updated.status,
+        };
+        onDocumentAdd(assignPropertyId, asPropertyDoc);
+      }
+      setAssignModalDoc(null);
+      setAssignPropertyId('');
+    } catch (err) {
+      alert(`Failed to assign: ${(err as Error).message}`);
+    } finally {
+      setIsAssigning(false);
+    }
   };
 
-  const getTypeLabel = (type: string) => {
-    return documentTypes.find(t => t.value === type)?.label || type;
+  // ── Delete ────────────────────────────────────────────────────────────────
+
+  const handleDelete = async (docId: string) => {
+    if (!window.confirm('Delete this document? This action cannot be undone.')) return;
+    setDeletingId(docId);
+    try {
+      if (isVaultMode) {
+        await documentService.deleteDocument(docId);
+        setVaultDocs(prev => prev.filter(d => d.id !== docId));
+      } else if (property) {
+        if (onDocumentDelete) {
+          await onDocumentDelete(property.id, docId);
+        } else {
+          const updatedDocs = property.documents.filter(d => d.id !== docId);
+          await propertyService.updateProperty(property.id, { documents: updatedDocs } as any);
+        }
+      }
+    } catch (err) {
+      alert(`Delete failed: ${(err as Error).message}`);
+    } finally {
+      setDeletingId(null);
+    }
   };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const docCount = displayDocs.length;
+  const validCount      = displayDocs.filter(d => computeStatus((d as any).expiryDate ? safeDate((d as any).expiryDate) : null) === 'valid').length;
+  const expiringSoon    = displayDocs.filter(d => d.status === 'expiring-soon').length;
+  const expiredCount    = displayDocs.filter(d => d.status === 'expired').length;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="border-b bg-card/50">
         <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={onBack} className="p-2">
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <div>
-                <h1 className="mb-1">Document Management</h1>
-                <p className="text-muted-foreground">{property.address}</p>
+                <h1 className="mb-0.5">
+                  {isVaultMode ? 'Document Vault — Unassigned' : 'Document Management'}
+                </h1>
+                <p className="text-muted-foreground text-sm">
+                  {isVaultMode
+                    ? 'Documents not yet linked to a property. Upload here and assign later.'
+                    : property?.address}
+                </p>
               </div>
             </div>
 
             <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
               <DialogTrigger asChild>
-                <Button 
-                  className="flex items-center space-x-2 px-6 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0"
-                  style={{ 
-                    backgroundColor: '#DC5F12', 
-                    borderColor: '#DC5F12', 
-                    minWidth: '180px',
-                    background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-                    fontFamily: 'Archivo, sans-serif'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                    e.currentTarget.style.transform = 'translateY(0px)';
-                  }}
+                <Button
+                  className="flex items-center gap-2 px-6 py-3 rounded-full"
+                  style={{ background: 'linear-gradient(135deg,#DC5F12,#DC5F12)', fontFamily: 'Archivo,sans-serif' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
                 >
                   <Upload className="w-4 h-4" strokeWidth={2.5} />
                   <span>Upload Document</span>
@@ -335,139 +329,80 @@ export function DocumentManagement({ property, onBack, onDocumentAdd, onDocument
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Upload New Document</DialogTitle>
+                  <DialogTitle>Upload New Document{isVaultMode ? ' (Unassigned)' : ''}</DialogTitle>
                 </DialogHeader>
+                {isVaultMode && (
+                  <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-800 mb-2">
+                    <FolderOpen className="w-4 h-4 mt-0.5 shrink-0" />
+                    <p>This document will be saved to the vault without a property. You can assign it to a property after uploading.</p>
+                  </div>
+                )}
                 <form onSubmit={handleUpload} className="space-y-4">
+                  {/* File picker */}
                   <div className="space-y-2">
                     <Label>Document File *</Label>
                     <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                      <input
-                        type="file"
-                        id="file-upload"
-                        className="hidden"
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        multiple
-                        onChange={handleFileSelect}
-                      />
-                      <label htmlFor="file-upload" className="cursor-pointer block">
+                      <input type="file" id="dm-file-upload" className="hidden"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onChange={handleFileSelect} />
+                      <label htmlFor="dm-file-upload" className="cursor-pointer block">
                         <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Drag and drop your files here, or click to browse
-                        </p>
-                        <Button type="button" variant="outline" size="sm">
-                          Browse Files
-                        </Button>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          PDF, JPG, PNG up to 2MB
-                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">Drag & drop or click to browse</p>
+                        <Button type="button" variant="outline" size="sm">Browse Files</Button>
+                        <p className="text-xs text-muted-foreground mt-2">PDF, JPG, PNG up to 25MB</p>
                       </label>
                     </div>
-                    {selectedDocuments.length === 0 && (
+                    {selectedForms.length > 0 && (
                       <p className="text-sm text-muted-foreground text-center">
-                        No files selected yet.
+                        {selectedForms.length} file{selectedForms.length > 1 ? 's' : ''} selected
                       </p>
-                    )}
-                    {selectedDocuments.length > 0 && (
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-muted-foreground">
-                          {selectedDocuments.length} file{selectedDocuments.length > 1 ? 's' : ''} selected. You can add more files or edit details below.
-                        </p>
-                      </div>
                     )}
                   </div>
 
-                  {selectedDocuments.length > 0 && (
-                    <div className="space-y-4">
-                      {selectedDocuments.map((docForm, index) => (
-                        <Card key={docForm.file.name + docForm.file.lastModified} className="p-4 border border-muted-foreground/20">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center space-x-3">
-                              <FileText className="w-6 h-6 text-orange-600" />
-                              <div>
-                                <p className="text-sm font-medium">{docForm.file.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {(docForm.file.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveSelectedDocument(index)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
+                  {/* Per-file metadata */}
+                  {selectedForms.map((form, i) => (
+                    <Card key={form.file.name + form.file.lastModified} className="p-4 border border-muted-foreground/20">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-5 h-5 text-orange-600" />
+                          <div>
+                            <p className="text-sm font-medium">{form.file.name}</p>
+                            <p className="text-xs text-muted-foreground">{(form.file.size / 1024 / 1024).toFixed(2)} MB</p>
                           </div>
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedForms(p => p.filter((_, idx) => idx !== i))}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label htmlFor={`dn-${i}`}>Document Name *</Label>
+                          <Input id={`dn-${i}`} value={form.name} onChange={e => updateForm(i, 'name', e.target.value)} required />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`dt-${i}`}>Document Type *</Label>
+                          <Select value={form.type} onValueChange={v => updateForm(i, 'type', v)}>
+                            <SelectTrigger id={`dt-${i}`}><SelectValue placeholder="Select type" /></SelectTrigger>
+                            <SelectContent>
+                              {DOCUMENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`di-${i}`}>Issue Date *</Label>
+                          <Input id={`di-${i}`} type="date" value={form.issueDate} onChange={e => updateForm(i, 'issueDate', e.target.value)} required />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`de-${i}`}>Expiry Date</Label>
+                          <Input id={`de-${i}`} type="date" value={form.expiryDate} onChange={e => updateForm(i, 'expiryDate', e.target.value)} />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
 
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label htmlFor={`doc-name-${index}`}>Document Name *</Label>
-                              <Input
-                                id={`doc-name-${index}`}
-                                placeholder="Enter document name"
-                                value={docForm.name}
-                                onChange={(e) => handleDocumentFieldChange(index, 'name', e.target.value)}
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor={`doc-type-${index}`}>Document Type *</Label>
-                              <Select
-                                value={docForm.type}
-                                onValueChange={(value) => handleDocumentFieldChange(index, 'type', value)}
-                                required
-                              >
-                                <SelectTrigger id={`doc-type-${index}`}>
-                                  <SelectValue placeholder="Select document type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {documentTypes.map(type => (
-                                    <SelectItem key={type.value} value={type.value}>
-                                      {type.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor={`issue-date-${index}`}>Issue Date *</Label>
-                              <Input
-                                id={`issue-date-${index}`}
-                                type="date"
-                                value={docForm.issueDate}
-                                onChange={(e) => handleDocumentFieldChange(index, 'issueDate', e.target.value)}
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor={`expiry-date-${index}`}>Expiry Date</Label>
-                              <Input
-                                id={`expiry-date-${index}`}
-                                type="date"
-                                value={docForm.expiryDate}
-                                onChange={(e) => handleDocumentFieldChange(index, 'expiryDate', e.target.value)}
-                              />
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex justify-end space-x-2 pt-4">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setIsUploadOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={isUploading || selectedDocuments.length === 0}>
-                      {isUploading ? 'Uploading...' : `Upload Document${selectedDocuments.length > 1 ? 's' : ''}`}
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={() => setIsUploadOpen(false)}>Cancel</Button>
+                    <Button type="submit" disabled={isUploading || selectedForms.length === 0}>
+                      {isUploading ? 'Uploading…' : `Upload Document${selectedForms.length > 1 ? 's' : ''}`}
                     </Button>
                   </div>
                 </form>
@@ -477,95 +412,88 @@ export function DocumentManagement({ property, onBack, onDocumentAdd, onDocument
         </div>
       </div>
 
+      {/* ── Assign to property modal (vault mode) ───────────────────────── */}
+      {assignModalDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setAssignModalDoc(null)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-[#136C9E]" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm" style={{ fontFamily: 'Archivo,sans-serif' }}>Assign to a property?</p>
+                <p className="text-xs text-muted-foreground">"{assignModalDoc.name}" is saved in the vault</p>
+              </div>
+            </div>
+
+            {availableProperties.length > 0 ? (
+              <>
+                <Select value={assignPropertyId} onValueChange={setAssignPropertyId}>
+                  <SelectTrigger className="mb-3"><SelectValue placeholder="Select a property (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    {availableProperties.map(p => <SelectItem key={p.id} value={p.id}>{p.address.split(',')[0]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setAssignModalDoc(null)}>Keep in vault</Button>
+                  <Button className="flex-1" disabled={!assignPropertyId || isAssigning}
+                    style={{ background: '#136C9E' }}
+                    onClick={handleAssign}>
+                    {isAssigning ? 'Assigning…' : 'Assign'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-4">No properties yet — the document is saved in the vault. Add a property first to assign it.</p>
+                <Button variant="outline" className="w-full" onClick={() => setAssignModalDoc(null)}>OK, keep in vault</Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground mb-1">Total Documents</p>
-                <p className="text-2xl font-semibold">{property.documents.length}</p>
-              </div>
-              <FileText className="w-8 h-8 text-muted-foreground" />
-            </div>
-          </Card>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground mb-1">Valid</p>
-                <p className="text-2xl font-semibold text-green-600">
-                  {property.documents.filter(d => getDocumentStatus(d) === 'valid').length}
-                </p>
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Total Documents', value: docCount, icon: <FileText className="w-7 h-7 text-muted-foreground" /> },
+            { label: 'Valid',           value: validCount,     icon: <CheckCircle  className="w-7 h-7 text-green-600" />,  cls: 'text-green-600' },
+            { label: 'Expiring Soon',   value: expiringSoon,   icon: <Clock        className="w-7 h-7 text-orange-600" />, cls: 'text-orange-600' },
+            { label: 'Expired',         value: expiredCount,   icon: <AlertTriangle className="w-7 h-7 text-red-600" />,   cls: 'text-red-600' },
+          ].map(s => (
+            <Card key={s.label} className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm mb-1">{s.label}</p>
+                  <p className={`text-2xl font-semibold ${s.cls || ''}`}>{s.value}</p>
+                </div>
+                {s.icon}
               </div>
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground mb-1">Expiring Soon</p>
-                <p className="text-2xl font-semibold text-orange-600">
-                  {property.documents.filter(d => getDocumentStatus(d) === 'expiring-soon').length}
-                </p>
-              </div>
-              <Clock className="w-8 h-8 text-orange-600" />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground mb-1">Expired</p>
-                <p className="text-2xl font-semibold text-red-600">
-                  {property.documents.filter(d => getDocumentStatus(d) === 'expired').length}
-                </p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-600" />
-            </div>
-          </Card>
+            </Card>
+          ))}
         </div>
 
         {/* Filters */}
-        <Card className="p-6 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search documents..."
-                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
-                  style={{
-                    '--tw-ring-color': '#8FCDFF',
-                    '--tw-ring-opacity': '0.5'
-                  } as React.CSSProperties}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+        <Card className="p-5 mb-6">
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input className="pl-10" placeholder="Search documents…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
-
             <div className="flex gap-3">
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="All Types" />
+                <SelectTrigger className="w-[160px]">
+                  <Filter className="w-4 h-4 mr-2" /><SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  {documentTypes.map(type => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
+                  {DOCUMENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="valid">Valid</SelectItem>
@@ -577,84 +505,87 @@ export function DocumentManagement({ property, onBack, onDocumentAdd, onDocument
           </div>
         </Card>
 
-        {/* Documents List */}
-        {filteredDocuments.length === 0 ? (
+        {/* Document list */}
+        {loadingVault ? (
+          <Card className="p-12 text-center">
+            <Clock className="w-10 h-10 text-muted-foreground mx-auto mb-3 animate-spin" />
+            <p className="text-muted-foreground">Loading vault documents…</p>
+          </Card>
+        ) : filteredDocs.length === 0 ? (
           <Card className="p-12 text-center">
             <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="mb-2">
-              {property.documents.length === 0 
-                ? 'No documents uploaded' 
-                : 'No documents match your filters'
-              }
+              {docCount === 0
+                ? isVaultMode ? 'No unassigned documents' : 'No documents uploaded'
+                : 'No documents match your filters'}
             </h3>
-            <p className="text-muted-foreground mb-6">
-              {property.documents.length === 0
-                ? 'Upload compliance documents to track their status and never miss renewals'
-                : 'Try adjusting your search or filters'
-              }
+            <p className="text-muted-foreground mb-6 text-sm">
+              {docCount === 0
+                ? isVaultMode
+                  ? 'Upload compliance certificates or other documents here — assign them to a property at any time.'
+                  : 'Upload compliance documents to track their status and never miss renewals.'
+                : 'Try adjusting your search or filters.'}
             </p>
             <Button onClick={() => setIsUploadOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Upload Document
+              <Plus className="w-4 h-4 mr-2" />Upload Document
             </Button>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {filteredDocuments.map((document) => {
-              const status = getDocumentStatus(document);
+          <div className="space-y-3">
+            {filteredDocs.map(doc => {
+              const status = doc.status ?? computeStatus(safeDate((doc as any).expiryDate));
+              const isLandlordDoc = 'landlordId' in doc; // vault doc
               return (
-                <Card key={document.id} className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      {getStatusIcon(status)}
+                <Card key={doc.id} className="p-5">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                      {status === 'valid'
+                        ? <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                        : status === 'expiring-soon'
+                        ? <Clock className="w-4 h-4 text-orange-600 shrink-0" />
+                        : <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />}
                       <div>
-                        <h3 className="mb-1">{document.name}</h3>
-                        <p className="text-muted-foreground">
-                          {getTypeLabel(document.type)}
-                        </p>
+                        <p className="font-medium text-sm">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">{typeLabel(doc.type)}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-sm mb-1">
-                          Issued: {formatDate(document.issueDate)}
-                        </p>
-                        {document.expiryDate && (
-                          <p className="text-sm text-muted-foreground">
-                            Expires: {formatDate(document.expiryDate)}
-                          </p>
-                        )}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="text-right text-xs text-muted-foreground">
+                        <p>Issued: {formatDate((doc as any).issueDate)}</p>
+                        {(doc as any).expiryDate && <p>Expires: {formatDate((doc as any).expiryDate)}</p>}
                       </div>
-                      
-                      {getStatusBadge(status)}
 
-                      <div className="flex items-center space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            if (document.url) {
-                              downloadPropertyDocument(document.url, document.name);
-                            } else {
-                              alert('Document URL not available');
-                            }
-                          }}
-                        >
-                          <Download className="w-4 h-4" />
+                      {/* Status badge */}
+                      {status === 'valid'
+                        ? <Badge className="bg-green-100 text-green-800 border-green-200">Valid</Badge>
+                        : status === 'expiring-soon'
+                        ? <Badge className="bg-orange-100 text-orange-800 border-orange-200">Expiring Soon</Badge>
+                        : <Badge className="bg-red-100 text-red-800 border-red-200">Expired</Badge>}
+
+                      {/* Vault doc — show assign button */}
+                      {isVaultMode && isLandlordDoc && availableProperties.length > 0 && (
+                        <Button variant="outline" size="sm" className="gap-1 text-xs"
+                          onClick={() => { setAssignModalDoc(doc as LandlordDocument); setAssignPropertyId(''); }}>
+                          <Building2 className="w-3 h-3" /> Assign
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          disabled={deletingId === document.id}
-                          onClick={() => handleDeleteDocument(document.id)}
-                          aria-label="Delete document"
-                        >
-                          {deletingId === document.id
-                            ? <Clock className="w-4 h-4 animate-spin" />
-                            : <X className="w-4 h-4" />}
-                        </Button>
-                      </div>
+                      )}
+
+                      {/* Download */}
+                      <Button variant="outline" size="sm"
+                        onClick={() => (doc as any).url
+                          ? downloadPropertyDocument((doc as any).url, doc.name)
+                          : alert('Document URL not available')}>
+                        <Download className="w-4 h-4" />
+                      </Button>
+
+                      {/* Delete */}
+                      <Button variant="outline" size="sm" disabled={deletingId === doc.id}
+                        onClick={() => handleDelete(doc.id)} aria-label="Delete document">
+                        {deletingId === doc.id
+                          ? <Clock className="w-4 h-4 animate-spin" />
+                          : <X className="w-4 h-4" />}
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -663,37 +594,24 @@ export function DocumentManagement({ property, onBack, onDocumentAdd, onDocument
           </div>
         )}
 
-        {/* Compliance Tips */}
+        {/* Compliance tips */}
         <Card className="p-6 mt-8 bg-muted/50">
           <h3 className="mb-4 flex items-center">
             <AlertTriangle className="w-5 h-5 text-orange-600 mr-2" />
             Compliance Reminders
           </h3>
           <div className="grid md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <h4 className="font-medium mb-2">Gas Safety Certificate</h4>
-              <p className="text-muted-foreground">
-                Required annually for all rental properties with gas appliances
-              </p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">EPC Certificate</h4>
-              <p className="text-muted-foreground">
-                Valid for 10 years, minimum rating of E required for rentals
-              </p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Insurance Policy</h4>
-              <p className="text-muted-foreground">
-                Landlord insurance should cover property damage and liability
-              </p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Tenancy Agreement</h4>
-              <p className="text-muted-foreground">
-                Keep signed agreements for all current and past tenancies
-              </p>
-            </div>
+            {[
+              ['Gas Safety Certificate', 'Required annually for all rental properties with gas appliances'],
+              ['EPC Certificate',        'Valid for 10 years, minimum rating of E required for rentals'],
+              ['Insurance Policy',       'Landlord insurance should cover property damage and liability'],
+              ['Tenancy Agreement',      'Keep signed agreements for all current and past tenancies'],
+            ].map(([title, desc]) => (
+              <div key={title}>
+                <h4 className="font-medium mb-1">{title}</h4>
+                <p className="text-muted-foreground">{desc}</p>
+              </div>
+            ))}
           </div>
         </Card>
       </div>

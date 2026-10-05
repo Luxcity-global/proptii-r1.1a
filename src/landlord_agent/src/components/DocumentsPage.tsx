@@ -36,8 +36,12 @@ import '../styles/documentsPage.css';
 
 interface DocumentsPageProps {
   properties: Property[];
+  /** Unassigned vault documents (no property) — passed from App.tsx */
+  unassignedDocuments?: import('../services/documentService').LandlordDocument[];
   onViewProperty: (property: Property) => void;
   onManageDocuments: (property: Property) => void;
+  /** Open the vault uploader (no property required) */
+  onUploadToVault?: () => void;
   onDeleteDocuments?: (documentIds: string[]) => void;
   onArchiveDocuments?: (documentIds: string[]) => void;
   onExportDocuments?: (format: 'json' | 'csv' | 'excel' | 'pdf', documentIds: string[]) => void;
@@ -205,8 +209,10 @@ function complianceFillClass(health: number): string {
 
 export function DocumentsPage({
   properties,
+  unassignedDocuments = [],
   onViewProperty,
   onManageDocuments,
+  onUploadToVault,
   onDeleteDocuments,
   onArchiveDocuments,
   onExportDocuments,
@@ -505,14 +511,28 @@ export function DocumentsPage({
     return <LandlordPageEmptyShell page="documents" variant="guest" />;
   }
 
-  if (isNewPortfolioUser(properties)) {
+  // If brand-new user with no properties AND no unassigned docs, show the
+  // "Add your first property" shell — but still allow vault upload via the button.
+  if (isNewPortfolioUser(properties) && unassignedDocuments.length === 0) {
     return (
       <LandlordPageEmptyShell
         page="documents"
         variant="new-user"
         onAddProperty={onAddProperty}
         userName={userProfile.name}
-      />
+      >
+        {onUploadToVault && (
+          <button
+            type="button"
+            className="ll-docs-btn-attach"
+            style={{ marginTop: 12 }}
+            onClick={onUploadToVault}
+          >
+            <Upload size={15} />
+            Upload document without a property
+          </button>
+        )}
+      </LandlordPageEmptyShell>
     );
   }
 
@@ -1265,6 +1285,18 @@ export function DocumentsPage({
               <Upload size={16} />
               Attach Document
             </button>
+            {onUploadToVault && (
+              <button
+                type="button"
+                className="ll-docs-ghost-btn"
+                onClick={onUploadToVault}
+                title="Upload a document without linking it to a property"
+                style={{ marginLeft: 6 }}
+              >
+                <FolderOpen size={14} />
+                <span className="hide-sm">Upload to Vault</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -1527,6 +1559,93 @@ export function DocumentsPage({
               </section>
             )}
 
+            {/* ── Unassigned documents section (property view only) ─────── */}
+            {viewScope === 'property' && (unassignedDocuments.length > 0 || onUploadToVault) && (
+              <section className="space-y-3" style={{ marginTop: 24 }}>
+                <div className="ll-docs-section-head">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <FolderOpen size={16} style={{ color: '#64748b' }} />
+                    <h2>Unassigned Documents</h2>
+                  </div>
+                  <span>{unassignedDocuments.length} document{unassignedDocuments.length !== 1 ? 's' : ''} not linked to a property</span>
+                </div>
+
+                {unassignedDocuments.length === 0 ? (
+                  <div className="ll-docs-empty is-filter" style={{ padding: '24px 20px' }}>
+                    <div className="ll-docs-empty-icon"><FolderOpen size={22} /></div>
+                    <h3 style={{ fontSize: 14 }}>No unassigned documents</h3>
+                    <p>Upload documents here and assign them to a property at any time.</p>
+                    {onUploadToVault && (
+                      <div className="ll-docs-empty-actions">
+                        <button type="button" className="ll-docs-btn-attach" onClick={onUploadToVault}>
+                          <Upload size={14} /> Upload to Vault
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {unassignedDocuments.map(doc => {
+                      const safeIssue = doc.issueDate instanceof Date ? doc.issueDate : new Date(doc.issueDate as any);
+                      const safeExpiry = doc.expiryDate ? (doc.expiryDate instanceof Date ? doc.expiryDate : new Date(doc.expiryDate as any)) : null;
+                      return (
+                        <div key={doc.id}
+                          style={{
+                            background: 'white',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 12,
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap' as const,
+                            gap: 12,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <FileText size={16} style={{ color: '#64748b', flexShrink: 0 }} />
+                            <div>
+                              <p style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', margin: 0 }}>{doc.name}</p>
+                              <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>
+                                {doc.type} · Issued {isNaN(safeIssue.getTime()) ? '—' : safeIssue.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {safeExpiry && !isNaN(safeExpiry.getTime()) && ` · Expires ${safeExpiry.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{
+                              padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 600,
+                              background: doc.status === 'valid' ? '#dcfce7' : doc.status === 'expiring-soon' ? '#fff7ed' : '#fff1f2',
+                              color: doc.status === 'valid' ? '#166534' : doc.status === 'expiring-soon' ? '#c2410c' : '#e11d48',
+                            }}>
+                              {doc.status === 'valid' ? 'Valid' : doc.status === 'expiring-soon' ? 'Expiring Soon' : 'Expired'}
+                            </span>
+                            {onUploadToVault && (
+                              <button type="button" className="ll-docs-ghost-btn" onClick={onUploadToVault}
+                                style={{ fontSize: 12, padding: '4px 10px' }}>
+                                <FolderOpen size={12} /> Manage
+                              </button>
+                            )}
+                            {doc.url && (
+                              <button type="button" className="ll-docs-icon-btn"
+                                onClick={() => downloadPropertyDocument(doc.url, doc.name)}
+                                title="Download">
+                                <Download size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {onUploadToVault && (
+                      <button type="button" className="ll-docs-ghost-btn" style={{ marginTop: 4 }} onClick={onUploadToVault}>
+                        <Upload size={13} /> Upload another unassigned document
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
             {viewScope === 'tenant' && (
               <section className="space-y-4">
                 <div className="ll-docs-section-head">
