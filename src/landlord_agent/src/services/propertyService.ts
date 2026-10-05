@@ -20,6 +20,23 @@ async function authHeaders(): Promise<Record<string, string>> {
 // ---------------------------------------------------------------------------
 // Shape helpers — map API response to the internal Property type
 // ---------------------------------------------------------------------------
+
+/**
+ * Safely coerce any date-like value (ISO string, Firestore Timestamp object,
+ * Date instance, or epoch number) to a proper JS Date.
+ * Returns null for null/undefined/unparseable values.
+ */
+function toDate(value: any): Date | null {
+    if (!value) return null;
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+    // Firestore Timestamp serialised as { _seconds, _nanoseconds } or { seconds, nanoseconds }
+    const secs = value._seconds ?? value.seconds;
+    if (typeof secs === 'number') return new Date(secs * 1000);
+    // ISO string, numeric timestamp, or other coercible value
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+}
+
 function mapFromApi(data: any): Property {
     return {
         id: data.id ?? data._id,
@@ -33,8 +50,13 @@ function mapFromApi(data: any): Property {
         amenities: data.amenities ?? [],
         notes: data.notes ?? '',
         photos: (data.photos ?? []) as PropertyPhoto[],
-        documents: (data.documents ?? []) as PropertyDocument[],
-        createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+        documents: (data.documents ?? []).map((doc: any) => ({
+            ...doc,
+            // Convert every date field in each document from string/Timestamp → Date
+            issueDate:  toDate(doc.issueDate)  ?? new Date(),
+            expiryDate: toDate(doc.expiryDate) ?? undefined,
+        })) as PropertyDocument[],
+        createdAt: toDate(data.createdAt) ?? new Date(),
         tenantId: data.tenantId,
         userId: data.userId,
     } as unknown as Property;

@@ -100,56 +100,44 @@ export function PropertyDetails({
   // Memoize formatted dates to prevent excessive re-renders
   const formattedDates = useMemo(() => {
     if (!property) return {};
-    
+
+    /** Safely coerce any date-like value to a Date, returns null if invalid */
+    const toDate = (v: any): Date | null => {
+      if (!v) return null;
+      if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+      // Firestore Timestamp { _seconds, _nanoseconds }
+      const secs = v._seconds ?? v.seconds;
+      if (typeof secs === 'number') return new Date(secs * 1000);
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    const fmt = (v: any): string => {
+      const d = toDate(v);
+      if (!d) return '—';
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
     try {
       return {
-        createdAt: property.createdAt.toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric'
-        }),
-        leaseEnd: property.tenant?.leaseEnd ? property.tenant.leaseEnd.toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric'
-        }) : '',
-        lastPaymentDate: property.tenant?.lastPaymentDate ? property.tenant.lastPaymentDate.toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric'
-        }) : '',
+        createdAt: fmt(property.createdAt),
+        leaseEnd: property.tenant?.leaseEnd ? fmt(property.tenant.leaseEnd) : '',
+        lastPaymentDate: property.tenant?.lastPaymentDate ? fmt(property.tenant.lastPaymentDate) : '',
         documentDates: property.documents.reduce((acc, doc) => {
           try {
             acc[doc.id] = {
-              issue: doc.issueDate.toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric'
-              }),
-              expiry: doc.expiryDate ? doc.expiryDate.toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric'
-              }) : null
+              issue:  fmt(doc.issueDate),
+              expiry: doc.expiryDate ? fmt(doc.expiryDate) : null,
             };
-          } catch (error) {
-            console.warn('Error formatting document date:', error);
-            acc[doc.id] = {
-              issue: 'Invalid date',
-              expiry: null
-            };
+          } catch {
+            acc[doc.id] = { issue: '—', expiry: null };
           }
           return acc;
-        }, {} as Record<string, { issue: string; expiry: string | null }>)
+        }, {} as Record<string, { issue: string; expiry: string | null }>),
       };
     } catch (error) {
       console.warn('Error formatting dates in PropertyDetails:', error);
-      return {
-        createdAt: '',
-        leaseEnd: '',
-        lastPaymentDate: '',
-        documentDates: {}
-      };
+      return { createdAt: '', leaseEnd: '', lastPaymentDate: '', documentDates: {} };
     }
   }, [property]);
 

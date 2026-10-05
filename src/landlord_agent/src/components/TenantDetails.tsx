@@ -580,8 +580,11 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate, initialT
     }).format(amount);
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-GB', {
+  const formatDate = (date: Date | string | null | undefined): string => {
+    if (!date) return '—';
+    const d = date instanceof Date ? date : new Date(date as any);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
       year: 'numeric'
