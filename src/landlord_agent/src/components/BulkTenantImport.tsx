@@ -42,6 +42,10 @@ export interface BulkTenantRow {
   _matchedPropertyId?: string;
   /** Resolved at parse time — display address of matched property */
   _matchedPropertyDisplay?: string;
+  /** Set at parse time if this email already exists in the landlord's tenant list */
+  _isDuplicate?: boolean;
+  /** Name of the existing tenant this duplicates */
+  _duplicateOf?: string;
   _errors?: string[];
   _status?: 'pending' | 'success' | 'error';
   _resultMessage?: string;
@@ -49,6 +53,7 @@ export interface BulkTenantRow {
 
 interface BulkTenantImportProps {
   properties: Property[];
+  existingTenants?: Tenant[];
   userProfile: UserProfile | null;
   userId: string;
   onBack: () => void;
@@ -146,7 +151,7 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 };
 
-export function BulkTenantImport({ properties, userProfile, userId, onBack, onComplete }: BulkTenantImportProps) {
+export function BulkTenantImport({ properties, existingTenants, userProfile, userId, onBack, onComplete }: BulkTenantImportProps) {
   const [step, setStep] = useState<Step>('upload');
   const [rows, setRows] = useState<BulkTenantRow[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -155,8 +160,9 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const validRows   = rows.filter(r => !r._errors?.length);
+  const validRows   = rows.filter(r => !r._errors?.length && !r._isDuplicate);
   const invalidRows = rows.filter(r => r._errors?.length);
+  const dupeRows    = rows.filter(r => r._isDuplicate && !r._errors?.length);
   const succeeded   = rows.filter(r => r._status === 'success').length;
   const failed      = rows.filter(r => r._status === 'error').length;
 
@@ -209,8 +215,34 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
               row._matchedPropertyDisplay = matched.address;
             }
           }
+          // Duplicate check — flag rows whose email already exists in the tenant list
+          if (existingTenants?.length) {
+            const normEmail = row.email.toLowerCase().trim();
+            const dupe = existingTenants.find(
+              t => (t.email || '').toLowerCase().trim() === normEmail
+            );
+            if (dupe) {
+              row._isDuplicate  = true;
+              row._duplicateOf  = dupe.name;
+            }
+          }
+          // Also flag within-CSV duplicates (same email appears twice in the file)
+          const seenEmails = new Set<string>();
+          // (done after the map, see below)
           row._errors = validateRow(row);
           return row;
+        });
+        // Flag within-CSV duplicate emails
+        const seenEmails = new Set<string>();
+        parsed.forEach(r => {
+          if (!r._isDuplicate) {
+            if (seenEmails.has(r.email)) {
+              r._isDuplicate = true;
+              r._duplicateOf = 'another row in this file';
+            } else {
+              seenEmails.add(r.email);
+            }
+          }
         });
         setRows(parsed);
         setStep('preview');
@@ -241,6 +273,10 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
       const row = updated[i];
       if (row._errors?.length) {
         updated[i] = { ...row, _status: 'error', _resultMessage: 'Skipped — validation errors' };
+        continue;
+      }
+      if (row._isDuplicate) {
+        updated[i] = { ...row, _status: 'error', _resultMessage: `Skipped — duplicate of ${row._duplicateOf || 'existing tenant'}` };
         continue;
       }
       try {
@@ -465,6 +501,11 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                         <AlertTriangle size={14} /> {invalidRows.length} Errors
                       </span>
                     )}
+                    {dupeRows.length > 0 && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '4px 12px', borderRadius: 9999, fontSize: 12, fontWeight: 700 }}>
+                        <AlertTriangle size={14} /> {dupeRows.length} Duplicate{dupeRows.length > 1 ? 's' : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -533,6 +574,8 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                               <td style={{ padding: '10px 14px' }}>
                                 {hasErr
                                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}><XCircle size={11} /> {row._errors!.length} error{row._errors!.length > 1 ? 's' : ''}</span>
+                                  : row._isDuplicate
+                                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fffbeb', color: '#b45309', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={11} /> Duplicate</span>
                                   : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}><CheckCircle size={11} /> Ready</span>}
                               </td>
                               <td style={{ padding: '10px 14px' }}>
@@ -552,6 +595,12 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                                   {hasErr && row._errors!.map((e, i) => (
                                     <p key={i} style={{ fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 4px' }}><AlertTriangle size={11} /> {e}</p>
                                   ))}
+                                  {row._isDuplicate && (
+                                    <p style={{ fontSize: 12, color: '#b45309', display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 8px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '6px 10px' }}>
+                                      <AlertTriangle size={12} />
+                                      Already exists as: <strong>{row._duplicateOf}</strong> — this row will be skipped. Remove the row or change the email to force-import.
+                                    </p>
+                                  )}
                                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
                                     <div>
                                       <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Phone</label>
@@ -621,9 +670,12 @@ export function BulkTenantImport({ properties, userProfile, userId, onBack, onCo
                       <RotateCcw size={15} /> Upload New File
                     </button>
                   </div>
-                  {invalidRows.length > 0 && validRows.length > 0 && (
+                  {(invalidRows.length > 0 || dupeRows.length > 0) && validRows.length > 0 && (
                     <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', margin: 0 }}>
-                      {invalidRows.length} row{invalidRows.length > 1 ? 's' : ''} with errors will be skipped. Fix them above to include all rows.
+                      {[
+                        invalidRows.length > 0 && `${invalidRows.length} error${invalidRows.length > 1 ? 's' : ''}`,
+                        dupeRows.length > 0 && `${dupeRows.length} duplicate${dupeRows.length > 1 ? 's' : ''}`,
+                      ].filter(Boolean).join(' · ')} will be skipped.
                     </p>
                   )}
                 </div>

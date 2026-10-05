@@ -207,7 +207,9 @@ class PropertyService {
         const existing = await this.getProperty(propertyId);
         if (!existing) throw new Error('Property not found');
         const newDoc: PropertyDocument = {
-            id: `doc-${Date.now()}`,
+            id: typeof crypto !== 'undefined' && crypto.randomUUID
+              ? `doc-${crypto.randomUUID()}`
+              : `doc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
             ...document,
         };
         await this.updateProperty(propertyId, {

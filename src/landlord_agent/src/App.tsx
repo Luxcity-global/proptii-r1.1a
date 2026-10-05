@@ -3069,7 +3069,17 @@ export function AppContent() {
                   console.log('Creating property with photos:', newProperty.photos.length);
                   console.log('Property photos data:', JSON.stringify(newProperty.photos, null, 2));
 
-                  // 4. Create property in Firebase
+                  // 4. Create property in Firebase — check for duplicate address first
+                  const normAddr = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+                  const addressDuplicate = properties.find(
+                    p => normAddr(p.address) === normAddr(newProperty.address)
+                  );
+                  if (addressDuplicate) {
+                    throw new Error(
+                      `A property at "${newProperty.address}" already exists in your portfolio. ` +
+                      `Use Edit to update it, or change the address if this is a different property.`
+                    );
+                  }
                   const propertyId = await addProperty(newProperty);
                   console.log('Property created with ID:', propertyId);
 
@@ -3168,6 +3178,7 @@ export function AppContent() {
         return (
           <AddTenant
             properties={properties}
+            existingTenants={tenants}
             preselectedPropertyId={selectedProperty?.id}
             prefillEmail={prefillEmailRef.current}
             userProfile={userProfile}
@@ -3308,6 +3319,7 @@ export function AppContent() {
         return (
           <BulkTenantImport
             properties={properties}
+            existingTenants={tenants}
             userProfile={userProfile}
             userId={resolveManagerId() || ''}
             onBack={() => navigateToScreen('add-tenant')}
@@ -3322,6 +3334,7 @@ export function AppContent() {
       case 'bulk-import-property':
         return (
           <BulkPropertyImport
+            existingProperties={properties}
             userProfile={userProfile}
             userId={resolveManagerId() || ''}
             userEmail={userProfile?.email}

@@ -27,6 +27,7 @@ import type { Property, Tenant, UserProfile } from '../App';
 
 interface AddTenantProps {
   properties:              Property[];
+  existingTenants?:        Tenant[];
   onSave:                  (tenant: Omit<Tenant, 'id'>) => Promise<void>;
   onBack:                  () => void;
   onBulkImport?:           () => void;
@@ -261,7 +262,7 @@ function Shell({ title, sub, view, stepIndex, done, onBack, onNavStep, onClose, 
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function AddTenant({ properties, onSave, onBack, onBulkImport, preselectedPropertyId, prefillEmail, userProfile }: AddTenantProps) {
+export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkImport, preselectedPropertyId, prefillEmail, userProfile }: AddTenantProps) {
   const [form, setForm]           = useState<FormData>(() => blank(prefillEmail, preselectedPropertyId));
   const [errors, setErrors]       = useState<FieldErrors>({});
   const [globalError, setGE]      = useState<string|null>(null);
@@ -359,6 +360,21 @@ export function AddTenant({ properties, onSave, onBack, onBulkImport, preselecte
         ...(form.employmentType && { employmentType: form.employmentType }),
         ...(form.notes          && { notes:          form.notes.trim() }),
       };
+
+      // ── Duplicate check ──────────────────────────────────────────────────
+      if (existingTenants?.length) {
+        const normEmail = tenant.email.toLowerCase().trim();
+        const emailDupe = existingTenants.find(
+          t => (t.email || '').toLowerCase().trim() === normEmail
+        );
+        if (emailDupe) {
+          throw new Error(
+            `A tenant with this email already exists: ${emailDupe.name}. ` +
+            `Use Edit from the Clients tab to update their details.`
+          );
+        }
+      }
+
       await onSave(tenant);
       setView('success');
     } catch (err: any) {

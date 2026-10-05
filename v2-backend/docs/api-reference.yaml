@@ -927,6 +927,179 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SuccessResponse" }
 
+  /tenants/bulk:
+    post:
+      tags: [Tenants]
+      summary: Bulk import up to 500 tenants — continues and reports all errors
+      description: |
+        Imports an array of tenant records sequentially. Each row is written
+        independently — a failure on one row does not stop the rest.
+        A 50ms delay is added between writes to avoid Firestore rate-limiting.
+        Returns a per-row result array with `success`, `id`, and `error` fields.
+        Property assignment is optional — leave `propertyId` blank and assign
+        tenants to properties later using `POST /tenants/bulk-assign`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenants]
+              properties:
+                tenants:
+                  type: array
+                  maxItems: 500
+                  description: Array of tenant objects to import
+                  items:
+                    $ref: "#/components/schemas/CreateTenantRequest"
+            example:
+              tenants:
+                - name: "James Okafor"
+                  email: "james.okafor@email.com"
+                  phone: "+44 7911 123456"
+                  propertyId: ""
+                  propertyAddress: ""
+                  rentAmount: 1800
+                  paymentFrequency: monthly
+                  firstPaymentDate: "2026-11-01T00:00:00.000Z"
+                  leaseStart: "2026-11-01T00:00:00.000Z"
+                  leaseEnd: "2027-10-31T00:00:00.000Z"
+                  status: active
+                  referencingStatus: not-started
+                  paymentStatus: current
+                  defaultRiskScore: 75
+                - name: "Sarah Jenkins"
+                  email: "sarah.j@email.com"
+                  phone: "+44 7822 654321"
+                  propertyId: ""
+                  propertyAddress: ""
+                  rentAmount: 1500
+                  paymentFrequency: monthly
+                  firstPaymentDate: "2026-11-01T00:00:00.000Z"
+                  leaseStart: "2026-11-01T00:00:00.000Z"
+                  leaseEnd: "2027-10-31T00:00:00.000Z"
+                  status: active
+                  referencingStatus: not-started
+                  paymentStatus: current
+                  defaultRiskScore: 75
+      responses:
+        "200":
+          description: Bulk import result — all rows processed, check per-row success/error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    description: Total rows submitted
+                    example: 2
+                  succeeded:
+                    type: integer
+                    description: Rows successfully written to Firestore
+                    example: 2
+                  failed:
+                    type: integer
+                    description: Rows that failed (validation errors or Firestore write failures)
+                    example: 0
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:   { type: integer, description: Zero-based row index }
+                        success: { type: boolean }
+                        id:      { type: string, description: Created tenant ID, example: "tenant_1790951549985_xgtbgw" }
+                        error:   { type: string, description: Error message if success=false }
+        "401": { description: Unauthorized }
+
+  /tenants/bulk-assign:
+    post:
+      tags: [Tenants]
+      summary: Bulk assign tenants to properties — continues and reports all errors
+      description: |
+        Assigns multiple tenants to properties in one request. Each assignment:
+        1. Updates the tenant document with propertyId, rentAmount, lease dates
+        2. Sets the property document status to "occupied" and tenantId (best-effort)
+        Processes sequentially with a 50ms delay. Failures on individual rows do
+        not stop the rest. Used after bulk import to match tenants to properties.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignments]
+              properties:
+                assignments:
+                  type: array
+                  description: Array of tenant-to-property assignment instructions
+                  items:
+                    type: object
+                    required: [tenantId, propertyId, rentAmount, leaseStart, leaseEnd]
+                    properties:
+                      tenantId:
+                        type: string
+                        description: Firestore document ID of the tenant
+                        example: "tenant_1790951549985_xgtbgw"
+                      propertyId:
+                        type: string
+                        description: Firestore document ID of the property
+                        example: "3h9fw6cM5B6Rcn7CulOo"
+                      rentAmount:
+                        type: number
+                        example: 1800
+                      leaseStart:
+                        type: string
+                        format: date-time
+                        example: "2026-11-01T00:00:00.000Z"
+                      leaseEnd:
+                        type: string
+                        format: date-time
+                        example: "2027-10-31T00:00:00.000Z"
+                      firstPaymentDate:
+                        type: string
+                        format: date-time
+                        example: "2026-11-01T00:00:00.000Z"
+                      paymentFrequency:
+                        type: string
+                        enum: [monthly, yearly, fixed-time]
+                        default: monthly
+            example:
+              assignments:
+                - tenantId: "tenant_1790951549985_xgtbgw"
+                  propertyId: "3h9fw6cM5B6Rcn7CulOo"
+                  rentAmount: 1800
+                  leaseStart: "2026-11-01T00:00:00.000Z"
+                  leaseEnd: "2027-10-31T00:00:00.000Z"
+                  firstPaymentDate: "2026-11-01T00:00:00.000Z"
+                  paymentFrequency: monthly
+      responses:
+        "200":
+          description: Bulk assignment result — all rows processed, check per-row success/error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:     { type: integer, example: 1 }
+                  succeeded: { type: integer, example: 1 }
+                  failed:    { type: integer, example: 0 }
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:    { type: integer }
+                        tenantId: { type: string }
+                        success:  { type: boolean }
+                        error:    { type: string, description: Present only when success=false }
+        "401": { description: Unauthorized }
+
   # ═══════════════════════════════════════════════════════════════
   # PAYMENTS
   # ═══════════════════════════════════════════════════════════════

@@ -123,6 +123,32 @@ function initializeFirebase() {
 async function bootstrap() {
   initializeFirebase();
 
+  // Apply Firebase Storage CORS config on startup (idempotent — safe to run every time)
+  try {
+    const admin = await import('firebase-admin');
+    const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'proptii-16946.firebasestorage.app';
+    const bucket = admin.storage().bucket(bucketName);
+    await bucket.setCorsConfiguration([
+      {
+        origin: [
+          'http://localhost:5173',
+          'http://localhost:5176',
+          'http://localhost:3000',
+          'https://proptii-frontend-pweq.onrender.com',
+          'https://proptii-frontend.onrender.com',
+          'https://proptii.co',
+          'https://www.proptii.co',
+        ],
+        method: ['GET', 'HEAD', 'OPTIONS'],
+        responseHeader: ['Content-Type', 'Content-Length', 'Content-Disposition', 'Authorization'],
+        maxAgeSeconds: 3600,
+      },
+    ]);
+    console.log('[Storage] CORS configuration applied to', bucketName);
+  } catch (corsErr: any) {
+    console.warn('[Storage] Could not apply CORS config (non-fatal):', corsErr?.message);
+  }
+
   // Disable default body parser so we can set a custom payload limit
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 

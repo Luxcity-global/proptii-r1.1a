@@ -32,9 +32,13 @@ export interface BulkPropertyRow {
   _status?: 'pending' | 'success' | 'error';
   _resultMessage?: string;
   _createdId?: string;
+  /** Set at parse time if address already exists in the portfolio */
+  _isDuplicate?: boolean;
+  _duplicateOf?: string;
 }
 
 interface BulkPropertyImportProps {
+  existingProperties?: Property[];
   userProfile: UserProfile | null;
   userId: string;
   userEmail?: string;
@@ -82,7 +86,7 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 };
 
-export function BulkPropertyImport({ userProfile, userId, userEmail, onBack, onComplete, onEnrich }: BulkPropertyImportProps) {
+export function BulkPropertyImport({ existingProperties, userProfile, userId, userEmail, onBack, onComplete, onEnrich }: BulkPropertyImportProps) {
   const [step, setStep]     = useState<Step>('upload');
   const [rows, setRows]     = useState<BulkPropertyRow[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -92,8 +96,9 @@ export function BulkPropertyImport({ userProfile, userId, userEmail, onBack, onC
   const [importedIds, setImportedIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const validRows   = rows.filter(r => !r._errors?.length);
+  const validRows   = rows.filter(r => !r._errors?.length && !r._isDuplicate);
   const invalidRows = rows.filter(r => r._errors?.length);
+  const dupeRows    = rows.filter(r => r._isDuplicate && !r._errors?.length);
   const succeeded   = rows.filter(r => r._status === 'success').length;
   const failed      = rows.filter(r => r._status === 'error').length;
 
@@ -116,6 +121,9 @@ export function BulkPropertyImport({ userProfile, userId, userEmail, onBack, onC
         if (res.data.length > MAX_ROWS) { setParseError(`Max ${MAX_ROWS} rows — file has ${res.data.length}.`); return; }
         if (res.data.length === 0) { setParseError('File is empty.'); return; }
 
+        const normAddr = (s: string) =>
+          s.trim().toLowerCase().replace(/[.,\/#!$%^&*;:{}=\-_`~()]/g, '').replace(/\s+/g, ' ').trim();
+
         const parsed: BulkPropertyRow[] = res.data.map((raw, i) => {
           const row: BulkPropertyRow = {
             _row:         i + 2,
@@ -131,7 +139,32 @@ export function BulkPropertyImport({ userProfile, userId, userEmail, onBack, onC
             _status: 'pending',
           };
           row._errors = validateRow(row);
+          // Check against existing portfolio by address (fuzzy)
+          if (existingProperties?.length && row.address.trim()) {
+            const normRow = normAddr(row.address);
+            const dupe = existingProperties.find(p => {
+              const normP = normAddr(p.address);
+              return normP === normRow || normP.includes(normRow) || normRow.includes(normP);
+            });
+            if (dupe) {
+              row._isDuplicate = true;
+              row._duplicateOf = dupe.address;
+            }
+          }
           return row;
+        });
+        // Flag within-file duplicate addresses
+        const seenAddrs = new Set<string>();
+        parsed.forEach(r => {
+          if (!r._isDuplicate && r.address.trim()) {
+            const k = normAddr(r.address);
+            if (seenAddrs.has(k)) {
+              r._isDuplicate = true;
+              r._duplicateOf = 'another row in this file';
+            } else {
+              seenAddrs.add(k);
+            }
+          }
         });
         setRows(parsed);
         setStep('preview');
@@ -163,6 +196,10 @@ export function BulkPropertyImport({ userProfile, userId, userEmail, onBack, onC
       const row = updated[i];
       if (row._errors?.length) {
         updated[i] = { ...row, _status: 'error', _resultMessage: 'Skipped — validation errors' };
+        continue;
+      }
+      if (row._isDuplicate) {
+        updated[i] = { ...row, _status: 'error', _resultMessage: `Skipped — already exists: ${row._duplicateOf || 'existing property'}` };
         continue;
       }
       try {
@@ -351,6 +388,11 @@ export function BulkPropertyImport({ userProfile, userId, userEmail, onBack, onC
                         <AlertTriangle size={14} /> {invalidRows.length} Errors
                       </span>
                     )}
+                    {dupeRows.length > 0 && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '4px 12px', borderRadius: 9999, fontSize: 12, fontWeight: 700 }}>
+                        <AlertTriangle size={14} /> {dupeRows.length} Duplicate{dupeRows.length > 1 ? 's' : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -389,11 +431,13 @@ export function BulkPropertyImport({ userProfile, userId, userEmail, onBack, onC
                               <td style={{ padding: '10px 14px' }}>
                                 {hasErr
                                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}><XCircle size={11} /> {row._errors!.length} error{row._errors!.length > 1 ? 's' : ''}</span>
+                                  : row._isDuplicate
+                                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fffbeb', color: '#b45309', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}><AlertTriangle size={11} /> Duplicate</span>
                                   : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}><CheckCircle size={11} /> Ready</span>}
                               </td>
                               <td style={{ padding: '10px 14px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  {hasErr && (
+                                  {(hasErr || row._isDuplicate) && (
                                     <button type="button" onClick={() => setExpandedRow(expandedRow === idx ? null : idx)} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                       {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                     </button>
@@ -404,9 +448,15 @@ export function BulkPropertyImport({ userProfile, userId, userEmail, onBack, onC
                                 </div>
                               </td>
                             </tr>
-                            {isExpanded && hasErr && (
-                              <tr style={{ background: '#fff8f8', borderBottom: '1px solid #f1f5f9' }}>
+                            {isExpanded && (hasErr || row._isDuplicate) && (
+                              <tr style={{ background: hasErr ? '#fff8f8' : '#fffbeb', borderBottom: '1px solid #f1f5f9' }}>
                                 <td colSpan={7} style={{ padding: '8px 14px 12px' }}>
+                                  {row._isDuplicate && (
+                                    <p style={{ fontSize: 12, color: '#b45309', display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 8px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '6px 10px' }}>
+                                      <AlertTriangle size={12} />
+                                      Already exists: <strong>{row._duplicateOf}</strong> — this row will be skipped. Change the address to force-import as a new property.
+                                    </p>
+                                  )}
                                   {row._errors!.map((e, i) => (
                                     <p key={i} style={{ fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0' }}><AlertTriangle size={11} /> {e}</p>
                                   ))}

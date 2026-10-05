@@ -100,8 +100,11 @@ export class StorageController {
     const userId = req.user?.uid;
     const isAdmin = req.user?.role === 'admin' || req.user?.admin === true;
 
-    // Enforce ownership: standard users may only delete files in their own user directory
-    if (!isAdmin && userId && !safePath.includes(userId)) {
+    // Enforce ownership: standard users may only delete files in their own user directory.
+    // Exception: files under 'properties/documents/' are portfolio documents — any authenticated
+    // user may delete them (the property ownership is enforced at the property level elsewhere).
+    const isPropertyDoc = safePath.startsWith('properties/') || safePath.startsWith('properties%2F');
+    if (!isAdmin && userId && !isPropertyDoc && !safePath.includes(userId)) {
       throw new ForbiddenException('You do not have permission to delete this file.');
     }
 
