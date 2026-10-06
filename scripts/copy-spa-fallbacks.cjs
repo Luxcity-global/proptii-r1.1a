@@ -26,6 +26,19 @@ const SPA_ROUTE_DIRS = [
   'admin',
   'admin/leads',
   'ProptiiAdmin',
+  'landlord',
+  'landlord/dashboard',
+  'landlord/properties',
+  'landlord/documents',
+  'landlord/contracts',
+  'landlord/clients',
+  'landlord/viewings',
+  'landlord/insights',
+  'landlord/inbox',
+  'landlord/messages',
+  'landlord/settings',
+  'landlord/referencing',
+  'agent',
 ];
 
 function main() {
@@ -44,6 +57,9 @@ function main() {
     fs.writeFileSync(target, indexHtml);
     created += 1;
   }
+
+  // Also write 200.html fallback for hosts supporting standard SPA rewrites
+  fs.writeFileSync(path.join(DIST, '200.html'), indexHtml);
 
   console.log(
     `copy-spa-fallbacks: ensured ${SPA_ROUTE_DIRS.length} SPA shell paths (${created} written)`,
