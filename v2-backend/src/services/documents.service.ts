@@ -93,16 +93,16 @@ export class DocumentsService {
 
   async getDocuments(landlordId: string, propertyId?: string | 'unassigned'): Promise<LandlordDocument[]> {
     const db = this.db();
-    let query: FirebaseFirestore.Query = db.collection(this.col).where('landlordId', '==', landlordId);
+    const snap = await db.collection(this.col).where('landlordId', '==', landlordId).get();
+    let docs = snap.docs.map(d => cleanDoc({ id: d.id, ...d.data() }));
 
     if (propertyId === 'unassigned') {
-      query = query.where('propertyId', '==', null);
+      docs = docs.filter(d => !d.propertyId);
     } else if (propertyId) {
-      query = query.where('propertyId', '==', propertyId);
+      docs = docs.filter(d => d.propertyId === propertyId);
     }
 
-    const snap = await query.orderBy('createdAt', 'desc').get();
-    return snap.docs.map(d => cleanDoc({ id: d.id, ...d.data() }));
+    return docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   // ── Assign to property ────────────────────────────────────────────────────

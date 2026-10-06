@@ -245,29 +245,6 @@ export function DocumentsPage({
   const [attachForm, setAttachForm] = useState<AttachFormState>(initialAttachForm);
   const [inspectionDoc, setInspectionDoc] = useState<DocumentWithProperty | null>(null);
 
-  // Auto-open the upload modal when navigated here via the Dashboard upload CTA
-  React.useEffect(() => {
-    if (openUploadOnMount) {
-      openAttachFlow();
-      onUploadModalOpened?.();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openUploadOnMount]);
-
-  // Auto-open the inspection drawer when navigated here via a Dashboard document chip
-  React.useEffect(() => {
-    if (!openDocumentId) return;
-    const timer = setTimeout(() => {
-      const doc = allDocuments.find(d => d.id === openDocumentId);
-      if (doc) {
-        openInspectionDrawer(doc);
-        onUploadModalOpened?.();
-      }
-    }, 50);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openDocumentId, allDocuments]);
-
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isMobile = useIsMobile();
@@ -500,6 +477,29 @@ export function DocumentsPage({
     setInspectionDoc(null);
     setShareFeedback(null);
   };
+
+  // Auto-open the upload modal when navigated here via the Dashboard upload CTA
+  React.useEffect(() => {
+    if (openUploadOnMount) {
+      openAttachFlow();
+      onUploadModalOpened?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openUploadOnMount]);
+
+  // Auto-open the inspection drawer when navigated here via a Dashboard document chip
+  React.useEffect(() => {
+    if (!openDocumentId) return;
+    const timer = setTimeout(() => {
+      const doc = allDocuments.find(d => d.id === openDocumentId);
+      if (doc) {
+        openInspectionDrawer(doc);
+        onUploadModalOpened?.();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDocumentId, allDocuments]);
 
   const handleShareDocument = async (document: DocumentWithProperty) => {
     const shareTarget = document.url?.trim() || `${document.name} · ${document.propertyAddress}`;
