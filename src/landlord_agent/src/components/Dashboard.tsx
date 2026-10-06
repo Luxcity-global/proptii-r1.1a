@@ -41,7 +41,7 @@ interface DashboardProps {
   onViewAllProperties?: () => void;
   onViewViewings?: () => void;
   onViewClients?: () => void;
-  onViewDocuments?: () => void;
+  onViewDocuments?: (documentId?: string) => void;
   onViewVacancyAlert?: (alertId: string) => void;
   onViewArrearsAlert?: (alertId: string) => void;
   marketInsights: MarketInsight[];
@@ -833,7 +833,7 @@ export function Dashboard({
                       key={doc.id}
                       type="button"
                       className="ll-doc-chip"
-                      onClick={() => onViewDocuments ? onViewDocuments() : onManageDocuments(doc.property)}
+                      onClick={() => onViewDocuments ? onViewDocuments(doc.id) : onManageDocuments(doc.property)}
                       title={doc.name}
                     >
                       <div className={`ll-doc-icon ${docBadgeClass(doc.type)}`}>

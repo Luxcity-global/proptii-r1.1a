@@ -352,7 +352,7 @@ export function DocumentManagement({
                   <span>Upload Document</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-zinc-900 shadow-2xl" style={{ backgroundColor: '#ffffff' }}>
                 <DialogHeader>
                   <DialogTitle>Upload New Document{isVaultMode ? ' (Unassigned)' : ''}</DialogTitle>
                 </DialogHeader>
