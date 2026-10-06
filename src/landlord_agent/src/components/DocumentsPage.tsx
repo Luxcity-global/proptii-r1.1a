@@ -60,7 +60,7 @@ interface DocumentWithProperty extends PropertyDocument {
 
 type ViewScope = 'property' | 'tenant' | 'all';
 type DisplayStyle = 'grid' | 'table';
-type CategoryFilter = 'all' | 'compliance' | 'contracts' | 'insurance' | 'other';
+type CategoryFilter = 'all' | 'compliance' | 'contracts' | 'insurance' | 'other' | 'unassigned';
 type AttachCategory =
   | 'compliance'
   | 'contract'
@@ -271,12 +271,13 @@ export function DocumentsPage({
       contracts: 0,
       insurance: 0,
       other: 0,
+      unassigned: unassignedDocuments.length,
     };
     allDocuments.forEach((doc) => {
       counts[categoryForType(doc.type)] += 1;
     });
     return counts;
-  }, [allDocuments]);
+  }, [allDocuments, unassignedDocuments]);
 
   const filteredDocuments = useMemo(() => {
     return allDocuments.filter((document) => {
@@ -297,7 +298,9 @@ export function DocumentsPage({
         (statusFilter === 'expired' && document.status === 'expired');
 
       const matchesType =
-        typeFilter === 'all' || CATEGORY_TYPES[typeFilter].includes(document.type);
+        typeFilter === 'all' ||
+        typeFilter === 'unassigned' ||
+        CATEGORY_TYPES[typeFilter as Exclude<CategoryFilter, 'all' | 'unassigned'>]?.includes(document.type);
 
       const matchesProperty =
         propertyFilter === 'all' || document.propertyId === propertyFilter;
@@ -447,8 +450,7 @@ export function DocumentsPage({
   const handleAttachSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const property = (properties || []).find((p) => p.id === attachForm.propertyId);
-    if (!property) return;
-    // Preserve the existing DocumentManagement upload path for real files.
+    // Property is now optional — if none selected, route to vault upload (DocumentManagement null mode)
     if (typeof window !== 'undefined' && attachForm.title.trim()) {
       window.sessionStorage.setItem(
         'proptii.pendingDocumentAttach',
@@ -460,7 +462,11 @@ export function DocumentsPage({
       );
     }
     closeAttachModal();
-    onManageDocuments(property);
+    if (property) {
+      onManageDocuments(property);
+    } else if (onUploadToVault) {
+      onUploadToVault();
+    }
   };
 
   const openInspectionDrawer = (document: DocumentWithProperty) => {
@@ -526,7 +532,7 @@ export function DocumentsPage({
             type="button"
             className="ll-docs-btn-attach"
             style={{ marginTop: 12 }}
-            onClick={onUploadToVault}
+            onClick={() => openAttachFlow()}
           >
             <Upload size={15} />
             Upload document without a property
@@ -1280,23 +1286,10 @@ export function DocumentsPage({
               type="button"
               className="ll-docs-btn-attach"
               onClick={() => openAttachFlow()}
-              disabled={(properties || []).length === 0}
             >
               <Upload size={16} />
-              Attach Document
+              Upload Document
             </button>
-            {onUploadToVault && (
-              <button
-                type="button"
-                className="ll-docs-ghost-btn"
-                onClick={onUploadToVault}
-                title="Upload a document without linking it to a property"
-                style={{ marginLeft: 6 }}
-              >
-                <FolderOpen size={14} />
-                <span className="hide-sm">Upload to Vault</span>
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -1390,17 +1383,16 @@ export function DocumentsPage({
           type="button"
           className="ll-docs-dropzone"
           onClick={() => openAttachFlow()}
-          disabled={(properties || []).length === 0}
+          disabled={false}
         >
           <div className="ll-docs-dropzone-main">
             <span className="ll-docs-dropzone-icon">
               <Upload size={22} />
             </span>
             <div>
-              <h3>Attach Documents to Property or Tenant</h3>
+              <h3>Upload Document</h3>
               <p>
-                Link compliance certificates to properties, or open a property vault to manage
-                attached files.
+                Upload compliance certificates or documents. Property is optional — leave blank to save to your vault.
               </p>
             </div>
           </div>
@@ -1417,6 +1409,7 @@ export function DocumentsPage({
                   ['contracts', 'Contracts'],
                   ['insurance', 'Insurance'],
                   ['other', 'Other'],
+                  ['unassigned', 'Unassigned'],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -1521,10 +1514,9 @@ export function DocumentsPage({
                 type="button"
                 className="ll-docs-btn-attach"
                 onClick={() => openAttachFlow()}
-                disabled={(properties || []).length === 0}
               >
                 <Upload size={16} />
-                Attach First Document
+                Upload Document
               </button>
             </div>
           </div>
@@ -1674,6 +1666,67 @@ export function DocumentsPage({
               </section>
             )}
 
+            {/* Unassigned section — shown in all three view scopes and when Unassigned tab active */}
+            {(typeFilter === 'unassigned' || (unassignedDocuments.length > 0 && typeFilter !== 'compliance' && typeFilter !== 'contracts' && typeFilter !== 'insurance' && typeFilter !== 'other')) && (
+              <section className="space-y-3" style={{ marginTop: viewScope === 'property' ? 0 : 8 }}>
+                <div className="ll-docs-section-head">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <FolderOpen size={15} style={{ color: '#64748b' }} />
+                    <h2>Unassigned Documents</h2>
+                  </div>
+                  <span>
+                    {unassignedDocuments.length} document{unassignedDocuments.length !== 1 ? 's' : ''} not linked to a property
+                  </span>
+                </div>
+                {unassignedDocuments.length === 0 ? (
+                  <div className="ll-docs-empty is-filter" style={{ padding: '20px' }}>
+                    <div className="ll-docs-empty-icon"><FolderOpen size={20} /></div>
+                    <h3 style={{ fontSize: 14 }}>No unassigned documents</h3>
+                    <p>Documents uploaded without a property will appear here.</p>
+                    <div className="ll-docs-empty-actions">
+                      <button type="button" className="ll-docs-btn-attach" onClick={() => openAttachFlow()}>
+                        <Upload size={14} /> Upload Document
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {unassignedDocuments
+                      .filter(doc => !searchTerm || doc.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .map(doc => {
+                        const safeIssue  = doc.issueDate  instanceof Date ? doc.issueDate  : new Date(doc.issueDate  as any);
+                        const safeExpiry = doc.expiryDate instanceof Date ? doc.expiryDate : doc.expiryDate ? new Date(doc.expiryDate as any) : null;
+                        return (
+                          <div key={doc.id} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <FileText size={15} style={{ color: '#64748b', flexShrink: 0 }} />
+                              <div>
+                                <p style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', margin: 0 }}>{doc.name}</p>
+                                <p style={{ fontSize: 11.5, color: '#94a3b8', margin: 0 }}>
+                                  {doc.type}
+                                  {!isNaN(safeIssue.getTime()) && ` · Issued ${safeIssue.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                                  {safeExpiry && !isNaN(safeExpiry.getTime()) && ` · Expires ${safeExpiry.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                                </p>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 600, background: doc.status === 'valid' ? '#dcfce7' : doc.status === 'expiring-soon' ? '#fff7ed' : '#fff1f2', color: doc.status === 'valid' ? '#166534' : doc.status === 'expiring-soon' ? '#c2410c' : '#e11d48' }}>
+                                {doc.status === 'valid' ? 'Valid' : doc.status === 'expiring-soon' ? 'Expiring Soon' : 'Expired'}
+                              </span>
+                              {doc.url && (
+                                <button type="button" className="ll-docs-icon-btn" onClick={() => downloadPropertyDocument(doc.url, doc.name)} title="Download">
+                                  <Download size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </section>
+            )}
+
             {viewScope === 'all' && (
               <section className="space-y-4">
                 <div className="ll-docs-section-head">
@@ -1704,9 +1757,9 @@ export function DocumentsPage({
           <div className="ll-docs-attach-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ll-docs-attach-head">
               <div>
-                <h3 id="ll-docs-attach-title">Attach Document to Property / Tenant</h3>
+                <h3 id="ll-docs-attach-title">Upload Document</h3>
                 <p>
-                  Link uploaded compliance certificates, tenancy contracts, or referencing proof.
+                  Upload a compliance certificate or document. Property is optional — leave blank to save to your vault.
                 </p>
               </div>
               <button
@@ -1732,9 +1785,8 @@ export function DocumentsPage({
               </label>
 
               <label className="ll-docs-field">
-                <span>Target Property</span>
+                <span>Target Property <span style={{ color: '#94a3b8', fontWeight: 400 }}>(optional)</span></span>
                 <select
-                  required
                   value={attachForm.propertyId}
                   onChange={(e) => {
                     const nextProperty = (properties || []).find((p) => p.id === e.target.value);
@@ -1745,9 +1797,7 @@ export function DocumentsPage({
                     }));
                   }}
                 >
-                  <option value="" disabled>
-                    Select a property
-                  </option>
+                  <option value="">No property — save to vault</option>
                   {(properties || []).map((property) => (
                     <option key={property.id} value={property.id}>
                       {property.address}
@@ -1805,16 +1855,16 @@ export function DocumentsPage({
 
               <div className="ll-docs-attach-drop">
                 <Upload size={22} />
-                <strong>Continue to vault upload</strong>
-                <p>PDF, JPG, PNG up to 25MB — file selection opens in the property vault.</p>
+                <strong>Continue to upload</strong>
+                <p>PDF, JPG, PNG up to 25MB — file selection opens next.</p>
               </div>
 
               <div className="ll-docs-attach-actions">
                 <button type="button" className="ll-docs-ghost-btn" onClick={closeAttachModal}>
                   Cancel
                 </button>
-                <button type="submit" className="ll-docs-btn-attach" disabled={!attachForm.propertyId}>
-                  Attach & Seal
+                <button type="submit" className="ll-docs-btn-attach">
+                  Upload Document
                 </button>
               </div>
             </form>
