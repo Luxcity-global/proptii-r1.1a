@@ -1853,8 +1853,37 @@ export function AppContent() {
               navigateToScreen('document-management');
             }}
             onUploadToVault={() => navigateToScreen('document-management-vault')}
+            onAssignDocument={async (documentId, propertyId) => {
+              try {
+                await documentService.assignToProperty(documentId, propertyId);
+                const updatedUnassigned = await documentService.getUnassignedDocuments();
+                setUnassignedDocuments(updatedUnassigned);
+                if (propertyId) {
+                  const updatedProp = await propertyService.getProperty(propertyId);
+                  if (updatedProp) {
+                    setProperties(prev => prev.map(p => p.id === propertyId ? updatedProp : p));
+                  }
+                }
+              } catch (error) {
+                console.error('Error assigning document to property:', error);
+                alert('Failed to assign document to property. Please try again.');
+              }
+            }}
             onDeleteDocuments={async (documentIds) => {
               try {
+                // Delete unassigned vault documents
+                const unassignedIds = documentIds.filter(id => unassignedDocuments.some(u => u.id === id));
+                for (const uId of unassignedIds) {
+                  try {
+                    await documentService.deleteDocument(uId);
+                  } catch (e) {
+                    console.warn('Failed to delete unassigned doc:', uId, e);
+                  }
+                }
+                if (unassignedIds.length > 0) {
+                  setUnassignedDocuments(prev => prev.filter(u => !unassignedIds.includes(u.id)));
+                }
+
                 // Group documents by property
                 const documentsByProperty = new Map<string, string[]>();
 
