@@ -9,6 +9,14 @@ import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 
 const API_BASE = () => getResolvedApiBaseUrl();
 
+/**
+ * Returns the base URL without the trailing /api segment.
+ * getResolvedApiBaseUrl() returns something like https://host.com/api
+ * but documentService endpoints are already prefixed with /api from the backend router.
+ * We strip the trailing /api to avoid double-prefix: /api/api/documents.
+ */
+const BACKEND_BASE = () => API_BASE().replace(/\/api$/, '');
+
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAccessTokenForApiRequest().catch(() => null);
   return {
@@ -58,7 +66,7 @@ export const documentService = {
     expiryDate?: Date | string | null;
     propertyId?: string | null;
   }): Promise<LandlordDocument> {
-    const res = await fetch(`${API_BASE()}/api/documents`, {
+    const res = await fetch(`${BACKEND_BASE()}/api/documents`, {
       method: 'POST',
       headers: await authHeaders(),
       body: JSON.stringify({
@@ -80,7 +88,7 @@ export const documentService = {
 
   /** List all documents for the authenticated landlord, optionally filtered by property */
   async getDocuments(propertyId?: string | 'unassigned'): Promise<LandlordDocument[]> {
-    const url = new URL(`${API_BASE()}/api/documents`);
+    const url = new URL(`${BACKEND_BASE()}/api/documents`);
     if (propertyId) url.searchParams.set('propertyId', propertyId);
     const res = await fetch(url.toString(), {
       headers: await authHeaders(),
@@ -97,7 +105,7 @@ export const documentService = {
 
   /** Assign a document to a property (or unassign by passing null) */
   async assignToProperty(documentId: string, propertyId: string | null): Promise<LandlordDocument> {
-    const res = await fetch(`${API_BASE()}/api/documents/${documentId}/assign`, {
+    const res = await fetch(`${BACKEND_BASE()}/api/documents/${documentId}/assign`, {
       method: 'PATCH',
       headers: await authHeaders(),
       body: JSON.stringify({ propertyId }),
@@ -112,7 +120,7 @@ export const documentService = {
 
   /** Delete a document record */
   async deleteDocument(documentId: string): Promise<void> {
-    const res = await fetch(`${API_BASE()}/api/documents/${documentId}`, {
+    const res = await fetch(`${BACKEND_BASE()}/api/documents/${documentId}`, {
       method: 'DELETE',
       headers: await authHeaders(),
     });
