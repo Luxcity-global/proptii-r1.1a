@@ -31,6 +31,7 @@ import {
   Plus,
   Building2,
   FolderOpen,
+  RefreshCw,
 } from 'lucide-react';
 import { Property, PropertyDocument } from '../App';
 import { propertyService } from '../services/propertyService';
@@ -118,7 +119,16 @@ export function DocumentManagement({
   const [vaultDocs,           setVaultDocs]            = useState<LandlordDocument[]>([]);
   const [vaultLoaded,         setVaultLoaded]          = useState(false);
   const [loadingVault,        setLoadingVault]         = useState(false);
-  /** After upload in vault mode — pick a property to assign to */
+
+  const fetchVaultDocs = React.useCallback(() => {
+    setLoadingVault(true);
+    documentService.getUnassignedDocuments()
+      .then(docs => { setVaultDocs(docs); setVaultLoaded(true); })
+      .catch(err => console.error('[DocumentManagement] vault load error:', err))
+      .finally(() => setLoadingVault(false));
+  }, []);
+  /** After upload in vault mode — pick a property to assign all uploaded docs to */
+  const [assignModalDocs,     setAssignModalDocs]      = useState<LandlordDocument[]>([]);
   const [assignModalDoc,      setAssignModalDoc]       = useState<LandlordDocument | null>(null);
   const [assignPropertyId,    setAssignPropertyId]     = useState('');
   const [isAssigning,         setIsAssigning]          = useState(false);
@@ -127,12 +137,8 @@ export function DocumentManagement({
 
   React.useEffect(() => {
     if (!isVaultMode || vaultLoaded) return;
-    setLoadingVault(true);
-    documentService.getUnassignedDocuments()
-      .then(docs => { setVaultDocs(docs); setVaultLoaded(true); })
-      .catch(err => console.error('[DocumentManagement] vault load error:', err))
-      .finally(() => setLoadingVault(false));
-  }, [isVaultMode, vaultLoaded]);
+    fetchVaultDocs();
+  }, [isVaultMode, vaultLoaded, fetchVaultDocs]);
 
   // ── Document list for display ─────────────────────────────────────────────
 
@@ -170,6 +176,7 @@ export function DocumentManagement({
 
     setIsUploading(true);
     const apiBase = getResolvedApiBaseUrl();
+    const createdVaultDocs: LandlordDocument[] = [];
 
     try {
       for (const form of selectedForms) {
@@ -205,10 +212,9 @@ export function DocumentManagement({
             expiryDate: expiryDate ?? null,
             propertyId: null,
           });
+          createdVaultDocs.push(doc);
           setVaultDocs(prev => [doc, ...prev]);
           onVaultDocumentAdded?.(doc);
-          // Offer to assign immediately
-          setAssignModalDoc(doc);
         } else {
           // 2b. Property mode — save to property.documents[]
           const newDoc: Omit<PropertyDocument, 'id'> = {
@@ -226,6 +232,12 @@ export function DocumentManagement({
 
       setSelectedForms([]);
       setIsUploadOpen(false);
+
+      // After all vault uploads complete, offer to assign to a property once
+      if (isVaultMode && createdVaultDocs.length > 0) {
+        setAssignModalDocs(createdVaultDocs);
+        setAssignModalDoc(createdVaultDocs[0]);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -236,24 +248,26 @@ export function DocumentManagement({
   const handleAssign = async () => {
     if (!assignModalDoc || !assignPropertyId) return;
     setIsAssigning(true);
+    const docsToAssign = assignModalDocs.length > 0 ? assignModalDocs : [assignModalDoc];
     try {
-      const updated = await documentService.assignToProperty(assignModalDoc.id, assignPropertyId);
-      // Remove from unassigned list since it now belongs to a property
-      setVaultDocs(prev => prev.filter(d => d.id !== updated.id));
-      // Tell parent so PropertyDetails can show it
       const prop = availableProperties.find(p => p.id === assignPropertyId);
-      if (prop) {
-        const asPropertyDoc: Omit<PropertyDocument, 'id'> = {
-          name:       updated.name,
-          type:       updated.type as PropertyDocument['type'],
-          url:        updated.url,
-          issueDate:  new Date(updated.issueDate),
-          expiryDate: updated.expiryDate ? new Date(updated.expiryDate) : undefined,
-          status:     updated.status,
-        };
-        onDocumentAdd(assignPropertyId, asPropertyDoc);
+      for (const doc of docsToAssign) {
+        const updated = await documentService.assignToProperty(doc.id, assignPropertyId);
+        setVaultDocs(prev => prev.filter(d => d.id !== updated.id));
+        if (prop) {
+          const asPropertyDoc: Omit<PropertyDocument, 'id'> = {
+            name:       updated.name,
+            type:       updated.type as PropertyDocument['type'],
+            url:        updated.url,
+            issueDate:  new Date(updated.issueDate),
+            expiryDate: updated.expiryDate ? new Date(updated.expiryDate) : undefined,
+            status:     updated.status,
+          };
+          onDocumentAdd(assignPropertyId, asPropertyDoc);
+        }
       }
       setAssignModalDoc(null);
+      setAssignModalDocs([]);
       setAssignPropertyId('');
     } catch (err) {
       alert(`Failed to assign: ${(err as Error).message}`);
@@ -314,6 +328,17 @@ export function DocumentManagement({
                 </p>
               </div>
             </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              {isVaultMode && (
+                <Button variant="outline" className="flex items-center gap-2 rounded-full px-4"
+                  onClick={() => { setVaultLoaded(false); fetchVaultDocs(); }}
+                  disabled={loadingVault}
+                  title="Refresh vault documents"
+                >
+                  <RefreshCw className={`w-4 h-4${loadingVault ? ' animate-spin' : ''}`} />
+                </Button>
+              )}
 
             <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
               <DialogTrigger asChild>
@@ -420,6 +445,7 @@ export function DocumentManagement({
                 </form>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </div>
       </div>
@@ -434,7 +460,11 @@ export function DocumentManagement({
               </div>
               <div>
                 <p className="font-semibold text-sm" style={{ fontFamily: 'Archivo,sans-serif' }}>Assign to a property?</p>
-                <p className="text-xs text-muted-foreground">"{assignModalDoc.name}" is saved in the vault</p>
+                <p className="text-xs text-muted-foreground">
+                  {assignModalDocs.length > 1
+                    ? `${assignModalDocs.length} documents saved to vault`
+                    : `"${assignModalDoc.name}" is saved in the vault`}
+                </p>
               </div>
             </div>
 
@@ -447,7 +477,7 @@ export function DocumentManagement({
                   </SelectContent>
                 </Select>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={() => setAssignModalDoc(null)}>Keep in vault</Button>
+                  <Button variant="outline" className="flex-1" onClick={() => { setAssignModalDoc(null); setAssignModalDocs([]); setAssignPropertyId(''); }}>Keep in vault</Button>
                   <Button className="flex-1" disabled={!assignPropertyId || isAssigning}
                     style={{ background: '#136C9E' }}
                     onClick={handleAssign}>

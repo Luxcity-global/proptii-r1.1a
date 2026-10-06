@@ -454,8 +454,22 @@ export function AppContent() {
   const enrichmentSourceRef = React.useRef<'import' | 'direct'>('direct');
   /** Vault documents (no property) — loaded lazily when Documents screen is first opened */
   const [unassignedDocuments, setUnassignedDocuments] = React.useState<LandlordDocument[]>([]);
+  const unassignedLoadedRef = React.useRef(false);
   /** When true, DocumentsPage will auto-open its upload modal on next mount */
   const [openDocsUploadOnMount, setOpenDocsUploadOnMount] = React.useState(false);
+  const [openDocsDocumentId, setOpenDocsDocumentId] = React.useState<string | undefined>(undefined);
+
+  // Fetch unassigned vault documents once the user opens the Documents tab
+  const loadUnassignedDocuments = React.useCallback(async () => {
+    if (unassignedLoadedRef.current) return;
+    try {
+      const docs = await documentService.getUnassignedDocuments();
+      setUnassignedDocuments(docs);
+      unassignedLoadedRef.current = true;
+    } catch (err) {
+      console.warn('[App] Failed to fetch unassigned docs:', err);
+    }
+  }, []);
 
   const clearSignInQueryParam = useCallback(() => {
     try {
@@ -1063,6 +1077,13 @@ export function AppContent() {
     resolveManagerId,
     portfolioRefreshKey,
   ]);
+
+  // Load unassigned vault documents when the user navigates to the documents screen
+  React.useEffect(() => {
+    if (navigationScreen === 'documents') {
+      loadUnassignedDocuments();
+    }
+  }, [navigationScreen, loadUnassignedDocuments]);
 
   // Helper function to get current user ID — delegates to resolveManagerId
   const getCurrentUserId = (): string | null => resolveManagerId();
@@ -1717,11 +1738,16 @@ export function AppContent() {
               }
             }}
             marketInsights={marketInsights}
-            onViewDocuments={() => {
-              setOpenDocsUploadOnMount(true);
+            onViewDocuments={(documentId) => {
+              if (documentId) {
+                setOpenDocsDocumentId(documentId);
+                setOpenDocsUploadOnMount(false);
+              } else {
+                setOpenDocsUploadOnMount(true);
+                setOpenDocsDocumentId(undefined);
+              }
+              loadUnassignedDocuments();
               handleNavigation('documents');
-              // Reset the flag after a tick so re-visiting docs doesn't re-open the modal
-              setTimeout(() => setOpenDocsUploadOnMount(false), 300);
             }}
             vacancyAlerts={vacancyAlerts}
             arrearsAlerts={arrearsAlerts}
@@ -1807,6 +1833,12 @@ export function AppContent() {
             properties={properties}
             unassignedDocuments={unassignedDocuments}
             openUploadOnMount={openDocsUploadOnMount}
+            openDocumentId={openDocsDocumentId}
+            onUploadModalOpened={() => {
+              // Reset both flags after DocumentsPage has consumed them
+              setOpenDocsUploadOnMount(false);
+              setOpenDocsDocumentId(undefined);
+            }}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -2320,6 +2352,17 @@ export function AppContent() {
             onViewAllProperties={() => handleNavigation('properties')}
             onViewViewings={() => handleNavigation('viewings')}
             onViewClients={() => handleNavigation('clients')}
+            onViewDocuments={(documentId) => {
+              if (documentId) {
+                setOpenDocsDocumentId(documentId);
+                setOpenDocsUploadOnMount(false);
+              } else {
+                setOpenDocsUploadOnMount(true);
+                setOpenDocsDocumentId(undefined);
+              }
+              loadUnassignedDocuments();
+              handleNavigation('documents');
+            }}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -2803,6 +2846,23 @@ export function AppContent() {
             userId={resolveManagerId() || ''}
             onBack={() => navigateToScreen('property-details')}
             onDocumentAdd={addDocumentToProperty}
+            onDocumentDelete={async (propertyId, documentId) => {
+              const prop = properties.find(p => p.id === propertyId);
+              if (!prop) return;
+              const updatedDocs = prop.documents.filter(d => d.id !== documentId);
+              await propertyService.updateProperty(propertyId, {
+                documents: updatedDocs.map(d => ({
+                  id: d.id, name: d.name, type: d.type, url: d.url,
+                  issueDate: d.issueDate instanceof Date ? d.issueDate.toISOString() : d.issueDate,
+                  expiryDate: d.expiryDate instanceof Date ? d.expiryDate.toISOString() : (d.expiryDate ?? undefined),
+                  status: d.status,
+                })) as any,
+              });
+              setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, documents: updatedDocs } : p));
+              if (selectedProperty?.id === propertyId) {
+                setSelectedProperty(prev => prev ? { ...prev, documents: updatedDocs } : null);
+              }
+            }}
           />
         );
 

@@ -44,6 +44,10 @@ interface DocumentsPageProps {
   onUploadToVault?: () => void;
   /** When true, auto-opens the Upload Document modal on first render */
   openUploadOnMount?: boolean;
+  /** When set, auto-opens the inspection drawer for this document ID on first render */
+  openDocumentId?: string;
+  /** Called after the upload modal or inspection drawer has been opened — lets parent reset the trigger flags */
+  onUploadModalOpened?: () => void;
   onDeleteDocuments?: (documentIds: string[]) => void;
   onArchiveDocuments?: (documentIds: string[]) => void;
   onExportDocuments?: (format: 'json' | 'csv' | 'excel' | 'pdf', documentIds: string[]) => void;
@@ -216,6 +220,8 @@ export function DocumentsPage({
   onManageDocuments,
   onUploadToVault,
   openUploadOnMount = false,
+  openDocumentId,
+  onUploadModalOpened,
   onDeleteDocuments,
   onArchiveDocuments,
   onExportDocuments,
@@ -239,13 +245,29 @@ export function DocumentsPage({
   const [attachForm, setAttachForm] = useState<AttachFormState>(initialAttachForm);
   const [inspectionDoc, setInspectionDoc] = useState<DocumentWithProperty | null>(null);
 
-  // Auto-open the upload modal if navigated here from the Dashboard "Upload Document" CTA
+  // Auto-open the upload modal when navigated here via the Dashboard upload CTA
   React.useEffect(() => {
     if (openUploadOnMount) {
       openAttachFlow();
+      onUploadModalOpened?.();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openUploadOnMount]);
+
+  // Auto-open the inspection drawer when navigated here via a Dashboard document chip
+  React.useEffect(() => {
+    if (!openDocumentId) return;
+    const timer = setTimeout(() => {
+      const doc = allDocuments.find(d => d.id === openDocumentId);
+      if (doc) {
+        openInspectionDrawer(doc);
+        onUploadModalOpened?.();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDocumentId, allDocuments]);
+
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isMobile = useIsMobile();
@@ -461,17 +483,6 @@ export function DocumentsPage({
   const handleAttachSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const property = (properties || []).find((p) => p.id === attachForm.propertyId);
-    // Property is now optional — if none selected, route to vault upload (DocumentManagement null mode)
-    if (typeof window !== 'undefined' && attachForm.title.trim()) {
-      window.sessionStorage.setItem(
-        'proptii.pendingDocumentAttach',
-        JSON.stringify({
-          title: attachForm.title.trim(),
-          category: attachForm.category,
-          tenant: attachForm.tenant,
-        }),
-      );
-    }
     closeAttachModal();
     if (property) {
       onManageDocuments(property);
@@ -1561,94 +1572,6 @@ export function DocumentsPage({
                 {effectiveDisplay === 'grid' ? renderPropertyCards() : renderPropertyTable()}
               </section>
             )}
-
-            {/* ── Unassigned documents section (property view only) ─────── */}
-            {viewScope === 'property' && (unassignedDocuments.length > 0 || onUploadToVault) && (
-              <section className="space-y-3" style={{ marginTop: 24 }}>
-                <div className="ll-docs-section-head">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <FolderOpen size={16} style={{ color: '#64748b' }} />
-                    <h2>Unassigned Documents</h2>
-                  </div>
-                  <span>{unassignedDocuments.length} document{unassignedDocuments.length !== 1 ? 's' : ''} not linked to a property</span>
-                </div>
-
-                {unassignedDocuments.length === 0 ? (
-                  <div className="ll-docs-empty is-filter" style={{ padding: '24px 20px' }}>
-                    <div className="ll-docs-empty-icon"><FolderOpen size={22} /></div>
-                    <h3 style={{ fontSize: 14 }}>No unassigned documents</h3>
-                    <p>Upload documents here and assign them to a property at any time.</p>
-                    {onUploadToVault && (
-                      <div className="ll-docs-empty-actions">
-                        <button type="button" className="ll-docs-btn-attach" onClick={onUploadToVault}>
-                          <Upload size={14} /> Upload to Vault
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {unassignedDocuments.map(doc => {
-                      const safeIssue = doc.issueDate instanceof Date ? doc.issueDate : new Date(doc.issueDate as any);
-                      const safeExpiry = doc.expiryDate ? (doc.expiryDate instanceof Date ? doc.expiryDate : new Date(doc.expiryDate as any)) : null;
-                      return (
-                        <div key={doc.id}
-                          style={{
-                            background: 'white',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: 12,
-                            padding: '12px 16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            flexWrap: 'wrap' as const,
-                            gap: 12,
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <FileText size={16} style={{ color: '#64748b', flexShrink: 0 }} />
-                            <div>
-                              <p style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', margin: 0 }}>{doc.name}</p>
-                              <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>
-                                {doc.type} · Issued {isNaN(safeIssue.getTime()) ? '—' : safeIssue.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                {safeExpiry && !isNaN(safeExpiry.getTime()) && ` · Expires ${safeExpiry.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
-                              </p>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{
-                              padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 600,
-                              background: doc.status === 'valid' ? '#dcfce7' : doc.status === 'expiring-soon' ? '#fff7ed' : '#fff1f2',
-                              color: doc.status === 'valid' ? '#166534' : doc.status === 'expiring-soon' ? '#c2410c' : '#e11d48',
-                            }}>
-                              {doc.status === 'valid' ? 'Valid' : doc.status === 'expiring-soon' ? 'Expiring Soon' : 'Expired'}
-                            </span>
-                            {onUploadToVault && (
-                              <button type="button" className="ll-docs-ghost-btn" onClick={onUploadToVault}
-                                style={{ fontSize: 12, padding: '4px 10px' }}>
-                                <FolderOpen size={12} /> Manage
-                              </button>
-                            )}
-                            {doc.url && (
-                              <button type="button" className="ll-docs-icon-btn"
-                                onClick={() => downloadPropertyDocument(doc.url, doc.name)}
-                                title="Download">
-                                <Download size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {onUploadToVault && (
-                      <button type="button" className="ll-docs-ghost-btn" style={{ marginTop: 4 }} onClick={onUploadToVault}>
-                        <Upload size={13} /> Upload another unassigned document
-                      </button>
-                    )}
-                  </div>
-                )}
-              </section>
-            )}
             {viewScope === 'tenant' && (
               <section className="space-y-4">
                 <div className="ll-docs-section-head">
@@ -1677,8 +1600,8 @@ export function DocumentsPage({
               </section>
             )}
 
-            {/* Unassigned section — shown in all three view scopes and when Unassigned tab active */}
-            {(typeFilter === 'unassigned' || (unassignedDocuments.length > 0 && typeFilter !== 'compliance' && typeFilter !== 'contracts' && typeFilter !== 'insurance' && typeFilter !== 'other')) && (
+            {/* Unassigned section — shown in all view scopes and when Unassigned tab is active */}
+            {(typeFilter === 'unassigned' || (unassignedDocuments.length > 0 && typeFilter !== 'compliance' && typeFilter !== 'contracts' && typeFilter !== 'insurance' && typeFilter !== 'other' && viewScope !== 'all')) && (
               <section className="space-y-3" style={{ marginTop: viewScope === 'property' ? 0 : 8 }}>
                 <div className="ll-docs-section-head">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
