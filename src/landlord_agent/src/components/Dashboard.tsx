@@ -41,6 +41,7 @@ interface DashboardProps {
   onViewAllProperties?: () => void;
   onViewViewings?: () => void;
   onViewClients?: () => void;
+  onViewDocuments?: () => void;
   onViewVacancyAlert?: (alertId: string) => void;
   onViewArrearsAlert?: (alertId: string) => void;
   marketInsights: MarketInsight[];
@@ -425,6 +426,7 @@ export function Dashboard({
   onViewAllProperties,
   onViewViewings,
   onViewClients,
+  onViewDocuments,
   onViewVacancyAlert,
   onViewArrearsAlert,
   vacancyAlerts = [],
@@ -654,7 +656,8 @@ export function Dashboard({
   const hasOccupancy = occupiedProperties > 0;
   const firstProperty = properties[0];
   const handleUploadDocument = () => {
-    if (firstProperty) onManageDocuments(firstProperty);
+    if (onViewDocuments) onViewDocuments();
+    else if (firstProperty) onManageDocuments(firstProperty);
     else onAddProperty();
   };
   const handleAssignTenant = () => {
@@ -806,6 +809,12 @@ export function Dashboard({
             <div className={`ll-content-box${documentChips.length === 0 ? " ll-is-empty" : ""}`}>
               <div className="ll-box-header">
                 <h3 className="ll-box-title ll-heading">Your Documents</h3>
+                {(documentChips.length > 0 || onViewDocuments) && (
+                  <button type="button" className="ll-box-link" onClick={() => onViewDocuments?.()}>
+                    View all documents
+                    <ChevronRight size={14} />
+                  </button>
+                )}
               </div>
               {documentChips.length === 0 ? (
                 <ContainerEmpty
@@ -824,7 +833,7 @@ export function Dashboard({
                       key={doc.id}
                       type="button"
                       className="ll-doc-chip"
-                      onClick={() => onManageDocuments(doc.property)}
+                      onClick={() => onViewDocuments ? onViewDocuments() : onManageDocuments(doc.property)}
                       title={doc.name}
                     >
                       <div className={`ll-doc-icon ${docBadgeClass(doc.type)}`}>

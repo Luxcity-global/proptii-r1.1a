@@ -327,7 +327,7 @@ export function DocumentManagement({
                   <span>Upload Document</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Upload New Document{isVaultMode ? ' (Unassigned)' : ''}</DialogTitle>
                 </DialogHeader>
@@ -341,15 +341,27 @@ export function DocumentManagement({
                   {/* File picker */}
                   <div className="space-y-2">
                     <Label>Document File *</Label>
-                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                      <input type="file" id="dm-file-upload" className="hidden"
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onChange={handleFileSelect} />
-                      <label htmlFor="dm-file-upload" className="cursor-pointer block">
-                        <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground mb-2">Drag & drop or click to browse</p>
-                        <Button type="button" variant="outline" size="sm">Browse Files</Button>
-                        <p className="text-xs text-muted-foreground mt-2">PDF, JPG, PNG up to 25MB</p>
-                      </label>
+                    <div
+                      className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                      onClick={() => document.getElementById('dm-file-upload')?.click()}
+                    >
+                      <input
+                        type="file"
+                        id="dm-file-upload"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        multiple
+                        onChange={handleFileSelect}
+                      />
+                      <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground mb-2">Drag & drop or click to browse</p>
+                      <span
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium border border-input bg-background hover:bg-accent rounded-md cursor-pointer"
+                        onClick={e => { e.stopPropagation(); document.getElementById('dm-file-upload')?.click(); }}
+                      >
+                        Browse Files
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-2">PDF, JPG, PNG up to 25MB</p>
                     </div>
                     {selectedForms.length > 0 && (
                       <p className="text-sm text-muted-foreground text-center">

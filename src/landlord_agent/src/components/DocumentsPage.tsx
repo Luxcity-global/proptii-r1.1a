@@ -42,6 +42,8 @@ interface DocumentsPageProps {
   onManageDocuments: (property: Property) => void;
   /** Open the vault uploader (no property required) */
   onUploadToVault?: () => void;
+  /** When true, auto-opens the Upload Document modal on first render */
+  openUploadOnMount?: boolean;
   onDeleteDocuments?: (documentIds: string[]) => void;
   onArchiveDocuments?: (documentIds: string[]) => void;
   onExportDocuments?: (format: 'json' | 'csv' | 'excel' | 'pdf', documentIds: string[]) => void;
@@ -213,6 +215,7 @@ export function DocumentsPage({
   onViewProperty,
   onManageDocuments,
   onUploadToVault,
+  openUploadOnMount = false,
   onDeleteDocuments,
   onArchiveDocuments,
   onExportDocuments,
@@ -235,6 +238,14 @@ export function DocumentsPage({
   const [attachModalOpen, setAttachModalOpen] = useState(false);
   const [attachForm, setAttachForm] = useState<AttachFormState>(initialAttachForm);
   const [inspectionDoc, setInspectionDoc] = useState<DocumentWithProperty | null>(null);
+
+  // Auto-open the upload modal if navigated here from the Dashboard "Upload Document" CTA
+  React.useEffect(() => {
+    if (openUploadOnMount) {
+      openAttachFlow();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openUploadOnMount]);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isMobile = useIsMobile();

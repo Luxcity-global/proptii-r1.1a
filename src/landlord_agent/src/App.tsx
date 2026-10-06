@@ -454,6 +454,8 @@ export function AppContent() {
   const enrichmentSourceRef = React.useRef<'import' | 'direct'>('direct');
   /** Vault documents (no property) — loaded lazily when Documents screen is first opened */
   const [unassignedDocuments, setUnassignedDocuments] = React.useState<LandlordDocument[]>([]);
+  /** When true, DocumentsPage will auto-open its upload modal on next mount */
+  const [openDocsUploadOnMount, setOpenDocsUploadOnMount] = React.useState(false);
 
   const clearSignInQueryParam = useCallback(() => {
     try {
@@ -1715,6 +1717,12 @@ export function AppContent() {
               }
             }}
             marketInsights={marketInsights}
+            onViewDocuments={() => {
+              setOpenDocsUploadOnMount(true);
+              handleNavigation('documents');
+              // Reset the flag after a tick so re-visiting docs doesn't re-open the modal
+              setTimeout(() => setOpenDocsUploadOnMount(false), 300);
+            }}
             vacancyAlerts={vacancyAlerts}
             arrearsAlerts={arrearsAlerts}
           />
@@ -1798,6 +1806,7 @@ export function AppContent() {
           <DocumentsPage
             properties={properties}
             unassignedDocuments={unassignedDocuments}
+            openUploadOnMount={openDocsUploadOnMount}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
