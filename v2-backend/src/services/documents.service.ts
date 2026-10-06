@@ -91,10 +91,25 @@ export class DocumentsService {
 
   // ── List ──────────────────────────────────────────────────────────────────
 
-  async getDocuments(landlordId: string, propertyId?: string | 'unassigned'): Promise<LandlordDocument[]> {
+  async getDocuments(landlordId: string, propertyId?: string | 'unassigned', userEmail?: string): Promise<LandlordDocument[]> {
     const db = this.db();
     const snap = await db.collection(this.col).where('landlordId', '==', landlordId).get();
     let docs = snap.docs.map(d => cleanDoc({ id: d.id, ...d.data() }));
+
+    if (userEmail && userEmail !== landlordId) {
+      try {
+        const emailSnap = await db.collection(this.col).where('landlordId', '==', userEmail).get();
+        const emailDocs = emailSnap.docs.map(d => cleanDoc({ id: d.id, ...d.data() }));
+        const seenIds = new Set(docs.map(d => d.id));
+        for (const ed of emailDocs) {
+          if (!seenIds.has(ed.id)) {
+            docs.push(ed);
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed fallback query by userEmail: ${err?.message}`);
+      }
+    }
 
     if (propertyId === 'unassigned') {
       docs = docs.filter(d => !d.propertyId);
@@ -107,13 +122,17 @@ export class DocumentsService {
 
   // ── Assign to property ────────────────────────────────────────────────────
 
-  async assignToProperty(documentId: string, landlordId: string, propertyId: string | null): Promise<LandlordDocument> {
+  async assignToProperty(documentId: string, landlordId: string, propertyId: string | null, userEmail?: string): Promise<LandlordDocument> {
     const db = this.db();
     const ref = db.collection(this.col).doc(documentId);
     const snap = await ref.get();
     if (!snap.exists) throw new Error('Document not found');
     const data = snap.data()!;
-    if (data.landlordId !== landlordId) throw new Error('Forbidden');
+    const isOwner =
+      data.landlordId === landlordId ||
+      (userEmail && data.landlordId === userEmail) ||
+      (data.landlordId && landlordId && String(data.landlordId).toLowerCase() === String(landlordId).toLowerCase());
+    if (!isOwner) throw new Error('Forbidden');
     const update = {
       propertyId: propertyId ?? null,
       updatedAt: new Date().toISOString(),
@@ -156,13 +175,17 @@ export class DocumentsService {
 
   // ── Delete ────────────────────────────────────────────────────────────────
 
-  async deleteDocument(documentId: string, landlordId: string): Promise<void> {
+  async deleteDocument(documentId: string, landlordId: string, userEmail?: string): Promise<void> {
     const db = this.db();
     const ref = db.collection(this.col).doc(documentId);
     const snap = await ref.get();
     if (!snap.exists) return; // idempotent
     const data = snap.data()!;
-    if (data.landlordId !== landlordId) throw new Error('Forbidden');
+    const isOwner =
+      data.landlordId === landlordId ||
+      (userEmail && data.landlordId === userEmail) ||
+      (data.landlordId && landlordId && String(data.landlordId).toLowerCase() === String(landlordId).toLowerCase());
+    if (!isOwner) throw new Error('Forbidden');
 
     // Delete record from Firestore
     await ref.delete();

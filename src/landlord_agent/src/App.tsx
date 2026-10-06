@@ -1852,7 +1852,20 @@ export function AppContent() {
               selectProperty(property);
               navigateToScreen('document-management');
             }}
-            onUploadToVault={() => navigateToScreen('document-management-vault')}
+            onAddDocumentToProperty={async (propertyId, doc) => {
+              addDocumentToProperty(propertyId, doc);
+              try {
+                await propertyService.addDocumentToProperty(propertyId, doc);
+              } catch (err) {
+                console.warn('Could not sync to propertyService:', err);
+              }
+            }}
+            onVaultDocumentAdded={(doc) => {
+              setUnassignedDocuments(prev => [doc, ...prev]);
+            }}
+            onUploadToVault={() => {
+              // Now handled in-place by DocumentsPage modal
+            }}
             onAssignDocument={async (documentId, propertyId) => {
               try {
                 await documentService.assignToProperty(documentId, propertyId);
@@ -1871,18 +1884,18 @@ export function AppContent() {
             }}
             onDeleteDocuments={async (documentIds) => {
               try {
-                // Delete unassigned vault documents
-                const unassignedIds = documentIds.filter(id => unassignedDocuments.some(u => u.id === id));
-                for (const uId of unassignedIds) {
-                  try {
-                    await documentService.deleteDocument(uId);
-                  } catch (e) {
-                    console.warn('Failed to delete unassigned doc:', uId, e);
+                // Delete unassigned vault documents from backend
+                for (const id of documentIds) {
+                  const isUnassigned = unassignedDocuments.some(u => u.id === id);
+                  if (isUnassigned) {
+                    try {
+                      await documentService.deleteDocument(id);
+                    } catch (e) {
+                      console.warn('Failed to delete unassigned doc from backend:', id, e);
+                    }
                   }
                 }
-                if (unassignedIds.length > 0) {
-                  setUnassignedDocuments(prev => prev.filter(u => !unassignedIds.includes(u.id)));
-                }
+                setUnassignedDocuments(prev => prev.filter(u => !documentIds.includes(u.id)));
 
                 // Group documents by property
                 const documentsByProperty = new Map<string, string[]>();
@@ -2892,6 +2905,9 @@ export function AppContent() {
                 setSelectedProperty(prev => prev ? { ...prev, documents: updatedDocs } : null);
               }
             }}
+            onVaultDocumentDeleted={(docId) => {
+              setUnassignedDocuments(prev => prev.filter(d => d.id !== docId));
+            }}
           />
         );
 
@@ -2914,6 +2930,9 @@ export function AppContent() {
                 if (already) return prev;
                 return [doc, ...prev];
               });
+            }}
+            onVaultDocumentDeleted={(docId) => {
+              setUnassignedDocuments(prev => prev.filter(d => d.id !== docId));
             }}
           />
         );

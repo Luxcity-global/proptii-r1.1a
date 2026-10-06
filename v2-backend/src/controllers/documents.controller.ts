@@ -54,7 +54,8 @@ export class DocumentsController {
     @Query('propertyId') propertyId?: string,
   ) {
     const landlordId = req.user?.uid || req.user?.id || req.user?.email;
-    const docs = await this.documentsService.getDocuments(landlordId, propertyId);
+    const userEmail = req.user?.email;
+    const docs = await this.documentsService.getDocuments(landlordId, propertyId, userEmail);
     return { success: true, documents: docs };
   }
 
@@ -65,7 +66,8 @@ export class DocumentsController {
   @ApiResponse({ status: 200, description: 'Document updated' })
   async assign(@Req() req: any, @Param('id') id: string, @Body() body: { propertyId: string | null }) {
     const landlordId = req.user?.uid || req.user?.id || req.user?.email;
-    const doc = await this.documentsService.assignToProperty(id, landlordId, body.propertyId ?? null);
+    const userEmail = req.user?.email;
+    const doc = await this.documentsService.assignToProperty(id, landlordId, body.propertyId ?? null, userEmail);
     return { success: true, document: doc };
   }
 
@@ -77,7 +79,8 @@ export class DocumentsController {
   @ApiResponse({ status: 200, description: 'Deleted' })
   async remove(@Req() req: any, @Param('id') id: string) {
     const landlordId = req.user?.uid || req.user?.id || req.user?.email;
-    await this.documentsService.deleteDocument(id, landlordId);
+    const userEmail = req.user?.email;
+    await this.documentsService.deleteDocument(id, landlordId, userEmail);
     return { success: true };
   }
 }

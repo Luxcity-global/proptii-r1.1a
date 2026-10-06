@@ -58,6 +58,8 @@ interface DocumentManagementProps {
   onDocumentDelete?: (propertyId: string, documentId: string) => Promise<void>;
   /** Called when a vault document is assigned to a property (vault mode only) */
   onVaultDocumentAdded?: (doc: LandlordDocument) => void;
+  /** Called when a vault document is deleted */
+  onVaultDocumentDeleted?: (docId: string) => void;
 }
 
 const DOCUMENT_TYPES = [
@@ -105,6 +107,7 @@ export function DocumentManagement({
   onDocumentAdd,
   onDocumentDelete,
   onVaultDocumentAdded,
+  onVaultDocumentDeleted,
 }: DocumentManagementProps) {
   const isVaultMode = !property;
 
@@ -285,6 +288,7 @@ export function DocumentManagement({
       if (isVaultMode) {
         await documentService.deleteDocument(docId);
         setVaultDocs(prev => prev.filter(d => d.id !== docId));
+        onVaultDocumentDeleted?.(docId);
       } else if (property) {
         if (onDocumentDelete) {
           await onDocumentDelete(property.id, docId);
