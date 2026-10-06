@@ -191,6 +191,28 @@ export class DocumentsService {
     await ref.delete();
     this.logger.log(`Deleted document ${documentId} for landlord ${landlordId}`);
 
+    // Clean up document from property if it was assigned
+    if (data.propertyId) {
+      try {
+        const propRef = db.collection('properties').doc(data.propertyId);
+        const propSnap = await propRef.get();
+        if (propSnap.exists) {
+          const propData = propSnap.data()!;
+          const existingDocs = Array.isArray(propData.documents) ? propData.documents : [];
+          const filteredDocs = existingDocs.filter((d: any) => d.id !== documentId && d.url !== data.url);
+          if (filteredDocs.length !== existingDocs.length) {
+            await propRef.update({
+              documents: filteredDocs,
+              updatedAt: new Date().toISOString(),
+            });
+            this.logger.log(`Cleaned up document ${documentId} from property ${data.propertyId}`);
+          }
+        }
+      } catch (propErr: any) {
+        this.logger.warn(`Could not remove document ${documentId} from property ${data.propertyId}: ${propErr?.message}`);
+      }
+    }
+
     // Clean up physical file in Cloud Storage if storageService is available
     if (this.storageService && data.url) {
       try {
