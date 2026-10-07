@@ -1081,7 +1081,7 @@ export function AppContent() {
 
   // Load unassigned vault documents when the user navigates to the documents screen
   React.useEffect(() => {
-    if (navigationScreen === 'documents') {
+    if (navigationScreen === 'documents' || navigationScreen === 'dashboard') {
       loadUnassignedDocuments();
     }
   }, [navigationScreen, loadUnassignedDocuments]);
@@ -1696,6 +1696,7 @@ export function AppContent() {
         return (
           <Dashboard
             properties={properties}
+            unassignedDocuments={unassignedDocuments}
             tenants={tenants}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
@@ -2364,6 +2365,7 @@ export function AppContent() {
         return (
           <Dashboard
             properties={properties}
+            unassignedDocuments={unassignedDocuments}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
             isPortfolioLoading={isPortfolioLoading}

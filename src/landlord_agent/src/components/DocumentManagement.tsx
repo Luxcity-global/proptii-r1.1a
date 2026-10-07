@@ -688,7 +688,7 @@ export function DocumentManagement({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              className="bg-[#DC5F12] hover:bg-[#c45310] focus:ring-[#DC5F12] text-white"
               onClick={() => documentToDelete && confirmDelete(documentToDelete.id)}
             >
               Delete

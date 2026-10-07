@@ -26,6 +26,7 @@ import "../styles/dashboardOverview.css";
 
 interface DashboardProps {
   properties: Property[];
+  unassignedDocuments?: any[];
   tenants?: Tenant[];
   userProfile: UserProfile | null;
   isAuthenticated?: boolean;
@@ -411,6 +412,7 @@ function DashboardGlobalEmpty({
 
 export function Dashboard({
   properties,
+  unassignedDocuments = [],
   tenants = [],
   userProfile,
   isAuthenticated,
@@ -602,14 +604,17 @@ export function Dashboard({
   }, [properties]);
 
   const documentChips = useMemo(() => {
-    const docs: Array<{ id: string; name: string; type: string; property: Property }> = [];
+    const docs: Array<{ id: string; name: string; type: string; property?: Property }> = [];
     properties.forEach((p) => {
       (p.documents || []).forEach((d) => {
         docs.push({ id: d.id, name: d.name, type: d.type, property: p });
       });
     });
+    unassignedDocuments.forEach((d) => {
+      docs.push({ id: d.id, name: d.name, type: d.type || "other" });
+    });
     return docs.slice(0, 8);
-  }, [properties]);
+  }, [properties, unassignedDocuments]);
 
   const displayProperties = useMemo(() => {
     let list = [...properties];
@@ -833,7 +838,7 @@ export function Dashboard({
                       key={doc.id}
                       type="button"
                       className="ll-doc-chip"
-                      onClick={() => onViewDocuments ? onViewDocuments(doc.id) : onManageDocuments(doc.property)}
+                      onClick={() => onViewDocuments ? onViewDocuments(doc.id) : (doc.property && onManageDocuments(doc.property))}
                       title={doc.name}
                     >
                       <div className={`ll-doc-icon ${docBadgeClass(doc.type)}`}>
