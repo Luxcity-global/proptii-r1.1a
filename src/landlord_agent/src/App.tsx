@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
+import { toast } from "sonner";
 import { TooltipProvider } from './components/ui/tooltip';
 import { Routes, Route, useLocation, MemoryRouter, useInRouterContext } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -34,6 +35,12 @@ import { alertService, type Alert } from './services/alertService';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
 import { AddLandlordWizard } from './components/AddLandlordWizard';
+import { BulkTenantImport } from './components/BulkTenantImport';
+import { BulkPropertyImport } from './components/BulkPropertyImport';
+import { BulkAssignTable } from './components/BulkAssignTable';
+import { PropertyEnrichmentQueue } from './components/PropertyEnrichmentQueue';
+import { documentService } from './services/documentService';
+import type { LandlordDocument } from './services/documentService';
 import { propertyService } from './services/propertyService';
 import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
@@ -311,7 +318,12 @@ export type Screen =
   | 'invite-tenant'
   | 'select-existing-tenant'
   | 'add-landlord'
-  | 'landlord-details';
+  | 'landlord-details'
+  | 'bulk-import-tenant'
+  | 'bulk-import-property'
+  | 'bulk-assign'
+  | 'property-enrichment-queue'
+  | 'document-management-vault';
 
 // Property setup data interface
 interface PropertySetupData {
@@ -445,6 +457,28 @@ export function AppContent() {
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
+  /** IDs returned from a completed bulk property import — passed to the enrichment queue */
+  const importedPropertyIdsRef = React.useRef<string[]>([]);
+  /** Where the enrichment queue was launched from: 'import' (post-CSV) or 'direct' (Properties page button) */
+  const enrichmentSourceRef = React.useRef<'import' | 'direct'>('direct');
+  /** Vault documents (no property) — loaded lazily when Documents screen is first opened */
+  const [unassignedDocuments, setUnassignedDocuments] = React.useState<LandlordDocument[]>([]);
+  const unassignedLoadedRef = React.useRef(false);
+  /** When true, DocumentsPage will auto-open its upload modal on next mount */
+  const [openDocsUploadOnMount, setOpenDocsUploadOnMount] = React.useState(false);
+  const [openDocsDocumentId, setOpenDocsDocumentId] = React.useState<string | undefined>(undefined);
+
+  // Fetch unassigned vault documents once the user opens the Documents tab
+  const loadUnassignedDocuments = React.useCallback(async () => {
+    if (unassignedLoadedRef.current) return;
+    try {
+      const docs = await documentService.getUnassignedDocuments();
+      setUnassignedDocuments(docs);
+      unassignedLoadedRef.current = true;
+    } catch (err) {
+      console.warn('[App] Failed to fetch unassigned docs:', err);
+    }
+  }, []);
 
   const clearSignInQueryParam = useCallback(() => {
     try {
@@ -1053,6 +1087,13 @@ export function AppContent() {
     portfolioRefreshKey,
   ]);
 
+  // Load unassigned vault documents when the user navigates to the documents screen
+  React.useEffect(() => {
+    if (navigationScreen === 'documents' || navigationScreen === 'dashboard') {
+      loadUnassignedDocuments();
+    }
+  }, [navigationScreen, loadUnassignedDocuments]);
+
   // Helper function to get current user ID — delegates to resolveManagerId
   const getCurrentUserId = (): string | null => resolveManagerId();
 
@@ -1454,10 +1495,10 @@ export function AppContent() {
       if (selectedProperty?.id === property.id) {
         setSelectedProperty(null);
       }
-      console.log('Deleted property via Firestore client and updated state:', property.id);
+      toast.success('Property successfully deleted!');
     } catch (error) {
       console.error('Failed to delete property:', error);
-      alert(`Failed to delete property: ${(error as any)?.message || 'Unknown error'}`);
+      toast.error(`Failed to delete property: ${(error as any)?.message || 'Unknown error'}`);
     }
   };
 
@@ -1658,6 +1699,7 @@ export function AppContent() {
         return (
           <Dashboard
             properties={properties}
+            unassignedDocuments={unassignedDocuments}
             tenants={tenants}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
@@ -1701,6 +1743,17 @@ export function AppContent() {
               }
             }}
             marketInsights={marketInsights}
+            onViewDocuments={(documentId) => {
+              if (documentId) {
+                setOpenDocsDocumentId(documentId);
+                setOpenDocsUploadOnMount(false);
+              } else {
+                setOpenDocsUploadOnMount(true);
+                setOpenDocsDocumentId(undefined);
+              }
+              loadUnassignedDocuments();
+              handleNavigation('documents');
+            }}
             vacancyAlerts={vacancyAlerts}
             arrearsAlerts={arrearsAlerts}
           />
@@ -1767,6 +1820,14 @@ export function AppContent() {
             onDuplicateProperty={duplicateProperty}
             onExportProperties={exportProperties}
             onImportProperties={importProperties}
+            onBulkImportProperties={() => navigateToScreen('bulk-import-property')}
+            onBulkAssignTenants={() => navigateToScreen('bulk-assign')}
+            onEnrichProperties={() => {
+              // Standalone enrichment — show all properties
+              importedPropertyIdsRef.current = properties.map(p => p.id);
+              enrichmentSourceRef.current = 'direct';
+              navigateToScreen('property-enrichment-queue');
+            }}
             userProfile={userProfile}
           />
         );
@@ -1775,6 +1836,14 @@ export function AppContent() {
         return (
           <DocumentsPage
             properties={properties}
+            unassignedDocuments={unassignedDocuments}
+            openUploadOnMount={openDocsUploadOnMount}
+            openDocumentId={openDocsDocumentId}
+            onUploadModalOpened={() => {
+              // Reset both flags after DocumentsPage has consumed them
+              setOpenDocsUploadOnMount(false);
+              setOpenDocsDocumentId(undefined);
+            }}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -1788,13 +1857,53 @@ export function AppContent() {
               selectProperty(property);
               navigateToScreen('document-management');
             }}
+            onAddDocumentToProperty={async (propertyId, doc) => {
+              addDocumentToProperty(propertyId, doc);
+              try {
+                await propertyService.addDocumentToProperty(propertyId, doc);
+              } catch (err) {
+                console.warn('Could not sync to propertyService:', err);
+              }
+            }}
+            onVaultDocumentAdded={(doc) => {
+              setUnassignedDocuments(prev => [doc, ...prev]);
+            }}
+            onUploadToVault={() => {
+              // Now handled in-place by DocumentsPage modal
+            }}
+            onAssignDocument={async (documentId, propertyId) => {
+              try {
+                await documentService.assignToProperty(documentId, propertyId);
+                const updatedUnassigned = await documentService.getUnassignedDocuments();
+                setUnassignedDocuments(updatedUnassigned);
+                if (propertyId) {
+                  const updatedProp = await propertyService.getProperty(propertyId);
+                  if (updatedProp) {
+                    setProperties(prev => prev.map(p => p.id === propertyId ? updatedProp : p));
+                  }
+                }
+              } catch (error) {
+                console.error('Error assigning document to property:', error);
+                alert('Failed to assign document to property. Please try again.');
+              }
+            }}
             onDeleteDocuments={async (documentIds) => {
               try {
+                // Delete from landlord_documents vault collection unconditionally
+                for (const id of documentIds) {
+                  try {
+                    await documentService.deleteDocument(id);
+                  } catch (e) {
+                    console.warn('Doc deletion from landlord_documents (may be property-only):', id, e);
+                  }
+                }
+                setUnassignedDocuments(prev => prev.filter(u => !documentIds.includes(u.id)));
+
                 // Group documents by property
                 const documentsByProperty = new Map<string, string[]>();
 
                 properties.forEach(property => {
-                  property.documents.forEach(doc => {
+                  (property.documents || []).forEach(doc => {
                     if (documentIds.includes(doc.id)) {
                       if (!documentsByProperty.has(property.id)) {
                         documentsByProperty.set(property.id, []);
@@ -1810,9 +1919,9 @@ export function AppContent() {
                   if (!property) return;
 
                   // Filter out deleted documents
-                  const updatedDocuments = property.documents.filter(doc => !docIdsToDelete.includes(doc.id));
+                  const updatedDocuments = (property.documents || []).filter(doc => !docIdsToDelete.includes(doc.id));
 
-                  // Update property — pass plain Date objects, no Firestore Timestamp needed
+                  // Update property
                   await propertyService.updateProperty(propertyId, {
                     documents: updatedDocuments.map(doc => ({
                       id: doc.id,
@@ -1820,7 +1929,7 @@ export function AppContent() {
                       type: doc.type,
                       url: doc.url,
                       issueDate: doc.issueDate instanceof Date ? doc.issueDate.toISOString() : doc.issueDate,
-                      expiryDate: doc.expiryDate instanceof Date ? doc.expiryDate.toISOString() : (doc.expiryDate ?? undefined),
+                      expiryDate: doc.expiryDate instanceof Date ? doc.expiryDate.toISOString() : (doc.expiryDate ?? null),
                       status: doc.status
                     })) as any
                   });
@@ -2259,6 +2368,7 @@ export function AppContent() {
         return (
           <Dashboard
             properties={properties}
+            unassignedDocuments={unassignedDocuments}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
             isPortfolioLoading={isPortfolioLoading}
@@ -2287,6 +2397,17 @@ export function AppContent() {
             onViewAllProperties={() => handleNavigation('properties')}
             onViewViewings={() => handleNavigation('viewings')}
             onViewClients={() => handleNavigation('clients')}
+            onViewDocuments={(documentId) => {
+              if (documentId) {
+                setOpenDocsDocumentId(documentId);
+                setOpenDocsUploadOnMount(false);
+              } else {
+                setOpenDocsUploadOnMount(true);
+                setOpenDocsDocumentId(undefined);
+              }
+              loadUnassignedDocuments();
+              handleNavigation('documents');
+            }}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -2387,6 +2508,7 @@ export function AppContent() {
             onSection2={() => navigateToScreen('property-details-selection')}
             onSection3={() => navigateToScreen('amenities-selection')}
             onSection4={() => navigateToScreen('images-notes-selection')}
+            onBulkImport={!isEditing ? () => navigateToScreen('bulk-import-property') : undefined}
           />
         );
 
@@ -2765,8 +2887,62 @@ export function AppContent() {
         return (
           <DocumentManagement
             property={selectedProperty}
+            availableProperties={properties}
+            userId={resolveManagerId() || ''}
             onBack={() => navigateToScreen('property-details')}
             onDocumentAdd={addDocumentToProperty}
+            onDocumentDelete={async (propertyId, documentId) => {
+              const prop = properties.find(p => p.id === propertyId);
+              if (!prop) return;
+              const updatedDocs = (prop.documents || []).filter(d => d.id !== documentId);
+
+              // Also delete from landlord_documents if it exists there
+              try {
+                await documentService.deleteDocument(documentId);
+              } catch {}
+
+              await propertyService.updateProperty(propertyId, {
+                documents: updatedDocs.map(d => ({
+                  id: d.id, name: d.name, type: d.type, url: d.url,
+                  issueDate: d.issueDate instanceof Date ? d.issueDate.toISOString() : d.issueDate,
+                  expiryDate: d.expiryDate instanceof Date ? d.expiryDate.toISOString() : (d.expiryDate ?? null),
+                  status: d.status,
+                })) as any,
+              });
+              setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, documents: updatedDocs } : p));
+              if (selectedProperty?.id === propertyId) {
+                setSelectedProperty(prev => prev ? { ...prev, documents: updatedDocs } : null);
+              }
+            }}
+            onVaultDocumentDeleted={(docId) => {
+              setUnassignedDocuments(prev => prev.filter(d => d.id !== docId));
+            }}
+          />
+        );
+
+      case 'document-management-vault':
+        return (
+          <DocumentManagement
+            property={null}
+            availableProperties={properties}
+            userId={resolveManagerId() || ''}
+            onBack={() => {
+              setNavigationScreen('documents');
+              navigateToScreen('main-app');
+            }}
+            onDocumentAdd={addDocumentToProperty}
+            onVaultDocumentAdded={(doc) => {
+              setUnassignedDocuments(prev => {
+                // Only keep unassigned ones (propertyId null)
+                if (doc.propertyId) return prev;
+                const already = prev.find(d => d.id === doc.id);
+                if (already) return prev;
+                return [doc, ...prev];
+              });
+            }}
+            onVaultDocumentDeleted={(docId) => {
+              setUnassignedDocuments(prev => prev.filter(d => d.id !== docId));
+            }}
           />
         );
 
@@ -3051,7 +3227,17 @@ export function AppContent() {
                   console.log('Creating property with photos:', newProperty.photos.length);
                   console.log('Property photos data:', JSON.stringify(newProperty.photos, null, 2));
 
-                  // 4. Create property in Firebase
+                  // 4. Create property in Firebase — check for duplicate address first
+                  const normAddr = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+                  const addressDuplicate = properties.find(
+                    p => normAddr(p.address) === normAddr(newProperty.address)
+                  );
+                  if (addressDuplicate) {
+                    throw new Error(
+                      `A property at "${newProperty.address}" already exists in your portfolio. ` +
+                      `Use Edit to update it, or change the address if this is a different property.`
+                    );
+                  }
                   const propertyId = await addProperty(newProperty);
                   console.log('Property created with ID:', propertyId);
 
@@ -3133,6 +3319,7 @@ export function AppContent() {
               prefillEmailRef.current = email;
               navigateToScreen('invite-tenant');
             }}
+            onBulkImport={() => navigateToScreen('bulk-import-tenant')}
             onBack={() => {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
@@ -3149,9 +3336,11 @@ export function AppContent() {
         return (
           <AddTenant
             properties={properties}
+            existingTenants={tenants}
             preselectedPropertyId={selectedProperty?.id}
             prefillEmail={prefillEmailRef.current}
             userProfile={userProfile}
+            onBulkImport={() => navigateToScreen('bulk-import-tenant')}
             onSave={async (tenant) => {
               if (!userProfile) {
                 window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'add-tenant' } }, '*');
@@ -3160,6 +3349,9 @@ export function AppContent() {
               // addTenant POSTs to backend — useTenants in ClientsPage re-fetches on navigate
               await addTenant(tenant);
               prefillEmailRef.current = undefined;
+              // Increment refresh key so properties re-fetch from Firestore in the background
+              // (tenant list in ClientsPage re-fetches via useTenants on next mount)
+              setPortfolioRefreshKey(k => k + 1);
               // If coming from property-preview, stash tenant for preview context
               if (previousScreen === 'property-preview') {
                 setPropertySetupData(prev => ({
@@ -3277,6 +3469,123 @@ export function AppContent() {
               // re-fetch when mounted, so no extra state management needed here.
               navigateToScreen('main-app');
               setNavigationScreen('clients');
+            }}
+          />
+        );
+
+      case 'bulk-import-tenant':
+        return (
+          <BulkTenantImport
+            properties={properties}
+            existingTenants={tenants}
+            userProfile={userProfile}
+            userId={resolveManagerId() || ''}
+            onBack={() => navigateToScreen('add-tenant')}
+            onComplete={() => {
+              navigateToScreen('main-app');
+              setNavigationScreen('clients');
+              setPortfolioRefreshKey(k => k + 1);
+            }}
+          />
+        );
+
+      case 'bulk-import-property':
+        return (
+          <BulkPropertyImport
+            existingProperties={properties}
+            userProfile={userProfile}
+            userId={resolveManagerId() || ''}
+            userEmail={userProfile?.email}
+            onBack={() => {
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
+            }}
+            onComplete={() => {
+              setPortfolioRefreshKey(k => k + 1);
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
+            }}
+            onEnrich={(ids) => {
+              importedPropertyIdsRef.current = ids;
+              enrichmentSourceRef.current = 'import';
+              // Refresh properties so the enrichment queue has fresh data
+              setPortfolioRefreshKey(k => k + 1);
+              navigateToScreen('property-enrichment-queue');
+            }}
+          />
+        );
+
+      case 'bulk-assign':
+        return (
+          <BulkAssignTable
+            tenants={tenants}
+            properties={properties}
+            onBack={() => {
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
+            }}
+            onComplete={() => {
+              setPortfolioRefreshKey(k => k + 1);
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
+            }}
+          />
+        );
+
+      case 'property-enrichment-queue':
+        return (
+          <PropertyEnrichmentQueue
+            importedPropertyIds={importedPropertyIdsRef.current}
+            properties={properties}
+            onBack={() => {
+              if (enrichmentSourceRef.current === 'import') {
+                navigateToScreen('bulk-import-property');
+              } else {
+                navigateToScreen('main-app');
+                setNavigationScreen('properties');
+              }
+            }}
+            onAddPhotos={(property) => {
+              selectProperty(property);
+              navigateToScreen('photo-management');
+            }}
+            onUploadDocs={(property) => {
+              selectProperty(property);
+              navigateToScreen('document-management');
+            }}
+            onEditDetails={(property) => {
+              selectProperty(property);
+              setIsEditing(true);
+              setEditingPropertyId(property.id);
+              setPropertySetupData({
+                propertyType: property.type || null,
+                propertyDetails: {
+                  address: property.address || '',
+                  monthlyRent: String(property.rent ?? ''),
+                  bedrooms: String(property.bedrooms ?? ''),
+                  bathrooms: String((property as any).bathrooms ?? ''),
+                  squareFootage: String((property as any).squareFootage ?? ''),
+                  uploadedDocuments: [],
+                },
+                amenities: property.amenities || [],
+                images: (property.photos || []).map(p => p.url),
+                imageFiles: [],
+                additionalNotes: property.notes || '',
+                status: property.status,
+              });
+              // After editing, come back to the enrichment queue
+              setPreviousScreen('property-enrichment-queue');
+              navigateToScreen('property-setup-step1');
+            }}
+            onViewProperty={(property) => {
+              selectProperty(property);
+              navigateToScreen('property-details');
+            }}
+            onDone={() => {
+              importedPropertyIdsRef.current = [];
+              setPortfolioRefreshKey(k => k + 1);
+              navigateToScreen('main-app');
+              setNavigationScreen('properties');
             }}
           />
         );

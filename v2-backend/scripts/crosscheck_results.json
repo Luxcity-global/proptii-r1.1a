@@ -1,0 +1,894 @@
+[
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/health",
+    "summary": "Liveness probe",
+    "controller": "health.controller.ts",
+    "handler": "checkHealth",
+    "controllerRoute": "/health"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/ping",
+    "summary": "Alias liveness probe",
+    "controller": "health.controller.ts",
+    "handler": "checkHealth",
+    "controllerRoute": "/ping"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/flags",
+    "summary": "Get runtime feature flags",
+    "controller": "flags.controller.ts",
+    "handler": "getFlags",
+    "controllerRoute": "/flags"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/auth/me",
+    "summary": "Get current user identity",
+    "controller": "auth.controller.ts",
+    "handler": "",
+    "controllerRoute": "/auth/me"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/auth/me",
+    "summary": "Get current user identity (POST alias)",
+    "controller": "auth.controller.ts",
+    "handler": "",
+    "controllerRoute": "/auth/me"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/auth/role",
+    "summary": "Assign role to authenticated user",
+    "controller": "auth.controller.ts",
+    "handler": "",
+    "controllerRoute": "/auth/role"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/native-properties/search",
+    "summary": "Public property search",
+    "controller": "native-properties.controller.ts",
+    "handler": "search",
+    "controllerRoute": "/native-properties/search"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/native-properties",
+    "summary": "List properties by owner",
+    "controller": "native-properties.controller.ts",
+    "handler": "findAllByUser",
+    "controllerRoute": "/native-properties"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/native-properties",
+    "summary": "Create property listing",
+    "controller": "native-properties.controller.ts",
+    "handler": "",
+    "controllerRoute": "/native-properties"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/native-properties/{id}",
+    "summary": "Get property by ID",
+    "controller": "native-properties.controller.ts",
+    "handler": "findById",
+    "controllerRoute": "/native-properties/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "PUT",
+    "yamlPath": "/native-properties/{id}",
+    "summary": "Update property listing",
+    "controller": "native-properties.controller.ts",
+    "handler": "toLowerCase",
+    "controllerRoute": "/native-properties/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "DELETE",
+    "yamlPath": "/native-properties/{id}",
+    "summary": "Delete property listing",
+    "controller": "native-properties.controller.ts",
+    "handler": "toLowerCase",
+    "controllerRoute": "/native-properties/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/tenants",
+    "summary": "Create tenant record",
+    "controller": "tenants.controller.ts",
+    "handler": "createTenant",
+    "controllerRoute": "/tenants"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/tenants",
+    "summary": "List tenants for authenticated landlord",
+    "controller": "tenants.controller.ts",
+    "handler": "getTenants",
+    "controllerRoute": "/tenants"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/tenants/{id}",
+    "summary": "Get single tenant by ID",
+    "controller": "tenants.controller.ts",
+    "handler": "getTenant",
+    "controllerRoute": "/tenants/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "PUT",
+    "yamlPath": "/tenants/{id}",
+    "summary": "Update tenant record",
+    "controller": "tenants.controller.ts",
+    "handler": "updateTenant",
+    "controllerRoute": "/tenants/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "DELETE",
+    "yamlPath": "/tenants/{id}",
+    "summary": "Delete tenant record",
+    "controller": "tenants.controller.ts",
+    "handler": "deleteTenant",
+    "controllerRoute": "/tenants/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/payments/bulk",
+    "summary": "Save or update bulk payment periods",
+    "controller": "payments.controller.ts",
+    "handler": "saveBulkPayments",
+    "controllerRoute": "/payments/bulk"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/payments/tenant/{tenantId}",
+    "summary": "Get all payment periods for a tenant",
+    "controller": "payments.controller.ts",
+    "handler": "getTenantPayments",
+    "controllerRoute": "/payments/tenant/:tenantId"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/payments/{id}",
+    "summary": "Get single payment period by ID",
+    "controller": "payments.controller.ts",
+    "handler": "getPaymentPeriod",
+    "controllerRoute": "/payments/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "PUT",
+    "yamlPath": "/payments/{id}/status",
+    "summary": "Update payment period status",
+    "controller": "payments.controller.ts",
+    "handler": "updatePaymentStatus",
+    "controllerRoute": "/payments/:id/status"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/tenant-invitations",
+    "summary": "Record a tenant invitation",
+    "controller": "tenant-invitations.controller.ts",
+    "handler": "now",
+    "controllerRoute": "/tenant-invitations"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/tenant-invitations",
+    "summary": "List invitations for landlord",
+    "controller": "tenant-invitations.controller.ts",
+    "handler": "if",
+    "controllerRoute": "/tenant-invitations"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "PUT",
+    "yamlPath": "/tenant-invitations/{id}",
+    "summary": "Update invitation status",
+    "controller": "tenant-invitations.controller.ts",
+    "handler": "if",
+    "controllerRoute": "/tenant-invitations/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/landlords",
+    "summary": "List all landlords and agents",
+    "controller": "landlords.controller.ts",
+    "handler": "getAllLandlords",
+    "controllerRoute": "/landlords"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/landlords/check",
+    "summary": "Check if an email belongs to a landlord or agent",
+    "controller": "landlords.controller.ts",
+    "handler": "if",
+    "controllerRoute": "/landlords/check"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/landlords/register",
+    "summary": "Register a new landlord profile",
+    "controller": "landlords.controller.ts",
+    "handler": "registerLandlord",
+    "controllerRoute": "/landlords/register"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/clients/landlords",
+    "summary": "List client landlords (frontend alias)",
+    "controller": "landlords.controller.ts",
+    "handler": "getClientLandlords",
+    "controllerRoute": "/clients/landlords"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/clients/landlords",
+    "summary": "Create landlord record (frontend alias)",
+    "controller": "landlords.controller.ts",
+    "handler": "registerLandlord",
+    "controllerRoute": "/clients/landlords"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/clients/landlords/{id}",
+    "summary": "Get single landlord by ID",
+    "controller": "landlords.controller.ts",
+    "handler": "getLandlordById",
+    "controllerRoute": "/clients/landlords/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "PUT",
+    "yamlPath": "/clients/landlords/{id}",
+    "summary": "Update landlord record",
+    "controller": "landlords.controller.ts",
+    "handler": "updateLandlord",
+    "controllerRoute": "/clients/landlords/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "DELETE",
+    "yamlPath": "/clients/landlords/{id}",
+    "summary": "Delete landlord record",
+    "controller": "landlords.controller.ts",
+    "handler": "deleteLandlord",
+    "controllerRoute": "/clients/landlords/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/alerts",
+    "summary": "List in-app alerts for authenticated user",
+    "controller": "alerts.controller.ts",
+    "handler": "getAlerts",
+    "controllerRoute": "/alerts"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/alerts",
+    "summary": "Create alert",
+    "controller": "alerts.controller.ts",
+    "handler": "createAlert",
+    "controllerRoute": "/alerts"
+  },
+  {
+    "status": "UNMATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/alerts/events",
+    "summary": "Subscribe to real-time alert events (SSE)",
+    "controller": null,
+    "handler": null
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "PATCH",
+    "yamlPath": "/alerts/{id}/read",
+    "summary": "Mark alert as read",
+    "controller": "alerts.controller.ts",
+    "handler": "markAlertRead",
+    "controllerRoute": "/alerts/:id/read"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "DELETE",
+    "yamlPath": "/alerts/{id}",
+    "summary": "Delete alert",
+    "controller": "alerts.controller.ts",
+    "handler": "deleteAlert",
+    "controllerRoute": "/alerts/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/viewing-requests",
+    "summary": "Create viewing request",
+    "controller": "viewing-request.controller.ts",
+    "handler": "log",
+    "controllerRoute": "/viewing-requests"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/viewing-requests",
+    "summary": "List viewing requests",
+    "controller": "viewing-request.controller.ts",
+    "handler": "log",
+    "controllerRoute": "/viewing-requests"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/viewing-requests/{id}",
+    "summary": "Get single viewing request",
+    "controller": "viewing-request.controller.ts",
+    "handler": "log",
+    "controllerRoute": "/viewing-requests/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "PUT",
+    "yamlPath": "/viewing-requests/{id}",
+    "summary": "Update viewing request status",
+    "controller": "viewing-request.controller.ts",
+    "handler": "log",
+    "controllerRoute": "/viewing-requests/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "DELETE",
+    "yamlPath": "/viewing-requests/{id}",
+    "summary": "Cancel viewing request",
+    "controller": "viewing-request.controller.ts",
+    "handler": "log",
+    "controllerRoute": "/viewing-requests/:id"
+  },
+  {
+    "status": "UNMATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/saved-properties",
+    "summary": "Get saved properties for authenticated user",
+    "controller": null,
+    "handler": null
+  },
+  {
+    "status": "UNMATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/saved-properties",
+    "summary": "Save a property",
+    "controller": null,
+    "handler": null
+  },
+  {
+    "status": "UNMATCHED",
+    "yamlMethod": "DELETE",
+    "yamlPath": "/saved-properties/{propertyId}",
+    "summary": "Unsave a property",
+    "controller": null,
+    "handler": null
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/contracts",
+    "summary": "List contracts for authenticated user (tenant view)",
+    "controller": "contract.controller.ts",
+    "handler": "getContracts",
+    "controllerRoute": "/contracts"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/contracts",
+    "summary": "Save signed contract record",
+    "controller": "contract.controller.ts",
+    "handler": "saveSignedContract",
+    "controllerRoute": "/contracts"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/contracts/landlord",
+    "summary": "List contracts for landlord/agent",
+    "controller": "contract.controller.ts",
+    "handler": "getLandlordContracts",
+    "controllerRoute": "/contracts/landlord"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/contracts/landlord",
+    "summary": "Send contract to tenant",
+    "controller": "contract.controller.ts",
+    "handler": "sendContractToTenant",
+    "controllerRoute": "/contracts/landlord"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/contracts/landlord/{id}",
+    "summary": "Get single landlord contract",
+    "controller": "contract.controller.ts",
+    "handler": "getContractById",
+    "controllerRoute": "/contracts/landlord/:id"
+  },
+  {
+    "status": "UNMATCHED",
+    "yamlMethod": "PUT",
+    "yamlPath": "/contracts/landlord/{id}",
+    "summary": "Update contract status",
+    "controller": null,
+    "handler": null
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "DELETE",
+    "yamlPath": "/contracts/landlord/{id}",
+    "summary": "Delete contract",
+    "controller": "contract.controller.ts",
+    "handler": "deleteContract",
+    "controllerRoute": "/contracts/landlord/:id"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/contracts/templates",
+    "summary": "List contract templates",
+    "controller": "contract.controller.ts",
+    "handler": "getTemplates",
+    "controllerRoute": "/contracts/templates"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/contracts/templates",
+    "summary": "Save contract template",
+    "controller": "contract.controller.ts",
+    "handler": "saveTemplate",
+    "controllerRoute": "/contracts/templates"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/contracts/send-signed-contract",
+    "summary": "Email signed contract PDF to recipient",
+    "controller": "contract.controller.ts",
+    "handler": "",
+    "controllerRoute": "/contracts/send-signed-contract"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/email/send",
+    "summary": "Send transactional email via Resend",
+    "controller": "email.controller.ts",
+    "handler": "sendEmail",
+    "controllerRoute": "/email/send"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/email/send-base64",
+    "summary": "Send email with base64-encoded attachment",
+    "controller": "email.controller.ts",
+    "handler": "sendEmailBase64",
+    "controllerRoute": "/email/send-base64"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/storage/upload",
+    "summary": "Upload file to Firebase Cloud Storage",
+    "controller": "storage.controller.ts",
+    "handler": "",
+    "controllerRoute": "/storage/upload"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "DELETE",
+    "yamlPath": "/storage/file",
+    "summary": "Delete file from Firebase Cloud Storage",
+    "controller": "storage.controller.ts",
+    "handler": "deleteFile",
+    "controllerRoute": "/storage/file"
+  },
+  {
+    "status": "UNMATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/users/profile",
+    "summary": "Get authenticated user profile",
+    "controller": null,
+    "handler": null
+  },
+  {
+    "status": "UNMATCHED",
+    "yamlMethod": "PUT",
+    "yamlPath": "/users/profile",
+    "summary": "Update user profile",
+    "controller": null,
+    "handler": null
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/reviews",
+    "summary": "List property reviews",
+    "controller": "user-profile.controller.ts",
+    "handler": "getReviews",
+    "controllerRoute": "/reviews"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/reviews",
+    "summary": "Create property review",
+    "controller": "user-profile.controller.ts",
+    "handler": "createReview",
+    "controllerRoute": "/reviews"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/reviews/stats",
+    "summary": "Get review statistics",
+    "controller": "user-profile.controller.ts",
+    "handler": "getReviewStats",
+    "controllerRoute": "/reviews/stats"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/insights",
+    "summary": "Get market insights",
+    "controller": "insights.controller.ts",
+    "handler": "getMarketInsights",
+    "controllerRoute": "/insights"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/insights/price-trends",
+    "summary": "Get price trend data by postcode",
+    "controller": "insights.controller.ts",
+    "handler": "getPriceTrends",
+    "controllerRoute": "/insights/price-trends"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/insights/demand",
+    "summary": "Get demand metrics by location",
+    "controller": "insights.controller.ts",
+    "handler": "getDemandMetrics",
+    "controllerRoute": "/insights/demand"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/billing/plans",
+    "summary": "Get available subscription plans",
+    "controller": "billing.controller.ts",
+    "handler": "getPlans",
+    "controllerRoute": "/billing/plans"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/billing/status",
+    "summary": "Get subscription status for authenticated user",
+    "controller": "billing.controller.ts",
+    "handler": "getBillingStatus",
+    "controllerRoute": "/billing/status"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/billing/checkout",
+    "summary": "Create checkout session",
+    "controller": "billing.controller.ts",
+    "handler": "createCheckoutSession",
+    "controllerRoute": "/billing/checkout"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/search/classify",
+    "summary": "Classify search query intent and extract entities",
+    "controller": "classifier.controller.ts",
+    "handler": "classify",
+    "controllerRoute": "/search/classify"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/properties/facts",
+    "summary": "Batch-fetch property facts by listing IDs or UPRNs",
+    "controller": "property-facts.controller.ts",
+    "handler": "getBatchFacts",
+    "controllerRoute": "/properties/facts"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/properties/{listingId}/facts",
+    "summary": "Get property facts for single listing",
+    "controller": "property-facts.controller.ts",
+    "handler": "getSingleFacts",
+    "controllerRoute": "/properties/:listingId/facts"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/properties/report",
+    "summary": "Generate streaming property due-diligence report",
+    "controller": "report.controller.ts",
+    "handler": "if",
+    "controllerRoute": "/properties/report"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/tenant-dashboard/summary",
+    "summary": "Get tenant dashboard summary stats",
+    "controller": "tenant-dashboard.controller.ts",
+    "handler": "firestore",
+    "controllerRoute": "/tenant-dashboard/summary"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/referencing/status/{tenantEmail}",
+    "summary": "Check referencing status by tenant email",
+    "controller": "referencing.controller.ts",
+    "handler": "getReferencingStatusByEmail",
+    "controllerRoute": "/referencing/status/:tenantEmail"
+  },
+  {
+    "status": "UNMATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/referencing/identity",
+    "summary": "Save identity section",
+    "controller": null,
+    "handler": null
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/referencing/shares",
+    "summary": "Share referencing passport with a landlord/agent",
+    "controller": "referencing.controller.ts",
+    "handler": "shareReferencingPassport",
+    "controllerRoute": "/referencing/shares"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/referencing/public/{viewToken}",
+    "summary": "View public referencing passport (no auth)",
+    "controller": "referencing.controller.ts",
+    "handler": "getPublicPassportByToken",
+    "controllerRoute": "/referencing/public/:viewToken"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/referencing/request",
+    "summary": "Send referencing invite email to tenant",
+    "controller": "referencing.controller.ts",
+    "handler": "",
+    "controllerRoute": "/referencing/request"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/referee-guarantor-responses",
+    "summary": "List referee/guarantor responses",
+    "controller": "referee-guarantor.controller.ts",
+    "handler": "getResponses",
+    "controllerRoute": "/referee-guarantor-responses"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/referee-guarantor-responses",
+    "summary": "Submit referee or guarantor response",
+    "controller": "referee-guarantor.controller.ts",
+    "handler": "saveResponse",
+    "controllerRoute": "/referee-guarantor-responses"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/referencing/invite-guarantor",
+    "summary": "Send guarantor invitation",
+    "controller": "referee-guarantor.controller.ts",
+    "handler": "inviteGuarantor",
+    "controllerRoute": "/referencing/invite-guarantor"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/property-selections",
+    "summary": "List property selections for tenant",
+    "controller": "property-selections.controller.ts",
+    "handler": "getSelections",
+    "controllerRoute": "/property-selections"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/property-selections",
+    "summary": "Mark interest in a property",
+    "controller": "property-selections.controller.ts",
+    "handler": "createSelection",
+    "controllerRoute": "/property-selections"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/property-selections/stats",
+    "summary": "Get selection funnel stats for tenant",
+    "controller": "property-selections.controller.ts",
+    "handler": "getStats",
+    "controllerRoute": "/property-selections/stats"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/homeowner-maintenance",
+    "summary": "List maintenance tasks",
+    "controller": "homeowner.controller.ts",
+    "handler": "getMaintenanceTasks",
+    "controllerRoute": "/homeowner-maintenance"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/homeowner-maintenance",
+    "summary": "Create maintenance task",
+    "controller": "homeowner.controller.ts",
+    "handler": "createMaintenanceTask",
+    "controllerRoute": "/homeowner-maintenance"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/guest/enquiry",
+    "summary": "Submit property enquiry as a guest",
+    "controller": "guest-enquiry.controller.ts",
+    "handler": "submitEnquiry",
+    "controllerRoute": "/guest/enquiry"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/communication/conversations",
+    "summary": "List conversations for authenticated user",
+    "controller": "communication.controller.ts",
+    "handler": "getConversations",
+    "controllerRoute": "/communication/conversations"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/communication/conversations",
+    "summary": "Get or create conversation",
+    "controller": "communication.controller.ts",
+    "handler": "getOrCreateConversation",
+    "controllerRoute": "/communication/conversations"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/communication/conversations/{id}/messages",
+    "summary": "Get messages in a conversation",
+    "controller": "communication.controller.ts",
+    "handler": "getMessages",
+    "controllerRoute": "/communication/conversations/:id/messages"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/communication/conversations/{id}/messages",
+    "summary": "Send message in conversation",
+    "controller": "communication.controller.ts",
+    "handler": "sendMessage",
+    "controllerRoute": "/communication/conversations/:id/messages"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/admin/customers",
+    "summary": "List all customers (admin only)",
+    "controller": "admin-dashboard.controller.ts",
+    "handler": "listCustomers",
+    "controllerRoute": "/admin/customers"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/admin/overview",
+    "summary": "Get platform overview stats (admin only)",
+    "controller": "admin-dashboard.controller.ts",
+    "handler": "overview",
+    "controllerRoute": "/admin/overview"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/leads",
+    "summary": "Submit campaign lead",
+    "controller": "leads.controller.ts",
+    "handler": "submitLead",
+    "controllerRoute": "/leads"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/leads/session",
+    "summary": "Get personalised lead session data",
+    "controller": "leads.controller.ts",
+    "handler": "getLeadBySession",
+    "controllerRoute": "/leads/session"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/leads/export",
+    "summary": "Export all leads as CSV (admin only)",
+    "controller": "leads.controller.ts",
+    "handler": "assertAdminUser",
+    "controllerRoute": "/leads/export"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "POST",
+    "yamlPath": "/sheets",
+    "summary": "Append row to Google Sheet (waitlist or other)",
+    "controller": "sheets.controller.ts",
+    "handler": "appendRow",
+    "controllerRoute": "/sheets"
+  },
+  {
+    "status": "MATCHED",
+    "yamlMethod": "GET",
+    "yamlPath": "/sheets/{sheetId}",
+    "summary": "Read sheet data (admin only)",
+    "controller": "sheets.controller.ts",
+    "handler": "assertAdminUser",
+    "controllerRoute": "/sheets/:sheetId"
+  }
+]

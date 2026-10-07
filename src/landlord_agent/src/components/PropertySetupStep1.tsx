@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, Home, X } from 'lucide-react';
 
 interface PropertySetupStep1Props {
   onNext: () => void;
@@ -10,11 +10,22 @@ interface PropertySetupStep1Props {
   onSection2: () => void;
   onSection3: () => void;
   onSection4: () => void;
+  onBulkImport?: () => void;
 }
 
-export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSection2, onSection3, onSection4 }: PropertySetupStep1Props) {
+export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSection2, onSection3, onSection4, onBulkImport }: PropertySetupStep1Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [modalOpen, setModalOpen]         = useState(!!onBulkImport);
+  const [modalSelected, setModalSelected] = useState<'single' | 'bulk'>('single');
+
+  function confirmModal() {
+    if (modalSelected === 'bulk') {
+      onBulkImport?.();
+    } else {
+      setModalOpen(false);
+    }
+  }
   
   const slides = [
     {
@@ -75,6 +86,72 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
   }, [currentSlide, slides.length, isTransitioning]);
 
   return (
+    <>
+    {/* ── Mode Selection Modal ─────────────────────────────────────────── */}
+    {modalOpen && onBulkImport && (
+      <div
+        onClick={e => { if (e.target === e.currentTarget) setModalOpen(false); }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}
+      >
+        <div style={{ background: '#fff', borderRadius: 26, padding: '32px 36px', maxWidth: 480, width: '100%', boxShadow: '0 25px 60px -15px rgba(0,0,0,0.3)', position: 'relative', fontFamily: 'Nunito Sans, sans-serif' }}>
+          {/* Close */}
+          <button type="button" onClick={() => setModalOpen(false)} style={{ position: 'absolute', top: 20, right: 20, width: 32, height: 32, borderRadius: '50%', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <X size={16} />
+          </button>
+
+          {/* Header */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#eaf3f8', color: '#136C9E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+              <Home size={24} />
+            </div>
+            <h2 style={{ fontSize: 21, fontWeight: 700, color: '#1e293b', fontFamily: 'Archivo, sans-serif', letterSpacing: '-0.01em', margin: 0 }}>
+              How would you like to add properties?
+            </h2>
+            <p style={{ fontSize: 13.5, color: '#64748b', marginTop: 4, lineHeight: 1.45 }}>
+              Add a single property step-by-step, or import multiple at once from a spreadsheet.
+            </p>
+          </div>
+
+          {/* Options */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 26 }}>
+            {/* Single */}
+            <div onClick={() => setModalSelected('single')} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 18px', border: `2px solid ${modalSelected === 'single' ? '#136C9E' : '#e2e8f0'}`, borderRadius: 18, cursor: 'pointer', background: modalSelected === 'single' ? '#f0f7fb' : '#fff', boxShadow: modalSelected === 'single' ? '0 4px 16px rgba(19,108,158,0.1)' : 'none', transition: 'all 0.2s ease', userSelect: 'none' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Home size={22} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', fontFamily: 'Archivo, sans-serif' }}>Single Property</div>
+                <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>Add one property step-by-step — type, details, amenities, photos.</div>
+              </div>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${modalSelected === 'single' ? '#136C9E' : '#cbd5e1'}`, background: modalSelected === 'single' ? '#136C9E' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s ease' }}>
+                {modalSelected === 'single' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />}
+              </div>
+            </div>
+
+            {/* Bulk */}
+            <div onClick={() => setModalSelected('bulk')} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 18px', border: `2px solid ${modalSelected === 'bulk' ? '#DC5F12' : '#e2e8f0'}`, borderRadius: 18, cursor: 'pointer', background: modalSelected === 'bulk' ? '#fff3ec' : '#fff', boxShadow: modalSelected === 'bulk' ? '0 4px 16px rgba(220,95,18,0.1)' : 'none', transition: 'all 0.2s ease', userSelect: 'none' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: '#fff3ec', color: '#DC5F12', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Upload size={22} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', fontFamily: 'Archivo, sans-serif' }}>Multiple Properties</div>
+                <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>Upload a CSV spreadsheet to add up to 500 properties at once.</div>
+              </div>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${modalSelected === 'bulk' ? '#DC5F12' : '#cbd5e1'}`, background: modalSelected === 'bulk' ? '#DC5F12' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s ease' }}>
+                {modalSelected === 'bulk' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />}
+              </div>
+            </div>
+          </div>
+
+          {/* Continue */}
+          <button type="button" onClick={confirmModal} style={{ width: '100%', height: 50, background: '#136C9E', color: '#fff', border: 'none', borderRadius: 14, fontFamily: 'Archivo, sans-serif', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(19,108,158,0.28)' }}>
+            <span>Continue</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    )}
+
     <div className="min-h-screen py-4 px-4 md:px-2" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -238,6 +315,8 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
                   <span className="font-semibold text-gray-900 text-sm md:text-base">Section 4: Images and Additional Notes</span>
                 </div>
               </Button>
+
+              {/* Sections end here */}
             </div>
           </div>
 
@@ -342,5 +421,6 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
         </div>
       </div>
     </div>
+    </>
   );
 }

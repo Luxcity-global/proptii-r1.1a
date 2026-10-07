@@ -31,6 +31,16 @@ import {
   Bell,
 } from 'lucide-react';
 import { ImportPropertiesDialog } from './ImportPropertiesDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
@@ -51,6 +61,9 @@ interface PropertiesPageProps {
   onDuplicateProperty?: (property: Property) => void;
   onExportProperties?: (properties: Property[], format: string) => void;
   onImportProperties?: (properties: Property[]) => void;
+  onBulkImportProperties?: () => void;
+  onBulkAssignTenants?: () => void;
+  onEnrichProperties?: () => void;
   onViewInsights?: () => void;
   onRefresh?: () => void;
   onViewSettings?: () => void;
@@ -84,6 +97,52 @@ function propertyName(address: string): string {
 function cityFromAddress(address: string): string {
   const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
   return parts.length > 1 ? parts[parts.length - 1] : '';
+}
+
+/**
+ * PropImg — property cover image with shimmer skeleton, lazy loading,
+ * blur-up fade-in, and onError fallback. Zero external dependencies.
+ */
+function PropImg({ src, alt }: { src: string; alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+  const fallback = '/assets/property-placeholder.jpg';
+  const effectiveSrc = errored ? fallback : src;
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {/* Shimmer skeleton — visible until image loads */}
+      {!loaded && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(90deg, #e8eef4 25%, #f3f6f9 50%, #e8eef4 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'propImgShimmer 1.4s ease-in-out infinite',
+          }}
+        />
+      )}
+      <img
+        src={effectiveSrc}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        style={{
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+          opacity: loaded ? 1 : 0,
+          transition: 'opacity 0.35s ease',
+          display: 'block',
+        }}
+        onLoad={() => setLoaded(true)}
+        onError={() => {
+          if (!errored) { setErrored(true); setLoaded(false); }
+          else setLoaded(true); // show fallback even if it also fails
+        }}
+      />
+    </div>
+  );
 }
 
 function timeAgo(date?: Date | string | number | null): string {
@@ -184,6 +243,9 @@ export function PropertiesPage({
   onDuplicateProperty,
   onExportProperties,
   onImportProperties: handleImportProperties,
+  onBulkImportProperties,
+  onBulkAssignTenants,
+  onEnrichProperties,
   onViewInsights,
   onRefresh,
   onViewSettings,
@@ -202,6 +264,8 @@ export function PropertiesPage({
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   const arrearsByTenantId = useMemo(() => {
     const map = new Map<string, ArrearsAlert>();
@@ -496,8 +560,15 @@ export function PropertiesPage({
 
   const handleBulkDelete = () => {
     if (onDeleteProperty && selectedProperties.size > 0) {
+      setBulkDeleteConfirm(true);
+    }
+  };
+
+  const confirmBulkDelete = () => {
+    if (onDeleteProperty && selectedProperties.size > 0) {
       properties.filter((p) => selectedProperties.has(p.id)).forEach(onDeleteProperty);
       clearSelection();
+      setBulkDeleteConfirm(false);
     }
   };
 
@@ -627,7 +698,7 @@ export function PropertiesPage({
           <Archive className="mr-2 h-4 w-4" />
           Archive Property
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onDeleteProperty?.(property)} className="text-red-600 focus:text-red-600">
+        <DropdownMenuItem onClick={() => setPropertyToDelete(property)} className="text-red-600 focus:text-red-600">
           <Trash2 className="mr-2 h-4 w-4" />
           Delete Property
         </DropdownMenuItem>
@@ -692,8 +763,34 @@ export function PropertiesPage({
                 Portfolio Insights
               </button>
             )}
+            {onBulkAssignTenants && (
+              <button
+                type="button"
+                className="ll-props-btn-insights"
+                onClick={onBulkAssignTenants}
+                title="Assign multiple tenants to properties at once"
+              >
+                <span className="ll-props-insights-icon">
+                  <Users size={12} />
+                </span>
+                Assign Tenants
+              </button>
+            )}
+            {onEnrichProperties && (
+              <button
+                type="button"
+                className="ll-props-btn-insights"
+                onClick={onEnrichProperties}
+                title="Review and enrich your property listings — add photos, documents and missing details"
+              >
+                <span className="ll-props-insights-icon">
+                  <Sparkles size={12} />
+                </span>
+                Enrich Properties
+              </button>
+            )}
             <button type="button" className="ll-props-btn-add" onClick={onAddProperty}>
-          <Plus className="w-4 h-4" strokeWidth={2.5} />
+              <Plus className="w-4 h-4" strokeWidth={2.5} />
               Add Property
             </button>
       </div>
@@ -1167,7 +1264,7 @@ export function PropertiesPage({
                 <article key={property.id} className="ll-props-card">
                   <div className="ll-props-card-img">
                     {img ? (
-                      <img src={img} alt={property.address} />
+                      <PropImg src={img} alt={property.address} />
                     ) : (
                       <div className="ll-props-card-img-empty">
                         <Building2 size={36} />
@@ -1270,6 +1367,50 @@ export function PropertiesPage({
         onClose={() => setShowImportDialog(false)}
         onImport={handleImportPropertiesSubmit}
       />
+      <AlertDialog open={!!propertyToDelete} onOpenChange={(open) => !open && setPropertyToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Property</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete "{propertyToDelete?.street}"? This action cannot be undone and will delete all associated documents and photos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={() => {
+                if (propertyToDelete && onDeleteProperty) {
+                  onDeleteProperty(propertyToDelete);
+                  setPropertyToDelete(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteConfirm} onOpenChange={setBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Properties</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedProperties.size} selected properties? This action cannot be undone and will delete all associated documents and photos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={confirmBulkDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

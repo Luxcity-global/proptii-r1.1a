@@ -25,18 +25,49 @@ import {
   Eye,
   Share2,
   X,
+  Link2,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useIsMobile } from './ui/use-mobile';
 import { Property, PropertyDocument, UserProfile } from '../App';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
+import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
+import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
+import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
+import { documentService, LandlordDocument } from '../services/documentService';
 import '../styles/documentsPage.css';
 
 interface DocumentsPageProps {
   properties: Property[];
+  /** Unassigned vault documents (no property) — passed from App.tsx */
+  unassignedDocuments?: LandlordDocument[];
   onViewProperty: (property: Property) => void;
   onManageDocuments: (property: Property) => void;
+  /** Open the vault uploader (no property required) */
+  onUploadToVault?: () => void;
+  /** Assign an unassigned vault document to a property */
+  onAssignDocument?: (documentId: string, propertyId: string) => Promise<void>;
+  /** Add a document directly to a property without leaving DocumentsPage */
+  onAddDocumentToProperty?: (propertyId: string, doc: Omit<PropertyDocument, 'id'>) => Promise<void> | void;
+  /** Added an unassigned document to vault */
+  onVaultDocumentAdded?: (doc: LandlordDocument) => void;
+  /** When true, auto-opens the Upload Document modal on first render */
+  openUploadOnMount?: boolean;
+  /** When set, auto-opens the inspection drawer for this document ID on first render */
+  openDocumentId?: string;
+  /** Called after the upload modal or inspection drawer has been opened — lets parent reset the trigger flags */
+  onUploadModalOpened?: () => void;
   onDeleteDocuments?: (documentIds: string[]) => void;
   onArchiveDocuments?: (documentIds: string[]) => void;
   onExportDocuments?: (format: 'json' | 'csv' | 'excel' | 'pdf', documentIds: string[]) => void;
@@ -51,11 +82,12 @@ interface DocumentWithProperty extends PropertyDocument {
   propertyAddress: string;
   propertyId: string;
   tenantName: string | null;
+  isUnassigned?: boolean;
 }
 
 type ViewScope = 'property' | 'tenant' | 'all';
 type DisplayStyle = 'grid' | 'table';
-type CategoryFilter = 'all' | 'compliance' | 'contracts' | 'insurance' | 'other';
+type CategoryFilter = 'all' | 'compliance' | 'contracts' | 'insurance' | 'other' | 'unassigned';
 type AttachCategory =
   | 'compliance'
   | 'contract'
@@ -70,7 +102,8 @@ interface AttachFormState {
   propertyId: string;
   tenant: string;
   category: AttachCategory;
-  fileSize: string;
+  issueDate: string;
+  expiryDate: string;
 }
 
 const ATTACH_CATEGORIES: { value: AttachCategory; label: string }[] = [
@@ -88,8 +121,27 @@ const initialAttachForm: AttachFormState = {
   propertyId: '',
   tenant: 'Property-Wide',
   category: 'compliance',
-  fileSize: '1.8 MB',
+  issueDate: new Date().toISOString().split('T')[0],
+  expiryDate: '',
 };
+
+function mapAttachCategoryToDocType(cat: AttachCategory): PropertyDocument['type'] {
+  switch (cat) {
+    case 'compliance': return 'epc';
+    case 'contract': return 'tenancy-agreement';
+    default: return 'other';
+  }
+}
+
+function computeDocumentStatus(expiry?: string | null): PropertyDocument['status'] {
+  if (!expiry) return 'valid';
+  const exp = new Date(expiry);
+  if (isNaN(exp.getTime())) return 'valid';
+  const diffDays = Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return 'expired';
+  if (diffDays <= 30) return 'expiring-soon';
+  return 'valid';
+}
 
 const CATEGORY_TYPES: Record<Exclude<CategoryFilter, 'all'>, PropertyDocument['type'][]> = {
   compliance: ['epc', 'gas-cert'],
@@ -204,8 +256,16 @@ function complianceFillClass(health: number): string {
 
 export function DocumentsPage({
   properties,
+  unassignedDocuments = [],
   onViewProperty,
   onManageDocuments,
+  onUploadToVault,
+  onAssignDocument,
+  onAddDocumentToProperty,
+  onVaultDocumentAdded,
+  openUploadOnMount = false,
+  openDocumentId,
+  onUploadModalOpened,
   onDeleteDocuments,
   onArchiveDocuments,
   onExportDocuments,
@@ -225,8 +285,19 @@ export function DocumentsPage({
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const [attachModalOpen, setAttachModalOpen] = useState(false);
+  const [attachStep, setAttachStep] = useState<1 | 2>(1);
   const [attachForm, setAttachForm] = useState<AttachFormState>(initialAttachForm);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [inspectionDoc, setInspectionDoc] = useState<DocumentWithProperty | null>(null);
+  const [assignModalDoc, setAssignModalDoc] = useState<DocumentWithProperty | null>(null);
+  const [assignTargetPropertyId, setAssignTargetPropertyId] = useState<string>('');
+  const [isAssigning, setIsAssigning] = useState<boolean>(false);
+  const [documentToDelete, setDocumentToDelete] = useState<{ id: string; name: string; isDrawer?: boolean } | null>(null);
+
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isMobile = useIsMobile();
@@ -238,15 +309,32 @@ export function DocumentsPage({
   };
 
   const allDocuments = useMemo<DocumentWithProperty[]>(() => {
-    return (properties || []).flatMap((property) =>
+    const propDocs: DocumentWithProperty[] = (properties || []).flatMap((property) =>
       (property.documents || []).map((document) => ({
         ...document,
         propertyAddress: property.address,
         propertyId: property.id,
         tenantName: property.tenant?.name ?? null,
+        isUnassigned: false,
       })),
     );
-  }, [properties]);
+
+    const unassignedMapped: DocumentWithProperty[] = (unassignedDocuments || []).map((doc) => ({
+      id: doc.id,
+      name: doc.name,
+      type: (doc.type as any) || 'other',
+      url: doc.url,
+      issueDate: doc.issueDate instanceof Date ? doc.issueDate : new Date(doc.issueDate as any),
+      expiryDate: doc.expiryDate ? (doc.expiryDate instanceof Date ? doc.expiryDate : new Date(doc.expiryDate as any)) : undefined,
+      status: doc.status || 'valid',
+      propertyAddress: 'Unassigned (Vault)',
+      propertyId: '',
+      tenantName: null,
+      isUnassigned: true,
+    }));
+
+    return [...propDocs, ...unassignedMapped];
+  }, [properties, unassignedDocuments]);
 
   const tenantOptions = useMemo(() => {
     const names = new Set<string>();
@@ -263,9 +351,13 @@ export function DocumentsPage({
       contracts: 0,
       insurance: 0,
       other: 0,
+      unassigned: 0,
     };
     allDocuments.forEach((doc) => {
       counts[categoryForType(doc.type)] += 1;
+      if (doc.isUnassigned || !doc.propertyId) {
+        counts.unassigned += 1;
+      }
     });
     return counts;
   }, [allDocuments]);
@@ -289,10 +381,14 @@ export function DocumentsPage({
         (statusFilter === 'expired' && document.status === 'expired');
 
       const matchesType =
-        typeFilter === 'all' || CATEGORY_TYPES[typeFilter].includes(document.type);
+        typeFilter === 'all' ||
+        (typeFilter === 'unassigned' && (document.isUnassigned || !document.propertyId)) ||
+        (typeFilter !== 'unassigned' && CATEGORY_TYPES[typeFilter as Exclude<CategoryFilter, 'all' | 'unassigned'>]?.includes(document.type));
 
       const matchesProperty =
-        propertyFilter === 'all' || document.propertyId === propertyFilter;
+        propertyFilter === 'all' ||
+        (propertyFilter === 'unassigned' && (document.isUnassigned || !document.propertyId)) ||
+        document.propertyId === propertyFilter;
 
       const matchesTenant =
         tenantFilter === 'all' || document.tenantName === tenantFilter;
@@ -427,32 +523,91 @@ export function DocumentsPage({
       ...initialAttachForm,
       propertyId: target?.id || '',
       tenant: target?.tenant?.name || 'Property-Wide',
+      issueDate: new Date().toISOString().split('T')[0],
+      expiryDate: '',
     });
+    setAttachStep(1);
+    setSelectedFile(null);
+    setUploadError(null);
+    setIsUploadingFile(false);
     setAttachModalOpen(true);
   };
 
   const closeAttachModal = () => {
     setAttachModalOpen(false);
+    setAttachStep(1);
     setAttachForm(initialAttachForm);
+    setSelectedFile(null);
+    setUploadError(null);
+    setIsUploadingFile(false);
   };
 
-  const handleAttachSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    const property = (properties || []).find((p) => p.id === attachForm.propertyId);
-    if (!property) return;
-    // Preserve the existing DocumentManagement upload path for real files.
-    if (typeof window !== 'undefined' && attachForm.title.trim()) {
-      window.sessionStorage.setItem(
-        'proptii.pendingDocumentAttach',
-        JSON.stringify({
-          title: attachForm.title.trim(),
-          category: attachForm.category,
-          tenant: attachForm.tenant,
-        }),
-      );
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+    setUploadError(null);
+    if (!attachForm.title || attachForm.title.trim() === '') {
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      setAttachForm((prev) => ({ ...prev, title: cleanName }));
     }
-    closeAttachModal();
-    onManageDocuments(property);
+  };
+
+  const handlePerformUpload = async () => {
+    if (!selectedFile) {
+      setUploadError('Please choose a file to upload.');
+      return;
+    }
+    setIsUploadingFile(true);
+    setUploadError(null);
+    try {
+      const apiBase = getResolvedApiBaseUrl();
+      const fd = new FormData();
+      fd.append('file', selectedFile, selectedFile.name);
+      fd.append('folder', 'properties/documents');
+      const token = await getAccessTokenForApiRequest().catch(() => null);
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${apiBase}/storage/upload`, { method: 'POST', headers, body: fd });
+      if (!res.ok) throw new Error(`Storage upload failed (${res.status})`);
+      const data = await res.json();
+      if (!data.url) throw new Error('No file URL returned from upload');
+
+      const docTitle = attachForm.title.trim() || selectedFile.name;
+      const docType = mapAttachCategoryToDocType(attachForm.category);
+      const issueDate = attachForm.issueDate ? new Date(attachForm.issueDate) : new Date();
+      const expiryDate = attachForm.expiryDate ? new Date(attachForm.expiryDate) : undefined;
+      const status = computeDocumentStatus(attachForm.expiryDate);
+
+      if (attachForm.propertyId) {
+        if (onAddDocumentToProperty) {
+          await onAddDocumentToProperty(attachForm.propertyId, {
+            name: docTitle,
+            type: docType,
+            url: data.url,
+            issueDate,
+            expiryDate,
+            status,
+          });
+        }
+      } else {
+        const created = await documentService.createDocument({
+          name: docTitle,
+          type: docType,
+          url: data.url,
+          issueDate,
+          expiryDate: expiryDate ?? null,
+          propertyId: null,
+        });
+        if (onVaultDocumentAdded) {
+          onVaultDocumentAdded(created);
+        }
+      }
+
+      closeAttachModal();
+    } catch (err: any) {
+      console.error('[DocumentsPage] Upload error:', err);
+      setUploadError(err?.message || 'Upload failed. Please try again.');
+    } finally {
+      setIsUploadingFile(false);
+    }
   };
 
   const openInspectionDrawer = (document: DocumentWithProperty) => {
@@ -464,6 +619,57 @@ export function DocumentsPage({
     setInspectionDoc(null);
     setShareFeedback(null);
   };
+
+  const openAssignModal = (doc: DocumentWithProperty) => {
+    setAssignModalDoc(doc);
+    setAssignTargetPropertyId((properties && properties[0]?.id) || '');
+  };
+
+  const closeAssignModal = () => {
+    setAssignModalDoc(null);
+    setAssignTargetPropertyId('');
+    setIsAssigning(false);
+  };
+
+  const handleConfirmAssign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignModalDoc || !assignTargetPropertyId || !onAssignDocument) return;
+    setIsAssigning(true);
+    try {
+      await onAssignDocument(assignModalDoc.id, assignTargetPropertyId);
+      closeAssignModal();
+      if (inspectionDoc && inspectionDoc.id === assignModalDoc.id) {
+        closeInspectionDrawer();
+      }
+    } catch (err) {
+      console.error('Failed to assign document:', err);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  // Auto-open the upload modal when navigated here via the Dashboard upload CTA
+  React.useEffect(() => {
+    if (openUploadOnMount) {
+      openAttachFlow();
+      onUploadModalOpened?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openUploadOnMount]);
+
+  // Auto-open the inspection drawer when navigated here via a Dashboard document chip
+  React.useEffect(() => {
+    if (!openDocumentId) return;
+    const timer = setTimeout(() => {
+      const doc = allDocuments.find(d => d.id === openDocumentId);
+      if (doc) {
+        openInspectionDrawer(doc);
+        onUploadModalOpened?.();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDocumentId, allDocuments]);
 
   const handleShareDocument = async (document: DocumentWithProperty) => {
     const shareTarget = document.url?.trim() || `${document.name} · ${document.propertyAddress}`;
@@ -503,13 +709,39 @@ export function DocumentsPage({
     return <LandlordPageEmptyShell page="documents" variant="guest" />;
   }
 
+  // If brand-new user with no properties AND no unassigned docs, show the
+  // "Add your first property" shell — but still allow vault upload via the button.
+  if (isNewPortfolioUser(properties) && unassignedDocuments.length === 0) {
+    return (
+      <LandlordPageEmptyShell
+        page="documents"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile.name}
+      >
+        {onUploadToVault && (
+          <button
+            type="button"
+            className="ll-docs-btn-attach"
+            style={{ marginTop: 12 }}
+            onClick={() => openAttachFlow()}
+          >
+            <Upload size={15} />
+            Upload document without a property
+          </button>
+        )}
+      </LandlordPageEmptyShell>
+    );
+  }
+
   const effectiveDisplay: DisplayStyle = isMobile && viewScope === 'all' ? 'grid' : displayStyle;
   const vaultEmpty = allDocuments.length === 0 && !hasActiveFilters;
+  const hasMatchingUnassigned = filteredDocuments.some((d) => d.isUnassigned || !d.propertyId);
   const filterEmpty =
     !vaultEmpty &&
     ((viewScope === 'all' && filteredDocuments.length === 0) ||
-      (viewScope === 'property' && filteredProperties.length === 0) ||
-      (viewScope === 'tenant' && filteredTenants.length === 0));
+      (viewScope === 'property' && filteredProperties.length === 0 && !hasMatchingUnassigned) ||
+      (viewScope === 'tenant' && filteredTenants.length === 0 && !hasMatchingUnassigned));
 
   const renderBulkBar = () =>
     showBulkActions && selectedDocuments.length > 0 ? (
@@ -567,7 +799,7 @@ export function DocumentsPage({
       </div>
     ) : null;
 
-  const renderDocumentTable = () => (
+  const renderDocumentTable = (docs: DocumentWithProperty[] = filteredDocuments) => (
     <div className="ll-docs-table-wrap">
       <div className="ll-docs-table-scroll">
         <table className="ll-docs-table">
@@ -578,10 +810,20 @@ export function DocumentsPage({
                   type="checkbox"
                   className="ll-docs-check"
                   checked={
-                    selectedDocuments.length === filteredDocuments.length &&
-                    filteredDocuments.length > 0
+                    docs.length > 0 && docs.every((d) => selectedDocuments.includes(d.id))
                   }
-                  onChange={selectAllDocuments}
+                  onChange={() => {
+                    const allSelected = docs.length > 0 && docs.every((d) => selectedDocuments.includes(d.id));
+                    if (allSelected) {
+                      setSelectedDocuments((prev) =>
+                        prev.filter((id) => !docs.some((d) => d.id === id)),
+                      );
+                    } else {
+                      setSelectedDocuments((prev) =>
+                        Array.from(new Set([...prev, ...docs.map((d) => d.id)])),
+                      );
+                    }
+                  }}
                   aria-label="Select all documents"
                 />
               </th>
@@ -595,9 +837,10 @@ export function DocumentsPage({
             </tr>
           </thead>
           <tbody>
-            {filteredDocuments.map((document) => {
+            {docs.map((document) => {
               const property = getPropertyByDocument(document.propertyId);
               const daysUntilExpiry = getDaysUntilExpiry(document.expiryDate);
+              const isUnassignedDoc = document.isUnassigned || !document.propertyId;
               return (
                 <tr
                   key={documentRowKey(document)}
@@ -619,14 +862,30 @@ export function DocumentsPage({
                     </div>
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="ll-docs-prop-btn"
-                      onClick={() => property && onViewProperty(property)}
-                    >
-                      <Building2 size={14} />
-                      <span>{document.propertyAddress}</span>
-                    </button>
+                    {isUnassignedDoc ? (
+                      <span
+                        className="ll-docs-chip"
+                        style={{
+                          color: 'var(--amber-11, #d97706)',
+                          background: 'var(--amber-3, #fef3c7)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <Link2 size={12} />
+                        Unassigned Vault
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ll-docs-prop-btn"
+                        onClick={() => property && onViewProperty(property)}
+                      >
+                        <Building2 size={14} />
+                        <span>{document.propertyAddress}</span>
+                      </button>
+                    )}
                   </td>
                   <td>{document.tenantName || '—'}</td>
                   <td>{formatDocumentType(document.type)}</td>
@@ -663,6 +922,17 @@ export function DocumentsPage({
                   </td>
                   <td className="is-right">
                     <div className="ll-docs-row-actions">
+                      {isUnassignedDoc && onAssignDocument && (
+                        <button
+                          type="button"
+                          className="ll-docs-icon-btn"
+                          title="Assign to Property"
+                          style={{ color: 'var(--primary-color, #2563eb)' }}
+                          onClick={() => openAssignModal(document)}
+                        >
+                          <Link2 size={15} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="ll-docs-icon-btn"
@@ -682,14 +952,29 @@ export function DocumentsPage({
                       >
                         <Download size={15} />
                       </button>
-                      <button
-                        type="button"
-                        className="ll-docs-icon-btn"
-                        title="Manage documents"
-                        onClick={() => property && onManageDocuments(property)}
-                      >
-                        <FolderOpen size={15} />
-                      </button>
+                      {!isUnassignedDoc && (
+                        <button
+                          type="button"
+                          className="ll-docs-icon-btn"
+                          title="Manage documents"
+                          onClick={() => property && onManageDocuments(property)}
+                        >
+                          <FolderOpen size={15} />
+                        </button>
+                      )}
+                      {onDeleteDocuments && (
+                        <button
+                          type="button"
+                          className="ll-docs-icon-btn"
+                          title="Delete document"
+                          style={{ color: '#ef4444' }}
+                          onClick={() => {
+                            setDocumentToDelete({ id: document.id, name: document.name });
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -701,11 +986,12 @@ export function DocumentsPage({
     </div>
   );
 
-  const renderDocumentGrid = () => (
+  const renderDocumentGrid = (docs: DocumentWithProperty[] = filteredDocuments) => (
     <div className="ll-docs-file-grid">
-      {filteredDocuments.map((document) => {
+      {docs.map((document) => {
         const property = getPropertyByDocument(document.propertyId);
         const daysUntilExpiry = getDaysUntilExpiry(document.expiryDate);
+        const isUnassignedDoc = document.isUnassigned || !document.propertyId;
         return (
           <div
             key={documentRowKey(document)}
@@ -736,14 +1022,45 @@ export function DocumentsPage({
               </div>
             </div>
             <div className="ll-docs-file-card-body">
-              <button
-                type="button"
-                className="ll-docs-prop-btn"
-                onClick={() => property && onViewProperty(property)}
-              >
-                <Building2 size={14} />
-                <span>{document.propertyAddress}</span>
-              </button>
+              {isUnassignedDoc ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span
+                    className="ll-docs-chip"
+                    style={{
+                      color: 'var(--amber-11, #d97706)',
+                      background: 'var(--amber-3, #fef3c7)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Link2 size={12} />
+                    Unassigned Vault
+                  </span>
+                  {onAssignDocument && (
+                    <button
+                      type="button"
+                      className="ll-docs-ghost-btn"
+                      style={{ fontSize: '11px', padding: '2px 8px', height: 'auto', color: 'var(--primary-color, #2563eb)' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAssignModal(document);
+                      }}
+                    >
+                      Assign
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="ll-docs-prop-btn"
+                  onClick={() => property && onViewProperty(property)}
+                >
+                  <Building2 size={14} />
+                  <span>{document.propertyAddress}</span>
+                </button>
+              )}
               <div>Type: {formatDocumentType(document.type)}</div>
               <div>Issued: {formatDate(document.issueDate)}</div>
               <div>
@@ -780,14 +1097,41 @@ export function DocumentsPage({
                 <Download size={14} />
                 Download
               </button>
-              <button
-                type="button"
-                className="ll-docs-icon-btn"
-                title="Manage documents"
-                onClick={() => property && onManageDocuments(property)}
-              >
-                <FolderOpen size={15} />
-              </button>
+              {isUnassignedDoc ? (
+                onAssignDocument && (
+                  <button
+                    type="button"
+                    className="ll-docs-icon-btn"
+                    title="Assign to Property"
+                    style={{ color: 'var(--primary-color, #2563eb)' }}
+                    onClick={() => openAssignModal(document)}
+                  >
+                    <Link2 size={15} />
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  className="ll-docs-icon-btn"
+                  title="Manage documents"
+                  onClick={() => property && onManageDocuments(property)}
+                >
+                  <FolderOpen size={15} />
+                </button>
+              )}
+              {onDeleteDocuments && (
+                <button
+                  type="button"
+                  className="ll-docs-icon-btn"
+                  title="Delete document"
+                  style={{ color: '#ef4444' }}
+                  onClick={() => {
+                    setDocumentToDelete({ id: document.id, name: document.name });
+                  }}
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
             </div>
           </div>
         );
@@ -1247,10 +1591,9 @@ export function DocumentsPage({
               type="button"
               className="ll-docs-btn-attach"
               onClick={() => openAttachFlow()}
-              disabled={(properties || []).length === 0}
             >
               <Upload size={16} />
-              Attach Document
+              Upload Document
             </button>
           </div>
         </div>
@@ -1345,17 +1688,16 @@ export function DocumentsPage({
           type="button"
           className="ll-docs-dropzone"
           onClick={() => openAttachFlow()}
-          disabled={(properties || []).length === 0}
+          disabled={false}
         >
           <div className="ll-docs-dropzone-main">
             <span className="ll-docs-dropzone-icon">
               <Upload size={22} />
             </span>
             <div>
-              <h3>Attach Documents to Property or Tenant</h3>
+              <h3>Upload Document</h3>
               <p>
-                Link compliance certificates to properties, or open a property vault to manage
-                attached files.
+                Upload compliance certificates or documents. Property is optional — leave blank to save to your vault.
               </p>
             </div>
           </div>
@@ -1372,6 +1714,7 @@ export function DocumentsPage({
                   ['contracts', 'Contracts'],
                   ['insurance', 'Insurance'],
                   ['other', 'Other'],
+                  ['unassigned', 'Unassigned'],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -1476,10 +1819,9 @@ export function DocumentsPage({
                 type="button"
                 className="ll-docs-btn-attach"
                 onClick={() => openAttachFlow()}
-                disabled={(properties || []).length === 0}
               >
                 <Upload size={16} />
-                Attach First Document
+                Upload Document
               </button>
             </div>
           </div>
@@ -1503,41 +1845,92 @@ export function DocumentsPage({
           <>
             {viewScope === 'property' && (
               <section className="space-y-4">
-                <div className="ll-docs-section-head">
-                  <h2>Properties & Attached Document Packs</h2>
-                  <span>
-                    Showing {filteredProperties.length} propert
-                    {filteredProperties.length === 1 ? 'y' : 'ies'}
-                  </span>
-                </div>
-                {effectiveDisplay === 'grid' ? renderPropertyCards() : renderPropertyTable()}
+                {typeFilter === 'unassigned' ? (
+                  <>
+                    <div className="ll-docs-section-head">
+                      <h2>Unassigned Documents Vault</h2>
+                      <span>
+                        Showing {filteredDocuments.length} document{filteredDocuments.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    {renderBulkBar()}
+                    {effectiveDisplay === 'table' && !isMobile
+                      ? renderDocumentTable(filteredDocuments)
+                      : renderDocumentGrid(filteredDocuments)}
+                  </>
+                ) : (
+                  <>
+                    <div className="ll-docs-section-head">
+                      <h2>Properties & Attached Document Packs</h2>
+                      <span>
+                        Showing {filteredProperties.length} propert
+                        {filteredProperties.length === 1 ? 'y' : 'ies'}
+                      </span>
+                    </div>
+                    {effectiveDisplay === 'grid' ? renderPropertyCards() : renderPropertyTable()}
+
+                    {hasMatchingUnassigned && (
+                      <div style={{ marginTop: 32 }}>
+                        <div className="ll-docs-section-head">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Link2 size={16} style={{ color: 'var(--amber-11, #d97706)' }} />
+                            <h2>Unassigned Documents in Vault</h2>
+                          </div>
+                          <span>
+                            {filteredDocuments.filter((d) => d.isUnassigned || !d.propertyId).length} document{filteredDocuments.filter((d) => d.isUnassigned || !d.propertyId).length === 1 ? '' : 's'} not linked to a property
+                          </span>
+                        </div>
+                        {renderBulkBar()}
+                        {effectiveDisplay === 'table' && !isMobile
+                          ? renderDocumentTable(filteredDocuments.filter((d) => d.isUnassigned || !d.propertyId))
+                          : renderDocumentGrid(filteredDocuments.filter((d) => d.isUnassigned || !d.propertyId))}
+                      </div>
+                    )}
+                  </>
+                )}
               </section>
             )}
-
             {viewScope === 'tenant' && (
               <section className="space-y-4">
-                <div className="ll-docs-section-head">
-                  <h2>Tenants & Attached Document Records</h2>
-                  <span>
-                    Showing {filteredTenants.length} tenant
-                    {filteredTenants.length === 1 ? '' : 's'}
-                  </span>
-                </div>
-                {filteredTenants.length === 0 ? (
-                  <div className="ll-docs-empty is-filter">
-                    <div className="ll-docs-empty-icon">
-                      <Users size={22} />
+                {typeFilter === 'unassigned' ? (
+                  <>
+                    <div className="ll-docs-section-head">
+                      <h2>Unassigned Documents Vault</h2>
+                      <span>
+                        Showing {filteredDocuments.length} document{filteredDocuments.length === 1 ? '' : 's'}
+                      </span>
                     </div>
-                    <h3>No tenants with documents</h3>
-                    <p>
-                      Assign tenants to properties to group documents by tenant, or switch to By
-                      Property / All Documents.
-                    </p>
-                  </div>
-                ) : effectiveDisplay === 'grid' ? (
-                  renderTenantCards()
+                    {renderBulkBar()}
+                    {effectiveDisplay === 'table' && !isMobile
+                      ? renderDocumentTable(filteredDocuments)
+                      : renderDocumentGrid(filteredDocuments)}
+                  </>
                 ) : (
-                  renderTenantTable()
+                  <>
+                    <div className="ll-docs-section-head">
+                      <h2>Tenants & Attached Document Records</h2>
+                      <span>
+                        Showing {filteredTenants.length} tenant
+                        {filteredTenants.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    {filteredTenants.length === 0 ? (
+                      <div className="ll-docs-empty is-filter">
+                        <div className="ll-docs-empty-icon">
+                          <Users size={22} />
+                        </div>
+                        <h3>No tenants with documents</h3>
+                        <p>
+                          Assign tenants to properties to group documents by tenant, or switch to By
+                          Property / All Documents.
+                        </p>
+                      </div>
+                    ) : effectiveDisplay === 'grid' ? (
+                      renderTenantCards()
+                    ) : (
+                      renderTenantTable()
+                    )}
+                  </>
                 )}
               </section>
             )}
@@ -1545,7 +1938,7 @@ export function DocumentsPage({
             {viewScope === 'all' && (
               <section className="space-y-4">
                 <div className="ll-docs-section-head">
-                  <h2>All Document Records</h2>
+                  <h2>{typeFilter === 'unassigned' ? 'Unassigned Documents Vault' : 'All Document Records'}</h2>
                   <span>
                     Showing {filteredDocuments.length} file
                     {filteredDocuments.length === 1 ? '' : 's'}
@@ -1572,9 +1965,17 @@ export function DocumentsPage({
           <div className="ll-docs-attach-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ll-docs-attach-head">
               <div>
-                <h3 id="ll-docs-attach-title">Attach Document to Property / Tenant</h3>
+                <h3 id="ll-docs-attach-title">
+                  {attachStep === 1 ? 'Upload Document — Details' : 'Upload Document — Select File'}
+                </h3>
                 <p>
-                  Link uploaded compliance certificates, tenancy contracts, or referencing proof.
+                  {attachStep === 1
+                    ? 'Enter document details and select property assignment.'
+                    : `Upload file for ${
+                        attachForm.propertyId
+                          ? (properties || []).find((p) => p.id === attachForm.propertyId)?.address || 'Selected Property'
+                          : "Vault (Don't assign to a property yet)"
+                      }`}
                 </p>
               </div>
               <button
@@ -1587,59 +1988,78 @@ export function DocumentsPage({
               </button>
             </div>
 
-            <form className="ll-docs-attach-form" onSubmit={handleAttachSubmit}>
-              <label className="ll-docs-field">
-                <span>Document Title</span>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Gas_Safety_Certificate_2026.pdf"
-                  value={attachForm.title}
-                  onChange={(e) => setAttachForm((prev) => ({ ...prev, title: e.target.value }))}
-                />
-              </label>
+            {uploadError && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  background: '#fee2e2',
+                  color: '#b91c1c',
+                  fontSize: 13,
+                  marginBottom: 14,
+                }}
+              >
+                {uploadError}
+              </div>
+            )}
 
-              <label className="ll-docs-field">
-                <span>Target Property</span>
-                <select
-                  required
-                  value={attachForm.propertyId}
-                  onChange={(e) => {
-                    const nextProperty = (properties || []).find((p) => p.id === e.target.value);
-                    setAttachForm((prev) => ({
-                      ...prev,
-                      propertyId: e.target.value,
-                      tenant: nextProperty?.tenant?.name || 'Property-Wide',
-                    }));
-                  }}
-                >
-                  <option value="" disabled>
-                    Select a property
-                  </option>
-                  {(properties || []).map((property) => (
-                    <option key={property.id} value={property.id}>
-                      {property.address}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            {attachStep === 1 ? (
+              <form
+                className="ll-docs-attach-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setAttachStep(2);
+                }}
+              >
+                <label className="ll-docs-field">
+                  <span>Document Title</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gas Safety Certificate 2026 (or auto-named from file)"
+                    value={attachForm.title}
+                    onChange={(e) => setAttachForm((prev) => ({ ...prev, title: e.target.value }))}
+                  />
+                </label>
 
-              <label className="ll-docs-field">
-                <span>Target Tenant (Optional)</span>
-                <select
-                  value={attachForm.tenant}
-                  onChange={(e) => setAttachForm((prev) => ({ ...prev, tenant: e.target.value }))}
-                >
-                  <option value="Property-Wide">Property-Wide (Building Compliance)</option>
-                  {tenantOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="ll-docs-field">
+                  <span>Target Property</span>
+                  <select
+                    value={attachForm.propertyId}
+                    onChange={(e) => {
+                      const nextProperty = (properties || []).find((p) => p.id === e.target.value);
+                      setAttachForm((prev) => ({
+                        ...prev,
+                        propertyId: e.target.value,
+                        tenant: nextProperty?.tenant?.name || 'Property-Wide',
+                      }));
+                    }}
+                  >
+                    <option value="">Don't assign to a property yet</option>
+                    {(properties || []).map((property) => (
+                      <option key={property.id} value={property.id}>
+                        {property.address}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <div className="ll-docs-attach-grid">
+                {attachForm.propertyId && (
+                  <label className="ll-docs-field">
+                    <span>Target Tenant (Optional)</span>
+                    <select
+                      value={attachForm.tenant}
+                      onChange={(e) => setAttachForm((prev) => ({ ...prev, tenant: e.target.value }))}
+                    >
+                      <option value="Property-Wide">Property-Wide (Building Compliance)</option>
+                      {tenantOptions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
                 <label className="ll-docs-field">
                   <span>Document Category</span>
                   <select
@@ -1659,33 +2079,186 @@ export function DocumentsPage({
                     ))}
                   </select>
                 </label>
-                <label className="ll-docs-field">
-                  <span>File Size</span>
-                  <input
-                    type="text"
-                    value={attachForm.fileSize}
-                    onChange={(e) =>
-                      setAttachForm((prev) => ({ ...prev, fileSize: e.target.value }))
+
+                <div className="ll-docs-attach-grid">
+                  <label className="ll-docs-field">
+                    <span>Issue Date</span>
+                    <input
+                      type="date"
+                      value={attachForm.issueDate}
+                      onChange={(e) =>
+                        setAttachForm((prev) => ({ ...prev, issueDate: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="ll-docs-field">
+                    <span>Expiry Date (Optional)</span>
+                    <input
+                      type="date"
+                      value={attachForm.expiryDate}
+                      onChange={(e) =>
+                        setAttachForm((prev) => ({ ...prev, expiryDate: e.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
+
+                <div className="ll-docs-attach-actions">
+                  <button type="button" className="ll-docs-ghost-btn" onClick={closeAttachModal}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="ll-docs-btn-attach">
+                    Continue to File Upload →
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="ll-docs-attach-form">
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    fontSize: 12,
+                    color: '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <span style={{ fontWeight: 600 }}>Destination: </span>
+                    {attachForm.propertyId
+                      ? (properties || []).find((p) => p.id === attachForm.propertyId)?.address || 'Selected Property'
+                      : "Vault (Don't assign to a property yet)"}
+                  </div>
+                  <button
+                    type="button"
+                    className="ll-docs-ghost-btn"
+                    style={{ fontSize: 11, padding: '2px 8px', height: 'auto' }}
+                    onClick={() => setAttachStep(1)}
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                <div
+                  className={`ll-docs-attach-drop ${isDragOver ? 'is-drag-over' : ''}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      handleFileSelect(e.dataTransfer.files[0]);
                     }
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    cursor: 'pointer',
+                    padding: '28px 16px',
+                    border: isDragOver
+                      ? '2px dashed var(--primary-color, #2563eb)'
+                      : '2px dashed #cbd5e1',
+                    background: isDragOver ? 'rgba(37, 99, 235, 0.05)' : '#f8fafc',
+                    borderRadius: 14,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 6,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleFileSelect(e.target.files[0]);
+                      }
+                    }}
                   />
-                </label>
-              </div>
+                  <Upload size={32} style={{ color: 'var(--primary-color, #2563eb)', marginBottom: 4 }} />
+                  <strong style={{ fontSize: 13, color: '#1e293b' }}>
+                    Drag &amp; drop your document here, or click to browse
+                  </strong>
+                  <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>
+                    PDF, JPG, PNG, DOCX up to 25MB
+                  </p>
+                </div>
 
-              <div className="ll-docs-attach-drop">
-                <Upload size={22} />
-                <strong>Continue to vault upload</strong>
-                <p>PDF, JPG, PNG up to 25MB — file selection opens in the property vault.</p>
-              </div>
+                {selectedFile && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      background: '#f1f5f9',
+                      borderRadius: 10,
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                      <FileText size={22} style={{ color: 'var(--primary-color, #2563eb)', flexShrink: 0 }} />
+                      <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            textOverflow: 'ellipsis',
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {selectedFile.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>
+                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="ll-docs-icon-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile(null);
+                      }}
+                      title="Remove file"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                )}
 
-              <div className="ll-docs-attach-actions">
-                <button type="button" className="ll-docs-ghost-btn" onClick={closeAttachModal}>
-                  Cancel
-                </button>
-                <button type="submit" className="ll-docs-btn-attach" disabled={!attachForm.propertyId}>
-                  Attach & Seal
-                </button>
+                <div className="ll-docs-attach-actions">
+                  <button
+                    type="button"
+                    className="ll-docs-ghost-btn"
+                    onClick={() => setAttachStep(1)}
+                    disabled={isUploadingFile}
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="button"
+                    className="ll-docs-btn-attach"
+                    disabled={!selectedFile || isUploadingFile}
+                    onClick={() => handlePerformUpload()}
+                  >
+                    {isUploadingFile ? 'Uploading to Vault...' : 'Upload Document'}
+                  </button>
+                </div>
               </div>
-            </form>
+            )}
           </div>
         </div>
       )}
@@ -1732,43 +2305,87 @@ export function DocumentsPage({
                 </span>
               </div>
 
-              <div className="ll-docs-drawer-card">
-                <div className="ll-docs-drawer-card-label">Attached Property</div>
-                <div className="ll-docs-drawer-card-row">
-                  {(() => {
-                    const property = getPropertyByDocument(inspectionDoc.propertyId);
-                    const thumb = property ? coverUrl(property) : null;
-                    return thumb ? (
-                      <img src={thumb} alt="" className="ll-docs-drawer-thumb" />
-                    ) : (
-                      <div className="ll-docs-drawer-thumb is-placeholder">
-                        <Building2 size={16} />
+              {inspectionDoc.isUnassigned || !inspectionDoc.propertyId ? (
+                <div
+                  className="ll-docs-drawer-card"
+                  style={{
+                    border: '1px solid var(--amber-7, #fcd34d)',
+                    background: 'var(--amber-2, #fffbeb)',
+                  }}
+                >
+                  <div className="ll-docs-drawer-card-label" style={{ color: 'var(--amber-11, #b45309)' }}>
+                    Vault Status
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      marginTop: 4,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Link2 size={16} style={{ color: 'var(--amber-11, #b45309)' }} />
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#1e293b' }}>
+                        Document stored in vault (not linked to property)
+                      </span>
+                    </div>
+                    {onAssignDocument && (
+                      <button
+                        type="button"
+                        className="ll-docs-btn-attach"
+                        style={{ padding: '6px 12px', fontSize: 12, height: 'auto' }}
+                        onClick={() => openAssignModal(inspectionDoc)}
+                      >
+                        <Link2 size={13} />
+                        Assign to Property
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="ll-docs-drawer-card">
+                    <div className="ll-docs-drawer-card-label">Attached Property</div>
+                    <div className="ll-docs-drawer-card-row">
+                      {(() => {
+                        const property = getPropertyByDocument(inspectionDoc.propertyId);
+                        const thumb = property ? coverUrl(property) : null;
+                        return thumb ? (
+                          <img src={thumb} alt="" className="ll-docs-drawer-thumb" />
+                        ) : (
+                          <div className="ll-docs-drawer-thumb is-placeholder">
+                            <Building2 size={16} />
+                          </div>
+                        );
+                      })()}
+                      <div>
+                        <strong>{propertyName(inspectionDoc.propertyAddress)}</strong>
+                        <span>{inspectionDoc.propertyAddress}</span>
                       </div>
-                    );
-                  })()}
-                  <div>
-                    <strong>{propertyName(inspectionDoc.propertyAddress)}</strong>
-                    <span>{inspectionDoc.propertyAddress}</span>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="ll-docs-drawer-card">
-                <div className="ll-docs-drawer-card-label">Attached Tenant / Applicant</div>
-                <div className="ll-docs-drawer-card-row">
-                  <div className="ll-docs-drawer-avatar">
-                    {initialsFromName(inspectionDoc.tenantName || 'PW')}
+                  <div className="ll-docs-drawer-card">
+                    <div className="ll-docs-drawer-card-label">Attached Tenant / Applicant</div>
+                    <div className="ll-docs-drawer-card-row">
+                      <div className="ll-docs-drawer-avatar">
+                        {initialsFromName(inspectionDoc.tenantName || 'PW')}
+                      </div>
+                      <div>
+                        <strong>{inspectionDoc.tenantName || 'Property-Wide'}</strong>
+                        <span>
+                          {inspectionDoc.tenantName
+                            ? 'Attached to tenancy'
+                            : 'Building compliance record'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <strong>{inspectionDoc.tenantName || 'Property-Wide'}</strong>
-                    <span>
-                      {inspectionDoc.tenantName
-                        ? 'Attached to tenancy'
-                        : 'Building compliance record'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
 
               <div className="ll-docs-drawer-section">
                 <div className="ll-docs-drawer-card-label">Automated Audit & OCR Metrics</div>
@@ -1849,22 +2466,182 @@ export function DocumentsPage({
                 <Share2 size={15} />
                 Share
               </button>
-              <button
-                type="button"
-                className="ll-docs-drawer-share"
-                onClick={() => {
-                  const property = getPropertyByDocument(inspectionDoc.propertyId);
-                  closeInspectionDrawer();
-                  if (property) onManageDocuments(property);
-                }}
-              >
-                <FolderOpen size={15} />
-                Manage
-              </button>
+              {inspectionDoc.isUnassigned || !inspectionDoc.propertyId ? (
+                onAssignDocument && (
+                  <button
+                    type="button"
+                    className="ll-docs-drawer-share"
+                    onClick={() => openAssignModal(inspectionDoc)}
+                  >
+                    <Link2 size={15} />
+                    Assign
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  className="ll-docs-drawer-share"
+                  onClick={() => {
+                    const property = getPropertyByDocument(inspectionDoc.propertyId);
+                    closeInspectionDrawer();
+                    if (property) onManageDocuments(property);
+                  }}
+                >
+                  <FolderOpen size={15} />
+                  Manage
+                </button>
+              )}
+              {onDeleteDocuments && (
+                <button
+                  type="button"
+                  className="ll-docs-drawer-share"
+                  style={{ color: '#ef4444' }}
+                  onClick={() => {
+                    setDocumentToDelete({ id: inspectionDoc.id, name: inspectionDoc.name, isDrawer: true });
+                  }}
+                >
+                  <Trash2 size={15} />
+                  Delete
+                </button>
+              )}
             </div>
           </aside>
         </div>
       )}
+
+      {assignModalDoc && (
+        <div
+          className="ll-docs-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAssignModal}
+        >
+          <div
+            className="ll-docs-attach-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 440 }}
+          >
+            <div className="ll-docs-attach-head">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: 'var(--amber-3, #fef3c7)',
+                    color: 'var(--amber-11, #d97706)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Link2 size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
+                    Assign to Property
+                  </h3>
+                  <p style={{ fontSize: 12, color: 'var(--slate-10, #64748b)', margin: 0 }}>
+                    Link &quot;{assignModalDoc.name}&quot; to a property portfolio
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ll-docs-icon-btn"
+                onClick={closeAssignModal}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmAssign} style={{ padding: '16px 20px 20px' }}>
+              <div style={{ marginBottom: 16 }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: 'var(--slate-11, #334155)',
+                    marginBottom: 6,
+                  }}
+                >
+                  Select Target Property
+                </label>
+                <select
+                  className="ll-docs-select"
+                  style={{ width: '100%', height: 40 }}
+                  value={assignTargetPropertyId}
+                  onChange={(e) => setAssignTargetPropertyId(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>Choose property...</option>
+                  {properties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.address}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: 10,
+                  marginTop: 24,
+                }}
+              >
+                <button
+                  type="button"
+                  className="ll-docs-ghost-btn"
+                  onClick={closeAssignModal}
+                  disabled={isAssigning}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="ll-docs-btn-attach"
+                  disabled={isAssigning || !assignTargetPropertyId}
+                >
+                  {isAssigning ? 'Assigning...' : 'Confirm Assignment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={!!documentToDelete} onOpenChange={(open) => !open && setDocumentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete "{documentToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[#DC5F12] hover:bg-[#c45310] focus:ring-[#DC5F12] text-white"
+              onClick={() => {
+                if (documentToDelete && onDeleteDocuments) {
+                  onDeleteDocuments([documentToDelete.id]);
+                  if (documentToDelete.isDrawer) {
+                    closeInspectionDrawer();
+                  }
+                  setDocumentToDelete(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

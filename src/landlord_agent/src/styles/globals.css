@@ -123,11 +123,13 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--border, rgba(0, 0, 0, 0.1));
+    outline-color: var(--ring, rgba(0, 0, 0, 0.5));
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--background, #ffffff);
+    color: var(--foreground, #18181b);
   }
 }
 

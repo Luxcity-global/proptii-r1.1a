@@ -1,4 +1,5 @@
 import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -51,6 +52,8 @@ export function PropertyCard({
   className = "",
   showActions = true 
 }: PropertyCardProps) {
+  const [imgLoaded, setImgLoaded]     = useState(false);
+  const [imgErrored, setImgErrored]   = useState(false);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -83,22 +86,45 @@ export function PropertyCard({
   };
 
   return (
+    <>
+    <style>{`@keyframes propImgShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
     <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
       {/* Property Image */}
       <div className="aspect-video relative overflow-hidden">
         {(() => {
           const validPhotos = property.photos?.filter((p) => p && p.url && !p.url.startsWith('blob:')) || [];
           const coverPhotoUrl = validPhotos.find((p) => p.isCover)?.url || validPhotos[0]?.url;
-          return coverPhotoUrl ? (
-            <img
-              src={coverPhotoUrl}
-              alt={property.address}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // If remote image fails to load, gracefully fall back
-                e.currentTarget.src = '/images/property-placeholder.jpg';
-              }}
-            />
+          const fallback = '/assets/property-placeholder.jpg';
+          const effectiveSrc = imgErrored ? fallback : coverPhotoUrl;
+
+          return effectiveSrc ? (
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+              {/* Shimmer skeleton — shown until image loads */}
+              {!imgLoaded && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(90deg,#e8eef4 25%,#f3f6f9 50%,#e8eef4 75%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'propImgShimmer 1.4s ease-in-out infinite',
+                  }}
+                />
+              )}
+              <img
+                src={effectiveSrc}
+                alt={property.address}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+                style={{ opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease' }}
+                onLoad={() => setImgLoaded(true)}
+                onError={() => {
+                  if (!imgErrored) { setImgErrored(true); setImgLoaded(false); }
+                  else setImgLoaded(true);
+                }}
+              />
+            </div>
           ) : (
             <div className="w-full h-full bg-muted flex items-center justify-center">
               <Image className="w-8 h-8 text-muted-foreground" />
@@ -207,6 +233,7 @@ export function PropertyCard({
         )}
       </div>
     </Card>
+    </>
   );
 }
 

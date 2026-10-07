@@ -68,6 +68,9 @@ import { EventsService } from './services/events.service';
 import { StorageService } from './services/storage.service';
 import { StorageController } from './controllers/storage.controller';
 
+import { DocumentsController } from './controllers/documents.controller';
+import { DocumentsService }    from './services/documents.service';
+
 // ── Campaign Lead Capture ─────────────────────────────────────────────────────
 import { LeadsModule } from './leads/leads.module';
 
@@ -145,6 +148,8 @@ function resolvePublicFolder(folder: string): string {
     // R1.4 Sprint 2.2 + 3.1
     PropertyFactsController,
     ReportController,
+    // Document Vault
+    DocumentsController,
   ],
   providers: [
     {
@@ -175,6 +180,8 @@ function resolvePublicFolder(folder: string): string {
     TenantsService,
     // R1.4 Sprint 1.3
     ClassifierService,
+    // Document Vault
+    DocumentsService,
   ],
   exports: [EventsService],
 })

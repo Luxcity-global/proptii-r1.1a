@@ -328,12 +328,13 @@ export function ImportPropertiesDialog({ isOpen, onClose, onImport }: ImportProp
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
-        className="overflow-y-auto"
+        className="overflow-y-auto bg-white dark:bg-zinc-900 shadow-2xl"
         style={{ 
           width: '90vw', 
           maxWidth: '90vw', 
           height: '90vh', 
           maxHeight: '90vh',
+          backgroundColor: '#ffffff',
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)'
