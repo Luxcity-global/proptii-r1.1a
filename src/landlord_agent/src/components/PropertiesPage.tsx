@@ -31,6 +31,16 @@ import {
   Bell,
 } from 'lucide-react';
 import { ImportPropertiesDialog } from './ImportPropertiesDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
@@ -255,6 +265,8 @@ export function PropertiesPage({
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   const arrearsByTenantId = useMemo(() => {
     const map = new Map<string, ArrearsAlert>();
@@ -549,8 +561,15 @@ export function PropertiesPage({
 
   const handleBulkDelete = () => {
     if (onDeleteProperty && selectedProperties.size > 0) {
+      setBulkDeleteConfirm(true);
+    }
+  };
+
+  const confirmBulkDelete = () => {
+    if (onDeleteProperty && selectedProperties.size > 0) {
       properties.filter((p) => selectedProperties.has(p.id)).forEach(onDeleteProperty);
       clearSelection();
+      setBulkDeleteConfirm(false);
     }
   };
 
@@ -680,7 +699,7 @@ export function PropertiesPage({
           <Archive className="mr-2 h-4 w-4" />
           Archive Property
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onDeleteProperty?.(property)} className="text-red-600 focus:text-red-600">
+        <DropdownMenuItem onClick={() => setPropertyToDelete(property)} className="text-red-600 focus:text-red-600">
           <Trash2 className="mr-2 h-4 w-4" />
           Delete Property
         </DropdownMenuItem>
@@ -1360,6 +1379,50 @@ export function PropertiesPage({
         onClose={() => setShowImportDialog(false)}
         onImport={handleImportPropertiesSubmit}
       />
+      <AlertDialog open={!!propertyToDelete} onOpenChange={(open) => !open && setPropertyToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Property</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete "{propertyToDelete?.street}"? This action cannot be undone and will delete all associated documents and photos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={() => {
+                if (propertyToDelete && onDeleteProperty) {
+                  onDeleteProperty(propertyToDelete);
+                  setPropertyToDelete(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteConfirm} onOpenChange={setBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Properties</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedProperties.size} selected properties? This action cannot be undone and will delete all associated documents and photos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={confirmBulkDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

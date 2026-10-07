@@ -27,6 +27,16 @@ import {
   X,
   Link2,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useIsMobile } from './ui/use-mobile';
 import { Property, PropertyDocument, UserProfile } from '../App';
@@ -287,6 +297,7 @@ export function DocumentsPage({
   const [assignModalDoc, setAssignModalDoc] = useState<DocumentWithProperty | null>(null);
   const [assignTargetPropertyId, setAssignTargetPropertyId] = useState<string>('');
   const [isAssigning, setIsAssigning] = useState<boolean>(false);
+  const [documentToDelete, setDocumentToDelete] = useState<{ id: string; name: string; isDrawer?: boolean } | null>(null);
 
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -959,9 +970,7 @@ export function DocumentsPage({
                           title="Delete document"
                           style={{ color: '#ef4444' }}
                           onClick={() => {
-                            if (window.confirm(`Delete "${document.name}"? This action cannot be undone.`)) {
-                              onDeleteDocuments([document.id]);
-                            }
+                            setDocumentToDelete({ id: document.id, name: document.name });
                           }}
                         >
                           <Trash2 size={15} />
@@ -1118,9 +1127,7 @@ export function DocumentsPage({
                   title="Delete document"
                   style={{ color: '#ef4444' }}
                   onClick={() => {
-                    if (window.confirm(`Delete "${document.name}"? This action cannot be undone.`)) {
-                      onDeleteDocuments([document.id]);
-                    }
+                    setDocumentToDelete({ id: document.id, name: document.name });
                   }}
                 >
                   <Trash2 size={15} />
@@ -2491,10 +2498,7 @@ export function DocumentsPage({
                   className="ll-docs-drawer-share"
                   style={{ color: '#ef4444' }}
                   onClick={() => {
-                    if (window.confirm(`Delete "${inspectionDoc.name}"? This action cannot be undone.`)) {
-                      onDeleteDocuments([inspectionDoc.id]);
-                      closeInspectionDrawer();
-                    }
+                    setDocumentToDelete({ id: inspectionDoc.id, name: inspectionDoc.name, isDrawer: true });
                   }}
                 >
                   <Trash2 size={15} />
@@ -2611,6 +2615,34 @@ export function DocumentsPage({
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!documentToDelete} onOpenChange={(open) => !open && setDocumentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete "{documentToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={() => {
+                if (documentToDelete && onDeleteDocuments) {
+                  onDeleteDocuments([documentToDelete.id]);
+                  if (documentToDelete.isDrawer) {
+                    closeInspectionDrawer();
+                  }
+                  setDocumentToDelete(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

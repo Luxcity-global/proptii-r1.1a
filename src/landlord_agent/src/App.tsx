@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
+import { toast } from "sonner";
 import { TooltipProvider } from './components/ui/tooltip';
 import { Routes, Route, useLocation, MemoryRouter, useInRouterContext } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -1491,10 +1492,10 @@ export function AppContent() {
       if (selectedProperty?.id === property.id) {
         setSelectedProperty(null);
       }
-      console.log('Deleted property via Firestore client and updated state:', property.id);
+      toast.success('Property successfully deleted!');
     } catch (error) {
       console.error('Failed to delete property:', error);
-      alert(`Failed to delete property: ${(error as any)?.message || 'Unknown error'}`);
+      toast.error(`Failed to delete property: ${(error as any)?.message || 'Unknown error'}`);
     }
   };
 

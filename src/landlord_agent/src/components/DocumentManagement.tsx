@@ -17,6 +17,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Badge } from './ui/badge';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
+import {
   ArrowLeft,
   Upload,
   FileText,
@@ -110,6 +120,7 @@ export function DocumentManagement({
   onVaultDocumentDeleted,
 }: DocumentManagementProps) {
   const isVaultMode = !property;
+  const [documentToDelete, setDocumentToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const [isUploadOpen,        setIsUploadOpen]        = useState(false);
   const [searchTerm,          setSearchTerm]           = useState('');
@@ -281,8 +292,11 @@ export function DocumentManagement({
 
   // ── Delete ────────────────────────────────────────────────────────────────
 
-  const handleDelete = async (docId: string) => {
-    if (!window.confirm('Delete this document? This action cannot be undone.')) return;
+  const handleDelete = async (docId: string, docName: string) => {
+    setDocumentToDelete({ id: docId, name: docName });
+  };
+
+  const confirmDelete = async (docId: string) => {
     setDeletingId(docId);
     try {
       if (isVaultMode) {
@@ -301,6 +315,7 @@ export function DocumentManagement({
       alert(`Delete failed: ${(err as Error).message}`);
     } finally {
       setDeletingId(null);
+      setDocumentToDelete(null);
     }
   };
 
@@ -661,6 +676,26 @@ export function DocumentManagement({
           </div>
         </Card>
       </div>
+
+      <AlertDialog open={!!documentToDelete} onOpenChange={(open) => !open && setDocumentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete "{documentToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={() => documentToDelete && confirmDelete(documentToDelete.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
