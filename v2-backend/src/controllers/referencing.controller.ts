@@ -215,7 +215,7 @@ export class ReferencingController {
     return await this.referencingService.saveUserFile(uid, file, body);
   }
 
-  @Delete(['referencing/files/:fileId', 'documents/:fileId'])
+  @Delete('referencing/files/:fileId')
   @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Delete user uploaded file' })
