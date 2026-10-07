@@ -328,7 +328,14 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
     goTo('step3','step2');
   }
   function handleReview(skip=false) {
-    if (skip) { goTo('summary','step3'); return; }
+    if (skip) {
+      // Skip the summary — go straight to confirm & POST
+      setDone(prev => ({...prev, step3: true}));
+      setErrors({}); setGE(null);
+      // Run the confirm flow directly without showing the review screen
+      handleConfirm();
+      return;
+    }
     goTo('summary','step3');
   }
 

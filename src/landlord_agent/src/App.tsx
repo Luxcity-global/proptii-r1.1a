@@ -13,6 +13,8 @@ import { PropertyTypeSelection } from './components/PropertyTypeSelection';
 import { PropertyDetailsSelection } from './components/PropertyDetailsSelection';
 import { AmenitiesSelection } from './components/AmenitiesSelection';
 import { ImagesAndNotesSelection } from './components/ImagesAndNotesSelection';
+import { AddPropertyWizard } from './components/AddPropertyWizard';
+import type { WizardPropertyData } from './components/AddPropertyWizard';
 import { PhotoUpload } from './components/PhotoUpload';
 import { Dashboard } from './components/Dashboard';
 import { PropertyDetails } from './components/PropertyDetails';
@@ -2493,73 +2495,220 @@ export function AppContent() {
         );
 
       case 'property-setup-step1':
+      case 'property-type-selection':
+      case 'property-details-selection':
+      case 'amenities-selection':
+      case 'images-notes-selection':
         return (
-          <PropertySetupStep1
-            onNext={() => navigateToScreen('property-type-selection')}
+          <AddPropertyWizard
+            isEditing={isEditing}
+            isPublishing={isPublishing}
+            initialData={{
+              propertyType:      propertySetupData.propertyType || undefined,
+              address:           propertySetupData.propertyDetails.address,
+              monthlyRent:       propertySetupData.propertyDetails.monthlyRent,
+              bedrooms:          propertySetupData.propertyDetails.bedrooms,
+              bathrooms:         propertySetupData.propertyDetails.bathrooms,
+              squareFootage:     propertySetupData.propertyDetails.squareFootage,
+              uploadedDocuments: propertySetupData.propertyDetails.uploadedDocuments,
+              amenities:         propertySetupData.amenities,
+              images:            propertySetupData.images,
+              imageFiles:        propertySetupData.imageFiles,
+              additionalNotes:   propertySetupData.additionalNotes,
+              status:            propertySetupData.status,
+            }}
+            onBulkImport={!isEditing ? () => navigateToScreen('bulk-import-property') : undefined}
             onBack={() => {
+              setIsEditing(false);
+              setEditingPropertyId(null);
               if (properties.length > 0) {
-                navigateToScreen('main-app');
+                navigateToScreen(selectedProperty ? 'property-details' : 'main-app');
               } else {
                 navigateToScreen('onboarding-options');
               }
             }}
-            onHome={() => navigateToScreen('main-app')}
-            onSection1={() => navigateToScreen('property-type-selection')}
-            onSection2={() => navigateToScreen('property-details-selection')}
-            onSection3={() => navigateToScreen('amenities-selection')}
-            onSection4={() => navigateToScreen('images-notes-selection')}
-            onBulkImport={!isEditing ? () => navigateToScreen('bulk-import-property') : undefined}
-          />
-        );
+            onAddTenant={() => {
+              trackEvent('landlord_add_tenant_clicked', { source: 'property_wizard' });
+              setPreviousScreen('property-setup-step1');
+              navigateToScreen('tenant-selection');
+            }}
+            onPublish={async (wizardData: WizardPropertyData) => {
+              if (!userProfile) {
+                window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'publish' } }, '*');
+                throw new Error('Authentication required');
+              }
+              setIsPublishing(true);
+              try {
+                // Sync wizard data into legacy propertySetupData shape so upload helpers work
+                const syncedSetupData = {
+                  ...propertySetupData,
+                  propertyType: wizardData.propertyType,
+                  propertyDetails: {
+                    address:           wizardData.address,
+                    monthlyRent:       wizardData.monthlyRent,
+                    bedrooms:          wizardData.bedrooms,
+                    bathrooms:         wizardData.bathrooms,
+                    squareFootage:     wizardData.squareFootage,
+                    uploadedDocuments: wizardData.uploadedDocuments,
+                  },
+                  amenities:       wizardData.amenities,
+                  images:          wizardData.images,
+                  imageFiles:      wizardData.imageFiles,
+                  additionalNotes: wizardData.additionalNotes,
+                  status:          wizardData.status,
+                };
 
-      case 'property-type-selection':
-        return (
-          <PropertyTypeSelection
-            selectedType={propertySetupData.propertyType}
-            onTypeSelect={(type) => updatePropertySetupData({ propertyType: type })}
-            onNext={() => navigateToScreen('property-details-selection')}
-            onBack={() => navigateToScreen('property-setup-step1')}
-            onHome={() => navigateToScreen('main-app')}
-            onPropertySetup={() => navigateToScreen('property-setup-step1')}
-          />
-        );
+                // 1. Upload images
+                let uploadedPhotos: PropertyPhoto[] = [];
+                if (syncedSetupData.imageFiles.length > 0) {
+                  uploadedPhotos = await uploadPropertyImages(syncedSetupData.imageFiles);
+                  if (uploadedPhotos.length === 0) {
+                    throw new Error(
+                      `Image upload failed — none of the ${syncedSetupData.imageFiles.length} photo(s) could be uploaded. ` +
+                      `Please check your connection and try again.`
+                    );
+                  }
+                }
 
-      case 'property-details-selection':
-        return (
-          <PropertyDetailsSelection
-            propertyDetails={propertySetupData.propertyDetails}
-            onPropertyDetailsChange={updatePropertyDetails}
-            onNext={() => navigateToScreen('amenities-selection')}
-            onBack={() => navigateToScreen('property-type-selection')}
-            onHome={() => navigateToScreen('main-app')}
-            onPropertySetup={() => navigateToScreen('property-setup-step1')}
-          />
-        );
+                // 2. Upload documents
+                let uploadedDocuments: PropertyDocument[] = [];
+                if (syncedSetupData.propertyDetails.uploadedDocuments.length > 0) {
+                  uploadedDocuments = await uploadPropertyDocuments(syncedSetupData.propertyDetails.uploadedDocuments);
+                }
 
-      case 'amenities-selection':
-        return (
-          <AmenitiesSelection
-            selectedAmenities={propertySetupData.amenities}
-            onAmenitiesChange={(amenities) => updatePropertySetupData({ amenities })}
-            onNext={() => navigateToScreen('images-notes-selection')}
-            onBack={() => navigateToScreen('property-details-selection')}
-            onHome={() => navigateToScreen('main-app')}
-            onPropertySetup={() => navigateToScreen('property-setup-step1')}
-          />
-        );
+                // 3. Build property object from wizard data
+                const bedrooms     = parseInt(syncedSetupData.propertyDetails.bedrooms) || 1;
+                const bathrooms    = parseInt(syncedSetupData.propertyDetails.bathrooms);
+                const squareFootage= parseInt(syncedSetupData.propertyDetails.squareFootage);
+                const rent         = parseInt(syncedSetupData.propertyDetails.monthlyRent) || 0;
 
-      case 'images-notes-selection':
-        return (
-          <ImagesAndNotesSelection
-            uploadedImages={propertySetupData.images}
-            imageFiles={propertySetupData.imageFiles}
-            additionalNotes={propertySetupData.additionalNotes}
-            onImagesChange={(images, imageFiles) => updatePropertySetupData({ images, imageFiles })}
-            onNotesChange={(notes) => updatePropertySetupData({ additionalNotes: notes })}
-            onNext={() => navigateToScreen('property-preview')}
-            onBack={() => navigateToScreen('amenities-selection')}
-            onHome={() => navigateToScreen('main-app')}
-            onPropertySetup={() => navigateToScreen('property-setup-step1')}
+                const preservedStatus = syncedSetupData.status
+                  || (isEditing && selectedProperty ? selectedProperty.status : undefined)
+                  || 'vacant';
+
+                const newProperty: Property = {
+                  id: 'setup-property',
+                  address:    syncedSetupData.propertyDetails.address,
+                  type:       syncedSetupData.propertyType || 'Property',
+                  bedrooms,
+                  rent,
+                  status:     preservedStatus,
+                  amenities:  syncedSetupData.amenities,
+                  notes:      syncedSetupData.additionalNotes,
+                  photos:     [],
+                  documents:  [],
+                  createdAt:  new Date(),
+                  ...(isNaN(bathrooms)     ? {} : { bathrooms }),
+                  ...(isNaN(squareFootage) ? {} : { squareFootage }),
+                } as any;
+
+                // 4. Resolve photos (blob: → permanent URL)
+                let finalPhotos: PropertyPhoto[] = [];
+                let uploadIdx = 0;
+                for (let i = 0; i < syncedSetupData.images.length; i++) {
+                  const imgUrl = syncedSetupData.images[i];
+                  if (!imgUrl) continue;
+                  if (!imgUrl.startsWith('blob:')) {
+                    const existing = (selectedProperty?.photos || []).find(p => p.url === imgUrl);
+                    finalPhotos.push({
+                      id:       existing?.id || `photo-${Date.now()}-${i}`,
+                      url:      imgUrl,
+                      filename: existing?.filename || `property-photo-${i + 1}.jpg`,
+                      isCover:  finalPhotos.length === 0,
+                      room:     existing?.room ?? (finalPhotos.length === 0 ? 'Exterior' : undefined),
+                    });
+                  } else if (uploadIdx < uploadedPhotos.length) {
+                    finalPhotos.push({
+                      ...uploadedPhotos[uploadIdx],
+                      isCover: finalPhotos.length === 0,
+                      room:    finalPhotos.length === 0 ? 'Exterior' : uploadedPhotos[uploadIdx].room,
+                    });
+                    uploadIdx++;
+                  }
+                }
+                while (uploadIdx < uploadedPhotos.length) {
+                  finalPhotos.push({ ...uploadedPhotos[uploadIdx], isCover: finalPhotos.length === 0 });
+                  uploadIdx++;
+                }
+                if (finalPhotos.length === 0 && uploadedPhotos.length > 0) finalPhotos = uploadedPhotos;
+                if (finalPhotos.length === 0 && isEditing && selectedProperty?.photos) {
+                  finalPhotos = selectedProperty.photos.filter(p => p.url && !p.url.startsWith('blob:'));
+                }
+                newProperty.photos = finalPhotos;
+
+                // 5. Resolve documents
+                let finalDocuments: PropertyDocument[] = uploadedDocuments;
+                if (isEditing && selectedProperty?.documents?.length) {
+                  finalDocuments = [...selectedProperty.documents, ...uploadedDocuments];
+                }
+                newProperty.documents = finalDocuments;
+
+                if (isEditing && editingPropertyId) {
+                  const originalProperty = await propertyService.getProperty(editingPropertyId);
+                  const cleanUpdates = Object.fromEntries(
+                    Object.entries({
+                      address:     newProperty.address,
+                      type:        newProperty.type,
+                      bedrooms:    newProperty.bedrooms,
+                      bathrooms:   (newProperty as any).bathrooms,
+                      squareFootage: (newProperty as any).squareFootage,
+                      rent:        newProperty.rent,
+                      amenities:   newProperty.amenities,
+                      notes:       newProperty.notes,
+                      status:      originalProperty?.status || preservedStatus,
+                      photos:      newProperty.photos,
+                      documents:   newProperty.documents,
+                    }).filter(([, v]) => v !== undefined)
+                  ) as any;
+
+                  await propertyService.updateProperty(editingPropertyId, cleanUpdates);
+                  const updated = await propertyService.getProperty(editingPropertyId);
+                  if (updated) {
+                    const tenantForProperty = tenants.find(t => t.propertyId === editingPropertyId || t.id === updated.tenantId);
+                    const finalStatus = tenantForProperty ? 'occupied' : (updated.status || preservedStatus);
+                    const enriched = { ...updated, status: finalStatus, tenant: tenantForProperty || updated.tenant, tenantId: tenantForProperty?.id || updated.tenantId };
+                    setSelectedProperty(enriched);
+                    setProperties(prev => prev.map(p => p.id === editingPropertyId ? enriched : p));
+                    const currentUserId = getCurrentUserId();
+                    if (currentUserId) alertService.generateAlerts(currentUserId).catch(() => {});
+                  }
+                  setIsEditing(false);
+                  setEditingPropertyId(null);
+                  navigateToScreen('property-details');
+                } else {
+                  const normAddr = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+                  const dupe = properties.find(p => normAddr(p.address) === normAddr(newProperty.address));
+                  if (dupe) throw new Error(`A property at "${newProperty.address}" already exists. Use Edit to update it.`);
+
+                  const propertyId = await addProperty(newProperty);
+
+                  // Update any pending tenants
+                  if (propertySetupData.pendingTenants?.length) {
+                    try {
+                      const { tenantService: ts } = await import('./services/tenantService');
+                      const currentUserId = getCurrentUserId();
+                      if (currentUserId) {
+                        const allT = await ts.getTenants(currentUserId);
+                        for (const t of allT.filter(t => t.propertyAddress === newProperty.address && (!t.propertyId || t.propertyId === 'setup-property'))) {
+                          await ts.updateTenant(t.id, { propertyId, propertyAddress: newProperty.address } as Partial<Tenant>);
+                        }
+                      }
+                    } catch { /* non-fatal */ }
+                  }
+
+                  const created = await propertyService.getProperty(propertyId);
+                  if (!created) throw new Error('Property was saved but could not be verified. Please check your properties list.');
+                  selectProperty(created);
+                  setProperties(prev => prev.some(p => p.id === created.id) ? prev.map(p => p.id === created.id ? created : p) : [...prev, created]);
+                  navigateToScreen('property-details');
+                  trackEvent('landlord_property_saved', { is_edit: false, property_id: propertyId });
+                }
+              } catch (err) {
+                setIsPublishing(false);
+                throw err; // Let wizard show the error banner
+              }
+              setIsPublishing(false);
+            }}
           />
         );
 
@@ -3023,286 +3172,10 @@ export function AppContent() {
 
 
       case 'property-preview':
-        console.log('Rendering PropertyPreview component with setup data:', propertySetupData);
-        return (
-          <PropertyPreview
-            property={createPropertyFromSetupData()}
-            isEditing={isEditing}
-            isPublishing={isPublishing}
-            onBack={() => navigateToScreen('images-notes-selection')}
-            onEdit={() => navigateToScreen('property-type-selection')}
-            onManageDocuments={() => { }}
-            onManagePhotos={() => { }}
-            updateProperty={() => { }}
-            onHome={() => navigateToScreen('main-app')}
-            onPropertySetup={() => navigateToScreen('property-setup-step1')}
-            onPublishProperty={async () => {
-              // Guest user – ask them to sign up before saving to Firebase
-              if (!userProfile) {
-                window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'publish' } }, '*');
-                return;
-              }
-              
-              setIsPublishing(true);
-              try {
-                console.log(isEditing ? '💾 Saving property changes...' : '📤 Publishing property...');
-                console.log('Property setup data:', {
-                  imageFilesCount: propertySetupData.imageFiles.length,
-                  imagesCount: propertySetupData.images.length
-                });
-
-                // 1. Upload images to storage via the v2-backend
-                let uploadedPhotos: PropertyPhoto[] = [];
-                if (propertySetupData.imageFiles.length > 0) {
-                  console.log(`Uploading ${propertySetupData.imageFiles.length} image(s)...`);
-                  uploadedPhotos = await uploadPropertyImages(propertySetupData.imageFiles);
-                  console.log('Uploaded photos:', uploadedPhotos.length);
-
-                  // If we had files to upload but got nothing back, abort before saving
-                  // a property with an empty photos array.
-                  if (uploadedPhotos.length === 0) {
-                    throw new Error(
-                      `Image upload failed — none of the ${propertySetupData.imageFiles.length} photo(s) could be uploaded. ` +
-                      `Please check your connection and try again.`
-                    );
-                  }
-                } else {
-                  console.warn('No image files to upload');
-                }
-
-                // 2. Upload documents to Firebase Storage
-                let uploadedDocuments: PropertyDocument[] = [];
-                if (propertySetupData.propertyDetails.uploadedDocuments.length > 0) {
-                  console.log('Uploading property documents...');
-                  uploadedDocuments = await uploadPropertyDocuments(propertySetupData.propertyDetails.uploadedDocuments);
-                  console.log('Uploaded documents:', uploadedDocuments);
-                }
-
-                // 3. Convert setup data to property
-                const newProperty = createPropertyFromSetupData();
-
-                // 4. Resolve photos:
-                //    - blob: URLs → replace with the corresponding uploaded permanent URL
-                //    - permanent URLs (on edit) → keep as-is
-                let finalPhotos: PropertyPhoto[] = [];
-                let uploadIdx = 0;
-
-                for (let i = 0; i < propertySetupData.images.length; i++) {
-                  const imgUrl = propertySetupData.images[i];
-                  if (!imgUrl) continue;
-
-                  if (!imgUrl.startsWith('blob:')) {
-                    // Existing permanent URL (edit mode) — preserve it
-                    const existing = (selectedProperty?.photos || []).find(p => p.url === imgUrl);
-                    finalPhotos.push({
-                      id: existing?.id || `photo-${Date.now()}-${i}`,
-                      url: imgUrl,
-                      filename: existing?.filename || `property-photo-${i + 1}.jpg`,
-                      isCover: finalPhotos.length === 0,
-                      room: existing?.room ?? (finalPhotos.length === 0 ? 'Exterior' : undefined)
-                    });
-                  } else {
-                    // Blob URL → swap in the uploaded permanent URL
-                    if (uploadIdx < uploadedPhotos.length) {
-                      finalPhotos.push({
-                        ...uploadedPhotos[uploadIdx],
-                        isCover: finalPhotos.length === 0,
-                        room: finalPhotos.length === 0 ? 'Exterior' : uploadedPhotos[uploadIdx].room
-                      });
-                      uploadIdx++;
-                    }
-                    // If upload count < blob count (partial failure), silently skip —
-                    // the hard abort above already prevented a total-zero scenario.
-                  }
-                }
-
-                // Append any extra uploaded photos (e.g. parallel uploads arrived out of order)
-                while (uploadIdx < uploadedPhotos.length) {
-                  finalPhotos.push({
-                    ...uploadedPhotos[uploadIdx],
-                    isCover: finalPhotos.length === 0
-                  });
-                  uploadIdx++;
-                }
-
-                // Last-resort guards
-                if (finalPhotos.length === 0 && uploadedPhotos.length > 0) {
-                  finalPhotos = uploadedPhotos;
-                }
-                if (finalPhotos.length === 0 && isEditing && selectedProperty?.photos) {
-                  finalPhotos = selectedProperty.photos.filter(p => p.url && !p.url.startsWith('blob:'));
-                }
-
-                newProperty.photos = finalPhotos;
-
-                // Resolve documents
-                let finalDocuments: PropertyDocument[] = uploadedDocuments;
-                if (isEditing && selectedProperty?.documents && selectedProperty.documents.length > 0) {
-                  finalDocuments = [...selectedProperty.documents, ...uploadedDocuments];
-                }
-                newProperty.documents = finalDocuments;
-
-                if (isEditing && editingPropertyId) {
-                  // Fetch the original property to preserve status and other important fields
-                  const originalProperty = await propertyService.getProperty(editingPropertyId);
-                  const preservedStatus = originalProperty?.status || selectedProperty?.status || 'vacant';
-
-                  // Prepare updates object with all changes, including photos and documents
-                  const updates = {
-                    address: newProperty.address,
-                    type: newProperty.type,
-                    bedrooms: newProperty.bedrooms,
-                    bathrooms: newProperty.bathrooms,
-                    squareFootage: newProperty.squareFootage,
-                    rent: newProperty.rent,
-                    amenities: newProperty.amenities,
-                    notes: newProperty.notes,
-                    status: preservedStatus, // Preserve the original status from database
-                    photos: newProperty.photos,
-                    documents: newProperty.documents,
-                  };
-
-                  // Filter out undefined values - Firestore doesn't accept undefined
-                  const cleanUpdates = Object.fromEntries(
-                    Object.entries(updates).filter(([_, value]) => value !== undefined)
-                  ) as any;
-
-                  await propertyService.updateProperty(editingPropertyId, cleanUpdates);
-
-                  // Fetch the updated property from Firebase to get the latest data with proper mapping
-                  const updated = await propertyService.getProperty(editingPropertyId);
-                  if (updated) {
-                    // Enrich property with tenant data if tenant exists (similar to selectProperty)
-                    const tenantForProperty = tenants.find(t => t.propertyId === editingPropertyId || t.id === updated.tenantId);
-
-                    // Determine the correct status:
-                    // 1. If property has a tenant, it should be 'occupied'
-                    // 2. Otherwise, use the preserved status from the original property
-                    let finalStatus = preservedStatus;
-                    if (tenantForProperty) {
-                      finalStatus = 'occupied';
-                    } else if (updated.status) {
-                      // Use the status from the database if no tenant
-                      finalStatus = updated.status;
-                    }
-
-                    // Build the complete property object with tenant and correct status
-                    const propertyWithPreservedStatus = {
-                      ...updated,
-                      status: finalStatus,
-                      tenant: tenantForProperty || updated.tenant,
-                      tenantId: tenantForProperty?.id || updated.tenantId
-                    };
-
-                    // Update both selectedProperty and properties array with fetched data
-                    // This ensures we have the complete, properly mapped property object
-                    setSelectedProperty(propertyWithPreservedStatus);
-                    setProperties(prev =>
-                      prev.map(p => p.id === editingPropertyId ? propertyWithPreservedStatus : p)
-                    );
-
-                    console.log('✅ Property updated successfully:', {
-                      id: editingPropertyId,
-                      status: propertyWithPreservedStatus.status,
-                      address: propertyWithPreservedStatus.address,
-                      hasTenant: !!tenantForProperty
-                    });
-
-                    // Trigger alert regeneration after property update
-                    const currentUserId = getCurrentUserId();
-                    if (currentUserId) {
-                      console.log('🔄 Triggering alert regeneration after property update');
-                      alertService.generateAlerts(currentUserId).catch(error => {
-                        console.warn('⚠️ Failed to regenerate alerts after property update:', error);
-                      });
-                    }
-                  } else {
-                    console.error('❌ Failed to fetch updated property after save');
-                  }
-
-                  setIsEditing(false);
-                  setEditingPropertyId(null);
-                  navigateToScreen('property-details');
-                } else {
-                  console.log('Creating property with photos:', newProperty.photos.length);
-                  console.log('Property photos data:', JSON.stringify(newProperty.photos, null, 2));
-
-                  // 4. Create property in Firebase — check for duplicate address first
-                  const normAddr = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
-                  const addressDuplicate = properties.find(
-                    p => normAddr(p.address) === normAddr(newProperty.address)
-                  );
-                  if (addressDuplicate) {
-                    throw new Error(
-                      `A property at "${newProperty.address}" already exists in your portfolio. ` +
-                      `Use Edit to update it, or change the address if this is a different property.`
-                    );
-                  }
-                  const propertyId = await addProperty(newProperty);
-                  console.log('Property created with ID:', propertyId);
-
-                  // 5. Update pending tenants with the correct propertyId
-                  if (propertySetupData.pendingTenants && propertySetupData.pendingTenants.length > 0) {
-                    console.log(`Updating ${propertySetupData.pendingTenants.length} pending tenant(s) with propertyId:`, propertyId);
-                    try {
-                      const { tenantService } = await import('./services/tenantService');
-                      // Find tenants that were saved but need propertyId update
-                      // Note: This assumes tenants were saved with a temporary propertyId or address match
-                      const currentUserId = getCurrentUserId();
-                      if (currentUserId) {
-                        // Get all tenants for this user and update those matching the property address
-                        const allTenants = await tenantService.getTenants(currentUserId);
-                        const propertyAddress = newProperty.address;
-                        const tenantsToUpdate = allTenants.filter(t =>
-                          t.propertyAddress === propertyAddress &&
-                          (!t.propertyId || t.propertyId === 'setup-property' || t.propertyId === 'pending')
-                        );
-
-                        for (const tenant of tenantsToUpdate) {
-                          await tenantService.updateTenant(tenant.id, {
-                            propertyId: propertyId,
-                            propertyAddress: propertyAddress
-                          } as Partial<Tenant>);
-                          console.log(`✅ Updated tenant ${tenant.id} with propertyId ${propertyId}`);
-                        }
-                      }
-                    } catch (error) {
-                      console.error('Error updating pending tenants:', error);
-                      // Don't block property creation if tenant update fails
-                    }
-                  }
-
-                  // 6. Fetch created property from DB
-                  const createdProperty = await propertyService.getProperty(propertyId);
-                  if (!createdProperty) {
-                    throw new Error('Property was created but could not be verified in the database. Please check your properties list.');
-                  }
-
-                  selectProperty(createdProperty);
-                  setProperties(prev => {
-                    const exists = prev.some(p => p.id === createdProperty!.id);
-                    return exists ? prev.map(p => p.id === createdProperty!.id ? createdProperty! : p) : [...prev, createdProperty!];
-                  });
-                  navigateToScreen('property-details');
-                  trackEvent('landlord_property_saved', {
-                    is_edit: false,
-                    property_id: propertyId
-                  });
-                }
-              } catch (error) {
-                console.error('Error publishing property:', error);
-                alert(`Failed to publish property: ${error instanceof Error ? error.message : 'Unknown error'}`);
-              } finally {
-                setIsPublishing(false);
-              }
-            }}
-            onAddTenant={() => {
-              trackEvent('landlord_add_tenant_clicked', { source: 'property_preview' });
-              setPreviousScreen('property-preview');
-              navigateToScreen('tenant-selection');
-            }}
-          />
-        );
+        // Redirect: the new AddPropertyWizard handles preview inline (Step 5).
+        // This case can be reached from sessionStorage restore — send to wizard.
+        navigateToScreen('property-setup-step1');
+        return null;
 
       case 'tenant-selection':
         return (
