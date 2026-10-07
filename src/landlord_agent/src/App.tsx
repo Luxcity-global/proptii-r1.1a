@@ -1003,25 +1003,48 @@ export function AppContent() {
   const navigateToScreen = (screen: Screen) => {
     setIsTransitioning(true);
     trackEvent('landlord_screen_navigation', { screen, from_screen: currentScreen });
-    setTimeout(() => {
-      setCurrentScreen(screen);
-      setIsTransitioning(false);
+    // State updates are batched synchronously — no setTimeout needed.
+    // The old 2ms delay caused a visible double-render: one frame with
+    // isTransitioning=true (opacity-0 scale-75) then another when setState fired,
+    // which produced the URL-changes-but-nothing-happens / dashboard-flash bug
+    // when navigating back from the property wizard.
+    setCurrentScreen(screen);
+    setIsTransitioning(false);
 
-      // Persist current screen to sessionStorage (survives reload within same tab)
+    // Persist current screen to sessionStorage (survives reload within same tab)
+    try {
+      sessionStorage.setItem('proptii_current_screen', screen);
+    } catch (e) {
+      // Ignore storage errors
+    }
+
+    // Clear selected property when navigating back to main app
+    if (screen === 'main-app') {
+      setSelectedProperty(null);
       try {
-        sessionStorage.setItem('proptii_current_screen', screen);
-      } catch (e) {
-        // Ignore storage errors
-      }
+        sessionStorage.removeItem('proptii_selected_property_id');
+      } catch (e) {}
+    }
+  };
 
-      // Clear selected property when navigating back to main app
-      if (screen === 'main-app') {
-        setSelectedProperty(null);
-        try {
-          sessionStorage.removeItem('proptii_selected_property_id');
-        } catch (e) {}
-      }
-    }, 2); // Half of the transition duration
+  /**
+   * Navigate to a main-app section atomically — sets currentScreen, navigationScreen,
+   * and clears the wizard-screen sessionStorage key in one synchronous batch.
+   * Use this instead of navigateToScreen('main-app') when you also need to control
+   * which sidebar section is active (prevents the "dashboard not found" flash).
+   */
+  const navigateToMainApp = (section: NavigationScreen) => {
+    trackEvent('landlord_screen_navigation', { screen: 'main-app', from_screen: currentScreen });
+    setCurrentScreen('main-app');
+    setNavigationScreen(section);
+    setIsTransitioning(false);
+    try {
+      // Remove the wizard screen so a page reload doesn't re-open the wizard
+      sessionStorage.removeItem('proptii_current_screen');
+      sessionStorage.removeItem('proptii_previous_screen');
+      sessionStorage.removeItem('proptii_selected_property_id');
+    } catch (e) {}
+    setSelectedProperty(null);
   };
 
   const completeOnboarding = () => {
@@ -2537,10 +2560,15 @@ export function AppContent() {
             onBack={() => {
               setIsEditing(false);
               setEditingPropertyId(null);
-              if (properties.length > 0) {
-                navigateToScreen(selectedProperty ? 'property-details' : 'main-app');
-              } else {
+              if (properties.length === 0) {
+                // No properties yet — first-time user, go back to onboarding
                 navigateToScreen('onboarding-options');
+              } else if (isEditing && selectedProperty) {
+                // Was editing an existing property — return to that property's detail view
+                navigateToScreen('property-details');
+              } else {
+                // Normal add flow — land on the Properties section, not an ambiguous 'main-app'
+                navigateToMainApp('properties');
               }
             }}
             onAddTenant={() => {
@@ -2754,8 +2782,7 @@ export function AppContent() {
       case 'tenant-details':
       case 'landlord-details': {
         if (currentScreen === 'landlord-details' && userRole !== 'agent') {
-          navigateToScreen('main-app');
-          setNavigationScreen('clients');
+          navigateToMainApp('clients');
           return null;
         }
         return (
@@ -2775,7 +2802,7 @@ export function AppContent() {
                 initialTab={clientDetailsTab}
                 onBack={() => {
                   setClientDetailsTab('overview');
-                  navigateToScreen('main-app');
+                  navigateToMainApp('clients');
                 }}
                 onEdit={(tenant) => {
                   setSelectedTenant(tenant);
@@ -2826,7 +2853,7 @@ export function AppContent() {
             {currentScreen === 'landlord-details' && userRole === 'agent' && (
               <LandlordDetails
                 landlord={selectedLandlord}
-                onBack={() => navigateToScreen('main-app')}
+                onBack={() => navigateToMainApp('clients')}
                 onEdit={(landlord) => {
                   setSelectedLandlord(landlord);
                 }}
@@ -2842,7 +2869,7 @@ export function AppContent() {
             key={selectedProperty?.id || 'property-details'}
             property={selectedProperty}
             tenants={tenants}
-            onBack={() => navigateToScreen('main-app')}
+            onBack={() => navigateToMainApp('properties')}
             onEdit={(property) => {
               // Enter editing mode and prefill setup data from the selected property
               setSelectedProperty(property);
@@ -3092,8 +3119,7 @@ export function AppContent() {
             availableProperties={properties}
             userId={resolveManagerId() || ''}
             onBack={() => {
-              setNavigationScreen('documents');
-              navigateToScreen('main-app');
+              navigateToMainApp('documents');
             }}
             onDocumentAdd={addDocumentToProperty}
             onVaultDocumentAdded={(doc) => {
@@ -3144,13 +3170,12 @@ export function AppContent() {
         return (
           <VacancyPrevention
             alert={selectedVacancyAlert!}
-            onBack={() => navigateToScreen('main-app')}
-            onInitiatePreMarketing={(alert, assets) => {
-              // Update alert status and handle pre-marketing initiation
+            onBack={() => navigateToMainApp('dashboard')}
+            onInitiatePreMarketing={(alert, _assets) => {
               setVacancyAlerts(prev =>
                 prev.map(a => a.id === alert.id ? { ...a, status: 'pre-marketing' } : a)
               );
-              navigateToScreen('main-app');
+              navigateToMainApp('dashboard');
             }}
           />
         );
@@ -3158,11 +3183,10 @@ export function AppContent() {
       case 'arrears-management':
         const tenantForArrears = tenants.find(t => t.id === selectedArrearsAlert?.tenantId);
         if (!tenantForArrears) {
-          // Fallback if tenant not found
           return (
             <div className="p-8 text-center">
               <p className="text-muted-foreground">Tenant not found</p>
-              <button onClick={() => navigateToScreen('main-app')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Go Back</button>
+              <button onClick={() => navigateToMainApp('dashboard')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Go Back</button>
             </div>
           );
         }
@@ -3170,9 +3194,8 @@ export function AppContent() {
           <ArrearsManagement
             alert={selectedArrearsAlert!}
             tenant={tenantForArrears}
-            onBack={() => navigateToScreen('main-app')}
-            onInitiateWorkflow={(workflowType, details) => {
-              // Handle workflow initiation
+            onBack={() => navigateToMainApp('dashboard')}
+            onInitiateWorkflow={(workflowType, _details) => {
               setArrearsAlerts(prev =>
                 prev.map(a => a.id === selectedArrearsAlert?.id ?
                   {
@@ -3180,7 +3203,7 @@ export function AppContent() {
                       workflowType === 'payment-plan' ? 'payment-plan' : 'legal-action'
                   } : a)
               );
-              navigateToScreen('main-app');
+              navigateToMainApp('dashboard');
             }}
           />
         );
@@ -3212,10 +3235,9 @@ export function AppContent() {
             onBack={() => {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
-                navigateToScreen('property-preview');
+                navigateToScreen('property-setup-step1');
               } else {
-                navigateToScreen('main-app');
-                setNavigationScreen('clients');
+                navigateToMainApp('clients');
               }
             }}
           />
@@ -3253,10 +3275,9 @@ export function AppContent() {
               prefillEmailRef.current = undefined;
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
-                navigateToScreen('property-preview');
+                navigateToScreen('property-setup-step1');
               } else {
-                navigateToScreen('main-app');
-                setNavigationScreen('clients');
+                navigateToMainApp('clients');
               }
             }}
           />
@@ -3266,8 +3287,7 @@ export function AppContent() {
         const tenantToEdit = editingTenantRef.current || selectedTenant;
         if (!tenantToEdit) {
           // No tenant to edit — fall back to clients
-          navigateToScreen('main-app');
-          setNavigationScreen('clients');
+          navigateToMainApp('clients');
           return null;
         }
         return (
@@ -3311,10 +3331,9 @@ export function AppContent() {
               prefillEmailRef.current = undefined;
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
-                navigateToScreen('property-preview');
+                navigateToScreen('property-setup-step1');
               } else {
-                navigateToScreen('main-app');
-                setNavigationScreen('clients');
+                navigateToMainApp('clients');
               }
             }}
           />
@@ -3330,10 +3349,9 @@ export function AppContent() {
             onSuccess={() => {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
-                navigateToScreen('property-preview');
+                navigateToScreen('property-setup-step1');
               } else {
-                navigateToScreen('main-app');
-                setNavigationScreen('clients');
+                navigateToMainApp('clients');
               }
             }}
           />
@@ -3341,23 +3359,18 @@ export function AppContent() {
 
       case 'add-landlord':
         if (userRole !== 'agent') {
-          navigateToScreen('main-app');
-          setNavigationScreen('clients');
+          navigateToMainApp('clients');
           return null;
         }
         // Use the new wizard
         return (
           <AddLandlordWizard
             userProfile={userProfile}
-            onBack={() => {
-              navigateToScreen('main-app');
-              setNavigationScreen('clients');
-            }}
+            onBack={() => navigateToMainApp('clients')}
             onSaved={(_id) => {
               // Navigate back to clients — ClientsPage's useLandlords hook will
               // re-fetch when mounted, so no extra state management needed here.
-              navigateToScreen('main-app');
-              setNavigationScreen('clients');
+              navigateToMainApp('clients');
             }}
           />
         );
@@ -3371,9 +3384,8 @@ export function AppContent() {
             userId={resolveManagerId() || ''}
             onBack={() => navigateToScreen('add-tenant')}
             onComplete={() => {
-              navigateToScreen('main-app');
-              setNavigationScreen('clients');
               setPortfolioRefreshKey(k => k + 1);
+              navigateToMainApp('clients');
             }}
           />
         );
@@ -3385,14 +3397,10 @@ export function AppContent() {
             userProfile={userProfile}
             userId={resolveManagerId() || ''}
             userEmail={userProfile?.email}
-            onBack={() => {
-              navigateToScreen('main-app');
-              setNavigationScreen('properties');
-            }}
+            onBack={() => navigateToMainApp('properties')}
             onComplete={() => {
               setPortfolioRefreshKey(k => k + 1);
-              navigateToScreen('main-app');
-              setNavigationScreen('properties');
+              navigateToMainApp('properties');
             }}
             onEnrich={(ids) => {
               importedPropertyIdsRef.current = ids;
@@ -3409,14 +3417,10 @@ export function AppContent() {
           <BulkAssignTable
             tenants={tenants}
             properties={properties}
-            onBack={() => {
-              navigateToScreen('main-app');
-              setNavigationScreen('properties');
-            }}
+            onBack={() => navigateToMainApp('properties')}
             onComplete={() => {
               setPortfolioRefreshKey(k => k + 1);
-              navigateToScreen('main-app');
-              setNavigationScreen('properties');
+              navigateToMainApp('properties');
             }}
           />
         );
@@ -3430,8 +3434,7 @@ export function AppContent() {
               if (enrichmentSourceRef.current === 'import') {
                 navigateToScreen('bulk-import-property');
               } else {
-                navigateToScreen('main-app');
-                setNavigationScreen('properties');
+                navigateToMainApp('properties');
               }
             }}
             onAddPhotos={(property) => {
@@ -3473,8 +3476,7 @@ export function AppContent() {
             onDone={() => {
               importedPropertyIdsRef.current = [];
               setPortfolioRefreshKey(k => k + 1);
-              navigateToScreen('main-app');
-              setNavigationScreen('properties');
+              navigateToMainApp('properties');
             }}
           />
         );
