@@ -17,6 +17,53 @@ async function authHeaders(): Promise<Record<string, string>> {
     };
 }
 
+function messageFromResponse(status: number, errText: string, fallback: string): string {
+    let errMsg = `${fallback} (HTTP ${status})`;
+    try {
+        const errJson = JSON.parse(errText);
+        if (errJson.message) errMsg = Array.isArray(errJson.message) ? errJson.message.join(', ') : errJson.message;
+    } catch {
+        if (errText) errMsg = errText;
+    }
+    return errMsg;
+}
+
+/** The live API rejects a property save when the account has no stored role. */
+async function ensureOwnerRole(role: 'landlord' | 'agent', userId: string): Promise<void> {
+    const headers = await authHeaders();
+    const me = await fetch(`${API_BASE}/api/auth/me`, { headers });
+    if (me.ok) {
+        const profile = await me.json().catch(() => ({}));
+        const current = profile?.role || profile?.data?.role;
+        if (current === 'landlord' || current === 'agent' || current === 'homeowner') return;
+    }
+
+    const assigned = await fetch(`${API_BASE}/api/auth/role`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ role, source: 'manual_select' }),
+    });
+    if (assigned.ok) return;
+
+    const errText = await assigned.text().catch(() => '');
+    if (assigned.status === 403) {
+        throw new Error(messageFromResponse(assigned.status, errText, 'Could not assign your account role'));
+    }
+
+    if (!userId || userId.includes('@')) {
+        throw new Error(messageFromResponse(assigned.status, errText, 'Could not assign your account role'));
+    }
+
+    const { doc, setDoc } = await import('firebase/firestore');
+    const { db } = await import('../../../config/firebaseConfig');
+    await setDoc(doc(db, 'users', userId), {
+        uid: userId,
+        role,
+        roleSource: 'manual_select',
+        roleAssignedAt: new Date().toISOString(),
+    }, { merge: true });
+}
+
 // ---------------------------------------------------------------------------
 // Shape helpers — map API response to the internal Property type
 // ---------------------------------------------------------------------------
@@ -73,8 +120,10 @@ class PropertyService {
     async createProperty(
         propertyData: Omit<Property, 'id' | 'createdAt' | 'tenant'>,
         ownerUserId: string,
-        ownerEmail?: string
+        ownerEmail?: string,
+        ownerRole: 'landlord' | 'agent' = 'landlord'
     ): Promise<string> {
+        await ensureOwnerRole(ownerRole, ownerUserId);
         const headers = await authHeaders();
         const res = await fetch(`${API_BASE}/api/native-properties`, {
             method: 'POST',
@@ -83,14 +132,7 @@ class PropertyService {
         });
         if (!res.ok) {
             const errText = await res.text().catch(() => '');
-            let errMsg = `Failed to save property to database (HTTP ${res.status})`;
-            try {
-                const errJson = JSON.parse(errText);
-                if (errJson.message) errMsg = Array.isArray(errJson.message) ? errJson.message.join(', ') : errJson.message;
-            } catch {
-                if (errText) errMsg = errText;
-            }
-            throw new Error(errMsg);
+            throw new Error(messageFromResponse(res.status, errText, 'Failed to save property to database'));
         }
         const data = await res.json();
         const propertyId = data.id || data._id;

@@ -36,7 +36,6 @@ import {
   Bar,
 } from 'recharts';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { useAnalytics, AnalyticsData } from '../hooks/useAnalytics';
 import '../styles/analyticsPage.css';
 
@@ -71,7 +70,6 @@ function trendLabel(value?: number | null): string | null {
 export function PortfolioInsights({
   properties,
   userProfile,
-  onAddProperty,
   isAuthenticated = false,
   marketInsights,
   onViewSettings,
@@ -85,17 +83,6 @@ export function PortfolioInsights({
 
   if (!isUserAuthenticated) {
     return <LandlordPageEmptyShell page="insights" variant="guest" />;
-  }
-
-  if (isNewPortfolioUser(properties)) {
-    return (
-      <LandlordPageEmptyShell
-        page="insights"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile?.name}
-      />
-    );
   }
 
   return (

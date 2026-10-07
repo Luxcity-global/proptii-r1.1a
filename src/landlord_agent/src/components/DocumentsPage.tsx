@@ -30,7 +30,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useIsMobile } from './ui/use-mobile';
 import { Property, PropertyDocument, UserProfile } from '../App';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import '../styles/documentsPage.css';
 
@@ -211,7 +210,6 @@ export function DocumentsPage({
   onArchiveDocuments,
   onExportDocuments,
   userProfile,
-  onAddProperty,
   onRefresh,
   onViewSettings,
   onViewNotifications,
@@ -503,17 +501,6 @@ export function DocumentsPage({
 
   if (!userProfile) {
     return <LandlordPageEmptyShell page="documents" variant="guest" />;
-  }
-
-  if (isNewPortfolioUser(properties)) {
-    return (
-      <LandlordPageEmptyShell
-        page="documents"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      />
-    );
   }
 
   const effectiveDisplay: DisplayStyle = isMobile && viewScope === 'all' ? 'grid' : displayStyle;

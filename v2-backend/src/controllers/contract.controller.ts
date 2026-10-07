@@ -70,8 +70,8 @@ export class ContractController {
   @ApiOperation({ summary: 'List contracts for authenticated user email' })
   @ApiResponse({ status: 200, description: 'Array of contract documents' })
   async getContracts(@Req() req: any) {
-    const email = req.user.email || '';
-    return await this.contractService.getContracts(email);
+    const email = req.user?.email || '';
+    return await this.contractService.getContracts(email, req.user?.uid);
   }
 
   @Post()
@@ -82,12 +82,21 @@ export class ContractController {
   async saveSignedContract(@Req() req: any, @Body() body: any) {
     const userId = req.user?.uid || req.user?.id || req.user?.email || 'unknown';
     const result = await this.contractService.saveSignedContract(body, userId);
+    const managerEmail = body.landlordEmail || body.agentEmail;
     this.eventsService.emit({
       type: 'contract_sent',
       userId,
-      targetEmail: body.tenantEmail || body.recipientEmail,
-      data: { contractId: result.id, title: body.title || body.contractName },
+      targetEmail: managerEmail || body.tenantEmail || body.recipientEmail,
+      data: { contractId: result.id, title: body.title || body.contractName || body.templateName },
     });
+    if (managerEmail && body.tenantEmail && managerEmail !== body.tenantEmail) {
+      this.eventsService.emit({
+        type: 'contract_sent',
+        userId,
+        targetEmail: body.tenantEmail,
+        data: { contractId: result.id, title: body.title || body.contractName || body.templateName },
+      });
+    }
     return result;
   }
 

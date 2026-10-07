@@ -1,6 +1,18 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
+function emailFromToken(decoded: any): string {
+  const identities = decoded?.firebase?.identities?.email;
+  const identityEmail = Array.isArray(identities)
+    ? identities.find((value: unknown) => typeof value === 'string' && value.includes('@'))
+    : '';
+  const preferred = typeof decoded?.preferred_username === 'string' && decoded.preferred_username.includes('@')
+    ? decoded.preferred_username
+    : '';
+  const raw = decoded?.email || identityEmail || preferred || '';
+  return typeof raw === 'string' ? raw.trim() : '';
+}
+
 function ensureFirebaseInitialized() {
   if (admin.apps.length) return;
 
@@ -117,7 +129,7 @@ export class FirebaseAuthGuard implements CanActivate {
           ...decodedToken,
           uid: decodedToken.uid,
           sub: decodedToken.uid,
-          email: decodedToken.email,
+          email: emailFromToken(decodedToken),
           // Ensure effectiveRole wins over any stale value baked into the JWT
           role: effectiveRole,
         };
@@ -174,11 +186,11 @@ export class OptionalFirebaseAuthGuard implements CanActivate {
       if (admin.apps.length) {
         const decodedToken = await admin.auth().verifyIdToken(token);
         request.user = {
+          ...decodedToken,
           uid: decodedToken.uid,
           sub: decodedToken.uid,
-          email: decodedToken.email,
+          email: emailFromToken(decodedToken),
           role: decodedToken.role || null,
-          ...decodedToken,
         };
         return true;
       }

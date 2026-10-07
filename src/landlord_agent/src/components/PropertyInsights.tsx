@@ -33,7 +33,7 @@ interface PropertyInsightsProps {
 
 export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
   const [timeframe, setTimeframe] = useState('1yr');
-  const { marketData, isLoading, error } = usePropertyMarketData(property?.id);
+  const { marketData, isLoading, error } = usePropertyMarketData(property?.id, property?.address);
 
   if (!property) {
     return (
@@ -95,7 +95,9 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
     {
       type: 'demographics',
       title: 'Target Demographic Insights',
-      description: `Area attracts young professionals (avg age ${marketData.demographics.averageAge}). Consider modern amenities.`,
+      description: marketData.demographics?.averageAge
+        ? `Area attracts young professionals (avg age ${marketData.demographics.averageAge}). Consider modern amenities.`
+        : 'Demographic detail is not included in this market response.',
       impact: 'neutral',
       confidence: 'high'
     }
@@ -365,20 +367,24 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
               <Card className="p-6">
                 <h3 className="mb-4">Area Demographics</h3>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span>Average Age</span>
-                    <span className="font-semibold">{marketData.demographics.averageAge} years</span>
-                  </div>
+                  {marketData.demographics?.averageAge ? (
+                    <div className="flex justify-between items-center">
+                      <span>Average Age</span>
+                      <span className="font-semibold">{marketData.demographics.averageAge} years</span>
+                    </div>
+                  ) : null}
                   
                   <div className="flex justify-between items-center">
                     <span>Average Income</span>
                     <span className="font-semibold">{formatCurrency(45000)}</span>
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span>Household Size</span>
-                    <span className="font-semibold">{marketData.demographics.familyHouseholds}% families</span>
-                  </div>
+                  {marketData.demographics?.familyHouseholds ? (
+                    <div className="flex justify-between items-center">
+                      <span>Household Size</span>
+                      <span className="font-semibold">{marketData.demographics.familyHouseholds}% families</span>
+                    </div>
+                  ) : null}
                   
                   <div className="flex justify-between items-center">
                     <span>Renters vs Owners</span>

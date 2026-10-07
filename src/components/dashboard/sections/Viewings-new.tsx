@@ -182,23 +182,19 @@ const Viewings: React.FC = () => {
     return map;
   }, [propertySelections]);
 
-  const getViewingImage = (viewing: ViewingBooking) => {
+  const getViewingImage = (viewing: ViewingBooking): string | null => {
+    const property = viewing.property as ViewingBooking['property'] & {
+      imageUrls?: string[];
+      photos?: Array<{ url?: string }>;
+    };
+    const ownImage = property?.imageUrls?.find((url) => url && !url.startsWith('blob:'))
+      || property?.photos?.find((photo) => photo?.url && !photo.url.startsWith('blob:'))?.url;
+    if (ownImage) return ownImage;
     if (viewing.propertyId && selectionImageByPropertyId.has(viewing.propertyId)) {
-      return selectionImageByPropertyId.get(viewing.propertyId) as string;
+      const saved = selectionImageByPropertyId.get(viewing.propertyId);
+      if (saved && !saved.startsWith('blob:')) return saved;
     }
-    const match = propertySelections.find((s) => {
-      const v = viewing.property;
-      const p = s.property?.location;
-      return (
-        !!p &&
-        v.street === p.street &&
-        v.town === p.town &&
-        v.city === p.city &&
-        v.postcode === p.postcode &&
-        s.property?.images?.length
-      );
-    });
-    return (match?.property?.images?.[0]) || '/images/detached-house.jpg';
+    return null;
   };
 
   // Load any draft viewing from sessionStorage to show an immediate placeholder
@@ -278,22 +274,28 @@ const Viewings: React.FC = () => {
 
         // Also include Book Viewing Requests as upcoming placeholders
         const requestsResult = await bookViewingRequestService.getUserRequests(user.id);
-        const requestBookings: ViewingBooking[] = (requestsResult.requests || []).map((r: BookViewingRequest) => ({
+        const requestBookings: ViewingBooking[] = (requestsResult.requests || [])
+          .filter((r: BookViewingRequest) => r.status === 'requested')
+          .map((r: BookViewingRequest) => ({
           id: `request_${r.id}`,
           userId: r.userId,
           propertyId: r.propertyId,
           property: {
-            street: r.property.street,
-            town: r.property.town,
-            city: r.property.city,
-            postcode: r.property.postcode,
-            agent: r.property.agent
+            street: r.property?.street || 'Property viewing',
+            town: r.property?.town,
+            city: r.property?.city,
+            postcode: r.property?.postcode,
+            agent: r.property?.agent || { id: '', name: '', email: '', phone: '', company: '' }
           },
           viewingDetails: {
-            date: '',
-            time: '',
-            preference: 'In-Person Viewing',
-            userDetails: { fullName: '', email: '', phoneNumber: '' }
+            date: (r as any).viewingDetails?.date || (r as any).requestedDate || '',
+            time: (r as any).viewingDetails?.time || (r as any).requestedTime || '',
+            preference: (r as any).viewingDetails?.preference || 'In-Person Viewing',
+            userDetails: {
+              fullName: (r as any).viewingDetails?.userDetails?.fullName || '',
+              email: (r as any).viewingDetails?.userDetails?.email || '',
+              phoneNumber: (r as any).viewingDetails?.userDetails?.phoneNumber || '',
+            }
           },
           status: 'pending',
           createdAt: undefined as any,
@@ -416,13 +418,22 @@ const Viewings: React.FC = () => {
           userId: r.userId,
           propertyId: r.propertyId,
           property: {
-            street: r.property.street,
-            town: r.property.town,
-            city: r.property.city,
-            postcode: r.property.postcode,
-            agent: r.property.agent
+            street: r.property?.street || (r as any).propertyTitle || 'Property viewing',
+            town: r.property?.town,
+            city: r.property?.city,
+            postcode: r.property?.postcode,
+            agent: r.property?.agent || { id: '', name: '', email: '', phone: '', company: '' }
           },
-          viewingDetails: { date: '', time: '', preference: 'In-Person Viewing', userDetails: { fullName: '', email: '', phoneNumber: '' } },
+          viewingDetails: {
+            date: (r as any).viewingDetails?.date || (r as any).requestedDate || '',
+            time: (r as any).viewingDetails?.time || (r as any).requestedTime || '',
+            preference: (r as any).viewingDetails?.preference || 'In-Person Viewing',
+            userDetails: {
+              fullName: (r as any).viewingDetails?.userDetails?.fullName || '',
+              email: (r as any).viewingDetails?.userDetails?.email || '',
+              phoneNumber: (r as any).viewingDetails?.userDetails?.phoneNumber || '',
+            }
+          },
           status: 'pending',
           createdAt: undefined as any,
           updatedAt: undefined as any
@@ -960,10 +971,12 @@ const Viewings: React.FC = () => {
     </div>
   );
 
-  const renderViewingCard = (viewing: ViewingBooking, upcoming: boolean) => (
+  const renderViewingCard = (viewing: ViewingBooking, upcoming: boolean) => {
+    const image = getViewingImage(viewing);
+    return (
     <article key={viewing.id} className="tn-vw-card">
       <div className="tn-vw-card-img">
-        <img src={getViewingImage(viewing)} alt={viewing.property.street} />
+        {image ? <img src={image} alt={viewing.property.street} /> : null}
         <span className={`tn-vw-badge ${statusClass(viewing.status)}`}>{statusLabel(viewing.status)}</span>
       </div>
       <div className="tn-vw-card-body">
@@ -985,7 +998,8 @@ const Viewings: React.FC = () => {
         {renderViewingActions(viewing, upcoming)}
       </div>
     </article>
-  );
+    );
+  };
 
   return (
     <div className="tn-vw">

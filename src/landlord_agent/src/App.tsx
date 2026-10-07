@@ -363,8 +363,13 @@ const SCREEN_TO_PATH: Record<NavigationScreen, string> = {
 
 function screenFromPathname(pathname: string): NavigationScreen | null {
   if (pathname === '/index.html') return 'dashboard';
-  // Strip '/landlord' prefix if present so that subpaths match properly
-  const normalizedPath = pathname.startsWith('/landlord') ? pathname.replace('/landlord', '') || '/' : pathname;
+  let normalizedPath = pathname.startsWith('/landlord')
+    ? pathname.slice('/landlord'.length) || '/'
+    : pathname;
+  if (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
+    normalizedPath = normalizedPath.slice(0, -1);
+  }
+  if (!normalizedPath.startsWith('/')) normalizedPath = `/${normalizedPath}`;
   return PATH_TO_NAV_SCREEN[normalizedPath] ?? null;
 }
 
@@ -409,6 +414,9 @@ export function AppContent() {
     const targetUrl = `/landlord${path === '/' ? '' : path}`;
     if (window.location.pathname !== targetUrl) {
       window.history.pushState(null, '', targetUrl);
+      // Notify React Router. pushState alone leaves the router on /landlord,
+      // so the pathname effect snaps every section back to the dashboard.
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
   }, []);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -474,7 +482,7 @@ export function AppContent() {
   // appPropertyIds via useMemo so the ref inside useTenants stays stable.
   const appUserId = resolveManagerId();
   const appPropertyIds = React.useMemo(() => properties.map(p => p.id), [properties]);
-  const { tenants } = useTenants({ userId: appUserId, propertyIds: appPropertyIds });
+  const { tenants, invalidate: invalidateTenants } = useTenants({ userId: appUserId, propertyIds: appPropertyIds });
 
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
@@ -1261,7 +1269,7 @@ export function AppContent() {
       console.log('📝 About to create property with userId:', currentUserId);
       // Get owner email from userProfile for storing in property document
       const ownerEmail = userProfile?.email || hostUser?.email;
-      const propertyId = await propertyService.createProperty(safeProperty, currentUserId, ownerEmail);
+      const propertyId = await propertyService.createProperty(safeProperty, currentUserId, ownerEmail, userRole);
 
       // Fetch the created property to get full data with timestamps
       const newProperty = await propertyService.getProperty(propertyId);
@@ -1408,14 +1416,25 @@ export function AppContent() {
 
     // POST to backend — throws on failure so success screen is never shown
     const id = await tenantService.createTenant(tenantToCreate, currentUserId);
+    const savedTenant = { ...tenantToCreate, id } as Tenant;
 
-    // Mark linked property as occupied (best-effort — don't block on failure)
+    // The properties list reads tenant name and occupancy from this state.
     if (tenant.propertyId) {
+      const occupy = (property: Property): Property =>
+        property.id === tenant.propertyId
+          ? { ...property, status: 'occupied', tenantId: id, tenant: savedTenant }
+          : property;
+
+      setProperties(prev => prev.map(occupy));
+      setSelectedProperty(prev => (prev ? occupy(prev) : prev));
+
       propertyService.updateProperty(tenant.propertyId, {
         status: 'occupied',
         tenantId: id,
-      } as any).catch(e => console.warn('Failed to mark property occupied:', e));
+      }).catch(e => console.warn('Failed to mark property occupied:', e));
     }
+
+    invalidateTenants();
 
     // Regenerate alerts after new tenant (best-effort)
     alertService.generateAlerts(currentUserId).catch(e =>
@@ -1468,7 +1487,7 @@ export function AppContent() {
         status: 'vacant' as const,
         tenantId: undefined,
       };
-      const newId = await propertyService.createProperty(duplicateData as any, currentUserId);
+      const newId = await propertyService.createProperty(duplicateData as any, currentUserId, userProfile?.email, userRole);
       const created = await propertyService.getProperty(newId);
       if (created) {
         setProperties(prev => [...prev, created]);
@@ -1613,7 +1632,7 @@ export function AppContent() {
     for (const prop of importedProperties) {
       try {
         const { id: _id, createdAt: _ca, ...rest } = prop;
-        const newId = await propertyService.createProperty(rest as any, currentUserId);
+        const newId = await propertyService.createProperty(rest as any, currentUserId, userProfile?.email, userRole);
         const saved = await propertyService.getProperty(newId);
         if (saved) created.push(saved);
       } catch (err) {

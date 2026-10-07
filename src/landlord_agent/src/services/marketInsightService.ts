@@ -34,6 +34,37 @@ export interface MarketInsight {
 }
 
 class MarketInsightService {
+  /**
+   * GET /api/insights/price-trends
+   * Rental and sale price trends for a UK postcode. Returns median rent, yield, and year-on-year change.
+   */
+  async getPriceTrends(postcode?: string): Promise<{
+    postcode?: string;
+    avgPricePerSqFt?: number;
+    yearOnYearChange?: number;
+    quarterlyChange?: number;
+    medianRent?: number;
+    rentalYield?: number;
+  } | null> {
+    const response = await apiService.get('/insights/price-trends', postcode ? { postcode } : undefined);
+    return unwrapInsightPayload(response);
+  }
+
+  /**
+   * GET /api/insights/demand
+   * Rental demand for a location: searches per property, days to rent, and a competitiveness score.
+   */
+  async getDemand(location?: string): Promise<{
+    location?: string;
+    searchesPerProperty?: number;
+    avgTimeToRent?: number;
+    competitivenessScore?: number;
+    demandTrend?: string;
+  } | null> {
+    const response = await apiService.get('/insights/demand', location ? { location } : undefined);
+    return unwrapInsightPayload(response);
+  }
+
   async getActiveInsights(userId?: string): Promise<MarketInsight[]> {
     try {
       // Backend route is GET /api/insights (not /insights/active which doesn't exist).
@@ -166,6 +197,13 @@ class MarketInsightService {
       return 0;
     }
   }
+}
+
+function unwrapInsightPayload<T>(response: { data?: unknown } | null | undefined): T | null {
+  const body = response?.data as { data?: T } | T | undefined;
+  if (!body || typeof body !== 'object') return null;
+  if ('data' in body && body.data && typeof body.data === 'object') return body.data;
+  return body as T;
 }
 
 export const marketInsightService = new MarketInsightService();

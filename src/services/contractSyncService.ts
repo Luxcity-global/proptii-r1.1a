@@ -58,11 +58,20 @@ class ContractSyncService {
   }> {
     try {
       const landlordResult = await landlordUserService.isLandlordOrAgent(landlordEmail);
-      if (!landlordResult.isLandlord || !landlordResult.user) {
-        return { success: false, error: 'Landlord user not found' };
+      const landlordUser = landlordResult.isLandlord ? landlordResult.user : undefined;
+      const recipientEmail = (landlordUser?.email || landlordEmail || '').trim().toLowerCase();
+      if (!recipientEmail.includes('@')) {
+        return { success: false, error: 'A recipient email is required' };
       }
-      
-      const landlordUser = landlordResult.user;
+
+      const alreadyThere = await this.contractExistsInLandlordDashboard(
+        signedContractData.tenantEmail,
+        signedContractData.templateName,
+        recipientEmail,
+      );
+      if (alreadyThere) {
+        return { success: true };
+      }
       
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + 365);
@@ -72,11 +81,11 @@ class ContractSyncService {
         propertyAddress: signedContractData.propertyAddress || 'N/A',
         tenantName: signedContractData.tenantName,
         tenantEmail: signedContractData.tenantEmail,
-        landlordEmail: landlordUser.email,
-        landlordId: landlordUser.id,
-        status: 'signed',
+        landlordEmail: recipientEmail,
+        landlordId: landlordUser?.id,
+        status: signedContractData.status === 'signed' ? 'signed' : 'sent',
         sentDate: new Date(),
-        signedDate: new Date(signedContractData.signedDate),
+        signedDate: signedContractData.signedDate ? new Date(signedContractData.signedDate) : undefined,
         contractType: 'tenancy-agreement',
         fileUrl: signedContractData.documentUrl || '#',
         fileName: signedContractData.documentName,
@@ -89,7 +98,8 @@ class ContractSyncService {
       };
       
       const response = await apiService.post('/contracts/landlord/sync', landlordContract);
-      return { success: true, contractId: response.id };
+      const body = (response as any)?.data ?? response;
+      return { success: true, contractId: body?.id || body?.contractId };
     } catch (error: any) {
       console.error('❌ Error syncing contract to landlord dashboard:', error);
       return { success: false, error: error.message };
@@ -133,7 +143,8 @@ class ContractSyncService {
   ): Promise<boolean> {
     try {
       const response = await apiService.get(`/contracts/landlord/exists?tenantEmail=${tenantEmail}&title=${contractName}&landlordEmail=${landlordEmail}`);
-      return response.exists;
+      const body = (response as any)?.data ?? response;
+      return Boolean(body?.exists);
     } catch (error) {
       console.error('❌ Error checking contract existence:', error);
       return false;

@@ -993,7 +993,11 @@ const DashboardHome: React.FC = () => {
                               <button
                                 type="button"
                                 className="tn-dash-alert-link"
-                                onClick={() => navigate('/dashboard/tenant-contracts')}
+                                onClick={() => navigate('/dashboard/tenant-contracts', {
+                                  state: status === 'sent' || status === 'unsigned' || status === 'delivered'
+                                    ? { signContractId: contract.id }
+                                    : undefined,
+                                })}
                               >
                                 View
                               </button>

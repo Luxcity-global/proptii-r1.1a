@@ -34,7 +34,6 @@ import { ImportPropertiesDialog } from './ImportPropertiesDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import '../styles/propertiesPage.css';
 
 interface PropertiesPageProps {
@@ -647,17 +646,6 @@ export function PropertiesPage({
 
   if (!userProfile) {
     return <LandlordPageEmptyShell page="properties" variant="guest" />;
-  }
-
-  if (!isPortfolioLoading && isNewPortfolioUser(properties)) {
-  return (
-      <LandlordPageEmptyShell
-        page="properties"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      />
-    );
   }
 
   return (

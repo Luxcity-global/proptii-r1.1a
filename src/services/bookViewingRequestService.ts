@@ -1,5 +1,6 @@
 import apiService from './api';
 import { viewingPollingCoordinator } from './viewingService';
+import { publishViewingCopy } from './viewingInboxService';
 
 export interface BookViewingRequest {
   id: string;
@@ -27,6 +28,10 @@ export interface BookViewingRequest {
 }
 
 class BookViewingRequestService {
+  private onlyRequests(items: any[]): BookViewingRequest[] {
+    return (items || []).filter((item) => item?.status === 'requested');
+  }
+
   async saveRequest(
     userId: string,
     propertyId: string,
@@ -34,9 +39,13 @@ class BookViewingRequestService {
     managerInfo?: {
       landlordId?: string | null;
       agentId?: string | null;
-    }
+    },
+    viewingDetails?: { date?: string; time?: string; preference?: string; userDetails?: { fullName?: string; email?: string; phoneNumber?: string } }
   ): Promise<{ success: boolean; requestId?: string; error?: string }> {
     try {
+      const propertyTitle = [property?.street, property?.town, property?.postcode].filter(Boolean).join(', ')
+        || property?.street
+        || '';
       const payload = {
         userId,
         propertyId,
@@ -44,12 +53,18 @@ class BookViewingRequestService {
         agentId: managerInfo?.agentId ?? property.agent?.id ?? null,
         agentEmail: property.agent?.email?.toLowerCase().trim() || null,
         property,
+        propertyTitle,
+        requestedDate: viewingDetails?.date || '',
+        requestedTime: viewingDetails?.time || '',
+        ...(viewingDetails ? { viewingDetails } : {}),
         status: 'requested'
       };
 
       const response = await apiService.post('/viewing-requests', payload);
+      const requestId = response.id || response.data?.id;
+      publishViewingCopy({ ...payload, id: requestId, status: 'requested' }).catch(() => {});
       viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
-      return { success: true, requestId: response.id || response.data?.id };
+      return { success: true, requestId };
     } catch (error: any) {
       console.error('Error saving book viewing request:', error);
       return { success: false, error: error?.message || 'Unknown error' };
@@ -58,7 +73,7 @@ class BookViewingRequestService {
 
   async getUserRequests(userId: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
     try {
-      const requests = await viewingPollingCoordinator.fetchAll();
+      const requests = this.onlyRequests(await viewingPollingCoordinator.fetchAll());
       return { success: true, requests };
     } catch (error: any) {
       console.error('Error getting book viewing requests:', error);
@@ -68,7 +83,7 @@ class BookViewingRequestService {
 
   async getManagerRequests(managerId: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
     try {
-      const requests = await viewingPollingCoordinator.fetchAll();
+      const requests = this.onlyRequests(await viewingPollingCoordinator.fetchAll());
       return { success: true, requests };
     } catch (error: any) {
       console.error('Error getting manager viewing requests:', error);
@@ -78,7 +93,7 @@ class BookViewingRequestService {
 
   async getRequestsByEmail(agentEmail: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
     try {
-      const requests = await viewingPollingCoordinator.fetchAll();
+      const requests = this.onlyRequests(await viewingPollingCoordinator.fetchAll());
       return { success: true, requests };
     } catch (error: any) {
       console.error('Error getting viewing requests by email:', error);
@@ -92,7 +107,7 @@ class BookViewingRequestService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => items as BookViewingRequest[],
+      (items) => this.onlyRequests(items),
       callback,
       onError
     );
@@ -104,7 +119,7 @@ class BookViewingRequestService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => items as BookViewingRequest[],
+      (items) => this.onlyRequests(items),
       callback,
       onError
     );
@@ -116,7 +131,7 @@ class BookViewingRequestService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => items as BookViewingRequest[],
+      (items) => this.onlyRequests(items),
       callback,
       onError
     );

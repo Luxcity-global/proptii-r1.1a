@@ -27,6 +27,9 @@ interface DocumentSigningViewerProps {
   onExport?: (format: 'docx' | 'pdf') => void;
   onSignatureMethodSelect?: () => void;
   onUseSignature?: () => void;
+  sourceContractId?: string;
+  /** When set, the caller stores the signed PDF. The tenant save path stays unchanged. */
+  onPersistSigned?: (signedPdfBytes: Uint8Array, documentUrl: string) => Promise<void>;
 }
 
 interface SignaturePlacement {
@@ -46,7 +49,9 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
   onSave,
   onExport,
   onSignatureMethodSelect,
-  onUseSignature
+  onUseSignature,
+  sourceContractId,
+  onPersistSigned,
 }) => {
   // Debug: Check if context is available
   console.log('🔍 DocumentSigningViewer - Component rendering, checking context...');
@@ -492,6 +497,13 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
         // Continue with blobUrl if upload fails, though it won't persist across sessions
       }
 
+      if (onPersistSigned) {
+        await onPersistSigned(signedPdfBytes, finalDocumentUrl);
+        alert('Contract signed.');
+        if (onSigned) onSigned(signedPdfBytes);
+        return;
+      }
+
       // Add to signed contracts context
       console.log('🔄 Adding signed contract to Firestore...');
       try {
@@ -501,15 +513,22 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
         }
         const userId = user.id;
         
+        const signerEmail = user?.email || '';
+        const recipientIsReal = Boolean(
+          recipient.email
+          && recipient.email.includes('@')
+          && recipient.email !== 'user@example.com'
+          && recipient.email !== 'agent@example.com',
+        );
         const signedContractData = {
           templateId: template.id,
           templateName: template.name,
-          propertyName: 'Sample Property',
-          propertyAddress: '123 Sample Street, Sample City, SC 12345',
-          agentName: 'Sample Agent',
-          agentEmail: 'agent@example.com',
-          tenantName: recipient.name,
-          tenantEmail: recipient.email,
+          propertyName: 'Property',
+          propertyAddress: '',
+          agentName: recipientIsReal ? recipient.name : '',
+          agentEmail: recipientIsReal ? recipient.email : '',
+          tenantName: user?.name || recipient.name,
+          tenantEmail: signerEmail || recipient.email,
           signedDate: new Date().toISOString(),
           documentUrl: finalDocumentUrl,
           documentName: `${template.name.replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`,
@@ -523,6 +542,13 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
         
         if (result.success) {
           console.log('✅ Signed contract saved to Firestore successfully:', result.contractId);
+          if (sourceContractId && sourceContractId !== result.contractId) {
+            try {
+              await signedContractsFirestoreService.updateSignedContractStatus(sourceContractId, 'signed', false);
+            } catch (statusError) {
+              console.warn('Could not mark the received contract as signed:', statusError);
+            }
+          }
           
           // Also add to local context for immediate UI update
           const newSignedContract = {

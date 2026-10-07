@@ -20,11 +20,24 @@ interface CustomizePageProps {
     fileType?: string; // Added for DOCX files
   };
   onBack: () => void;
+  recipient?: { email: string; name: string };
+  initialTab?: 'home' | 'edit' | 'send';
+  markSourceSigned?: boolean;
+  sourceContract?: {
+    id: string;
+    title?: string;
+    propertyAddress?: string;
+    tenantName?: string;
+    tenantEmail?: string;
+    landlordEmail?: string;
+    landlordId?: string;
+    contractType?: string;
+  };
 }
 
-const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onBack }) => {
+const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onBack, recipient, initialTab = 'home', markSourceSigned = false, sourceContract }) => {
   const { isDemoMode } = useOnboardingSession();
-  const [activeTab, setActiveTab] = useState<'home' | 'edit' | 'send'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'edit' | 'send'>(initialTab);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
@@ -397,10 +410,11 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
               >
                 <DocumentSigningViewer
                   template={template}
-                  recipient={{
+                  recipient={recipient || {
                     email: 'user@example.com',
                     name: 'Document Signer'
                   }}
+                  sourceContractId={markSourceSigned ? template.id : undefined}
                   onSigned={(signedBytes) => {
                     setSignedPdfBytes(signedBytes);
                   }}
@@ -417,6 +431,8 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
             {activeTab === 'send' && (
               <div className="mt-4 overflow-y-auto max-h-[calc(100vh-200px)]">
                 <SendContract
+                  initialRecipient={recipient}
+                  sourceContract={sourceContract}
                   contractData={{
                     title: template.name,
                     content: 'Contract content will be extracted here',

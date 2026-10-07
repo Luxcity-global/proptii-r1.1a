@@ -49,9 +49,18 @@ class SignedContractsFirestoreService {
         return { success: false, error: 'Device is offline.' };
       }
 
-      const response = await apiService.post('/contracts', contractData);
-      logDev('✅ Signed contract saved successfully:', response.id);
-      return { success: true, contractId: response.id };
+      const response = await apiService.post('/contracts', {
+        ...contractData,
+        landlordEmail: (contractData as { landlordEmail?: string }).landlordEmail || contractData.agentEmail,
+        title: (contractData as { title?: string }).title || contractData.templateName,
+        fileUrl: contractData.documentUrl,
+        fileName: contractData.documentName,
+      });
+      const body = response?.data ?? response;
+      const contractId = body?.id || body?.contractId;
+      if (!contractId) return { success: false, error: 'Backend did not return a contract ID' };
+      logDev('✅ Signed contract saved successfully:', contractId);
+      return { success: true, contractId };
     } catch (error: any) {
       console.error('❌ Error saving signed contract:', error);
       return { success: false, error: error.message || 'Unknown error' };
@@ -61,11 +70,18 @@ class SignedContractsFirestoreService {
   async getUserSignedContracts(userId: string): Promise<{ success: boolean; contracts?: SignedContractData[]; error?: string }> {
     try {
       const response = await apiService.get(`/contracts`);
-      // Backend returns { success, data } — map to contracts
-      const contracts = (response.data || response.contracts || []).map((c: any) => ({
+      const body = response?.data ?? response;
+      const list = Array.isArray(body)
+        ? body
+        : Array.isArray(body?.data)
+          ? body.data
+          : Array.isArray(body?.contracts)
+            ? body.contracts
+            : [];
+      const contracts = list.map((c: any) => ({
         ...c,
-        createdAt: new Date(c.createdAt),
-        updatedAt: new Date(c.updatedAt)
+        createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
+        updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
       }));
       return { success: true, contracts };
     } catch (error: any) {
@@ -76,11 +92,13 @@ class SignedContractsFirestoreService {
   async getSignedContractById(contractId: string): Promise<{ success: boolean; contract?: SignedContractData; error?: string }> {
     try {
       const response = await apiService.get(`/contracts/${contractId}`);
-      if (!response.contract) return { success: false, error: 'Contract not found' };
+      const body = response?.data ?? response;
+      const record = body?.contract || (body?.id ? body : null);
+      if (!record) return { success: false, error: 'Contract not found' };
       const contract = {
-        ...response.contract,
-        createdAt: new Date(response.contract.createdAt),
-        updatedAt: new Date(response.contract.updatedAt)
+        ...record,
+        createdAt: record.createdAt ? new Date(record.createdAt) : new Date(),
+        updatedAt: record.updatedAt ? new Date(record.updatedAt) : new Date()
       };
       return { success: true, contract };
     } catch (error: any) {
