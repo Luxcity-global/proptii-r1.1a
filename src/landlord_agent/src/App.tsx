@@ -1884,15 +1884,12 @@ export function AppContent() {
             }}
             onDeleteDocuments={async (documentIds) => {
               try {
-                // Delete unassigned vault documents from backend
+                // Delete from landlord_documents vault collection unconditionally
                 for (const id of documentIds) {
-                  const isUnassigned = unassignedDocuments.some(u => u.id === id);
-                  if (isUnassigned) {
-                    try {
-                      await documentService.deleteDocument(id);
-                    } catch (e) {
-                      console.warn('Failed to delete unassigned doc from backend:', id, e);
-                    }
+                  try {
+                    await documentService.deleteDocument(id);
+                  } catch (e) {
+                    console.warn('Doc deletion from landlord_documents (may be property-only):', id, e);
                   }
                 }
                 setUnassignedDocuments(prev => prev.filter(u => !documentIds.includes(u.id)));
@@ -1901,7 +1898,7 @@ export function AppContent() {
                 const documentsByProperty = new Map<string, string[]>();
 
                 properties.forEach(property => {
-                  property.documents.forEach(doc => {
+                  (property.documents || []).forEach(doc => {
                     if (documentIds.includes(doc.id)) {
                       if (!documentsByProperty.has(property.id)) {
                         documentsByProperty.set(property.id, []);
@@ -1917,9 +1914,9 @@ export function AppContent() {
                   if (!property) return;
 
                   // Filter out deleted documents
-                  const updatedDocuments = property.documents.filter(doc => !docIdsToDelete.includes(doc.id));
+                  const updatedDocuments = (property.documents || []).filter(doc => !docIdsToDelete.includes(doc.id));
 
-                  // Update property — pass plain Date objects, no Firestore Timestamp needed
+                  // Update property
                   await propertyService.updateProperty(propertyId, {
                     documents: updatedDocuments.map(doc => ({
                       id: doc.id,
@@ -1927,7 +1924,7 @@ export function AppContent() {
                       type: doc.type,
                       url: doc.url,
                       issueDate: doc.issueDate instanceof Date ? doc.issueDate.toISOString() : doc.issueDate,
-                      expiryDate: doc.expiryDate instanceof Date ? doc.expiryDate.toISOString() : (doc.expiryDate ?? undefined),
+                      expiryDate: doc.expiryDate instanceof Date ? doc.expiryDate.toISOString() : (doc.expiryDate ?? null),
                       status: doc.status
                     })) as any
                   });
@@ -2891,12 +2888,18 @@ export function AppContent() {
             onDocumentDelete={async (propertyId, documentId) => {
               const prop = properties.find(p => p.id === propertyId);
               if (!prop) return;
-              const updatedDocs = prop.documents.filter(d => d.id !== documentId);
+              const updatedDocs = (prop.documents || []).filter(d => d.id !== documentId);
+
+              // Also delete from landlord_documents if it exists there
+              try {
+                await documentService.deleteDocument(documentId);
+              } catch {}
+
               await propertyService.updateProperty(propertyId, {
                 documents: updatedDocs.map(d => ({
                   id: d.id, name: d.name, type: d.type, url: d.url,
                   issueDate: d.issueDate instanceof Date ? d.issueDate.toISOString() : d.issueDate,
-                  expiryDate: d.expiryDate instanceof Date ? d.expiryDate.toISOString() : (d.expiryDate ?? undefined),
+                  expiryDate: d.expiryDate instanceof Date ? d.expiryDate.toISOString() : (d.expiryDate ?? null),
                   status: d.status,
                 })) as any,
               });

@@ -1,6 +1,55 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
+function isPropertyAuthorized(existing: any, userId?: string, userEmail?: string): boolean {
+  if (!existing) return false;
+
+  const uid = (userId || '').trim();
+  const email = (userEmail || '').trim().toLowerCase();
+
+  // 1. Direct UID matching across UID-like fields
+  if (uid) {
+    if (existing.userId && String(existing.userId).trim() === uid) return true;
+    if (existing.landlordId && String(existing.landlordId).trim() === uid) return true;
+    if (existing.ownerId && String(existing.ownerId).trim() === uid) return true;
+  }
+
+  // 2. Direct Email matching across all potential email/user fields
+  if (email) {
+    const candidateEmails = [
+      existing.ownerEmail,
+      existing.landlordEmail,
+      existing.email,
+      existing.userEmail,
+      existing.userId,     // often saved as email
+      existing.landlordId, // often saved as email
+    ]
+      .filter(Boolean)
+      .map(e => String(e).trim().toLowerCase());
+
+    if (candidateEmails.includes(email)) return true;
+  }
+
+  // 3. Reverse UID match if UID passed is an email
+  if (uid && uid.includes('@')) {
+    const uidEmail = uid.toLowerCase();
+    const candidateEmails = [
+      existing.ownerEmail,
+      existing.landlordEmail,
+      existing.email,
+      existing.userEmail,
+      existing.userId,
+      existing.landlordId,
+    ]
+      .filter(Boolean)
+      .map(e => String(e).trim().toLowerCase());
+
+    if (candidateEmails.includes(uidEmail)) return true;
+  }
+
+  return false;
+}
+
 @Injectable()
 export class NativePropertiesService {
   private get db() {
@@ -48,13 +97,31 @@ export class NativePropertiesService {
 
     try {
       const docMap = new Map<string, any>();
-      if (userId) {
-        const snap1 = await col.where('userId', '==', userId).get();
-        snap1.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+      const uid = (userId || '').trim();
+      const mail = (email || '').trim().toLowerCase();
+
+      if (uid) {
+        const [snap1, snap2] = await Promise.all([
+          col.where('userId', '==', uid).get().catch(() => ({ docs: [] })),
+          col.where('landlordId', '==', uid).get().catch(() => ({ docs: [] })),
+        ]);
+        snap1.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        snap2.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
       }
-      if (email) {
-        const snap2 = await col.where('ownerEmail', '==', email.toLowerCase().trim()).get();
-        snap2.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+
+      if (mail) {
+        const [s3, s4, s5, s6, s7] = await Promise.all([
+          col.where('ownerEmail', '==', mail).get().catch(() => ({ docs: [] })),
+          col.where('landlordEmail', '==', mail).get().catch(() => ({ docs: [] })),
+          col.where('email', '==', mail).get().catch(() => ({ docs: [] })),
+          col.where('userId', '==', mail).get().catch(() => ({ docs: [] })),
+          col.where('landlordId', '==', mail).get().catch(() => ({ docs: [] })),
+        ]);
+        s3.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        s4.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        s5.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        s6.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        s7.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
       }
 
       return Array.from(docMap.values());
@@ -116,20 +183,15 @@ export class NativePropertiesService {
     }
 
     const existing = doc.data();
-    const normalizedOwnerEmail = (existing?.ownerEmail || '').toLowerCase().trim();
-    const normalizedUserEmail = (userEmail || '').toLowerCase().trim();
-
-    const isOwner =
-      existing?.userId === userId ||
-      existing?.landlordId === userId ||
-      (normalizedOwnerEmail && normalizedOwnerEmail === normalizedUserEmail);
-
-    if (!isOwner) {
+    if (!isPropertyAuthorized(existing, userId, userEmail)) {
       throw new NotFoundException('Property not found or unauthorized');
     }
 
+    // Clean undefined values to prevent Firestore driver errors
+    const cleanedData = JSON.parse(JSON.stringify(data, (key, value) => value === undefined ? null : value));
+
     const updatedData = {
-      ...data,
+      ...cleanedData,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     await docRef.update(updatedData);
@@ -149,19 +211,27 @@ export class NativePropertiesService {
     }
 
     const existing = doc.data();
-    const normalizedOwnerEmail = (existing?.ownerEmail || '').toLowerCase().trim();
-    const normalizedUserEmail = (userEmail || '').toLowerCase().trim();
-
-    const isOwner =
-      existing?.userId === userId ||
-      existing?.landlordId === userId ||
-      (normalizedOwnerEmail && normalizedOwnerEmail === normalizedUserEmail);
-
-    if (!isOwner) {
+    if (!isPropertyAuthorized(existing, userId, userEmail)) {
       throw new NotFoundException('Property not found or unauthorized');
     }
 
     await docRef.delete();
+
+    // If documents were assigned to this property in landlord_documents, unassign them
+    try {
+      const db = this.db;
+      if (db) {
+        const snap = await db.collection('landlord_documents').where('propertyId', '==', id).get();
+        if (!snap.empty) {
+          const batch = db.batch();
+          snap.docs.forEach(d => {
+            batch.update(d.ref, { propertyId: null, updatedAt: new Date().toISOString() });
+          });
+          await batch.commit();
+        }
+      }
+    } catch {}
+
     return { success: true };
   }
 }

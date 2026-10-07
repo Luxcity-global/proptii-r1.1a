@@ -49,6 +49,54 @@ function cleanDoc(doc: any): LandlordDocument {
   };
 }
 
+function isDocumentAuthorized(data: any, landlordId?: string, userEmail?: string): boolean {
+  if (!data) return false;
+  const uid = (landlordId || '').trim();
+  const email = (userEmail || '').trim().toLowerCase();
+
+  // 1. Direct UID matching across UID fields
+  if (uid) {
+    if (data.landlordId && String(data.landlordId).trim() === uid) return true;
+    if (data.userId && String(data.userId).trim() === uid) return true;
+    if (data.ownerId && String(data.ownerId).trim() === uid) return true;
+  }
+
+  // 2. Direct Email matching across all potential email fields
+  if (email) {
+    const candidateEmails = [
+      data.landlordEmail,
+      data.ownerEmail,
+      data.email,
+      data.userEmail,
+      data.landlordId, // could be saved as email
+      data.userId,     // could be saved as email
+    ]
+      .filter(Boolean)
+      .map(e => String(e).trim().toLowerCase());
+
+    if (candidateEmails.includes(email)) return true;
+  }
+
+  // 3. Reverse UID match if UID passed is an email
+  if (uid && uid.includes('@')) {
+    const uidEmail = uid.toLowerCase();
+    const candidateEmails = [
+      data.landlordEmail,
+      data.ownerEmail,
+      data.email,
+      data.userEmail,
+      data.landlordId,
+      data.userId,
+    ]
+      .filter(Boolean)
+      .map(e => String(e).trim().toLowerCase());
+
+    if (candidateEmails.includes(uidEmail)) return true;
+  }
+
+  return false;
+}
+
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
@@ -93,24 +141,33 @@ export class DocumentsService {
 
   async getDocuments(landlordId: string, propertyId?: string | 'unassigned', userEmail?: string): Promise<LandlordDocument[]> {
     const db = this.db();
-    const snap = await db.collection(this.col).where('landlordId', '==', landlordId).get();
-    let docs = snap.docs.map(d => cleanDoc({ id: d.id, ...d.data() }));
+    const docMap = new Map<string, LandlordDocument>();
+    const uid = (landlordId || '').trim();
+    const mail = (userEmail || '').trim().toLowerCase();
 
-    if (userEmail && userEmail !== landlordId) {
-      try {
-        const emailSnap = await db.collection(this.col).where('landlordId', '==', userEmail).get();
-        const emailDocs = emailSnap.docs.map(d => cleanDoc({ id: d.id, ...d.data() }));
-        const seenIds = new Set(docs.map(d => d.id));
-        for (const ed of emailDocs) {
-          if (!seenIds.has(ed.id)) {
-            docs.push(ed);
-          }
-        }
-      } catch (err: any) {
-        this.logger.warn(`Failed fallback query by userEmail: ${err?.message}`);
-      }
+    if (uid) {
+      const [s1, s2] = await Promise.all([
+        db.collection(this.col).where('landlordId', '==', uid).get().catch(() => ({ docs: [] })),
+        db.collection(this.col).where('userId', '==', uid).get().catch(() => ({ docs: [] })),
+      ]);
+      s1.docs.forEach(d => docMap.set(d.id, cleanDoc({ id: d.id, ...d.data() })));
+      s2.docs.forEach(d => docMap.set(d.id, cleanDoc({ id: d.id, ...d.data() })));
     }
 
+    if (mail) {
+      const [s3, s4, s5, s6] = await Promise.all([
+        db.collection(this.col).where('landlordId', '==', mail).get().catch(() => ({ docs: [] })),
+        db.collection(this.col).where('ownerEmail', '==', mail).get().catch(() => ({ docs: [] })),
+        db.collection(this.col).where('landlordEmail', '==', mail).get().catch(() => ({ docs: [] })),
+        db.collection(this.col).where('email', '==', mail).get().catch(() => ({ docs: [] })),
+      ]);
+      s3.docs.forEach(d => docMap.set(d.id, cleanDoc({ id: d.id, ...d.data() })));
+      s4.docs.forEach(d => docMap.set(d.id, cleanDoc({ id: d.id, ...d.data() })));
+      s5.docs.forEach(d => docMap.set(d.id, cleanDoc({ id: d.id, ...d.data() })));
+      s6.docs.forEach(d => docMap.set(d.id, cleanDoc({ id: d.id, ...d.data() })));
+    }
+
+    let docs = Array.from(docMap.values());
     if (propertyId === 'unassigned') {
       docs = docs.filter(d => !d.propertyId);
     } else if (propertyId) {
@@ -128,11 +185,9 @@ export class DocumentsService {
     const snap = await ref.get();
     if (!snap.exists) throw new Error('Document not found');
     const data = snap.data()!;
-    const isOwner =
-      data.landlordId === landlordId ||
-      (userEmail && data.landlordId === userEmail) ||
-      (data.landlordId && landlordId && String(data.landlordId).toLowerCase() === String(landlordId).toLowerCase());
-    if (!isOwner) throw new Error('Forbidden');
+    if (!isDocumentAuthorized(data, landlordId, userEmail)) {
+      throw new Error('Forbidden');
+    }
     const update = {
       propertyId: propertyId ?? null,
       updatedAt: new Date().toISOString(),
@@ -179,20 +234,21 @@ export class DocumentsService {
     const db = this.db();
     const ref = db.collection(this.col).doc(documentId);
     const snap = await ref.get();
-    if (!snap.exists) return; // idempotent
-    const data = snap.data()!;
-    const isOwner =
-      data.landlordId === landlordId ||
-      (userEmail && data.landlordId === userEmail) ||
-      (data.landlordId && landlordId && String(data.landlordId).toLowerCase() === String(landlordId).toLowerCase());
-    if (!isOwner) throw new Error('Forbidden');
+    let data: any = null;
 
-    // Delete record from Firestore
-    await ref.delete();
-    this.logger.log(`Deleted document ${documentId} for landlord ${landlordId}`);
+    if (snap.exists) {
+      data = snap.data()!;
+      if (!isDocumentAuthorized(data, landlordId, userEmail)) {
+        throw new Error('Forbidden');
+      }
 
-    // Clean up document from property if it was assigned
-    if (data.propertyId) {
+      // Delete record from Firestore landlord_documents collection
+      await ref.delete();
+      this.logger.log(`Deleted document ${documentId} from landlord_documents`);
+    }
+
+    // Clean up document from property if it was explicitly assigned
+    if (data?.propertyId) {
       try {
         const propRef = db.collection('properties').doc(data.propertyId);
         const propSnap = await propRef.get();
@@ -213,8 +269,43 @@ export class DocumentsService {
       }
     }
 
+    // Also sweep landlord's properties in case the document is embedded in a property's documents array
+    try {
+      const col = db.collection('properties');
+      const uid = (landlordId || '').trim();
+      const mail = (userEmail || '').trim().toLowerCase();
+      const queries: Promise<any>[] = [];
+      if (uid) {
+        queries.push(col.where('userId', '==', uid).get().catch(() => ({ docs: [] })));
+        queries.push(col.where('landlordId', '==', uid).get().catch(() => ({ docs: [] })));
+      }
+      if (mail) {
+        queries.push(col.where('ownerEmail', '==', mail).get().catch(() => ({ docs: [] })));
+        queries.push(col.where('landlordEmail', '==', mail).get().catch(() => ({ docs: [] })));
+      }
+      const results = await Promise.all(queries);
+      const propsMap = new Map<string, any>();
+      results.forEach(res => (res.docs || []).forEach((d: any) => propsMap.set(d.id, d)));
+
+      for (const [propId, propDoc] of propsMap.entries()) {
+        const propData = propDoc.data();
+        const existingDocs = Array.isArray(propData.documents) ? propData.documents : [];
+        const hasDoc = existingDocs.some((d: any) => d.id === documentId || (data?.url && d.url === data.url));
+        if (hasDoc) {
+          const filteredDocs = existingDocs.filter((d: any) => d.id !== documentId && (!data?.url || d.url !== data.url));
+          await propDoc.ref.update({
+            documents: filteredDocs,
+            updatedAt: new Date().toISOString(),
+          });
+          this.logger.log(`Cleaned up document ${documentId} from property ${propId}`);
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not sweep properties for document ${documentId}: ${err?.message}`);
+    }
+
     // Clean up physical file in Cloud Storage if storageService is available
-    if (this.storageService && data.url) {
+    if (this.storageService && data?.url) {
       try {
         const match = data.url.match(/\/o\/([^?]+)/);
         if (match && match[1]) {
