@@ -21,14 +21,37 @@ export default defineConfig(({ mode }) => {
       {
         name: 'resolve-from-root-node-modules',
         resolveId(source) {
-          if (!source.startsWith('.') && !source.startsWith('/') && !source.startsWith('@/')) {
-            try {
-              return require.resolve(source, { paths: [rootNodeModules] });
-            } catch (e) {
-              // Fallback if require.resolve throws
-            }
+          if (!source || source.startsWith('\0')) return null;
+          const queryIndex = source.indexOf('?');
+          const bare = queryIndex === -1 ? source : source.slice(0, queryIndex);
+          const query = queryIndex === -1 ? '' : source.slice(queryIndex);
+          if (
+            !bare
+            || bare.startsWith('.')
+            || bare.startsWith('/')
+            || bare.startsWith('@/')
+            || path.isAbsolute(bare)
+          ) {
+            return null;
           }
-          return null;
+          try {
+            return require.resolve(bare, { paths: [rootNodeModules] }) + query;
+          } catch {
+            const candidates = [
+              path.join(rootNodeModules, bare),
+              path.join(rootNodeModules, `${bare}.mjs`),
+              path.join(rootNodeModules, `${bare}.js`),
+              path.join(rootNodeModules, `${bare}.min.mjs`),
+            ];
+            const found = candidates.find((file) => {
+              try {
+                return fs.existsSync(file) && fs.statSync(file).isFile();
+              } catch {
+                return false;
+              }
+            });
+            return found ? found + query : null;
+          }
         },
       },
     ],
