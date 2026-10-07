@@ -7,15 +7,8 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-  FileText, 
-  CheckCircle2, 
   ShieldCheck, 
   Edit3, 
-  Plus,
-  Copy,
-  Check,
-  ExternalLink,
-  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { firestoreService } from '../../services/firestoreService';
@@ -44,9 +37,6 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
   const [notes, setNotes] = useState('');
   const [hasAgreed, setHasAgreed] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [lastSentShare, setLastSentShare] = useState<any>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
 
   if (!isOpen) return null;
 
@@ -57,8 +47,6 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
     setAgencyName('');
     setPropertyAddress('');
     setNotes('');
-    setIsSuccess(false);
-    setLastSentShare(null);
   };
 
   const handleClose = () => {
@@ -66,15 +54,6 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
     onClose();
   };
 
-  const handleCopyLink = () => {
-    const viewToken = lastSentShare?.viewToken;
-    if (!viewToken) return;
-    const link = `${window.location.origin}/referencing/view/${viewToken}`;
-    navigator.clipboard.writeText(link).then(() => {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    });
-  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -110,12 +89,11 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
       const result = await firestoreService.shareReferencingPassport(userId, sharePayload);
 
       if (result.success) {
-        setIsSuccess(true);
-        setLastSentShare(result.share || sharePayload);
         toast.success(`Referencing passport shared with ${recipientName}!`);
         if (onShareComplete) {
           onShareComplete(result.share || sharePayload);
         }
+        handleClose();
       } else {
         toast.error(result.error || 'Failed to share referencing passport');
       }
@@ -134,7 +112,7 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
         onClick={handleClose}
       />
 
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden z-10 border border-slate-200">
+      <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden z-10 border border-slate-200">
         {/* Header */}
         <div
           className="px-6 py-5 flex items-center justify-between bg-slate-50/50 border-b border-slate-100"
@@ -161,97 +139,6 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 max-h-[80vh] overflow-y-auto">
-          {isSuccess ? (
-            <div className="text-center py-6 space-y-5">
-              <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto shadow-inner">
-                <CheckCircle2 className="w-10 h-10" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Successfully Sent!</h3>
-                <p className="text-sm text-gray-600 mt-1 max-w-md mx-auto">
-                  Your referencing passport has been shared with{' '}
-                  <span className="font-semibold text-gray-900">{lastSentShare?.recipientName || recipientName}</span>
-                  {' '}({lastSentShare?.recipientEmail || recipientEmail}).
-                  {' '}An email notification has been sent to them.
-                </p>
-              </div>
-
-              {/* Share details */}
-              <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-left text-xs text-gray-700 space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Recipient Role:</span>
-                  <span className="font-medium capitalize">{lastSentShare?.recipientRole || recipientRole}</span>
-                </div>
-                {lastSentShare?.propertyAddress && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Property:</span>
-                    <span className="font-medium truncate max-w-[240px]">{lastSentShare.propertyAddress}</span>
-                  </div>
-                )}
-                {lastSentShare?.expiresAt && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> Link expires:
-                    </span>
-                    <span className="font-medium">
-                      {new Date(lastSentShare.expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Email status:</span>
-                  <span className="inline-flex items-center text-green-700 font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
-                    Delivered
-                  </span>
-                </div>
-              </div>
-
-              {/* View link + copy */}
-              {lastSentShare?.viewToken && (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-left space-y-2">
-                  <p className="text-xs font-semibold text-gray-700">Shareable view link</p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-[11px] text-gray-500 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 truncate font-mono">
-                      {`${window.location.origin}/referencing/view/${lastSentShare.viewToken}`}
-                    </code>
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-                    >
-                      {copiedLink
-                        ? <><Check className="w-3.5 h-3.5 text-green-500" /> Copied!</>
-                        : <><Copy className="w-3.5 h-3.5" /> Copy</>
-                      }
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-gray-400">
-                    Anyone with this link can view the passport without logging in.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleResetForm}
-                  className="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  Send to Another
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="flex-1 py-3 px-4 rounded-xl text-white font-semibold transition-all text-sm shadow-md"
-                  style={{ backgroundColor: '#DC5F12' }}
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Passport Ready Banner */}
               <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between gap-3">
@@ -472,7 +359,6 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
                 </div>
               </div>
             </form>
-          )}
         </div>
       </div>
     </div>

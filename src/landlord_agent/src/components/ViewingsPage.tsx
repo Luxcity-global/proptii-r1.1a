@@ -25,7 +25,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import viewingService, { ViewingBooking, ViewingStats, viewingPollingCoordinator } from '../../../services/viewingService';
-import { listViewingsForLandlord, rememberViewings } from '../../../services/viewingInboxService';
+import { applyRememberedApplicant, listViewingsForLandlord, rememberApplicant, rememberViewings } from '../../../services/viewingInboxService';
 import {
   bookViewingRequestService,
   BookViewingRequest
@@ -45,6 +45,23 @@ import {
   mergeById,
 } from '../data/agentTestPersona';
 import '../styles/viewingsPage.css';
+
+function bookingForTable(booking: ViewingBooking, managerEmail?: string | null): ViewingBooking {
+  const withApplicant = applyRememberedApplicant(booking) as ViewingBooking;
+  const manager = (managerEmail || '').trim().toLowerCase();
+  const email = (withApplicant.viewingDetails?.userDetails?.email || '').trim().toLowerCase();
+  if (!manager || !email || email !== manager) return withApplicant;
+  return {
+    ...withApplicant,
+    viewingDetails: {
+      ...withApplicant.viewingDetails,
+      userDetails: {
+        ...withApplicant.viewingDetails.userDetails,
+        email: '',
+      },
+    },
+  };
+}
 
 // ViewingsPage component for managing property viewings and requests
 
@@ -425,11 +442,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           propertyTitles: ownedAddresses.split('\n').filter(Boolean),
         });
         linkedViewings.forEach((item) => {
-          if (viewingStatus(item.status) === 'requested') {
+          const incoming = viewingStatus(item.status);
+          if (incoming === 'requested') {
             requestsMap.set(item.id, item);
-          } else {
-            bookingsMap.set(item.id, item);
+            return;
           }
+          const current = bookingsMap.get(item.id);
+          const currentStatus = viewingStatus(current?.status);
+          const settled = new Set(['confirmed', 'rescheduled', 'completed', 'cancelled']);
+          if (current && settled.has(currentStatus) && !settled.has(incoming)) return;
+          bookingsMap.set(item.id, item);
         });
 
         const mergedRequests = withAgentDummyRequests(Array.from(requestsMap.values()));
@@ -666,18 +688,23 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
     }
   }, [bookings, loading]);
 
+  const tableBookings = useMemo(
+    () => bookings.map((booking) => bookingForTable(booking, managerEmail || userProfile?.email)),
+    [bookings, managerEmail, userProfile?.email],
+  );
+
   const upcomingViewings = useMemo(
     () =>
-      bookings.filter((viewing) =>
+      tableBookings.filter((viewing) =>
         ['confirmed', 'rescheduled'].includes(viewingStatus(viewing.status))
       ),
-    [bookings]
+    [tableBookings]
   );
 
   const pendingViewings = useMemo(
     () =>
-      bookings.filter((viewing) => viewingStatus(viewing.status) === 'pending'),
-    [bookings]
+      tableBookings.filter((viewing) => viewingStatus(viewing.status) === 'pending'),
+    [tableBookings]
   );
 
   const incomingRequests = useMemo(
@@ -687,16 +714,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
 
   const completedViewings = useMemo(
     () =>
-      bookings.filter((viewing) => viewingStatus(viewing.status) === 'completed'),
-    [bookings]
+      tableBookings.filter((viewing) => viewingStatus(viewing.status) === 'completed'),
+    [tableBookings]
   );
 
   const calendarViewings = useMemo(
     () =>
-      bookings.filter((viewing) =>
+      tableBookings.filter((viewing) =>
         ['confirmed', 'rescheduled', 'pending'].includes(viewingStatus(viewing.status)),
       ),
-    [bookings],
+    [tableBookings],
   );
 
   const calendarDays = useMemo(
@@ -1043,28 +1070,41 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const handleConfirmViewing = async (viewing: ViewingBooking) => {
     try {
       setIsProcessing(true);
-      await viewingService.updateViewingStatus(viewing.id, 'confirmed');
+      const result = await viewingService.updateViewingStatus(viewing.id, 'confirmed');
+      if (!result.success) {
+        setFeedback({ type: 'error', message: result.error || 'Failed to confirm viewing. Please try again.' });
+        return;
+      }
+
+      setBookings((prev) => prev.map((item) => (
+        item.id === viewing.id ? { ...item, status: 'confirmed' } : item
+      )));
+      setRequests((prev) => prev.filter((item) => item.id !== viewing.id));
 
       const tenantEmail = viewing.viewingDetails?.userDetails?.email;
       if (tenantEmail) {
-        await emailService.sendEmail({
-          to: tenantEmail,
-          subject: `Viewing Confirmed - ${viewing.property.street}`,
-          formData: {
-            property: viewing.property,
-            viewing: viewing.viewingDetails,
-            manager: {
-              name: managerName,
-              email: managerEmail
+        try {
+          await emailService.sendEmail({
+            to: tenantEmail,
+            subject: `Viewing Confirmed - ${viewing.property.street}`,
+            formData: {
+              property: viewing.property,
+              viewing: viewing.viewingDetails,
+              manager: {
+                name: managerName,
+                email: managerEmail
+              },
+              user: {
+                name: viewing.viewingDetails?.userDetails?.fullName,
+                email: tenantEmail
+              }
             },
-            user: {
-              name: viewing.viewingDetails?.userDetails?.fullName,
-              email: tenantEmail
-            }
-          },
-          attachments: [],
-          emailType: 'viewing-user'
-        });
+            attachments: [],
+            emailType: 'viewing-user'
+          });
+        } catch (emailError) {
+          console.error('Viewing was confirmed, but the tenant email failed:', emailError);
+        }
       }
 
       trackEvent('landlord_viewing_confirmed');
@@ -1117,6 +1157,10 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       setFeedback({ type: 'error', message: 'Please provide a preferred date and time slot.' });
       return;
     }
+    if (!requestForm.tenantEmail.includes('@')) {
+      setFeedback({ type: 'error', message: 'Enter the applicant email so they receive this viewing.' });
+      return;
+    }
 
     const addressParts = property.address.split(',').map((part) => part.trim());
     const viewingDetails: ViewingBooking['viewingDetails'] = {
@@ -1145,6 +1189,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
     };
 
     setIsProcessing(true);
+    let emailedAddress = '';
     try {
       if (isAgentPersona) {
         const localBooking: ViewingBooking = {
@@ -1161,6 +1206,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           updatedAt: new Date().toISOString(),
           confirmedAt: new Date().toISOString(),
         };
+        rememberApplicant(localBooking.id, viewingDetails.userDetails, managerEmail || userProfile?.email);
         setBookings((prev) => [localBooking, ...prev]);
         setStats((prev) => ({
           ...prev,
@@ -1189,31 +1235,61 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           { viewingDetails },
         );
         if (requestForm.tenantEmail) {
-          await emailService.sendEmail({
-            to: requestForm.tenantEmail,
-            subject: `Viewing Scheduled - ${propertyStreet(property.address)}`,
-            formData: {
-              property: propertyPayload,
-              viewing: viewingDetails,
-              manager: {
-                name: managerName,
-                email: managerEmail,
+          const applicantEmail = requestForm.tenantEmail.trim();
+          const when = `${requestForm.date} at ${requestForm.time}`;
+          const address = propertyStreet(property.address);
+          const safe = (value: string) => value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+          let emailSent = false;
+          try {
+            const emailResult = await emailService.sendEmail({
+              to: applicantEmail,
+              subject: `Your viewing is scheduled - ${address}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+                  <p>Hi ${safe(requestForm.tenantName || 'there')},</p>
+                  <p>${safe(managerName || 'Your landlord')} has scheduled a property viewing for you.</p>
+                  <p><strong>Property:</strong> ${safe(address)}</p>
+                  <p><strong>When:</strong> ${safe(when)}</p>
+                  <p><strong>Type:</strong> ${safe(requestForm.preference)}</p>
+                  <p>Sign in to Proptii to see it under Viewings.</p>
+                </div>
+              `,
+              formData: {
+                property: propertyPayload,
+                viewing: viewingDetails,
+                manager: { name: managerName, email: managerEmail },
+                user: { name: requestForm.tenantName, email: applicantEmail },
               },
-              user: {
-                name: requestForm.tenantName,
-                email: requestForm.tenantEmail,
-              },
-            },
-            attachments: [],
-            emailType: 'viewing-user',
-          });
+              attachments: [],
+              emailType: 'viewing-user',
+            });
+            emailSent = emailResult.success;
+            if (emailSent) emailedAddress = applicantEmail;
+          } catch (emailError) {
+            console.error('Viewing email was not sent:', emailError);
+          }
+          if (!emailSent) {
+            setFeedback({
+              type: 'error',
+              message: `Viewing scheduled, but the email to ${applicantEmail} did not send.`,
+            });
+            setIsRequestModalOpen(false);
+            setRequestForm(initialRequestForm);
+            switchTab('upcoming');
+            return;
+          }
         }
       }
 
       trackEvent('landlord_viewing_requested');
       setFeedback({
         type: 'success',
-        message: 'Viewing request submitted and appointment confirmed.',
+        message: emailedAddress
+          ? `Viewing scheduled. An email was sent to ${emailedAddress}.`
+          : 'Viewing request submitted and appointment confirmed.',
       });
       setIsRequestModalOpen(false);
       setRequestForm(initialRequestForm);
@@ -1241,17 +1317,27 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         time: rescheduleForm.time
       };
 
-      await viewingService.updateViewingStatus(
+      const updated = await viewingService.updateViewingStatus(
         selectedViewing.id,
         'rescheduled',
         rescheduleForm.message ? `Reschedule requested: ${rescheduleForm.message}` : undefined,
         undefined,
         { viewingDetails: updatedDetails }
       );
+      if (!updated.success) {
+        setFeedback({ type: 'error', message: updated.error || 'Failed to reschedule viewing. Please try again.' });
+        return;
+      }
+
+      setBookings((prev) => prev.map((item) => (
+        item.id === selectedViewing.id
+          ? { ...item, status: 'rescheduled', viewingDetails: updatedDetails }
+          : item
+      )));
 
       const tenantEmail = selectedViewing.viewingDetails?.userDetails?.email;
       if (tenantEmail) {
-        await emailService.sendEmail({
+        const emailResult = await emailService.sendEmail({
           to: tenantEmail,
           subject: `Viewing Rescheduled - ${selectedViewing.property.street}`,
           formData: {
@@ -1272,6 +1358,13 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           attachments: [],
           emailType: 'viewing-reschedule'
         });
+        if (!emailResult.success) {
+          setFeedback({ type: 'error', message: 'The viewing was rescheduled, but the email to the tenant did not send.' });
+          setIsRescheduleModalOpen(false);
+          setSelectedViewing(null);
+          setRescheduleForm(initialRescheduleForm);
+          return;
+        }
       }
 
       trackEvent('landlord_viewing_rescheduled');

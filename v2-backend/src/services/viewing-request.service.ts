@@ -82,7 +82,11 @@ export class ViewingRequestService {
       agent: {
         id: storedProperty?.agent?.id || source.agentId || '',
         name: storedProperty?.agent?.name || '',
-        email: storedProperty?.agent?.email || source.agentEmail || '',
+        email: this.normalizedEmail(
+          storedProperty?.agent?.email,
+          source.agentEmail,
+          source.landlordEmail,
+        ),
         phone: storedProperty?.agent?.phone || '',
         company: storedProperty?.agent?.company || '',
       },
@@ -90,13 +94,19 @@ export class ViewingRequestService {
 
     const details = source.viewingDetails && typeof source.viewingDetails === 'object' ? source.viewingDetails : {};
     const userDetails = details.userDetails || {};
+    const agentMail = property.agent.email;
+    const writtenContact = this.normalizedEmail(userDetails.email);
+    const storedTenant = this.normalizedEmail(source.tenantEmail);
+    const tenantMail = writtenContact && writtenContact !== agentMail
+      ? writtenContact
+      : (storedTenant && storedTenant !== agentMail ? storedTenant : (writtenContact && !agentMail ? writtenContact : ''));
     const viewingDetails: any = {
       date: details.date || source.requestedDate || '',
       time: details.time || source.requestedTime || '',
       preference: details.preference || 'In-Person Viewing',
       userDetails: {
         fullName: userDetails.fullName || '',
-        email: userDetails.email || source.tenantEmail || '',
+        email: tenantMail,
         phoneNumber: userDetails.phoneNumber || '',
       },
     };
@@ -140,18 +150,24 @@ export class ViewingRequestService {
       };
     }
     if (property && property.agent === undefined) delete property.agent;
-    const contactEmail = this.normalizedEmail(details?.userDetails?.email, data?.tenantEmail);
+    const applicantEmail = this.normalizedEmail(details?.userDetails?.email, data?.tenantEmail);
     const agentEmail = this.normalizedEmail(data?.agentEmail, property?.agent?.email, legacyAgent?.email);
     const explicitManager = Boolean(data?.landlordId || data?.agentId || agentEmail);
     const callerIsManager = Boolean(
-      contactEmail && callerEmail && contactEmail !== callerEmail && explicitManager,
+      (applicantEmail && callerEmail && applicantEmail !== callerEmail && explicitManager)
+      || (agentEmail && callerEmail && agentEmail === callerEmail),
     );
 
-    const tenantEmail = callerIsManager ? contactEmail : (callerEmail || contactEmail);
+    const tenantEmail = applicantEmail && applicantEmail !== agentEmail
+      ? applicantEmail
+      : (applicantEmail || (!callerIsManager ? callerEmail : ''));
     const callerMatchesAgent = Boolean(agentEmail && callerEmail && agentEmail === callerEmail);
-    const resolvedManagerId = data?.landlordId || data?.agentId || await this.managerIdForEmail(agentEmail);
+    const fromAgentEmail = agentEmail ? await this.managerIdForEmail(agentEmail) : '';
+    const providedManagerId = String(data?.landlordId || data?.agentId || '').trim();
+    const providedIsAccount = /^[A-Za-z0-9]{20,}$/.test(providedManagerId);
+    const resolvedManagerId = fromAgentEmail || (providedIsAccount ? providedManagerId : '');
     const landlordId = resolvedManagerId || (callerIsManager || callerMatchesAgent ? callerId : '') || '';
-    const agentId = data?.agentId || property?.agent?.id || resolvedManagerId || '';
+    const agentId = resolvedManagerId || '';
     const landlordEmail = callerIsManager || callerMatchesAgent
       ? callerEmail
       : this.normalizedEmail(data?.landlordEmail, agentEmail);
@@ -163,7 +179,10 @@ export class ViewingRequestService {
       || [property?.street, property?.town, property?.postcode].filter(Boolean).join(', ')
       || 'Property Viewing';
     const propertyTitleKey = String(property?.street || propertyTitle).trim().toLowerCase();
-    const tenantId = callerIsManager ? (data?.tenantId || '') : callerId;
+    const tenantAccountId = tenantEmail ? await this.accountIdForEmail(tenantEmail) : '';
+    const tenantId = callerIsManager
+      ? (tenantAccountId || String(data?.tenantId || ''))
+      : (tenantAccountId || callerId);
     const id = `viewing_${tenantId || callerId}_${Date.now()}`;
     const now = new Date().toISOString();
 
@@ -186,6 +205,18 @@ export class ViewingRequestService {
     if (landlordEmail) payload.landlordEmail = landlordEmail;
     if (agentId) payload.agentId = agentId;
     if (agentEmail) payload.agentEmail = agentEmail;
+    if (property && agentEmail) {
+      property.agent = {
+        ...(property.agent || {}),
+        email: property.agent?.email || agentEmail,
+      };
+    }
+    if (details && tenantEmail) {
+      details.userDetails = {
+        ...(details.userDetails || {}),
+        email: tenantEmail,
+      };
+    }
     if (property) payload.property = property;
     if (details) payload.viewingDetails = details;
     if (data?.agentNotes) payload.agentNotes = data.agentNotes;
@@ -255,7 +286,7 @@ export class ViewingRequestService {
     const addDoc = (doc: FirebaseFirestore.QueryDocumentSnapshot) => {
       ids.add(doc.id);
       const data = doc.data() || {};
-      for (const value of [data.address, data.street, data.title, data.name]) {
+        for (const value of [data.address, data.street, data.title, data.name, data.propertyAddress, data.fullAddress]) {
         const text = String(value || '').trim();
         if (text.length < 4 || text.toLowerCase() === 'property viewing') continue;
         titles.add(text);
@@ -279,6 +310,10 @@ export class ViewingRequestService {
     ];
     for (const address of emails) {
       tasks.push(collect('ownerEmail', address));
+      tasks.push(collect('landlordEmail', address));
+      tasks.push(collect('email', address));
+      tasks.push(collect('userId', address));
+      tasks.push(collect('landlordId', address));
       tasks.push(collect('agent.email', address));
     }
     await Promise.all(tasks);
@@ -286,6 +321,30 @@ export class ViewingRequestService {
       ids: Array.from(ids).slice(0, 40),
       titles: Array.from(titles).slice(0, 40),
     };
+  }
+
+  /** Firebase uid for the applicant, so their viewing list matches tenantId. */
+  private async accountIdForEmail(email: string): Promise<string> {
+    const normalized = this.normalizedEmail(email);
+    if (!normalized) return '';
+    if (admin.apps.length) {
+      try {
+        const record = await admin.auth().getUserByEmail(normalized);
+        if (record?.uid) return record.uid;
+      } catch {
+        /* this address may not have a Proptii login */
+      }
+    }
+    const db = this.db;
+    if (!db) return '';
+    try {
+      const snapshot = await db.collection('users').where('email', '==', normalized).limit(5).get();
+      const tenant = snapshot.docs.find((doc) => (doc.data() as any)?.role === 'tenant');
+      return tenant?.id || snapshot.docs[0]?.id || '';
+    } catch (err: any) {
+      console.warn('[ViewingRequestService] applicant lookup failed:', err?.message || err);
+      return '';
+    }
   }
 
   private async managerIdForEmail(email: string): Promise<string> {
@@ -332,7 +391,13 @@ export class ViewingRequestService {
       if (agent && emails.has(agent)) return true;
       const title = this.titleKey(data.propertyTitle || data.property?.street || data.address);
       const firstLine = title.split(',')[0].trim();
-      return Boolean(title && (titleKeys.has(title) || titleKeys.has(firstLine)));
+      const candidates = [title, firstLine].filter((value) => value.length >= 4);
+      return candidates.some((candidate) => [...titleKeys].some((owned) => {
+        if (owned === candidate) return true;
+        const shorter = owned.length < candidate.length ? owned : candidate;
+        const longer = owned.length < candidate.length ? candidate : owned;
+        return shorter.length >= 8 && longer.includes(shorter);
+      }));
     });
   }
 
@@ -346,6 +411,53 @@ export class ViewingRequestService {
       console.warn(`[ViewingRequestService] query ${field} failed:`, err?.message || err);
       return [];
     }
+  }
+
+  /** Same people who can see a viewing on the landlord list can confirm or decline it. */
+  private async assertCanManage(data: any, user: any, viewingId?: string) {
+    try {
+      this.assertViewingAccess(data, user);
+      return;
+    } catch (err: any) {
+      const code = typeof err?.getStatus === 'function' ? err.getStatus() : err?.status;
+      if (code !== 403) throw err;
+    }
+
+    const userId = String(user?.uid || '');
+    const emails = await this.collectEmails(user?.email || '', userId);
+    const listedEmail = [
+      data?.tenantEmail,
+      data?.landlordEmail,
+      data?.agentEmail,
+      data?.viewingDetails?.userDetails?.email,
+      data?.property?.agent?.email,
+    ].some((value) => emails.has(this.normalizedEmail(value)));
+    if (listedEmail) return;
+
+    const owned = await this.ownedProperties(userId, emails);
+    const propertyId = String(data?.propertyId || '');
+    if (propertyId && owned.ids.includes(propertyId)) return;
+
+    const title = this.titleKey(data?.propertyTitle || data?.property?.street || data?.address);
+    const firstLine = title.split(',')[0].trim();
+    const ownedKeys = new Set(
+      owned.titles.map((item) => this.titleKey(item)).filter((item) => item.length >= 4),
+    );
+    const candidates = [title, firstLine].filter((value) => value.length >= 4);
+    const matches = candidates.some((candidate) => [...ownedKeys].some((ownedTitle) => {
+      if (ownedTitle === candidate) return true;
+      const shorter = ownedTitle.length < candidate.length ? ownedTitle : candidate;
+      const longer = ownedTitle.length < candidate.length ? candidate : ownedTitle;
+      return shorter.length >= 8 && longer.includes(shorter);
+    }));
+    if (matches) return;
+
+    const visibleId = String(viewingId || data?.id || '');
+    if (visibleId) {
+      const visible = await this.getViewingRequests(userId, user?.role || '', user?.email);
+      if (visible.some((row) => row.id === visibleId)) return;
+    }
+    throw new ForbiddenException('You are not authorized to access or modify this viewing request');
   }
 
   private assertViewingAccess(viewing: any, user?: any) {
@@ -401,11 +513,23 @@ export class ViewingRequestService {
       const doc = await docRef.get();
       if (!doc.exists) throw new NotFoundException('Viewing request not found');
       const data = doc.data() || {};
-      this.assertViewingAccess(data, user || { uid: userId });
+      await this.assertCanManage(data, user || { uid: userId, email: user?.email }, id);
 
-      const nextStatus = this.canonicalStatus(status, this.canonicalStatus(data.status));
+      const requested = String(status || '').trim();
+      if (!requested) {
+        throw new ForbiddenException('A viewing status is required');
+      }
+      const nextStatus = this.canonicalStatus(requested);
       const now = new Date().toISOString();
       const payload: any = { status: nextStatus, updatedAt: now };
+      const callerEmail = this.normalizedEmail(user?.email);
+      const callerIsApplicant = data.tenantId === userId || this.normalizedEmail(data.tenantEmail) === callerEmail;
+      if (!callerIsApplicant && userId) {
+        if (!data.landlordId) payload.landlordId = userId;
+        if (!data.agentId) payload.agentId = userId;
+        if (!this.normalizedEmail(data.agentEmail) && callerEmail) payload.agentEmail = callerEmail;
+        if (!this.normalizedEmail(data.landlordEmail) && callerEmail) payload.landlordEmail = callerEmail;
+      }
       if (notes) payload.notes = notes;
       if (extras?.agentNotes) payload.agentNotes = extras.agentNotes;
       if (extras?.viewingDetails && typeof extras.viewingDetails === 'object') {
@@ -421,9 +545,10 @@ export class ViewingRequestService {
       await docRef.update(payload);
       return this.presentViewing(id, { ...data, ...payload });
     } catch (err: any) {
-      if (err?.status === 403 || err?.status === 404) throw err;
+      const code = typeof err?.getStatus === 'function' ? err.getStatus() : err?.status;
+      if (code === 400 || code === 403 || code === 404) throw err;
       console.warn('[ViewingRequestService] updateViewingStatus error:', err?.message || err);
-      return { id, status };
+      throw err;
     }
   }
 
@@ -435,7 +560,7 @@ export class ViewingRequestService {
       const doc = await docRef.get();
       if (!doc.exists) throw new NotFoundException('Viewing request not found');
       const data = doc.data();
-      this.assertViewingAccess(data, user || { uid: userId });
+      await this.assertCanManage(data, user || { uid: userId, email: user?.email }, id);
 
       await docRef.update({
         status: 'cancelled',

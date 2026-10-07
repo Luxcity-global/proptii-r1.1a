@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Building2,
@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import { trackEvent } from "../../../utils/analytics";
+import viewingService from "../../../services/viewingService";
+import { listViewingsForLandlord } from "../../../services/viewingInboxService";
 import "../styles/dashboardOverview.css";
 
 interface DashboardProps {
@@ -76,6 +78,26 @@ function docExtLabel(type: string, name: string): string {
   if (lower.includes("xls") || lower.includes("csv")) return "XLS";
   if (lower.includes("txt") || lower.includes("note")) return "TXT";
   return "DOC";
+}
+
+const OPEN_VIEWING_STATUSES = new Set(["pending", "requested", "confirmed", "rescheduled"]);
+
+function viewingWhen(item: { viewingDetails?: { date?: string; time?: string } }): string {
+  const date = item.viewingDetails?.date || "";
+  const time = item.viewingDetails?.time || "";
+  if (!date) return "Date to be confirmed";
+  const parsed = new Date(date.includes("T") ? date : `${date}T00:00:00`);
+  const label = Number.isNaN(parsed.getTime())
+    ? date
+    : parsed.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return time ? `${label} · ${time}` : label;
+}
+
+function viewingStatusLabel(status: string): string {
+  if (status === "requested" || status === "pending") return "New request";
+  if (status === "rescheduled") return "Rescheduled";
+  if (status === "confirmed") return "Confirmed";
+  return status;
 }
 
 function coverUrl(property: Property): string | null {
@@ -437,6 +459,58 @@ export function Dashboard({
 }: DashboardProps) {
   const isUserAuthenticated = isAuthenticated ?? Boolean(userProfile);
   const [propertyPill, setPropertyPill] = useState<PropertyPill>("all");
+  const [overviewViewings, setOverviewViewings] = useState<Array<{
+    id: string;
+    title: string;
+    when: string;
+    who: string;
+    status: string;
+  }>>([]);
+
+  useEffect(() => {
+    const email = userProfile?.email?.trim().toLowerCase();
+    if (!email) {
+      setOverviewViewings([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [bookingsResult, linked] = await Promise.all([
+          viewingService.getViewingBookingsByEmail(email),
+          listViewingsForLandlord({
+            email,
+            propertyTitles: properties.map((property) => property.address).filter(Boolean),
+          }),
+        ]);
+        const byId = new Map<string, any>();
+        for (const item of [...(bookingsResult.bookings || []), ...linked]) {
+          if (item?.id) byId.set(String(item.id), item);
+        }
+        const rows = Array.from(byId.values())
+          .filter((item) => OPEN_VIEWING_STATUSES.has(String(item.status || "").toLowerCase()))
+          .sort((a, b) => String(b.createdAt || b.viewingDetails?.date || "").localeCompare(
+            String(a.createdAt || a.viewingDetails?.date || ""),
+          ))
+          .slice(0, 4)
+          .map((item) => ({
+            id: String(item.id),
+            title: item.property?.street || item.propertyTitle || "Property viewing",
+            when: viewingWhen(item),
+            who: item.viewingDetails?.userDetails?.fullName
+              || item.viewingDetails?.userDetails?.email
+              || "Prospective tenant",
+            status: String(item.status || "pending").toLowerCase(),
+          }));
+        if (!cancelled) setOverviewViewings(rows);
+      } catch {
+        if (!cancelled) setOverviewViewings([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userProfile?.email, properties]);
 
   const uniqueVacancyAlerts = useMemo(() => {
     if (!vacancyAlerts) return [];
@@ -918,19 +992,48 @@ export function Dashboard({
           </div>
 
           <div className="ll-mid-right">
-            <div className="ll-content-box ll-is-empty">
+            <div className={`ll-content-box${overviewViewings.length === 0 ? " ll-is-empty" : ""}`}>
               <div className="ll-box-header">
                 <h3 className="ll-box-title ll-heading">Viewings</h3>
+                {overviewViewings.length > 0 && onViewViewings && (
+                  <button type="button" className="ll-box-link" onClick={onViewViewings}>
+                    View all
+                    <ChevronRight size={14} />
+                  </button>
+                )}
               </div>
-              <ContainerEmpty
-                icon={<CalendarDays size={22} />}
-                iconTone="orange"
-                title="No viewings scheduled"
-                description="Upcoming appointments with prospective buyers and tenants will appear here."
-                actionLabel="+ Schedule Viewing"
-                actionVariant="primary"
-                onAction={handleScheduleViewing}
-              />
+              {overviewViewings.length === 0 ? (
+                <ContainerEmpty
+                  icon={<CalendarDays size={22} />}
+                  iconTone="orange"
+                  title="No viewings scheduled"
+                  description="Upcoming appointments with prospective buyers and tenants will appear here."
+                  actionLabel="+ Schedule Viewing"
+                  actionVariant="primary"
+                  onAction={handleScheduleViewing}
+                />
+              ) : (
+                <div className="ll-alert-list">
+                  {overviewViewings.map((viewing) => (
+                    <button
+                      key={viewing.id}
+                      type="button"
+                      className="ll-alert-item"
+                      onClick={handleScheduleViewing}
+                    >
+                      <span className="ll-alert-icon" style={{ background: "#fff7ed", color: "#c2410c" }}>
+                        <CalendarDays size={16} />
+                      </span>
+                      <span>
+                        <div className="ll-doc-name">{viewing.title}</div>
+                        <div className="ll-doc-meta">
+                          {viewingStatusLabel(viewing.status)} · {viewing.who} · {viewing.when}
+                        </div>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className={`ll-content-box${combinedAlerts.length === 0 ? " ll-is-empty" : ""}`}>

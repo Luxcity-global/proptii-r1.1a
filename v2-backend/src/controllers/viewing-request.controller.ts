@@ -66,6 +66,14 @@ export class ViewingRequestController {
           data: eventData,
         });
       }
+      const applicantEmail = (result as any)?.tenantEmail;
+      if (applicantEmail && applicantEmail !== managerEmail && applicantEmail !== landlordEmail) {
+        this.eventsService.emit({
+          type: 'viewing_created',
+          targetEmail: applicantEmail,
+          data: eventData,
+        });
+      }
 
       return result;
     } catch (err: any) {

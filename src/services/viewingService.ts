@@ -1,6 +1,7 @@
 import apiService from './api';
 import sseService from './sseService';
-import { publishViewingCopy, rememberViewings } from './viewingInboxService';
+import landlordUserService from './landlordUserService';
+import { publishViewingCopy, rememberViewings, rememberApplicant, applyRememberedApplicant } from './viewingInboxService';
 
 const CLOSED_VIEWING_STATUSES = new Set(['confirmed', 'completed', 'cancelled', 'rescheduled']);
 
@@ -26,40 +27,47 @@ function normalizeViewingItem(item: any): any {
   const property = source.property && typeof source.property === 'object' ? source.property : null;
   const hasStreet = Boolean(property?.street);
   const details = source.viewingDetails && typeof source.viewingDetails === 'object' ? source.viewingDetails : null;
-  const alreadyCanonical = String(source.status || '').trim().toLowerCase() === status;
+  const agentEmail = String(
+    property?.agent?.email || source.agentEmail || source.landlordEmail || '',
+  ).trim();
+  const writtenContact = String(details?.userDetails?.email || '').trim();
+  const storedTenant = String(source.tenantEmail || '').trim();
+  const sameParty = (left: string, right: string) => left.toLowerCase() === right.toLowerCase();
+  const tenantEmail = writtenContact && !sameParty(writtenContact, agentEmail)
+    ? writtenContact
+    : (storedTenant && !sameParty(storedTenant, agentEmail) ? storedTenant : (!agentEmail ? writtenContact || storedTenant : ''));
 
-  if (source === item && alreadyCanonical && hasStreet) return item;
-
-  return {
+  const normalized = {
     ...source,
     id: source.id || item.id,
     status,
-    property: hasStreet
-      ? { ...property, town: property.town || '', city: property.city || '' }
-      : {
-          street: source.propertyTitle || source.propertyName || 'Property viewing',
-          town: '',
-          city: '',
-          postcode: '',
-          agent: {
-            id: source.agentId || '',
-            name: '',
-            email: source.agentEmail || '',
-            phone: '',
-            company: '',
-          },
-        },
-    viewingDetails: details || {
-      date: source.requestedDate || source.viewing_date || '',
-      time: source.requestedTime || source.viewing_time || '',
-      preference: source.preference || 'In-Person Viewing',
-      userDetails: {
-        fullName: source.tenantName || '',
-        email: source.tenantEmail || '',
-        phoneNumber: source.phone || '',
+    agentEmail: agentEmail || source.agentEmail || null,
+    property: {
+      street: property?.street || source.propertyTitle || source.propertyName || 'Property viewing',
+      town: property?.town || '',
+      city: property?.city || '',
+      postcode: property?.postcode || '',
+      agent: {
+        id: property?.agent?.id || source.agentId || '',
+        name: property?.agent?.name || '',
+        email: agentEmail,
+        phone: property?.agent?.phone || '',
+        company: property?.agent?.company || '',
       },
     },
+    viewingDetails: {
+      date: details?.date || source.requestedDate || source.viewing_date || '',
+      time: details?.time || source.requestedTime || source.viewing_time || '',
+      preference: details?.preference || source.preference || 'In-Person Viewing',
+      userDetails: {
+        fullName: details?.userDetails?.fullName || source.tenantName || '',
+        email: tenantEmail,
+        phoneNumber: details?.userDetails?.phoneNumber || source.phone || '',
+      },
+      ...(details?.whatsappNumber ? { whatsappNumber: details.whatsappNumber } : {}),
+    },
   };
+  return applyRememberedApplicant(normalized);
 }
 
 export interface ViewingBooking {
@@ -270,21 +278,47 @@ class ViewingService {
     }
   ): Promise<{ success: boolean; bookingId?: string; error?: string }> {
     try {
+      const agentEmail = property.agent?.email?.toLowerCase().trim() || null;
+      let landlordId = managerInfo?.landlordId || null;
+      let agentId = managerInfo?.agentId || null;
+      if (agentEmail) {
+        try {
+          const lookup = await landlordUserService.getLandlordUserByEmail(agentEmail);
+          if (lookup.success && lookup.user?.id) {
+            landlordId = lookup.user.id;
+            agentId = lookup.user.id;
+          }
+        } catch {
+          /* the email on the viewing is still enough for the landlord list */
+        }
+      }
+      const accountId = (value: string | null) => (
+        value && /^[A-Za-z0-9]{20,}$/.test(value) ? value : null
+      );
+      const listingId = propertyId && propertyId !== property?.street && !/\s/.test(propertyId)
+        ? propertyId
+        : null;
       const payload = {
         userId,
-        propertyId: propertyId || null,
-        landlordId: managerInfo?.landlordId ?? property.agent?.id ?? null,
-        agentId: managerInfo?.agentId ?? property.agent?.id ?? null,
-        agentEmail: property.agent?.email?.toLowerCase().trim() || null,
+        propertyId: listingId,
+        landlordId: accountId(landlordId),
+        agentId: accountId(agentId),
+        agentEmail,
+        tenantEmail: viewingDetails?.userDetails?.email?.trim().toLowerCase() || null,
         propertyTitle: [property?.street, property?.town, property?.postcode].filter(Boolean).join(', ') || property?.street || '',
         requestedDate: viewingDetails?.date || '',
         requestedTime: viewingDetails?.time || '',
+        notes: (viewingDetails as { notes?: string })?.notes || '',
         property,
         viewingDetails,
         status: 'pending'
       };
       const response = await apiService.post('/viewing-requests', payload);
-      const bookingId = response.id || response.data?.id;
+      const body = response?.data;
+      const bookingId = body?.id || body?.data?.id || response?.id;
+      if (bookingId) {
+        rememberApplicant(bookingId, viewingDetails?.userDetails, agentEmail);
+      }
       publishViewingCopy({ ...payload, id: bookingId, status: 'pending' }).catch(() => {});
       viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
       return { success: true, bookingId };
@@ -426,7 +460,16 @@ class ViewingService {
       if (agentNotes) payload.agentNotes = agentNotes;
       if (updates?.viewingDetails) payload.viewingDetails = updates.viewingDetails;
 
-      await apiService.put(`/viewing-requests/${bookingId}`, payload);
+      const response = await apiService.put(`/viewing-requests/${bookingId}`, payload);
+      const body = response?.data;
+      const updated = body && typeof body === 'object' && !Array.isArray(body)
+        ? (body.status ? body : (body.data && body.data.status ? body.data : body))
+        : {};
+      const savedStatus = String(updated.status || '').trim().toLowerCase();
+      if (savedStatus !== status) {
+        return { success: false, error: 'The viewing status did not change.' };
+      }
+      publishViewingCopy({ ...updated, id: updated.id || bookingId, status: savedStatus }).catch(() => {});
       viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
       return { success: true };
     } catch (error: any) {

@@ -72,6 +72,8 @@ function emailOf(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+const PASSPORT_SECTIONS = ['identity', 'employment', 'residential', 'financial', 'guarantor'] as const;
+
 function sectionStarted(section: unknown): boolean {
   if (!section || typeof section !== 'object') return false;
   return Object.values(section as Record<string, unknown>).some((value) => {
@@ -82,13 +84,47 @@ function sectionStarted(section: unknown): boolean {
   });
 }
 
+function passportForm(record: any): Record<string, any> {
+  const nested = record?.formData && typeof record.formData === 'object' && !Array.isArray(record.formData)
+    ? record.formData
+    : {};
+  const form: Record<string, any> = { ...nested };
+  for (const key of PASSPORT_SECTIONS) {
+    const top = record?.[key];
+    if (sectionStarted(top)) {
+      form[key] = { ...(nested[key] && typeof nested[key] === 'object' ? nested[key] : {}), ...top };
+    }
+  }
+  return form;
+}
+
+function formHasSections(form: Record<string, any> | null | undefined): boolean {
+  return PASSPORT_SECTIONS.some((key) => sectionStarted(form?.[key]));
+}
+
+function passportIsComplete(record: any, form: Record<string, any>): boolean {
+  const raw = String(record?.status || record?.passportStatus || '').trim().toLowerCase();
+  if (record?.isSubmitted === true || raw === 'submitted' || raw === 'complete') return true;
+  const steps = record?.stepStatus;
+  if (steps && [1, 2, 3, 4].every((step) => steps[step] === 'complete')) return true;
+  const identity = form.identity || {};
+  const employment = form.employment || {};
+  const residential = form.residential || {};
+  const financial = form.financial || {};
+  return Boolean(
+    identity.firstName && identity.lastName && identity.email
+    && (employment.employmentStatus || employment.companyDetails || employment.jobPosition)
+    && residential.currentAddress
+    && (financial.monthlyIncome || financial.proofOfIncomeDocument || financial.proofOfIncomeType),
+  );
+}
+
 function statusFromRecord(record: any): 'not-started' | 'in-progress' | 'complete' {
   if (!record || typeof record !== 'object') return 'not-started';
-  const raw = String(record.status || '').trim().toLowerCase();
-  if (record.isSubmitted === true || raw === 'submitted' || raw === 'complete') return 'complete';
-  const form = record.formData && typeof record.formData === 'object' ? record.formData : record;
-  const started = ['identity', 'employment', 'residential', 'financial', 'guarantor']
-    .some((key) => sectionStarted(form[key]));
+  const form = passportForm(record);
+  if (passportIsComplete(record, form)) return 'complete';
+  const raw = String(record.status || record.passportStatus || '').trim().toLowerCase();
+  const started = formHasSections(form);
   const steps = record.stepStatus && typeof record.stepStatus === 'object'
     ? Object.keys(record.stepStatus).length > 0
     : false;
@@ -96,18 +132,25 @@ function statusFromRecord(record: any): 'not-started' | 'in-progress' | 'complet
   return 'not-started';
 }
 
+function passportRichness(record: any): number {
+  const form = passportForm(record);
+  const sections = PASSPORT_SECTIONS.filter((key) => sectionStarted(form[key])).length;
+  return sections + (statusFromRecord(record) === 'complete' ? 10 : 0);
+}
+
 function mapLandlordReferencingStatus(
   status?: string,
   data?: { isSubmitted?: boolean; formData?: Record<string, unknown> },
   submissionId?: string | null,
 ): 'not-started' | 'in-progress' | 'complete' {
+  const form = passportForm(data);
+  if (passportIsComplete(data, form) || passportIsComplete({ status }, form)) return 'complete';
   const raw = String(status || '').trim().toLowerCase();
-  if (raw === 'complete' || raw === 'submitted' || data?.isSubmitted) return 'complete';
-  const hasForm = Boolean(data?.formData && Object.keys(data.formData).length > 0);
+  const hasForm = formHasSections(form);
   if (!raw || raw === 'none' || raw === 'not-started' || raw === 'not_started') {
     return hasForm || submissionId ? 'in-progress' : 'not-started';
   }
-  return 'in-progress';
+  return hasForm || raw === 'draft' || raw === 'in-progress' || raw === 'partial' ? 'in-progress' : 'not-started';
 }
 
 class ReferencingService {
@@ -134,7 +177,7 @@ class ReferencingService {
   ) {
     const status = statusFromRecord(record);
     if (status === 'not-started') return;
-    const form = record?.formData && typeof record.formData === 'object' ? record.formData : record;
+    const form = passportForm(record);
     const data = {
       ...(record || {}),
       formData: form,
@@ -144,7 +187,7 @@ class ReferencingService {
       const key = emailOf(email);
       if (!key) continue;
       const current = found.get(key);
-      if (!current || (current.status !== 'complete' && status === 'complete')) {
+      if (!current || passportRichness(data) > passportRichness(current.data)) {
         found.set(key, { status, data });
       }
     }
@@ -188,11 +231,14 @@ class ReferencingService {
         const json = await response.json();
         const shares = Array.isArray(json?.data) ? json.data : [];
         for (const share of shares) {
-          const record = share?.formData ? { ...share, formData: share.formData, status: share.passportStatus || share.status } : null;
+          const record = {
+            ...share,
+            status: share?.passportStatus || share?.status,
+          };
           this.rememberPassport(
             found,
-            [share?.tenantEmail, share?.formData?.identity?.email],
-            record || { status: share?.passportStatus },
+            [share?.tenantEmail, share?.formData?.identity?.email, share?.identity?.email],
+            record,
           );
           const ownerId = typeof share?.userId === 'string' ? share.userId : '';
           if (!ownerId || ids.includes(ownerId) || ids.includes(`general_${ownerId}`)) continue;
@@ -213,6 +259,17 @@ class ReferencingService {
     }
 
     return found;
+  }
+
+  private async readPassport(formId: string, headers: Record<string, string>) {
+    try {
+      const response = await fetch(`${this.API_URL}/api/referencing/forms/${encodeURIComponent(formId)}`, { headers });
+      if (!response.ok) return null;
+      const json = await response.json();
+      return json?.data || null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -241,19 +298,43 @@ class ReferencingService {
       }
 
       const result = await response.json();
-      const status = mapLandlordReferencingStatus(result?.status, result?.data, result?.submissionId);
-      const formData = result?.data?.formData;
-      if (status !== 'not-started') {
+      const directForm = passportForm(result?.data);
+      if (formHasSections(directForm)) {
+        const status = passportIsComplete(result?.data, directForm)
+          ? 'complete'
+          : mapLandlordReferencingStatus(result?.status, result?.data, result?.submissionId);
         return {
-          status,
-          data: result?.data
-            ? { ...result.data, formData, isSubmitted: status === 'complete' }
-            : undefined,
+          status: status === 'not-started' ? 'in-progress' : status,
+          data: {
+            ...(result?.data || {}),
+            formData: directForm,
+            isSubmitted: status === 'complete',
+          } as ReferencingDocument,
         };
       }
 
       const saved = (await this.passportsByEmail()).get(emailOf(email));
+      if (saved && formHasSections(passportForm(saved.data))) {
+        return { status: saved.status, data: saved.data };
+      }
+
+      const submissionId = typeof result?.submissionId === 'string' ? result.submissionId : '';
+      if (submissionId) {
+        const loaded = await this.readPassport(submissionId, headers);
+        if (loaded && formHasSections(passportForm(loaded))) {
+          const status = statusFromRecord(loaded);
+          return {
+            status,
+            data: { ...loaded, formData: passportForm(loaded), isSubmitted: status === 'complete' } as ReferencingDocument,
+          };
+        }
+      }
+
       if (saved) return { status: saved.status, data: saved.data };
+      const status = mapLandlordReferencingStatus(result?.status, result?.data, result?.submissionId);
+      if (status !== 'not-started' && result?.data) {
+        return { status, data: { ...result.data, formData: directForm, isSubmitted: false } as ReferencingDocument };
+      }
       return { status: 'not-started' };
     } catch (error: any) {
       console.error('❌ [landlord_agent] Error getting referencing status:', error);

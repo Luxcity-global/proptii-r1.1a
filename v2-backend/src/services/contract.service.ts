@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import {
+  getSignedDownloadUrl,
   isBase64DataUri,
   uploadBase64ToStorage,
   uploadBufferToStorage,
@@ -423,6 +424,48 @@ export class ContractService {
     }
   }
 
+  /** The stored file link expires. Signing needs the PDF bytes or a fresh link. */
+  private async contractForViewer(id: string, data: any) {
+    const presented = this.presentContract(id, data);
+    let fileBase64 = typeof data.fileBase64 === 'string' ? data.fileBase64 : '';
+    if (!fileBase64 && typeof data.base64Data === 'string') fileBase64 = data.base64Data;
+
+    if (!fileBase64 && data.storagePath && admin.apps.length) {
+      try {
+        const bucketName = process.env.FIREBASE_STORAGE_BUCKET
+          || `${process.env.FIREBASE_PROJECT_ID || 'proptii-16946'}.firebasestorage.app`;
+        const bucket = admin.storage().bucket(bucketName);
+        const plainPath = String(data.storagePath).startsWith('gs://')
+          ? String(data.storagePath).replace(`gs://${bucket.name}/`, '')
+          : String(data.storagePath);
+        const [bytes] = await bucket.file(plainPath).download();
+        if (bytes?.length && bytes.length < 8_000_000) {
+          fileBase64 = `data:application/pdf;base64,${bytes.toString('base64')}`;
+        }
+      } catch (err: any) {
+        this.logger.warn(`contract file read failed for ${id}: ${err?.message || err}`);
+      }
+    }
+
+    let fileUrl = presented.fileUrl || '';
+    if (data.storagePath) {
+      try {
+        const fresh = await getSignedDownloadUrl(String(data.storagePath));
+        if (fresh) fileUrl = fresh;
+      } catch (err: any) {
+        this.logger.warn(`contract link refresh failed for ${id}: ${err?.message || err}`);
+      }
+    }
+    if (fileBase64) {
+      const inline = fileBase64.startsWith('data:')
+        ? fileBase64
+        : `data:application/pdf;base64,${fileBase64}`;
+      if (!fileUrl || fileUrl === '#') fileUrl = inline;
+      return { ...presented, fileUrl, documentUrl: presented.documentUrl || fileUrl, fileBase64: inline };
+    }
+    return { ...presented, fileUrl, documentUrl: presented.documentUrl || fileUrl };
+  }
+
   async getContractById(contractId: string) {
     const col = this.contractsCol;
     if (!col) return { success: false, contract: null };
@@ -433,7 +476,7 @@ export class ContractService {
         return { success: false, contract: null };
       }
       const d = doc.data() || {};
-      return { success: true, contract: this.presentContract(doc.id, d) };
+      return { success: true, contract: await this.contractForViewer(doc.id, d) };
     } catch (err: any) {
       this.logger.warn(`getContractById error: ${err?.message || err}`);
       return { success: false, contract: null };

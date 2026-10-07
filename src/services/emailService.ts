@@ -31,6 +31,37 @@ interface SendEmailResponse {
   error?: string;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Viewing notices are not referencing applications. Build a short HTML body when the caller did not. */
+function viewingNoticeHtml(emailContent: EmailContent): string {
+  const form = emailContent.formData || {};
+  const property = form.property || {};
+  const viewing = form.viewing || {};
+  const user = form.user || {};
+  const manager = form.manager || {};
+  const address = [property.street, property.town, property.city, property.postcode].filter(Boolean).join(', ');
+  const message = viewing.rescheduleMessage || viewing.cancelMessage || '';
+  const fromName = user.name || manager.name || '';
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <p>${escapeHtml(emailContent.subject)}</p>
+      <p><strong>Property:</strong> ${escapeHtml(address || 'Property viewing')}</p>
+      ${viewing.date ? `<p><strong>Date:</strong> ${escapeHtml(viewing.date)}</p>` : ''}
+      ${viewing.time ? `<p><strong>Time:</strong> ${escapeHtml(viewing.time)}</p>` : ''}
+      ${viewing.preference ? `<p><strong>Type:</strong> ${escapeHtml(viewing.preference)}</p>` : ''}
+      ${fromName ? `<p><strong>From:</strong> ${escapeHtml(fromName)}${user.email ? ` (${escapeHtml(user.email)})` : ''}</p>` : ''}
+      ${message ? `<p><strong>Message:</strong> ${escapeHtml(message)}</p>` : ''}
+    </div>
+  `;
+}
+
 interface MultiEmailResponse {
   success: boolean;
   agent?: boolean;
@@ -247,34 +278,40 @@ class EmailService {
         'viewing-cancel',
         'viewing-cancellation',
       ];
-      if (
-        emailContent.html &&
-        emailContent.emailType &&
-        viewingEmailTypes.includes(emailContent.emailType)
-      ) {
+      if (emailContent.emailType && viewingEmailTypes.includes(emailContent.emailType)) {
+        if (!emailContent.to || !String(emailContent.to).includes('@')) {
+          return { success: false, error: 'A recipient email is required.' };
+        }
         try {
           console.info(`[EmailService] Sending viewing email via apiService`);
-          const response = await apiService.post<any>(
-            '/email/send',
-            {
-              to: emailContent.to,
-              subject: emailContent.subject,
-              html: emailContent.html,
-              emailType: emailContent.emailType,
-            },
-            {
-              headers: { 'Content-Type': 'application/json' },
-              timeout: 60000,
-            }
-          );
-          
-          if (response.data && !response.data.success) {
-            throw new Error(response.data.error || 'Failed to send email');
+          const html = emailContent.html || viewingNoticeHtml(emailContent);
+          const jsonBody = {
+            to: emailContent.to,
+            subject: emailContent.subject,
+            html,
+            emailType: emailContent.emailType,
+          };
+          let response: { data?: { success?: boolean; error?: string; messageId?: string } };
+          try {
+            response = await apiService.post<any>('/email/send', jsonBody, { timeout: 60000 });
+          } catch {
+            const form = new FormData();
+            form.append('to', emailContent.to);
+            form.append('subject', emailContent.subject);
+            form.append('html', html);
+            form.append('emailType', emailContent.emailType);
+            response = await apiService.post<any>('/email/send', form, { timeout: 60000 });
           }
-          console.log('Server response:', response.data);
+
+          const body = response?.data;
+          const sent = body?.success !== false && Boolean(body?.messageId || body?.success);
+          if (!sent) {
+            throw new Error(body?.error || 'Failed to send email');
+          }
+          console.log('Server response:', body);
           return {
             success: true,
-            messageId: response.data?.messageId,
+            messageId: body?.messageId,
           };
         } catch (error: any) {
           const errMessage = error.message || 'Unknown error';

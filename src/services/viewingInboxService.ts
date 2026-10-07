@@ -1,6 +1,74 @@
 import { auth, db } from '../config/firebaseConfig';
 
+const APPLICANT_KEY = 'proptii.viewingApplicants.v1';
 const STORAGE_KEY = 'proptii.viewingInbox.v1';
+
+function readApplicants(): Record<string, { fullName?: string; email?: string; phoneNumber?: string; managerEmail?: string }> {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const parsed = JSON.parse(localStorage.getItem(APPLICANT_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The landlord form's applicant, kept even when the API stores the signed-in email instead. */
+export function rememberApplicant(
+  id: string,
+  userDetails?: { fullName?: string; email?: string; phoneNumber?: string },
+  managerEmail?: string | null,
+): void {
+  const email = emailOf(userDetails?.email);
+  if (!id || !email || typeof localStorage === 'undefined') return;
+  try {
+    const current = readApplicants();
+    current[id] = {
+      fullName: userDetails?.fullName || '',
+      email: userDetails?.email || email,
+      phoneNumber: userDetails?.phoneNumber || '',
+      managerEmail: emailOf(managerEmail) || current[id]?.managerEmail || '',
+    };
+    const latest = Object.entries(current).slice(-200);
+    localStorage.setItem(APPLICANT_KEY, JSON.stringify(Object.fromEntries(latest)));
+  } catch {
+    /* the table still reads whatever the API returned */
+  }
+}
+
+function managerEmails(item: any, saved?: { managerEmail?: string }): string[] {
+  return [
+    saved?.managerEmail,
+    item?.property?.agent?.email,
+    item?.agentEmail,
+    item?.landlordEmail,
+    auth.currentUser?.email,
+  ].map(emailOf).filter(Boolean);
+}
+
+export function applyRememberedApplicant(item: any): any {
+  if (!item?.id) return item;
+  const saved = readApplicants()[item.id];
+  const savedEmail = emailOf(saved?.email);
+  if (!savedEmail) return item;
+  const managers = new Set(managerEmails(item, saved));
+  const shown = emailOf(item.viewingDetails?.userDetails?.email);
+  const shownIsManager = !shown || managers.has(shown);
+  if (shown && !shownIsManager && shown !== savedEmail) return item;
+  if (shown === savedEmail && item.viewingDetails?.userDetails?.fullName) return item;
+  return {
+    ...item,
+    tenantEmail: saved?.email || item.tenantEmail,
+    viewingDetails: {
+      ...(item.viewingDetails || {}),
+      userDetails: {
+        fullName: saved?.fullName || item.viewingDetails?.userDetails?.fullName || '',
+        email: saved?.email || '',
+        phoneNumber: saved?.phoneNumber || item.viewingDetails?.userDetails?.phoneNumber || '',
+      },
+    },
+  };
+}
 
 function emailOf(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -36,7 +104,27 @@ export function rememberViewings(items: any[]): void {
     const current = readStored();
     for (const item of items) {
       if (!item?.id) continue;
-      current[item.id] = item;
+      const previous = current[item.id];
+      const agent = emailOf(item?.property?.agent?.email || item?.agentEmail || item?.landlordEmail || previous?.agentEmail);
+      const previousTenant = emailOf(previous?.viewingDetails?.userDetails?.email || previous?.tenantEmail);
+      const nextTenant = emailOf(item?.viewingDetails?.userDetails?.email || item?.tenantEmail);
+      const keepPrevious = previousTenant && previousTenant !== agent && (!nextTenant || nextTenant === agent);
+      const merged = keepPrevious
+        ? {
+            ...item,
+            tenantEmail: previous.viewingDetails?.userDetails?.email || previous.tenantEmail,
+            viewingDetails: {
+              ...(item.viewingDetails || {}),
+              userDetails: {
+                ...(item.viewingDetails?.userDetails || {}),
+                fullName: item.viewingDetails?.userDetails?.fullName || previous?.viewingDetails?.userDetails?.fullName || '',
+                email: previous.viewingDetails?.userDetails?.email || previous.tenantEmail,
+                phoneNumber: item.viewingDetails?.userDetails?.phoneNumber || previous?.viewingDetails?.userDetails?.phoneNumber || '',
+              },
+            },
+          }
+        : item;
+      current[item.id] = applyRememberedApplicant(merged);
     }
     const latest = Object.entries(current).slice(-100);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(latest)));
@@ -59,7 +147,7 @@ function asBooking(item: any) {
       agent: {
         id: property.agent?.id || item.agentId || '',
         name: property.agent?.name || '',
-        email: property.agent?.email || item.agentEmail || '',
+        email: property.agent?.email || item.agentEmail || item.landlordEmail || '',
         phone: property.agent?.phone || '',
         company: property.agent?.company || '',
       },
@@ -70,11 +158,20 @@ function asBooking(item: any) {
       preference: details.preference || 'In-Person Viewing',
       userDetails: {
         fullName: userDetails.fullName || '',
-        email: userDetails.email || item.tenantEmail || '',
+        email: tenantContact(item, userDetails.email, property),
         phoneNumber: userDetails.phoneNumber || '',
       },
     },
   };
+}
+
+function tenantContact(item: any, writtenEmail: unknown, property: any): string {
+  const agent = emailOf(property?.agent?.email || item?.agentEmail || item?.landlordEmail);
+  const contact = emailOf(writtenEmail);
+  const stored = emailOf(item?.tenantEmail);
+  if (contact && contact !== agent) return String(writtenEmail);
+  if (stored && stored !== agent) return String(item.tenantEmail);
+  return '';
 }
 
 function isForLandlord(
@@ -135,7 +232,7 @@ export async function listViewingsForLandlord(options: {
   const add = (item: any) => {
     if (!item?.id || byId.has(item.id)) return;
     if (!isForLandlord(item, uids, email, titles)) return;
-    byId.set(item.id, asBooking(item));
+    byId.set(item.id, applyRememberedApplicant(asBooking(item)));
   };
 
   Object.values(readStored()).forEach(add);
@@ -156,6 +253,22 @@ export async function listViewingsForLandlord(options: {
   return Array.from(byId.values());
 }
 
+/** Viewings a landlord scheduled for this applicant email. */
+export async function listViewingsForTenant(email?: string | null): Promise<any[]> {
+  const address = emailOf(email);
+  if (!address) return [];
+  const rows = [
+    ...(await safeDocs('viewings', 'tenantEmail', address)),
+    ...(await safeDocs('viewingBookings', 'tenantEmail', address)),
+  ];
+  const byId = new Map<string, any>();
+  for (const item of rows) {
+    if (!item?.id || byId.has(item.id)) continue;
+    byId.set(item.id, applyRememberedApplicant(asBooking(item)));
+  }
+  return Array.from(byId.values());
+}
+
 /** So the landlord can open the booking from their email even when the API omits it. */
 export async function publishViewingCopy(item: any): Promise<void> {
   if (!item) return;
@@ -171,6 +284,30 @@ export async function publishViewingCopy(item: any): Promise<void> {
     agentEmail: agentEmail || null,
     landlordEmail: emailOf(item.landlordEmail) || agentEmail || null,
   };
+  const previous = readStored()[id];
+  const previousTenant = emailOf(previous?.viewingDetails?.userDetails?.email || previous?.tenantEmail);
+  const nextTenant = emailOf(copy.viewingDetails?.userDetails?.email || copy.tenantEmail);
+  if (previousTenant && previousTenant !== agentEmail && (!nextTenant || nextTenant === agentEmail)) {
+    copy.tenantEmail = previousTenant;
+    copy.viewingDetails = {
+      ...(copy.viewingDetails || {}),
+      userDetails: {
+        ...(copy.viewingDetails?.userDetails || {}),
+        fullName: copy.viewingDetails?.userDetails?.fullName || previous?.viewingDetails?.userDetails?.fullName || '',
+        email: previous.viewingDetails?.userDetails?.email || previous.tenantEmail,
+        phoneNumber: copy.viewingDetails?.userDetails?.phoneNumber || previous?.viewingDetails?.userDetails?.phoneNumber || '',
+      },
+    };
+  }
+  if (!emailOf(copy.property?.agent?.email) && agentEmail) {
+    copy.property = {
+      ...(copy.property || {}),
+      agent: {
+        ...(copy.property?.agent || {}),
+        email: agentEmail,
+      },
+    };
+  }
   rememberViewings([copy]);
   if (!db || !copy.userId) return;
   try {

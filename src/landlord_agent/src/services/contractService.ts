@@ -117,21 +117,43 @@ class ContractService {
     }));
   }
 
-  async getContract(contractId: string): Promise<Contract | null> {
+  private normalizeContract(contract: any): Contract {
+    return {
+      ...contract,
+      sentDate: new Date(contract.sentDate),
+      signedDate: contract.signedDate ? new Date(contract.signedDate) : undefined,
+      expiryDate: contract.expiryDate ? new Date(contract.expiryDate) : undefined,
+    };
+  }
+
+  private async readContract(path: string): Promise<any | null> {
     try {
-      const response = await apiService.get(`/contracts/landlord/${contractId}`);
+      const response = await apiService.get(path);
       const body = apiBody(response);
-      const contract = body?.contract;
-      if (!contract) return null;
-      return {
-        ...contract,
-        sentDate: new Date(contract.sentDate),
-        signedDate: contract.signedDate ? new Date(contract.signedDate) : undefined,
-        expiryDate: contract.expiryDate ? new Date(contract.expiryDate) : undefined,
-      };
+      return body?.contract || (body?.id ? body : null);
     } catch {
       return null;
     }
+  }
+
+  async getContract(contractId: string): Promise<Contract | null> {
+    const [landlordCopy, sharedCopy] = await Promise.all([
+      this.readContract(`/contracts/landlord/${contractId}`),
+      this.readContract(`/contracts/${contractId}`),
+    ]);
+    const contract = landlordCopy || sharedCopy;
+    if (!contract) return null;
+    const fileBase64 = [landlordCopy?.fileBase64, sharedCopy?.fileBase64, landlordCopy?.base64Data, sharedCopy?.base64Data]
+      .find((value) => typeof value === 'string' && value.length > 80) || contract.fileBase64;
+    const fileUrl = [fileBase64, landlordCopy?.fileUrl, sharedCopy?.fileUrl, landlordCopy?.documentUrl, sharedCopy?.documentUrl]
+      .find((value) => typeof value === 'string' && value && value !== '#') || contract.fileUrl;
+    return this.normalizeContract({
+      ...sharedCopy,
+      ...landlordCopy,
+      fileBase64,
+      fileUrl,
+      documentUrl: fileUrl || contract.documentUrl,
+    });
   }
 
   async updateContractStatus(

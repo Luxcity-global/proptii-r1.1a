@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import bookViewingRequestService from '../../services/bookViewingRequestService';
+import { viewingService } from '../../services/viewingService';
 import { listViewingsForLandlord } from '../../services/viewingInboxService';
 import { firestoreService } from '../../services/firestoreService';
 import { referencingService } from '../../landlord_agent/src/services/referencingService';
@@ -101,6 +102,50 @@ describe('tenant and landlord flows', () => {
       expect(visible[0].property.agent.email).toBe(AGENT_EMAIL);
       expect(otherAgent.map((row) => row.id)).not.toContain('viewing-1');
     });
+
+    it('sends the viewing to the landlord account instead of the listing id', async () => {
+      vi.mocked(apiService.get).mockImplementation(async (path: string) => {
+        if (String(path).includes('/landlords/check')) {
+          return {
+            success: true,
+            data: {
+              exists: true,
+              user: { id: 'landlordAccountId1234567890', email: AGENT_EMAIL, role: 'landlord', name: 'Aisha Agent' },
+            },
+          };
+        }
+        return { data: [] };
+      });
+      vi.mocked(apiService.post).mockResolvedValue({ id: 'viewing-2', data: { id: 'viewing-2' } });
+
+      const saved = await viewingService.saveViewingBooking(
+        'tenant-1',
+        {
+          street: '12 Maple Court',
+          town: 'Manchester',
+          postcode: 'M1 4AB',
+          agent: { id: 'agent-temp', name: 'Aisha Agent', email: AGENT_EMAIL, phone: '', company: '' },
+        },
+        {
+          date: '2026-10-21',
+          time: '14:00',
+          preference: 'In-Person Viewing',
+          userDetails: { fullName: 'Tenant One', email: TENANT_EMAIL, phoneNumber: '07000000001' },
+        },
+        '12 Maple Court',
+        { landlordId: 'agent-temp', agentId: 'agent-temp' },
+      );
+
+      expect(saved.success).toBe(true);
+      const posted = vi.mocked(apiService.post).mock.calls[0][1] as {
+        landlordId: string | null;
+        agentEmail: string | null;
+        propertyId: string | null;
+      };
+      expect(posted.landlordId).toBe('landlordAccountId1234567890');
+      expect(posted.agentEmail).toBe(AGENT_EMAIL);
+      expect(posted.propertyId).toBeNull();
+    });
   });
 
   describe('referencing', () => {
@@ -160,6 +205,45 @@ describe('tenant and landlord flows', () => {
 
       const status = await referencingService.getReferencingStatusByEmail('new.tenant@example.com');
       expect(status.status).toBe('not-started');
+    });
+
+    it('shows a completed passport when the status call only says in progress', async () => {
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        const path = String(url);
+        if (path.includes('/referencing/status/')) {
+          return jsonResponse({
+            status: 'in-progress',
+            submissionId: 'general_tenant-1',
+            data: { formData: {}, isSubmitted: false },
+          });
+        }
+        if (path.includes('/referencing/forms/general_tenant-1')) {
+          return jsonResponse({
+            success: true,
+            data: {
+              status: 'draft',
+              identity: {
+                firstName: 'Aisha',
+                lastName: 'Daodu',
+                email: TENANT_EMAIL,
+              },
+              employment: { employmentStatus: 'Employed', companyDetails: 'Northwind', jobPosition: 'Analyst' },
+              residential: { currentAddress: '12 Maple Court' },
+              financial: { monthlyIncome: '3200' },
+            },
+          });
+        }
+        if (path.includes('/referencing/received')) return jsonResponse({ success: true, data: [] });
+        if (path.includes('/referencing/forms/')) {
+          return jsonResponse({ success: true, data: { formData: {}, currentStep: 1 } });
+        }
+        return jsonResponse({}, false, 404);
+      }));
+
+      const status = await referencingService.getReferencingStatusByEmail(TENANT_EMAIL);
+      expect(status.status).toBe('complete');
+      expect(status.data?.formData?.employment?.companyDetails).toBe('Northwind');
+      expect(status.data?.formData?.residential?.currentAddress).toBe('12 Maple Court');
     });
   });
 

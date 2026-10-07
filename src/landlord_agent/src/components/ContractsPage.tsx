@@ -695,12 +695,15 @@ export function ContractsPage({
     setOpeningSignature(true);
     try {
       const name = contract.fileName || `${contract.title || 'contract'}.pdf`;
-      const sources = [contract.fileUrl];
       const full = await contractService.getContract(contract.id);
-      if (full) {
-        const record = full as Contract & { fileBase64?: string; documentUrl?: string; base64Data?: string };
-        sources.push(record.fileUrl, record.documentUrl || '', record.fileBase64 || '', record.base64Data || '');
-      }
+      const record = (full || contract) as Contract & { fileBase64?: string; documentUrl?: string; base64Data?: string };
+      const sources = [
+        record.fileBase64,
+        record.base64Data,
+        record.fileUrl,
+        record.documentUrl,
+        contract.fileUrl,
+      ];
       let file: File | null = null;
       for (const source of sources) {
         if (!source) continue;

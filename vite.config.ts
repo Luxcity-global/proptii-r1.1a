@@ -272,7 +272,6 @@ export default defineConfig(({ mode = 'development' }) => {
       } : undefined,
     },
     optimizeDeps: {
-      exclude: ['aria-hidden'],
       // Pre-bundle every bare-package import found in src/ so Vite never has to
       // discover and recompile deps on-demand (which causes browser reloads and
       // the visible "stall then reload" during local dev startup).

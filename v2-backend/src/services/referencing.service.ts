@@ -326,10 +326,27 @@ export class ReferencingService {
     });
   }
 
+  private passportIsComplete(doc: any, form: Record<string, any>): boolean {
+    const raw = String(doc?.status || '').toLowerCase();
+    if (doc?.isSubmitted === true || raw === 'submitted' || raw === 'complete') return true;
+    const steps = doc?.stepStatus;
+    if (steps && [1, 2, 3, 4].every((step) => steps[step] === 'complete')) return true;
+    const identity = form.identity || {};
+    const employment = form.employment || {};
+    const residential = form.residential || {};
+    const financial = form.financial || {};
+    return Boolean(
+      identity.firstName && identity.lastName && identity.email
+      && (employment.employmentStatus || employment.companyDetails || employment.jobPosition)
+      && residential.currentAddress
+      && (financial.monthlyIncome || financial.proofOfIncomeDocument || financial.proofOfIncomeType),
+    );
+  }
+
   private landlordStatus(doc: any, form: Record<string, any>): 'not-started' | 'in-progress' | 'complete' {
     if (!doc) return 'not-started';
+    if (this.passportIsComplete(doc, form)) return 'complete';
     const raw = String(doc.status || '').toLowerCase();
-    if (doc.isSubmitted === true || raw === 'submitted' || raw === 'complete') return 'complete';
     const filled = ['identity', 'employment', 'residential', 'financial', 'guarantor']
       .some((key) => this.sectionHasContent(form[key]));
     if (filled || raw === 'draft' || raw === 'in-progress' || raw === 'partial') return 'in-progress';

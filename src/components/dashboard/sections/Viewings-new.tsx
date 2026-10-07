@@ -3,11 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Calendar, Clock, MapPin, User, CheckCircle, Eye, X, Send, AlertCircle, ChevronLeft, ChevronRight, Search, LayoutGrid, List, RotateCcw } from 'lucide-react';
 import { maskEmail } from '../../../utils/formatters';
 import { viewingService, ViewingBooking, ViewingStats } from '../../../services/viewingService';
+import { listViewingsForTenant } from '../../../services/viewingInboxService';
 import { bookViewingRequestService, BookViewingRequest } from '../../../services/bookViewingRequestService';
 import { propertySelectionService, PropertySelection, PropertySelectionStats } from '../../../services/propertySelectionService';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSavedProperties } from '../../../contexts/SavedPropertiesContext';
-import BookViewingModal from '../../viewings/BookViewingModal';
+import RequestViewingModal, { RequestViewingProperty } from '../../viewings/RequestViewingModal';
 import emailService from '../../../services/emailService';
 import { useIsMobile } from '../ui/use-mobile';
 import TenantPageHeader from '../ui/TenantPageHeader';
@@ -18,6 +19,21 @@ type ViewingsTab = 'upcoming' | 'past' | 'calendar';
 type StatusFilter = 'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled';
 
 const CAL_HOURS = [9, 10, 11, 12, 13, 14, 15, 16];
+
+async function withApplicantViewings(bookings: ViewingBooking[], email?: string | null): Promise<ViewingBooking[]> {
+  if (!email) return bookings;
+  try {
+    const extra = await listViewingsForTenant(email);
+    const byId = new Map(bookings.map((booking) => [booking.id, booking]));
+    for (const item of extra) {
+      if (!item?.id || byId.has(item.id)) continue;
+      byId.set(item.id, item as ViewingBooking);
+    }
+    return Array.from(byId.values());
+  } catch {
+    return bookings;
+  }
+}
 
 function startOfWeekMonday(d: Date): Date {
   const x = new Date(d);
@@ -72,6 +88,10 @@ function statusClass(status: string): string {
     return status;
   }
   return 'pending';
+}
+
+function landlordEmailOf(viewing: ViewingBooking & { agentEmail?: string; landlordEmail?: string }): string {
+  return viewing.property?.agent?.email || viewing.agentEmail || viewing.landlordEmail || '';
 }
 
 function statusLabel(status: string): string {
@@ -133,6 +153,7 @@ const Viewings: React.FC = () => {
   const [rescheduleNewDate, setRescheduleNewDate] = useState('');
   const [rescheduleNewTime, setRescheduleNewTime] = useState('');
   const [rescheduleMessage, setRescheduleMessage] = useState('');
+  const [rescheduleAgentEmail, setRescheduleAgentEmail] = useState('');
   const [cancelMessage, setCancelMessage] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
@@ -307,7 +328,7 @@ const Viewings: React.FC = () => {
         if (upcoming.length === 0 && (allBookingsResult.bookings || []).length > 0) {
           console.log('Using fallback from all bookings to populate upcoming');
           upcoming = (allBookingsResult.bookings || []).filter(
-            (b: any) => b.status === 'pending' || b.status === 'confirmed'
+            (b: any) => b.status === 'pending' || b.status === 'confirmed' || b.status === 'rescheduled'
           );
         }
 
@@ -325,6 +346,9 @@ const Viewings: React.FC = () => {
         
         // Combine real bookings with filtered request placeholders
         upcoming = [...upcoming, ...filteredRequestBookings];
+        upcoming = (await withApplicantViewings(upcoming, user.email)).filter(
+          (booking) => booking.status === 'pending' || booking.status === 'confirmed' || booking.status === 'rescheduled',
+        );
         setUpcomingViewings(prev => {
           // Keep any draft at the top if present
           const draft = prev.find(v => String(v.id).startsWith('draft_'));
@@ -381,9 +405,10 @@ const Viewings: React.FC = () => {
     const unsubscribeBookings = viewingService.subscribeToUserViewingBookings(
       user.id,
       (bookings) => {
-        console.log('Real-time subscription received bookings:', bookings);
-        const upcoming = bookings.filter(b => b.status === 'pending' || b.status === 'confirmed');
-        const past = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
+        withApplicantViewings(bookings, user.email).then((merged) => {
+        console.log('Real-time subscription received bookings:', merged);
+        const upcoming = merged.filter(b => b.status === 'pending' || b.status === 'confirmed' || b.status === 'rescheduled');
+        const past = merged.filter(b => b.status === 'completed' || b.status === 'cancelled');
         console.log('Filtered upcoming:', upcoming);
         console.log('Filtered past:', past);
         setUpcomingViewings(prev => {
@@ -406,6 +431,7 @@ const Viewings: React.FC = () => {
           return [...upcoming, ...filteredRequests];
         });
         setPastViewings(past);
+        }).catch((error) => console.error('Error loading applicant viewings:', error));
       },
       (error) => console.error('Error in bookings subscription:', error)
     );
@@ -687,6 +713,7 @@ const Viewings: React.FC = () => {
       setRescheduleNewDate('');
       setRescheduleNewTime('');
       setRescheduleMessage('');
+      setRescheduleAgentEmail(landlordEmailOf(viewing));
       setIsRescheduleModalOpen(true);
     }
   };
@@ -712,6 +739,12 @@ const Viewings: React.FC = () => {
 
     setIsSendingEmail(true);
     try {
+      const agentEmail = (rescheduleAgentEmail || landlordEmailOf(selectedViewing)).trim();
+      if (!agentEmail.includes('@')) {
+        alert('Enter the landlord or agent email so they can receive this reschedule.');
+        return;
+      }
+
       const formData = {
         property: {
           street: selectedViewing.property.street,
@@ -719,8 +752,8 @@ const Viewings: React.FC = () => {
           city: selectedViewing.property.city,
           postcode: selectedViewing.property.postcode || '',
           agent: {
-            name: selectedViewing.property.agent.name,
-            email: selectedViewing.property.agent.email
+            name: selectedViewing.property.agent?.name || '',
+            email: agentEmail
           }
         },
         viewing: {
@@ -738,7 +771,7 @@ const Viewings: React.FC = () => {
       const propertyAddress = `${selectedViewing.property.street}, ${selectedViewing.property.town}, ${selectedViewing.property.city}`;
 
       const result = await emailService.sendEmail({
-        to: selectedViewing.property.agent.email,
+        to: agentEmail,
         subject: `Viewing Reschedule Request - ${propertyAddress}`,
         formData: formData,
         attachments: [],
@@ -746,8 +779,7 @@ const Viewings: React.FC = () => {
       });
 
       if (result.success) {
-        // P2-1: Store the new date and time in Firestore so the card updates
-        await viewingService.updateViewingStatus(
+        const updated = await viewingService.updateViewingStatus(
           selectedViewing.id,
           'rescheduled',
           `Reschedule requested: ${rescheduleMessage}`,
@@ -760,6 +792,24 @@ const Viewings: React.FC = () => {
             }
           }
         );
+        if (!updated.success) {
+          alert('The reschedule email was sent, but the viewing time could not be saved. Please try again.');
+          return;
+        }
+
+        setUpcomingViewings((prev) => prev.map((item) => (
+          item.id === selectedViewing.id
+            ? {
+                ...item,
+                status: 'rescheduled',
+                viewingDetails: {
+                  ...item.viewingDetails,
+                  date: rescheduleNewDate,
+                  time: rescheduleNewTime,
+                },
+              }
+            : item
+        )));
 
         alert('Reschedule request sent successfully!');
         setIsRescheduleModalOpen(false);
@@ -768,7 +818,7 @@ const Viewings: React.FC = () => {
         setRescheduleMessage('');
         setSelectedViewing(null);
       } else {
-        alert('Failed to send reschedule request. Please try again.');
+        alert(result.error || 'Failed to send reschedule request. Please try again.');
       }
     } catch (error) {
       console.error('Error sending reschedule email:', error);
@@ -1317,19 +1367,30 @@ const Viewings: React.FC = () => {
       </div>
 
 
-      <BookViewingModal
+      <RequestViewingModal
         open={isBookViewingOpen}
         onClose={() => {
           setIsBookViewingOpen(false);
           setBookAgainPrefill(null);
           setPrefilledPropertyData(null);
         }}
-        prefilledPropertyData={bookAgainPrefill || prefilledPropertyData}
-        onSubmissionComplete={() => {
-          setIsBookViewingOpen(false);
+        onSubmitted={() => {
           setBookAgainPrefill(null);
           setPrefilledPropertyData(null);
         }}
+        userId={user?.id}
+        applicantName={user?.name || [user?.givenName, user?.familyName].filter(Boolean).join(' ')}
+        applicantEmail={user?.email}
+        applicantPhone={user?.phone}
+        prefilledProperty={(bookAgainPrefill || prefilledPropertyData) as RequestViewingProperty | null}
+        properties={propertySelections.map((selection) => ({
+          id: selection.propertyId,
+          street: selection.property?.location?.street || selection.property?.address || selection.property?.title,
+          town: selection.property?.location?.town,
+          city: selection.property?.location?.city,
+          postcode: selection.property?.location?.postcode,
+          agent: selection.property?.agent,
+        })).filter((property) => property.street)}
       />
 
       {/* Reschedule Modal */}
@@ -1393,6 +1454,19 @@ const Viewings: React.FC = () => {
               </div>
 
               <div className="mb-4">
+                <label className={`block ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700 mb-1`}>
+                  Landlord or agent email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={rescheduleAgentEmail}
+                  onChange={(e) => setRescheduleAgentEmail(e.target.value)}
+                  placeholder="agent@agency.com"
+                  className={`w-full ${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                />
+              </div>
+
+              <div className="mb-4">
                 <label className={`block ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700 mb-2`}>
                   Message to Agent/Landlord <span className="text-red-500">*</span>
                 </label>
@@ -1405,7 +1479,7 @@ const Viewings: React.FC = () => {
                 />
                 <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-500 mt-1`}>
                   This message will be sent via email to{' '}
-                  <span className="font-mono tracking-wide">{maskEmail(selectedViewing.property.agent.email)}</span>
+                  <span className="font-mono tracking-wide">{maskEmail(rescheduleAgentEmail)}</span>
                 </p>
               </div>
 

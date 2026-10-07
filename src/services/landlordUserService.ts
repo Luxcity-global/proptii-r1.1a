@@ -19,13 +19,16 @@ class LandlordUserService {
   }> {
     try {
       const response = await apiService.get(`/landlords/check?email=${encodeURIComponent(email.toLowerCase())}`);
-      if (response.exists && response.user) {
+      const payload = response?.data && typeof response.data === 'object' && 'exists' in (response.data as object)
+        ? response.data as { exists?: boolean; user?: LandlordUser }
+        : response as { exists?: boolean; user?: LandlordUser };
+      if (payload.exists && payload.user) {
         return { 
           isLandlord: true, 
           user: {
-            ...response.user,
-            createdAt: response.user.createdAt ? new Date(response.user.createdAt) : undefined,
-            updatedAt: response.user.updatedAt ? new Date(response.user.updatedAt) : undefined
+            ...payload.user,
+            createdAt: payload.user.createdAt ? new Date(payload.user.createdAt) : undefined,
+            updatedAt: payload.user.updatedAt ? new Date(payload.user.updatedAt) : undefined
           } 
         };
       }
