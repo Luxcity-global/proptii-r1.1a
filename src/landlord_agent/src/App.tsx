@@ -15,6 +15,7 @@ import { AmenitiesSelection } from './components/AmenitiesSelection';
 import { ImagesAndNotesSelection } from './components/ImagesAndNotesSelection';
 import { AddPropertyWizard } from './components/AddPropertyWizard';
 import type { WizardPropertyData } from './components/AddPropertyWizard';
+import { EditProperty } from './components/EditProperty';
 import { PhotoUpload } from './components/PhotoUpload';
 import { Dashboard } from './components/Dashboard';
 import { PropertyDetails } from './components/PropertyDetails';
@@ -307,6 +308,7 @@ export type Screen =
   | 'property-details'
   | 'document-management'
   | 'photo-management'
+  | 'edit-property'
   | 'portfolio-insights'
   | 'property-insights'
   | 'tenant-details'
@@ -1743,8 +1745,9 @@ export function AppContent() {
               navigateToScreen('document-management');
             }}
             onManagePhotos={(property) => {
+              // Photos are managed inline in the PropertyDetails Photos tab
               selectProperty(property);
-              navigateToScreen('photo-management');
+              navigateToScreen('property-details');
             }}
             onViewInsights={() => handleNavigation('insights')}
             onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
@@ -1805,35 +1808,18 @@ export function AppContent() {
               navigateToScreen('property-details');
             }}
             onEditProperty={(property) => {
-              // Prefill edit state when editing from the Properties list
+              // Use the new single-page EditProperty form instead of the 5-step wizard
               selectProperty(property);
-              setIsEditing(true);
-              setEditingPropertyId(property.id);
-              setPropertySetupData({
-                propertyType: property.type || null,
-                propertyDetails: {
-                  address: property.address || '',
-                  monthlyRent: String(property.rent ?? ''),
-                  bedrooms: String(property.bedrooms ?? ''),
-                  bathrooms: String((property as any).bathrooms ?? ''),
-                  squareFootage: String((property as any).squareFootage ?? ''),
-                  uploadedDocuments: []
-                },
-                amenities: property.amenities || [],
-                images: (property.photos || []).map(p => p.url),
-                imageFiles: [],
-                additionalNotes: property.notes || '',
-                status: property.status // Preserve the original status
-              });
-              navigateToScreen('property-setup-step1');
+              navigateToScreen('edit-property');
             }}
             onManageDocuments={(property) => {
               selectProperty(property);
               navigateToScreen('document-management');
             }}
             onManagePhotos={(property) => {
+              // Photos are managed inline in the PropertyDetails Photos tab
               selectProperty(property);
-              navigateToScreen('photo-management');
+              navigateToScreen('property-details');
             }}
             onViewTenant={(tenant) => {
               selectTenant(tenant);
@@ -2411,8 +2397,9 @@ export function AppContent() {
               navigateToScreen('document-management');
             }}
             onManagePhotos={(property) => {
+              // Photos are managed inline in the PropertyDetails Photos tab
               selectProperty(property);
-              navigateToScreen('photo-management');
+              navigateToScreen('property-details');
             }}
             // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
             onViewInsights={() => {/* navigateToScreen('portfolio-insights') */ }}
@@ -2855,30 +2842,11 @@ export function AppContent() {
             tenants={tenants}
             onBack={() => navigateToMainApp('properties')}
             onEdit={(property) => {
-              // Enter editing mode and prefill setup data from the selected property
+              // Enter editing mode with the new single-page EditProperty form
               setSelectedProperty(property);
-              setIsEditing(true);
-              setEditingPropertyId(property.id);
-              setPropertySetupData({
-                propertyType: property.type || null,
-                propertyDetails: {
-                  address: property.address || '',
-                  monthlyRent: String(property.rent ?? ''),
-                  bedrooms: String(property.bedrooms ?? ''),
-                  bathrooms: String((property as any).bathrooms ?? ''),
-                  squareFootage: String((property as any).squareFootage ?? ''),
-                  uploadedDocuments: []
-                },
-                amenities: property.amenities || [],
-                images: (property.photos || []).map(p => p.url),
-                imageFiles: [],
-                additionalNotes: property.notes || '',
-                status: property.status // Preserve the original status
-              });
-              navigateToScreen('property-setup-step1');
+              navigateToScreen('edit-property');
             }}
             onManageDocuments={() => navigateToScreen('document-management')}
-            onManagePhotos={() => navigateToScreen('photo-management')}
             updateProperty={updateProperty}
             onViewTenant={(tenantId) => {
               const tenant = tenants.find(t => t.id === tenantId);
@@ -3122,12 +3090,38 @@ export function AppContent() {
         );
 
       case 'photo-management':
+        // Photos are now managed inline in the PropertyDetails Photos tab.
+        // Any deep-link or sessionStorage restore that lands here gets sent back.
+        navigateToScreen('property-details');
+        return null;
+
+      case 'edit-property':
+        if (!selectedProperty) {
+          navigateToMainApp('properties');
+          return null;
+        }
         return (
-          <PhotoManagement
+          <EditProperty
             property={selectedProperty}
+            userProfile={userProfile}
+            onSave={async (updates) => {
+              await updateProperty(selectedProperty.id, updates as any);
+              // Fetch the updated property from the DB so local state is accurate
+              const refreshed = await propertyService.getProperty(selectedProperty.id);
+              if (refreshed) {
+                const tenantForProperty = tenants.find(
+                  t => t.propertyId === selectedProperty.id || t.id === refreshed.tenantId
+                );
+                const enriched = {
+                  ...refreshed,
+                  tenant: tenantForProperty || refreshed.tenant,
+                  tenantId: tenantForProperty?.id || refreshed.tenantId,
+                };
+                setSelectedProperty(enriched);
+                setProperties(prev => prev.map(p => p.id === enriched.id ? enriched : p));
+              }
+            }}
             onBack={() => navigateToScreen('property-details')}
-            onPhotoAdd={addPhotoToProperty}
-            updateProperty={updateProperty}
           />
         );
 
@@ -3422,8 +3416,9 @@ export function AppContent() {
               }
             }}
             onAddPhotos={(property) => {
+              // Photos managed inline in PropertyDetails Photos tab
               selectProperty(property);
-              navigateToScreen('photo-management');
+              navigateToScreen('property-details');
             }}
             onUploadDocs={(property) => {
               selectProperty(property);
@@ -3431,27 +3426,7 @@ export function AppContent() {
             }}
             onEditDetails={(property) => {
               selectProperty(property);
-              setIsEditing(true);
-              setEditingPropertyId(property.id);
-              setPropertySetupData({
-                propertyType: property.type || null,
-                propertyDetails: {
-                  address: property.address || '',
-                  monthlyRent: String(property.rent ?? ''),
-                  bedrooms: String(property.bedrooms ?? ''),
-                  bathrooms: String((property as any).bathrooms ?? ''),
-                  squareFootage: String((property as any).squareFootage ?? ''),
-                  uploadedDocuments: [],
-                },
-                amenities: property.amenities || [],
-                images: (property.photos || []).map(p => p.url),
-                imageFiles: [],
-                additionalNotes: property.notes || '',
-                status: property.status,
-              });
-              // After editing, come back to the enrichment queue
-              setPreviousScreen('property-enrichment-queue');
-              navigateToScreen('property-setup-step1');
+              navigateToScreen('edit-property');
             }}
             onViewProperty={(property) => {
               selectProperty(property);
