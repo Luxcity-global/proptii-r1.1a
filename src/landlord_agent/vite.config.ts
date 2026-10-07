@@ -3,6 +3,47 @@ import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 import fs from 'fs';
 
+/**
+ * Vite plugin that resolves the pdfjs-dist pdf.worker ?url import used by
+ * DocumentSigningViewer.tsx. The `?url` suffix tells Vite to return the
+ * worker script as a URL string rather than executing it as a module, but the
+ * landlord sub-build's Rollup instance doesn't handle sub-path `?url` queries
+ * via the standard resolveId path. We intercept the bare specifier here and
+ * return the absolute filesystem path of the worker file so Rollup can copy it
+ * to the output directory and give us its public URL.
+ */
+function pdfjsWorkerUrlPlugin(): import('vite').Plugin {
+  const WORKER_ID = 'pdfjs-dist/build/pdf.worker';
+  return {
+    name: 'pdfjs-worker-url',
+    resolveId(source: string) {
+      // Rollup strips the `?url` suffix before calling resolveId, so we match
+      // both the bare module and the suffixed import.
+      if (source === WORKER_ID || source === `${WORKER_ID}?url`) {
+        // Return a virtual module ID — we'll supply the URL string in `load`.
+        return `\0pdfjs-worker-url`;
+      }
+      return null;
+    },
+    load(id: string) {
+      if (id === '\0pdfjs-worker-url') {
+        // Resolve the actual worker file path from root node_modules.
+        const workerPath = path.resolve(__dirname, '../../node_modules/pdfjs-dist/build/pdf.worker.min.mjs');
+        const fallback   = path.resolve(__dirname, '../../node_modules/pdfjs-dist/build/pdf.worker.min.js');
+        const exists     = fs.existsSync(workerPath) ? workerPath : (fs.existsSync(fallback) ? fallback : null);
+        if (!exists) {
+          // If the file is somehow missing, return a CDN URL so the build doesn't fail.
+          return `export default 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';`;
+        }
+        // Emit the worker file as a static asset and return its public URL.
+        const ref = this.emitFile({ type: 'asset', name: path.basename(exists), source: fs.readFileSync(exists) });
+        return `export default import.meta.ROLLUP_FILE_URL_${ref};`;
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const rootEnvDir = path.resolve(__dirname, '../..');
   const rootNodeModules = path.resolve(__dirname, '../../node_modules');
@@ -12,6 +53,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      pdfjsWorkerUrlPlugin(),
       {
         name: 'ga4-html-replace',
         transformIndexHtml(html: string) {
@@ -117,5 +159,11 @@ export default defineConfig(({ mode }) => {
       outDir: '../../public/landlord',
       emptyOutDir: true,
     },
+    // pdfjs-dist is consumed by DocumentSigningViewer via the `?url` worker import.
+    // Pre-bundling ensures Rollup sees the package during the landlord sub-build.
+    optimizeDeps: {
+      include: ['pdfjs-dist', 'pdf-lib'],
+    },
+    assetsInclude: ['**/*.worker.js', '**/*.worker.mjs'],
   };
 });
