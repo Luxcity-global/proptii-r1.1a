@@ -138,7 +138,16 @@ class RealDashboardService implements DashboardServiceInterface {
   }
 
   async getContracts(): Promise<ApiResponse<Contract[]>> {
-    return apiService.get<Contract[]>('/contracts');
+    const response = await apiService.get<any>('/contracts');
+    const body = response.data;
+    const list = Array.isArray(body)
+      ? body
+      : Array.isArray(body?.data)
+        ? body.data
+        : Array.isArray(body?.contracts)
+          ? body.contracts
+          : [];
+    return { success: true, data: list };
   }
 
   async getUserFiles(): Promise<ApiResponse<UserFile[]>> {

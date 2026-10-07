@@ -119,7 +119,10 @@ function SidebarNavList({
     <ul className="ll-sidebar-nav">
       {navigationItems.map((item) => {
         const path = screenToPath[item.id] || '/dashboard';
-        const isActive = location.pathname === path || currentScreen === item.id;
+        const currentPath = location.pathname.startsWith('/landlord')
+          ? location.pathname.slice('/landlord'.length) || '/'
+          : location.pathname;
+        const isActive = currentPath === path || currentScreen === item.id;
         return (
           <li key={item.id}>
             <button

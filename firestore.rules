@@ -14,6 +14,19 @@ service cloud.firestore {
       return isAuthenticated() && (request.auth.token.admin == true || request.auth.token.role == 'admin');
     }
 
+    function emailIs(value) {
+      return isAuthenticated()
+        && value is string
+        && request.auth.token.email is string
+        && value.lower() == request.auth.token.email.lower();
+    }
+
+    function propertyAgentEmailMatches() {
+      return resource.data.property is map
+        && resource.data.property.agent is map
+        && emailIs(resource.data.property.agent.email);
+    }
+
     // Users collection - protect private profile data
     match /users/{userId} {
       allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
@@ -81,11 +94,34 @@ service cloud.firestore {
 
     // Viewing bookings collection
     match /viewingBookings/{documentId} {
-      allow read, write: if isAuthenticated() && 
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         resource.data.landlordId == request.auth.uid || 
+         resource.data.agentId == request.auth.uid ||
+         emailIs(resource.data.agentEmail) ||
+         emailIs(resource.data.landlordEmail) ||
+         emailIs(resource.data.tenantEmail) ||
+         propertyAgentEmailMatches() ||
+         isAdmin());
+      allow write: if isAuthenticated() && 
         (resource == null || 
          resource.data.userId == request.auth.uid || 
          resource.data.landlordId == request.auth.uid || 
          resource.data.agentId == request.auth.uid ||
+         isAdmin());
+    }
+
+    // Viewings saved by the API. Landlords can read a booking sent to their email.
+    match /viewings/{documentId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         resource.data.tenantId == request.auth.uid || 
+         resource.data.landlordId == request.auth.uid || 
+         resource.data.agentId == request.auth.uid ||
+         emailIs(resource.data.agentEmail) ||
+         emailIs(resource.data.landlordEmail) ||
+         emailIs(resource.data.tenantEmail) ||
+         propertyAgentEmailMatches() ||
          isAdmin());
     }
 

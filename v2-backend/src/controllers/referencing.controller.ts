@@ -326,8 +326,8 @@ export class ReferencingController {
   @ApiOperation({ summary: 'List referencing passports received/claimed by landlord' })
   @ApiResponse({ status: 200, description: 'Array of received passports' })
   async getReceivedReferencings(@Req() req: any) {
-    const email = (req.user.email || '').toLowerCase().trim();
-    return await this.referencingService.getReceivedReferencings(email);
+    const email = (req.user?.email || '').toLowerCase().trim();
+    return await this.referencingService.getReceivedReferencings(email, req.user?.uid);
   }
 
   // ── Request referencing from a tenant ────────────────────────────────────

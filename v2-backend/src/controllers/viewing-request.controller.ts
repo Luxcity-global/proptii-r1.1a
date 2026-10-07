@@ -39,23 +39,33 @@ export class ViewingRequestController {
     try {
       const result = await this.viewingRequestService.createViewing(tenantId, tenantEmail, body);
       const createdId = (result as any)?.id || (result as any)?.requestId || 'unknown';
+      const createdStatus = (result as any)?.status || body.status || 'pending';
       this.logger.log(`[createViewing] uid=${tenantId} → created id=${createdId}`);
 
-      // Broadcast SSE event
+      const eventData = {
+        id: createdId,
+        tenantId: (result as any)?.tenantId || tenantId,
+        tenantEmail: (result as any)?.tenantEmail || tenantEmail,
+        propertyId: body.propertyId,
+        landlordId: (result as any)?.landlordId || body.landlordId,
+        agentId: (result as any)?.agentId || body.agentId,
+        status: createdStatus,
+      };
+      const managerEmail = (result as any)?.agentEmail || body.agentEmail || body.property?.agent?.email;
       this.eventsService.emit({
         type: 'viewing_created',
         userId: tenantId,
-        targetEmail: body.agentEmail || body.property?.agent?.email,
-        data: {
-          id: createdId,
-          tenantId,
-          tenantEmail,
-          propertyId: body.propertyId,
-          landlordId: body.landlordId,
-          agentId: body.agentId,
-          status: 'pending',
-        },
+        targetEmail: managerEmail,
+        data: eventData,
       });
+      const landlordEmail = (result as any)?.landlordEmail;
+      if (landlordEmail && landlordEmail !== managerEmail) {
+        this.eventsService.emit({
+          type: 'viewing_created',
+          targetEmail: landlordEmail,
+          data: eventData,
+        });
+      }
 
       return result;
     } catch (err: any) {
@@ -72,7 +82,7 @@ export class ViewingRequestController {
     const role = req.user.role || 'tenant';
     this.logger.log(`[getViewings] uid=${userId} role=${role}`);
     try {
-      const result = await this.viewingRequestService.getViewingRequests(userId, role);
+      const result = await this.viewingRequestService.getViewingRequests(userId, role, req.user.email);
       this.logger.log(`[getViewings] uid=${userId} → returned ${Array.isArray(result) ? result.length : '?'} item(s)`);
       return result;
     } catch (err: any) {
@@ -101,11 +111,18 @@ export class ViewingRequestController {
   @ApiOperation({ summary: 'Update viewing request status (confirmed, cancelled, rescheduled, completed)' })
   @ApiParam({ name: 'id', description: 'Viewing Request ID' })
   @ApiResponse({ status: 200, description: 'Status updated' })
-  async updateViewingStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: string; notes?: string }) {
+  async updateViewingStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: string; notes?: string; agentNotes?: string; viewingDetails?: any }) {
     const userId = req.user.uid;
     this.logger.log(`[updateViewingStatus] uid=${userId} id=${id} status=${body.status}`);
     try {
-      const result = await this.viewingRequestService.updateViewingStatus(id, userId, body.status, body.notes, req.user);
+      const result = await this.viewingRequestService.updateViewingStatus(
+        id,
+        userId,
+        body.status,
+        body.notes,
+        req.user,
+        { agentNotes: body.agentNotes, viewingDetails: body.viewingDetails },
+      );
       this.logger.log(`[updateViewingStatus] uid=${userId} id=${id} → updated OK`);
 
       // Broadcast SSE update event

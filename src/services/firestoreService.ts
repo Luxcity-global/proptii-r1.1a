@@ -206,10 +206,14 @@ class FirestoreService {
       }
 
       const headers = await authHeaders();
+      const identityEmail = typeof (formData as any)?.identity?.email === 'string'
+        ? (formData as any).identity.email.trim().toLowerCase()
+        : '';
       const payload = {
         formData: this.cleanFormData(formData),
         currentStep,
-        stepStatus
+        stepStatus,
+        ...(identityEmail.includes('@') ? { email: identityEmail } : {}),
       };
 
       const res = await fetch(`${API_BASE}/api/referencing/forms/${propertyId}`, {
@@ -250,7 +254,19 @@ class FirestoreService {
 
       const json = await res.json();
       if (json.success && json.data) {
-        return { success: true, data: json.data as ReferencingDocument };
+        const record = json.data as any;
+        const lookupEmail = [record.email, record.identity?.email, record.formData?.identity?.email]
+          .find((value) => typeof value === 'string' && value.includes('@'));
+        const storedEmail = typeof record.email === 'string' ? record.email.trim().toLowerCase() : '';
+        const normalized = typeof lookupEmail === 'string' ? lookupEmail.trim().toLowerCase() : '';
+        if (normalized && storedEmail !== normalized) {
+          fetch(`${API_BASE}/api/referencing/forms/${propertyId}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ email: normalized }),
+          }).catch(() => {});
+        }
+        return { success: true, data: record as ReferencingDocument };
       }
       
       return { success: true, data: undefined };
@@ -379,10 +395,12 @@ class FirestoreService {
       }
 
       const json = await res.json();
+      const responses = Array.isArray(json?.responses) ? json.responses : [];
+      const isGuarantor = (row: any) => `${row?.responseType || ''} ${row?.type || ''}`.toLowerCase().includes('guarantor');
       return {
         success: true,
-        refereeResponses: json.data?.refereeResponses || [],
-        guarantorResponses: json.data?.guarantorResponses || []
+        refereeResponses: json.data?.refereeResponses || responses.filter((row: any) => !isGuarantor(row)),
+        guarantorResponses: json.data?.guarantorResponses || responses.filter((row: any) => isGuarantor(row)),
       };
     } catch (error: any) {
       console.error('❌ Error getting referee/guarantor responses:', error);

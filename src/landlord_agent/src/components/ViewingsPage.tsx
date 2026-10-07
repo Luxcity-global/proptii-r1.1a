@@ -24,7 +24,8 @@ import {
   List,
   RotateCcw,
 } from 'lucide-react';
-import viewingService, { ViewingBooking, ViewingStats } from '../../../services/viewingService';
+import viewingService, { ViewingBooking, ViewingStats, viewingPollingCoordinator } from '../../../services/viewingService';
+import { listViewingsForLandlord, rememberViewings } from '../../../services/viewingInboxService';
 import {
   bookViewingRequestService,
   BookViewingRequest
@@ -36,7 +37,6 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { trackEvent } from '../../../utils/analytics';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { Property, UserProfile } from '../App';
 import {
   getAgentDummyViewingRequests,
@@ -256,7 +256,6 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   managerEmail,
   userProfile,
   properties = [],
-  onAddProperty,
   onRefresh,
   onViewSettings,
   onViewNotifications,
@@ -299,13 +298,15 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const withAgentDummyBookings = (live: ViewingBooking[]) =>
     isAgentPersona ? mergeById(getAgentDummyViewings(), live) : live;
 
+  const viewingStatus = (status?: string) => String(status || '').trim().toLowerCase();
+
   const statsFromBookings = (items: ViewingBooking[]): ViewingStats =>
     items.reduce<ViewingStats>(
       (acc, booking) => {
         acc.total++;
-        if (['pending', 'confirmed'].includes(booking.status)) acc.upcoming++;
-        if (booking.status === 'completed') acc.completed++;
-        if (booking.status === 'rescheduled') acc.rescheduled++;
+        if (['pending', 'confirmed'].includes(viewingStatus(booking.status))) acc.upcoming++;
+        if (viewingStatus(booking.status) === 'completed') acc.completed++;
+        if (viewingStatus(booking.status) === 'rescheduled') acc.rescheduled++;
         return acc;
       },
       { upcoming: 0, completed: 0, rescheduled: 0, total: 0 },
@@ -329,6 +330,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const [calendarWeekStart, setCalendarWeekStart] = useState<Date>(() => startOfWeekMonday(new Date()));
   
   const ITEMS_PER_PAGE = 10;
+  const ownedAddresses = (properties || []).map((property) => property.address).filter(Boolean).join('\n');
 
   useEffect(() => {
     let unsubscribeBookings: (() => void) | undefined;
@@ -414,6 +416,21 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         if (landlordUserId && bookingsResultById?.success && bookingsResultById.bookings) {
           bookingsResultById.bookings.forEach(booking => bookingsMap.set(booking.id, booking));
         }
+
+        rememberViewings(viewingPollingCoordinator.getCachedData() || []);
+        const linkedViewings = await listViewingsForLandlord({
+          uid: managerId,
+          extraIds: [landlordUserId],
+          email: normalizedEmail,
+          propertyTitles: ownedAddresses.split('\n').filter(Boolean),
+        });
+        linkedViewings.forEach((item) => {
+          if (viewingStatus(item.status) === 'requested') {
+            requestsMap.set(item.id, item);
+          } else {
+            bookingsMap.set(item.id, item);
+          }
+        });
 
         const mergedRequests = withAgentDummyRequests(Array.from(requestsMap.values()));
         const mergedBookings = withAgentDummyBookings(Array.from(bookingsMap.values()));
@@ -587,7 +604,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       unsubscribeRequests?.();
       unsubscribeStats?.();
     };
-  }, [managerId, managerEmail, isAuthenticatedUser, isAgentPersona]);
+  }, [managerId, managerEmail, isAuthenticatedUser, isAgentPersona, ownedAddresses]);
 
   // Function to check if a viewing date/time has passed
   const isViewingDatePassed = (viewing: ViewingBooking): boolean => {
@@ -652,27 +669,32 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const upcomingViewings = useMemo(
     () =>
       bookings.filter((viewing) =>
-        ['confirmed', 'rescheduled'].includes(viewing.status)
+        ['confirmed', 'rescheduled'].includes(viewingStatus(viewing.status))
       ),
     [bookings]
   );
 
   const pendingViewings = useMemo(
     () =>
-      bookings.filter((viewing) => viewing.status === 'pending'),
+      bookings.filter((viewing) => viewingStatus(viewing.status) === 'pending'),
     [bookings]
+  );
+
+  const incomingRequests = useMemo(
+    () => requests.filter((request) => viewingStatus(request.status) === 'requested'),
+    [requests],
   );
 
   const completedViewings = useMemo(
     () =>
-      bookings.filter((viewing) => viewing.status === 'completed'),
+      bookings.filter((viewing) => viewingStatus(viewing.status) === 'completed'),
     [bookings]
   );
 
   const calendarViewings = useMemo(
     () =>
       bookings.filter((viewing) =>
-        ['confirmed', 'rescheduled', 'pending'].includes(viewing.status),
+        ['confirmed', 'rescheduled', 'pending'].includes(viewingStatus(viewing.status)),
       ),
     [bookings],
   );
@@ -718,7 +740,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       {
         key: 'requests' as TabKey,
         title: 'Pending Requests',
-        value: requests.length + pendingViewings.length,
+        value: incomingRequests.length + pendingViewings.length,
         hint: 'Awaiting your approval',
         icon: <Clock size={16} />,
         tone: 'is-amber',
@@ -749,7 +771,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       },
     ];
   }, [
-    requests.length,
+    incomingRequests.length,
     pendingViewings.length,
     upcomingViewings.length,
     stats.completed,
@@ -798,32 +820,32 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const filteredCompletedViewings = useMemo(() => filterItems(completedViewings), [completedViewings, filterQuery, filterType]);
 
   // Pagination for requests tab (combines requests and pending viewings)
-  const allRequestsCount = requests.length + filteredPendingViewings.length;
+  const allRequestsCount = incomingRequests.length + filteredPendingViewings.length;
   const totalRequestsPages = Math.ceil(allRequestsCount / ITEMS_PER_PAGE);
   const requestsStartIndex = (currentRequestsPage - 1) * ITEMS_PER_PAGE;
   const requestsEndIndex = requestsStartIndex + ITEMS_PER_PAGE;
   
   // Paginate requests and pending viewings separately but show together
   const paginatedRequests = useMemo(() => {
-    if (requestsStartIndex < requests.length) {
-      const requestsEnd = Math.min(requests.length, requestsEndIndex);
-      const requestsSlice = requests.slice(requestsStartIndex, requestsEnd);
+    if (requestsStartIndex < incomingRequests.length) {
+      const requestsEnd = Math.min(incomingRequests.length, requestsEndIndex);
+      const requestsSlice = incomingRequests.slice(requestsStartIndex, requestsEnd);
       const remainingSlots = ITEMS_PER_PAGE - requestsSlice.length;
       
-      if (remainingSlots > 0 && requestsEndIndex > requests.length) {
-        const pendingStart = Math.max(0, requestsStartIndex - requests.length);
+      if (remainingSlots > 0 && requestsEndIndex > incomingRequests.length) {
+        const pendingStart = Math.max(0, requestsStartIndex - incomingRequests.length);
         const pendingEnd = Math.min(filteredPendingViewings.length, pendingStart + remainingSlots);
         const pendingSlice = filteredPendingViewings.slice(pendingStart, pendingEnd);
         return { requests: requestsSlice, pendingViewings: pendingSlice };
       }
       return { requests: requestsSlice, pendingViewings: [] };
     } else {
-      const pendingStart = requestsStartIndex - requests.length;
-      const pendingEnd = Math.min(filteredPendingViewings.length, requestsEndIndex - requests.length);
+      const pendingStart = requestsStartIndex - incomingRequests.length;
+      const pendingEnd = Math.min(filteredPendingViewings.length, requestsEndIndex - incomingRequests.length);
       const pendingSlice = filteredPendingViewings.slice(pendingStart, pendingEnd);
       return { requests: [], pendingViewings: pendingSlice };
     }
-  }, [requests, filteredPendingViewings, requestsStartIndex, requestsEndIndex]);
+  }, [incomingRequests, filteredPendingViewings, requestsStartIndex, requestsEndIndex]);
 
   const totalUpcomingPages = Math.ceil(filteredUpcomingViewings.length / ITEMS_PER_PAGE);
   const upcomingStartIndex = (currentUpcomingPage - 1) * ITEMS_PER_PAGE;
@@ -1413,17 +1435,6 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
     return <LandlordPageEmptyShell page="viewings" variant="guest" />;
   }
 
-  if (isNewPortfolioUser(properties)) {
-    return (
-      <LandlordPageEmptyShell
-        page="viewings"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile?.name}
-      />
-    );
-  }
-
   if (loading) {
     return (
       <div className="ll-vw">
@@ -1594,7 +1605,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                 className={`ll-vw-tab${activeTab === 'requests' ? ' is-active' : ''}`}
               >
                 <span>Pending Requests</span>
-                <span className="ll-vw-tab-count">{requests.length + pendingViewings.length}</span>
+                <span className="ll-vw-tab-count">{incomingRequests.length + pendingViewings.length}</span>
               </button>
               <button
                 type="button"
@@ -3291,15 +3302,15 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     ? `${propertyStreet((properties || [])[0].address)} is generating elevated inquiry volume`
                     : 'Viewing demand is tracking above baseline'}
                 </strong>{' '}
-                this month, with {requests.length} open request
-                {requests.length === 1 ? '' : 's'} and {stats.upcoming} upcoming appointment
+                this month, with {incomingRequests.length} open request
+                {incomingRequests.length === 1 ? '' : 's'} and {stats.upcoming} upcoming appointment
                 {stats.upcoming === 1 ? '' : 's'} across the portfolio.
               </div>
               <div className="ll-vw-insights-grid">
                 <div>
                   <span>Average Inquiries / Day</span>
                   <strong>
-                    {(Math.max(requests.length, bookings.length) / 7).toFixed(1)} inquiries
+                    {(Math.max(incomingRequests.length, bookings.length) / 7).toFixed(1)} inquiries
                   </strong>
                 </div>
                 <div>

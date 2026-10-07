@@ -7,6 +7,7 @@ import contractEmailService from '../../services/contractEmailService';
 import signedContractsFirestoreService from '../../services/signedContractsFirestoreService';
 import contractSyncService from '../../services/contractSyncService';
 import { uploadToFirebaseStorage } from '../../services/storageService';
+import { buildSignedContractSave } from '../../services/signedContractHandoff';
 
 interface SendContractProps {
   contractData: {
@@ -26,13 +27,28 @@ interface SendContractProps {
   onInterceptSignUp?: () => void;
   onSend: (recipients: string[], signature?: File) => void;
   onClose?: () => void;
+  initialRecipient?: { name: string; email: string };
+  sourceContract?: {
+    id: string;
+    title?: string;
+    propertyAddress?: string;
+    tenantName?: string;
+    tenantEmail?: string;
+    landlordEmail?: string;
+    landlordId?: string;
+    contractType?: string;
+  };
 }
 
 
-const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfBytes, interceptWithSignUp, onInterceptSignUp, onSend, onClose }) => {
+const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfBytes, interceptWithSignUp, onInterceptSignUp, onSend, onClose, initialRecipient, sourceContract }) => {
   const { addSignedContract } = useSignedContracts();
   const { user } = useAuth();
-  const [recipients, setRecipients] = useState<Array<{name: string, email: string, isRegistered: boolean}>>([{name: '', email: '', isRegistered: false}]);
+  const [recipients, setRecipients] = useState<Array<{name: string, email: string, isRegistered: boolean}>>([{
+    name: initialRecipient?.name || '',
+    email: initialRecipient?.email || '',
+    isRegistered: false,
+  }]);
   const [users, setUsers] = useState<User[]>([]);
   const [showSuggestions, setShowSuggestions] = useState<boolean[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -285,6 +301,13 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
         
         const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
         const blobUrl = URL.createObjectURL(pdfBlob);
+
+        const signedDataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(pdfBlob);
+        });
         
         // Upload to Firebase Storage
         console.log('☁️ Uploading signed document to storage...');
@@ -302,49 +325,35 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
         
         // Save complete contract data to Firestore
         const signedContractData = {
-          templateId: 'template-id', // TODO: Get from template prop
-          templateName: contractData.title || 'Contract Document',
-          propertyName: contractData.extractedFields?.propertyAddress?.split(',')[0] || 'Contract Property',
-          propertyAddress: contractData.extractedFields?.propertyAddress || 'Contract Property Address',
-          agentName: validRecipients[0].name || user?.name || 'Agent',
-          agentEmail: validRecipients[0].email || user?.email || 'agent@example.com',
-          tenantName: validRecipients[0].name || 'Tenant',
-          tenantEmail: validRecipients[0].email || 'tenant@example.com',
+          ...buildSignedContractSave({
+            source: sourceContract,
+            title: contractData.title,
+            propertyAddress: contractData.extractedFields?.propertyAddress,
+            recipientName: validRecipients[0].name,
+            recipientEmail: validRecipients[0].email,
+            signerName: user?.name,
+            signerEmail: user?.email,
+            uploadedUrl: finalDocumentUrl,
+            dataUrl: signedDataUrl,
+            byteLength: signedPdfBytes.length,
+          }),
           signedDate: new Date().toISOString(),
-          documentUrl: finalDocumentUrl,
-          documentName: `${(contractData.title || 'contract').replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`,
-          documentSize: signedPdfBytes.length,
-          documentType: 'application/pdf',
-          status: 'sent' as const,
-          emailSent: true,
-          emailSentDate: new Date().toISOString()
+          emailSentDate: new Date().toISOString(),
         };
         
         const result = await signedContractsFirestoreService.saveSignedContract(userId, signedContractData);
         
-        if (result.success) {
+        if (result.success && result.contractId) {
           console.log('✅ Signed contract saved to Firestore successfully:', result.contractId);
-          
-          // If any recipients are landlords/agents, sync to landlord dashboard
-          if (landlordCheck.hasLandlords && landlordCheck.landlords.length > 0) {
-            console.log('🔄 Syncing signed contract to landlord dashboard(s)...');
-            
-            // Get the full signed contract data that was just saved
-            const savedContract = await signedContractsFirestoreService.getSignedContractById(result.contractId!);
-            
-            if (savedContract.success && savedContract.contract) {
-              const landlordEmails = landlordCheck.landlords.map(l => l.email);
-              const syncResult = await contractSyncService.syncToMultipleLandlords(
-                savedContract.contract,
-                landlordEmails
-              );
-              
-              if (syncResult.success) {
-                console.log(`✅ Successfully synced to ${syncResult.syncedCount} landlord dashboard(s)`);
-                console.log('📊 Sync results:', syncResult.results);
-              } else {
-                console.error('❌ Failed to sync to landlord dashboards');
-              }
+          const savedContract = await signedContractsFirestoreService.getSignedContractById(result.contractId);
+          if (savedContract.success && savedContract.contract) {
+            const landlordEmails = validRecipients.map(r => r.email);
+            const syncResult = await contractSyncService.syncToMultipleLandlords(
+              savedContract.contract,
+              landlordEmails
+            );
+            if (syncResult.success) {
+              console.log(`✅ Contract is visible to ${syncResult.syncedCount} recipient(s)`);
             }
           }
         } else {

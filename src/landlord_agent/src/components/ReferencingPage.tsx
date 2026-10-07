@@ -52,6 +52,9 @@ interface ReceivedShare {
   score?: number;
   checks?: { label: string; passed: boolean }[];
   steps?: PassportStep[];
+  userId?: string;
+  passportStatus?: 'not-started' | 'in-progress' | 'complete';
+  formData?: Parameters<typeof derivePassportSteps>[0];
 }
 
 interface ReferencingPageProps {
@@ -238,6 +241,11 @@ function ReceivedPassports({
     setPassportShare(share);
     if (share.steps && share.steps.length > 0) {
       setPassportSteps(share.steps);
+      setPassportLoading(false);
+      return;
+    }
+    if (share.formData && Object.keys(share.formData).length > 0) {
+      setPassportSteps(derivePassportSteps(share.formData, share.passportStatus || 'in-progress'));
       setPassportLoading(false);
       return;
     }
@@ -691,7 +699,9 @@ function RequestReferencing({
                 </tr>
               ) : (
                 filteredTenants.map((tenant) => {
-                  const status = statuses.get(tenant.email) || 'not-started';
+                  const status = statuses.get(tenant.email)
+                    || statuses.get(tenant.email.trim().toLowerCase())
+                    || 'not-started';
                   const reqState = requestStates[tenant.email];
                   const isLoading = reqState?.loading;
                   const isSent = reqState?.success;
@@ -803,7 +813,13 @@ export function ReferencingPage({
       });
       if (!res.ok) throw new Error('Failed to load');
       const json = await res.json();
-      const live = json.data || [];
+      const live = ((json.data || []) as ReceivedShare[]).map((share) => {
+        if (share.steps?.length || !share.formData || !Object.keys(share.formData).length) return share;
+        return {
+          ...share,
+          steps: derivePassportSteps(share.formData, share.passportStatus || 'in-progress'),
+        };
+      });
       setShares(agentPersona ? mergeById(getAgentDummyReceivedShares(), live) : live);
     } catch {
       if (agentPersona) {

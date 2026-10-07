@@ -41,7 +41,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useIsMobile } from './ui/use-mobile';
 import { Property, PropertyDocument, UserProfile } from '../App';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
@@ -270,7 +269,6 @@ export function DocumentsPage({
   onArchiveDocuments,
   onExportDocuments,
   userProfile,
-  onAddProperty,
   onRefresh,
   onViewSettings,
   onViewNotifications,
@@ -708,31 +706,6 @@ export function DocumentsPage({
 
   if (!userProfile) {
     return <LandlordPageEmptyShell page="documents" variant="guest" />;
-  }
-
-  // If brand-new user with no properties AND no unassigned docs, show the
-  // "Add your first property" shell — but still allow vault upload via the button.
-  if (isNewPortfolioUser(properties) && unassignedDocuments.length === 0) {
-    return (
-      <LandlordPageEmptyShell
-        page="documents"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      >
-        {onUploadToVault && (
-          <button
-            type="button"
-            className="ll-docs-btn-attach"
-            style={{ marginTop: 12 }}
-            onClick={() => openAttachFlow()}
-          >
-            <Upload size={15} />
-            Upload document without a property
-          </button>
-        )}
-      </LandlordPageEmptyShell>
-    );
   }
 
   const effectiveDisplay: DisplayStyle = isMobile && viewScope === 'all' ? 'grid' : displayStyle;

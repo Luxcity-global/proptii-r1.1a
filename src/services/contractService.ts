@@ -288,9 +288,16 @@ class ContractService {
   ): Promise<{ success: boolean; contracts?: any[]; error?: string }> {
     try {
       const response = await apiService.get('/contracts');
-      let contracts = response.data || [];
-      if (statusFilter) contracts = contracts.filter((c: any) => c.status === statusFilter);
-      return { success: true, contracts };
+      const body = response?.data ?? response;
+      const contracts = Array.isArray(body)
+        ? body
+        : Array.isArray(body?.data)
+          ? body.data
+          : Array.isArray(body?.contracts)
+            ? body.contracts
+            : [];
+      const filtered = statusFilter ? contracts.filter((c: any) => c.status === statusFilter) : contracts;
+      return { success: true, contracts: filtered };
     } catch (error: any) {
       return { success: false, error: error.message };
     }

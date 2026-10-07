@@ -1,13 +1,18 @@
 import { Controller, Post, Get, Req, Body, UseGuards, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import * as admin from 'firebase-admin';
 
 export class UpdateRoleDto {
   @ApiProperty({ enum: ['tenant', 'landlord', 'agent'], description: 'Desired user role' })
+  @IsString()
+  @IsIn(['tenant', 'landlord', 'agent'])
   role: string;
 
   @ApiProperty({ required: false, description: 'Source trigger for role selection', default: 'manual_select' })
+  @IsOptional()
+  @IsString()
   source?: string;
 }
 

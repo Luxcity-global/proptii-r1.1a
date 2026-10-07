@@ -392,25 +392,6 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           agentId: landlordAgentId
         };
 
-        console.log('Manager info for viewing save:', managerInfo);
-
-        // Save the viewing request to bookViewingRequests collection (for landlord/agent to approve)
-        const requestResult = await bookViewingRequestService.saveRequest(
-          userIdToUse,
-          property.id || `property_${Date.now()}`,
-          property,
-          managerInfo
-        );
-
-        console.log('Viewing request result:', requestResult);
-
-        if (requestResult.error) {
-          console.error('Error saving viewing request:', requestResult.error);
-        } else {
-          console.log('✅ Successfully saved viewing request for landlord/agent approval');
-        }
-
-        // Create a properly typed viewing object for the booking
         const viewingBookingDetails = {
           date: viewing.date,
           time: viewing.time,
@@ -423,6 +404,25 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
             phoneNumber: viewing.userDetails.phoneNumber || ''
           }
         };
+
+        console.log('Manager info for viewing save:', managerInfo);
+
+        // Save the viewing request to bookViewingRequests collection (for landlord/agent to approve)
+        const requestResult = await bookViewingRequestService.saveRequest(
+          userIdToUse,
+          property.id || `property_${Date.now()}`,
+          property,
+          managerInfo,
+          viewingBookingDetails
+        );
+
+        console.log('Viewing request result:', requestResult);
+
+        if (requestResult.error) {
+          console.error('Error saving viewing request:', requestResult.error);
+        } else {
+          console.log('✅ Successfully saved viewing request for landlord/agent approval');
+        }
 
         const firestoreResult = await viewingService.saveViewingBooking(
           userIdToUse,

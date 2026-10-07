@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FileText, Download, Eye, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Search, Filter, Star, Trash2, Upload } from 'lucide-react';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
@@ -24,10 +24,19 @@ function agentInitials(name?: string | null): string {
 
 const TenantContracts: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const signContractId = (location.state as { signContractId?: string } | null)?.signContractId || null;
   const { plan, status } = useBillingStatus();
   const { signedContracts, isLoading, removeSignedContract } = useSignedContracts();
   const { isAuthenticated, user } = useAuth();
-  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [isContractModalOpen, setIsContractModalOpen] = useState(Boolean(signContractId));
+  const [contractToSign, setContractToSign] = useState<string | null>(signContractId);
+
+  useEffect(() => {
+    if (!signContractId) return;
+    setContractToSign(signContractId);
+    setIsContractModalOpen(true);
+  }, [signContractId]);
   const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [issueTemplate, setIssueTemplate] = useState('Standard Assured Shorthold Tenancy (AST) — 12 Months');
@@ -46,15 +55,15 @@ const TenantContracts: React.FC = () => {
     return signedContracts.map((c: any) => {
       const normalizedContract = {
         id: c.id,
-        documentName: c.documentName || c.name || null,
-        propertyName: c.propertyName || null,
+        documentName: c.documentName || c.fileName || c.title || c.contractName || c.name || null,
+        propertyName: c.propertyName || c.propertyAddress || null,
         propertyAddress: c.propertyAddress || null,
-        agentName: c.agentName || c.agent || null,
-        agentEmail: c.agentEmail || null,
+        agentName: c.agentName || c.agent || c.landlordEmail || null,
+        agentEmail: c.agentEmail || c.landlordEmail || null,
         tenantEmail: c.tenantEmail || null,
-        email: c.email || c.tenantEmail || c.agentEmail || null,
-        signedDate: c.signedDate || null,
-        documentUrl: c.documentUrl || null,
+        email: c.email || c.tenantEmail || c.agentEmail || c.landlordEmail || null,
+        signedDate: c.signedDate || c.sentDate || null,
+        documentUrl: c.documentUrl || (c.fileUrl && c.fileUrl !== '#' ? c.fileUrl : null),
         status: c.status || null,
         emailSent: c.emailSent || false
       };
@@ -65,8 +74,8 @@ const TenantContracts: React.FC = () => {
 
   const contractStats = {
     total: displaySignedContracts.length,
-    signed: displaySignedContracts.length,
-    requested: 0,
+    signed: displaySignedContracts.filter((c) => c.status === 'signed' || !c.status).length,
+    requested: displaySignedContracts.filter((c) => c.status === 'sent' || c.status === 'unsigned').length,
     expiring: 0
   };
   const summaryTotalContracts = isAuthenticated ? contractStats.total : 0;
@@ -78,8 +87,12 @@ const TenantContracts: React.FC = () => {
     const query = searchQuery.trim().toLowerCase();
     let list = displaySignedContracts;
 
-    if (activeTab === 'pending' || activeTab === 'drafts') {
-      list = [];
+    if (activeTab === 'pending') {
+      list = list.filter((contract) => contract.status === 'sent' || contract.status === 'unsigned');
+    } else if (activeTab === 'drafts') {
+      list = list.filter((contract) => contract.status === 'draft');
+    } else if (activeTab === 'signed') {
+      list = list.filter((contract) => contract.status === 'signed' || !contract.status);
     }
 
     if (query) {
@@ -143,6 +156,12 @@ const TenantContracts: React.FC = () => {
 
   const handleViewContract = async (contract: any) => {
     console.log('🔍 View button clicked for contract:', contract.id);
+    const needsSignature = contract.status === 'sent' || contract.status === 'unsigned' || contract.status === 'delivered';
+    if (needsSignature && contract.id) {
+      setContractToSign(String(contract.id));
+      setIsContractModalOpen(true);
+      return;
+    }
     let viewContract = contract;
 
     if (!viewContract.documentUrl) {
@@ -465,9 +484,9 @@ const TenantContracts: React.FC = () => {
                       </div>
                     </td>
                     <td>
-                      <span className="tn-ct-status is-signed">
+                      <span className={`tn-ct-status${contract.status === 'sent' || contract.status === 'unsigned' ? '' : ' is-signed'}`}>
                         <span className="dot" />
-                        Signed
+                        {contract.status === 'sent' ? 'Sent' : contract.status === 'unsigned' ? 'Awaiting signature' : contract.status === 'draft' ? 'Draft' : 'Signed'}
                       </span>
                     </td>
                     <td className="tn-ct-date">{formatDate(getContractDate(contract))}</td>
@@ -552,7 +571,12 @@ const TenantContracts: React.FC = () => {
       </div>
       <ContractModal
         isOpen={isContractModalOpen}
-        onClose={() => setIsContractModalOpen(false)}
+        onClose={() => {
+          setIsContractModalOpen(false);
+          setContractToSign(null);
+        }}
+        initialTab={contractToSign ? 'received' : 'uploaded'}
+        openContractId={contractToSign}
       />
       {isIssueModalOpen && (
         <div className="tn-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setIsIssueModalOpen(false); }}>

@@ -26,7 +26,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tenant, Property, ArrearsAlert, UserRole, UserProfile } from '../App';
 import { referencingService } from '../services/referencingService';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { useLandlords, Landlord } from '../hooks/useLandlords';
 import { useTenants } from '../hooks/useTenants';
 import { invitationService, PendingInvitation } from '../services/invitationService';
@@ -218,7 +217,6 @@ export function ClientsPage({
   onArchiveLandlord,
   onExportLandlords,
   userProfile,
-  onAddProperty,
   onViewInsights,
   onViewSettings,
   onViewNotifications,
@@ -635,17 +633,6 @@ export function ClientsPage({
 
   if (!userProfile) {
     return <LandlordPageEmptyShell page="clients" variant="guest" />;
-  }
-
-  if (isNewPortfolioUser(properties) && (tenants || []).length === 0) {
-    return (
-      <LandlordPageEmptyShell
-        page="clients"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      />
-    );
   }
 
   const showingLandlords = showLandlordTab && activeTab === 'landlords';
@@ -1220,7 +1207,9 @@ export function ClientsPage({
                       const { property: propertyName, unit } = propertyParts(tenant.propertyAddress);
                       const remaining = daysUntil(tenant.leaseEnd);
                       const chip = paymentChip(tenant.paymentStatus);
-                      const refStatus = referencingStatuses.get(tenant.email) || 'not-started';
+                      const refStatus = referencingStatuses.get(tenant.email)
+                        || referencingStatuses.get(tenant.email.trim().toLowerCase())
+                        || 'not-started';
                       return (
                         <tr
                           key={tenant.id}

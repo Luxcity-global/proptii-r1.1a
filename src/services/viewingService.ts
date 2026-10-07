@@ -1,5 +1,66 @@
 import apiService from './api';
 import sseService from './sseService';
+import { publishViewingCopy, rememberViewings } from './viewingInboxService';
+
+const CLOSED_VIEWING_STATUSES = new Set(['confirmed', 'completed', 'cancelled', 'rescheduled']);
+
+/** The list page only matches lowercase status. Older saves used PENDING. */
+function normalizeViewingStatus(value: unknown): string {
+  const raw = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!raw || raw === 'submitted' || raw === 'new' || raw === 'awaiting' || raw === 'awaiting_approval') {
+    return 'pending';
+  }
+  if (raw === 'request' || raw === 'requested') return 'requested';
+  if (raw === 'canceled') return 'cancelled';
+  if (CLOSED_VIEWING_STATUSES.has(raw) || raw === 'pending') return raw;
+  return 'pending';
+}
+
+function normalizeViewingItem(item: any): any {
+  if (!item || typeof item !== 'object') return item;
+  const nested = item.data && typeof item.data === 'object' ? item.data : null;
+  const source = nested && !item.property && !item.viewingDetails && !item.status
+    ? { ...nested, id: item.id || nested.id }
+    : item;
+  const status = normalizeViewingStatus(source.status);
+  const property = source.property && typeof source.property === 'object' ? source.property : null;
+  const hasStreet = Boolean(property?.street);
+  const details = source.viewingDetails && typeof source.viewingDetails === 'object' ? source.viewingDetails : null;
+  const alreadyCanonical = String(source.status || '').trim().toLowerCase() === status;
+
+  if (source === item && alreadyCanonical && hasStreet) return item;
+
+  return {
+    ...source,
+    id: source.id || item.id,
+    status,
+    property: hasStreet
+      ? { ...property, town: property.town || '', city: property.city || '' }
+      : {
+          street: source.propertyTitle || source.propertyName || 'Property viewing',
+          town: '',
+          city: '',
+          postcode: '',
+          agent: {
+            id: source.agentId || '',
+            name: '',
+            email: source.agentEmail || '',
+            phone: '',
+            company: '',
+          },
+        },
+    viewingDetails: details || {
+      date: source.requestedDate || source.viewing_date || '',
+      time: source.requestedTime || source.viewing_time || '',
+      preference: source.preference || 'In-Person Viewing',
+      userDetails: {
+        fullName: source.tenantName || '',
+        email: source.tenantEmail || '',
+        phoneNumber: source.phone || '',
+      },
+    },
+  };
+}
 
 export interface ViewingBooking {
   id: string;
@@ -98,9 +159,15 @@ export class ViewingPollingCoordinator {
     this.inFlightPromise = (async () => {
       try {
         const response = await apiService.get('/viewing-requests');
-        const items = Array.isArray(response) ? response : (response?.data || []);
+        const payload = Array.isArray(response) ? response : (response?.data || []);
+        const rows = Array.isArray(payload) ? payload : (payload?.data || []);
+        const items = (Array.isArray(rows) ? rows : []).map(normalizeViewingItem);
         this.cachedData = items;
         this.lastFetchTime = Date.now();
+        rememberViewings(items);
+        items.forEach((item) => {
+          publishViewingCopy(item).catch(() => {});
+        });
         this.notifyAll(items);
         return items;
       } catch (err: any) {
@@ -188,6 +255,10 @@ export class ViewingPollingCoordinator {
 export const viewingPollingCoordinator = new ViewingPollingCoordinator();
 
 class ViewingService {
+  private scheduledBookings(items: any[]): ViewingBooking[] {
+    return (items || []).filter((item) => item?.status !== 'requested');
+  }
+
   async saveViewingBooking(
     userId: string,
     property: ViewingBooking['property'],
@@ -205,13 +276,18 @@ class ViewingService {
         landlordId: managerInfo?.landlordId ?? property.agent?.id ?? null,
         agentId: managerInfo?.agentId ?? property.agent?.id ?? null,
         agentEmail: property.agent?.email?.toLowerCase().trim() || null,
+        propertyTitle: [property?.street, property?.town, property?.postcode].filter(Boolean).join(', ') || property?.street || '',
+        requestedDate: viewingDetails?.date || '',
+        requestedTime: viewingDetails?.time || '',
         property,
         viewingDetails,
         status: 'pending'
       };
       const response = await apiService.post('/viewing-requests', payload);
+      const bookingId = response.id || response.data?.id;
+      publishViewingCopy({ ...payload, id: bookingId, status: 'pending' }).catch(() => {});
       viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
-      return { success: true, bookingId: response.id || response.data?.id };
+      return { success: true, bookingId };
     } catch (error: any) {
       console.error('Error saving viewing booking:', error);
       return { success: false, error: error?.message || 'Unknown error' };
@@ -220,7 +296,7 @@ class ViewingService {
 
   async getUserViewingBookings(userId: string): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
     try {
-      const bookings = await viewingPollingCoordinator.fetchAll();
+      const bookings = this.scheduledBookings(await viewingPollingCoordinator.fetchAll());
       return { success: true, bookings };
     } catch (error: any) {
       console.error('Error getting user viewing bookings:', error);
@@ -233,7 +309,7 @@ class ViewingService {
     status: ViewingBooking['status']
   ): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
     try {
-      const bookings = await viewingPollingCoordinator.fetchAll();
+      const bookings = this.scheduledBookings(await viewingPollingCoordinator.fetchAll());
       return { success: true, bookings: bookings.filter((b: any) => b.status === status) };
     } catch (error: any) {
       console.error('Error getting viewing bookings by status:', error);
@@ -243,7 +319,7 @@ class ViewingService {
 
   async getManagerViewingBookings(managerId: string): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
     try {
-      const bookings = await viewingPollingCoordinator.fetchAll();
+      const bookings = this.scheduledBookings(await viewingPollingCoordinator.fetchAll());
       return { success: true, bookings };
     } catch (error: any) {
       console.error('Error getting manager viewing bookings:', error);
@@ -302,7 +378,7 @@ class ViewingService {
 
   async getViewingBookingsByEmail(agentEmail: string): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
     try {
-      const bookings = await viewingPollingCoordinator.fetchAll();
+      const bookings = this.scheduledBookings(await viewingPollingCoordinator.fetchAll());
       return { success: true, bookings };
     } catch (error: any) {
       console.error('Error getting viewing bookings by email:', error);
@@ -387,7 +463,7 @@ class ViewingService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => items as ViewingBooking[],
+      (items) => this.scheduledBookings(items),
       callback,
       onError
     );
@@ -399,7 +475,7 @@ class ViewingService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => items as ViewingBooking[],
+      (items) => this.scheduledBookings(items),
       callback,
       onError
     );
@@ -411,7 +487,7 @@ class ViewingService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => this.calculateStatsFromBookings(items as ViewingBooking[]),
+      (items) => this.calculateStatsFromBookings(this.scheduledBookings(items)),
       callback,
       onError
     );
@@ -423,7 +499,7 @@ class ViewingService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => this.calculateStatsFromBookings(items as ViewingBooking[]),
+      (items) => this.calculateStatsFromBookings(this.scheduledBookings(items)),
       callback,
       onError
     );
@@ -435,7 +511,7 @@ class ViewingService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => items as ViewingBooking[],
+      (items) => this.scheduledBookings(items),
       callback,
       onError
     );
@@ -447,7 +523,7 @@ class ViewingService {
     onError?: (error: Error) => void
   ): () => void {
     return viewingPollingCoordinator.subscribe(
-      (items) => this.calculateStatsFromBookings(items as ViewingBooking[]),
+      (items) => this.calculateStatsFromBookings(this.scheduledBookings(items)),
       callback,
       onError
     );

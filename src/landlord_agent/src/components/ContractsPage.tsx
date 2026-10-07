@@ -19,6 +19,7 @@ import {
   Settings,
   Bell,
   RotateCcw,
+  PenLine,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -29,12 +30,12 @@ import {
 import { SendContractModal } from './SendContractModal';
 import { contractService } from '../services/contractService';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { getLandlordTwoDummyContracts, isLandlordTwoTestAccount } from '../data/landlordTwoDummyContracts';
 import { getAgentDummyContracts, isAgentTestAccount } from '../data/agentTestPersona';
 import { Property, UserProfile } from '../App';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { useAuth } from '../../../contexts/AuthContext';
+import DocumentSigningViewer from '../../../components/contract/DocumentSigningViewer';
 import '../styles/contractsPage.css';
 
 export interface Contract {
@@ -51,6 +52,7 @@ export interface Contract {
   fileUrl: string;
   fileName: string;
   additionalInfo?: string;
+  signedBy?: string;
 }
 
 interface ContractsPageProps {
@@ -75,6 +77,35 @@ const TYPE_LABELS: Record<Contract['contractType'], string> = {
 };
 
 const AVATAR_TONES = ['blue', 'teal', 'violet', 'amber', 'rose'] as const;
+
+function bytesArePdf(bytes: Uint8Array): boolean {
+  return bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+}
+
+async function pdfFileFromSource(source: string, name: string): Promise<File | null> {
+  const value = source.trim();
+  if (!value || value === '#' || value === 'null') return null;
+  try {
+    if (value.startsWith('data:') || (!/^https?:\/\//i.test(value) && value.length > 80)) {
+      const payload = value.includes(',') ? value.split(',')[1] : value;
+      const binary = atob(payload.replace(/\s/g, ''));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      if (!bytesArePdf(bytes)) return null;
+      return new File([bytes], name, { type: 'application/pdf' });
+    }
+    if (!/^https?:\/\//i.test(value)) return null;
+    const response = await fetch(value);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if ((blob.type || '').includes('html')) return null;
+    const file = new File([blob], name, { type: 'application/pdf' });
+    const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+    return bytesArePdf(head) ? file : null;
+  } catch {
+    return null;
+  }
+}
 
 function FilterDropdown({
   label,
@@ -157,10 +188,14 @@ function statusChip(contract: Contract): { key: 'sent' | 'pending' | 'signed' | 
 
 function StatusPill({ contract }: { contract: Contract }) {
   const chip = statusChip(contract);
+  const landlordSigned = contract.signedBy === 'landlord' && contract.status !== 'signed';
   return (
-    <span className={`ll-ct-status is-${chip.key}`}>
-      <span className="dot" aria-hidden />
-      {chip.label}
+    <span className="inline-flex flex-col items-start gap-1">
+      <span className={`ll-ct-status is-${chip.key}`}>
+        <span className="dot" aria-hidden />
+        {chip.label}
+      </span>
+      {landlordSigned && <span className="text-[11px] text-slate-500">Signed by you</span>}
     </span>
   );
 }
@@ -179,7 +214,6 @@ export function ContractsPage({
   onBack,
   userProfile,
   properties = [],
-  onAddProperty,
   onViewInsights,
   onViewSettings,
   onViewNotifications,
@@ -201,6 +235,8 @@ export function ContractsPage({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [signingContract, setSigningContract] = useState<{ contract: Contract; file: File; fileUrl: string } | null>(null);
+  const [openingSignature, setOpeningSignature] = useState(false);
 
   useEffect(() => {
     if (!userId && !landlordEmail) {
@@ -654,6 +690,46 @@ export function ContractsPage({
     }
   };
 
+  const handleOpenSignature = async (contract: Contract) => {
+    if (openingSignature) return;
+    setOpeningSignature(true);
+    try {
+      const name = contract.fileName || `${contract.title || 'contract'}.pdf`;
+      const sources = [contract.fileUrl];
+      const full = await contractService.getContract(contract.id);
+      if (full) {
+        const record = full as Contract & { fileBase64?: string; documentUrl?: string; base64Data?: string };
+        sources.push(record.fileUrl, record.documentUrl || '', record.fileBase64 || '', record.base64Data || '');
+      }
+      let file: File | null = null;
+      for (const source of sources) {
+        if (!source) continue;
+        file = await pdfFileFromSource(source, name);
+        if (file) break;
+      }
+      if (!file) {
+        alert('This contract does not include a PDF yet, so it cannot be signed.');
+        return;
+      }
+      setSigningContract({ contract, file, fileUrl: URL.createObjectURL(file) });
+    } catch (err) {
+      console.error('Error opening contract for signature:', err);
+      alert('Could not open this contract for signing. Please try again.');
+    } finally {
+      setOpeningSignature(false);
+    }
+  };
+
+  const handleLandlordSigned = async (contract: Contract, documentUrl: string) => {
+    if (!userId && !landlordEmail) {
+      throw new Error('Sign in again to save this signature.');
+    }
+    await contractService.saveLandlordSignature(contract, documentUrl, userId || '', landlordEmail || '');
+    if (signingContract?.fileUrl) URL.revokeObjectURL(signingContract.fileUrl);
+    setSigningContract(null);
+    await loadContracts();
+  };
+
   const handleViewContract = (contract: Contract) => {
     if (contract.fileUrl && contract.fileUrl !== '#') {
       window.open(contract.fileUrl, '_blank');
@@ -728,6 +804,9 @@ export function ContractsPage({
         <DropdownMenuItem className="ll-ct-filter-item" onSelect={() => handleViewContract(contract)}>
           <Eye size={14} /> View Details
         </DropdownMenuItem>
+        <DropdownMenuItem className="ll-ct-filter-item" onSelect={() => { void handleOpenSignature(contract); }}>
+          <PenLine size={14} /> Sign
+        </DropdownMenuItem>
         <DropdownMenuItem className="ll-ct-filter-item" onSelect={() => handleDownloadContract(contract)}>
           <Download size={14} /> Download PDF
         </DropdownMenuItem>
@@ -788,17 +867,6 @@ export function ContractsPage({
 
   if (!userId && !landlordEmail) {
     return <LandlordPageEmptyShell page="contracts" variant="guest" />;
-  }
-
-  if ((userId || landlordEmail) && isNewPortfolioUser(properties) && !isLandlordTwoTestAccount(userId, landlordEmail) && !isAgentTestAccount(userId, landlordEmail)) {
-    return (
-      <LandlordPageEmptyShell
-        page="contracts"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile?.name}
-      />
-    );
   }
 
   const subsectionTabs: { id: Subsection; label: string; count: number; icon: React.ReactNode }[] = [
@@ -1178,6 +1246,53 @@ export function ContractsPage({
         onSend={handleSendContract}
         tenants={tenants}
       />
+
+      {signingContract && (
+        <div className="fixed inset-0 z-[80] flex flex-col bg-white">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div>
+              <div className="text-sm font-semibold text-slate-800">Sign contract</div>
+              <div className="text-xs text-slate-500">{signingContract.contract.title || signingContract.file.name}</div>
+            </div>
+            <button
+              type="button"
+              className="rounded-full border px-3 py-1 text-sm text-slate-600"
+              onClick={() => {
+                URL.revokeObjectURL(signingContract.fileUrl);
+                setSigningContract(null);
+              }}
+            >
+              Close
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto">
+            <DocumentSigningViewer
+              template={{
+                id: signingContract.contract.id,
+                name: signingContract.contract.title || signingContract.file.name,
+                file: signingContract.file,
+                fileUrl: signingContract.fileUrl,
+              }}
+              recipient={{
+                email: signingContract.contract.tenantEmail || 'user@example.com',
+                name: signingContract.contract.tenantName || 'Tenant',
+              }}
+              onPersistSigned={async (bytes, documentUrl) => {
+                let stored = documentUrl;
+                if (!/^https?:\/\//i.test(documentUrl)) {
+                  let binary = '';
+                  const chunk = 8192;
+                  for (let i = 0; i < bytes.length; i += chunk) {
+                    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+                  }
+                  stored = `data:application/pdf;base64,${btoa(binary)}`;
+                }
+                await handleLandlordSigned(signingContract.contract, stored);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

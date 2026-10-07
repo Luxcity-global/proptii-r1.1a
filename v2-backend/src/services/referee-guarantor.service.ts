@@ -37,27 +37,46 @@ export class RefereeGuarantorService {
    * Used by landlords/agents to view a tenant's referencing responses.
    */
   async getResponsesByEmail(tenantEmail: string) {
+    const empty = { responses: [] as any[], data: { refereeResponses: [] as any[], guarantorResponses: [] as any[] } };
     const db = this.db;
-    if (!db) return { responses: [] };
-    const email = tenantEmail.toLowerCase().trim();
+    if (!db) return empty;
+    const raw = (tenantEmail || '').trim();
+    const lower = raw.toLowerCase();
+    const candidates = [...new Set([lower, raw].filter((value) => value.includes('@')))];
+    if (!candidates.length) return empty;
+
+    const byId = new Map<string, any>();
+    const pull = async (field: string, value: string) => {
+      const snap = await db.collection('referee_guarantor_responses').where(field, '==', value).get();
+      snap.docs.forEach((doc) => byId.set(doc.id, { id: doc.id, ...doc.data() }));
+    };
+
     try {
-      const snap = await db.collection('referee_guarantor_responses')
-        .where('tenantEmail', '==', email)
-        .orderBy('createdAt', 'desc')
-        .get();
-      if (!snap.empty) {
-        return { responses: snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) };
+      for (const candidate of candidates) {
+        await pull('tenantEmail', candidate);
+        await pull('applicantEmail', candidate);
+        const users = await db.collection('users').where('email', '==', candidate).limit(3).get();
+        for (const user of users.docs) {
+          await pull('tenantId', user.id);
+        }
       }
-      // Fallback: try applicantEmail field (older records)
-      const snap2 = await db.collection('referee_guarantor_responses')
-        .where('applicantEmail', '==', email)
-        .orderBy('createdAt', 'desc')
-        .get();
-      return { responses: snap2.docs.map(doc => ({ id: doc.id, ...doc.data() })) };
     } catch (err: any) {
       this.logger.warn(`getResponsesByEmail error: ${err?.message || err}`);
-      return { responses: [] };
     }
+
+    const responses = [...byId.values()].sort((a, b) => {
+      const at = new Date(a.createdAt || a.submittedAt || 0).getTime();
+      const bt = new Date(b.createdAt || b.submittedAt || 0).getTime();
+      return bt - at;
+    });
+    const isGuarantor = (row: any) => `${row?.responseType || ''} ${row?.type || ''}`.toLowerCase().includes('guarantor');
+    return {
+      responses,
+      data: {
+        refereeResponses: responses.filter((row) => !isGuarantor(row)),
+        guarantorResponses: responses.filter((row) => isGuarantor(row)),
+      },
+    };
   }
 
   /**

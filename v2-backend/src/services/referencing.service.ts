@@ -186,12 +186,18 @@ export class ReferencingService {
 
     // 2. Strip any remaining raw base64 (safety net)
     const safeSection = this.stripRawBase64(sectionWithUrls);
+    const emailLower = section === 'identity'
+      ? this.normalizedEmail(safeSection?.email)
+      : '';
 
-    const payload = {
+    const payload: Record<string, any> = {
       userId,
       [section]: safeSection,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
+    // Lookup key for the landlord/agent status query. The visible identity
+    // email is left as the tenant typed it.
+    if (emailLower) payload.email = emailLower;
 
     if (!col) return { success: true, section, data: safeSection };
 
@@ -220,8 +226,14 @@ export class ReferencingService {
         }
       }
 
+      const emailLower = this.normalizedEmail(
+        safeData?.email,
+        safeData?.identity?.email,
+        safeData?.formData?.identity?.email,
+      );
       const payload = {
         ...safeData,
+        ...(emailLower ? { email: emailLower } : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
@@ -247,9 +259,15 @@ export class ReferencingService {
       }
     }
 
+    const emailLower = this.normalizedEmail(
+      safeFormData?.email,
+      safeFormData?.identity?.email,
+      safeFormData?.formData?.identity?.email,
+    );
     const payload = {
       userId,
       ...safeFormData,
+      ...(emailLower ? { email: emailLower } : {}),
       status: 'submitted',
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
@@ -266,19 +284,173 @@ export class ReferencingService {
     }
   }
 
-  async getReferencingStatusByEmail(email: string) {
+  private normalizedEmail(...values: unknown[]): string {
+    for (const value of values) {
+      if (typeof value !== 'string') continue;
+      const email = value.trim().toLowerCase();
+      if (email.includes('@')) return email;
+    }
+    return '';
+  }
+
+  private emailCandidates(email: string): string[] {
+    const raw = (email || '').trim();
+    const lower = raw.toLowerCase();
+    return [...new Set([lower, raw].filter((value) => value.includes('@')))];
+  }
+
+  /** Section saves live on the document root. Submit nests the same sections under formData. */
+  private flattenPassportForm(doc: any): Record<string, any> {
+    if (!doc || typeof doc !== 'object') return {};
+    const nested = doc.formData && typeof doc.formData === 'object' && !Array.isArray(doc.formData)
+      ? doc.formData
+      : {};
+    const keys = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'creditCheck', 'agentDetails'];
+    const form: Record<string, any> = {};
+    for (const key of keys) {
+      const top = doc[key];
+      const inner = nested[key];
+      const topObj = top && typeof top === 'object' && !Array.isArray(top) ? top : null;
+      const innerObj = inner && typeof inner === 'object' && !Array.isArray(inner) ? inner : null;
+      if (topObj || innerObj) form[key] = { ...(innerObj || {}), ...(topObj || {}) };
+    }
+    return this.stripBlobs(form);
+  }
+
+  private sectionHasContent(section: any): boolean {
+    if (!section || typeof section !== 'object') return false;
+    return Object.values(section).some((value) => {
+      if (value == null || value === '' || value === false) return false;
+      if (typeof value === 'object') return Object.keys(value).length > 0;
+      return true;
+    });
+  }
+
+  private landlordStatus(doc: any, form: Record<string, any>): 'not-started' | 'in-progress' | 'complete' {
+    if (!doc) return 'not-started';
+    const raw = String(doc.status || '').toLowerCase();
+    if (doc.isSubmitted === true || raw === 'submitted' || raw === 'complete') return 'complete';
+    const filled = ['identity', 'employment', 'residential', 'financial', 'guarantor']
+      .some((key) => this.sectionHasContent(form[key]));
+    if (filled || raw === 'draft' || raw === 'in-progress' || raw === 'partial') return 'in-progress';
+    return 'not-started';
+  }
+
+  private passportEnvelope(id: string, doc: any) {
+    const formData = this.flattenPassportForm(doc);
+    const status = this.landlordStatus(doc, formData);
+    return {
+      status,
+      submissionId: id,
+      data: {
+        userId: doc.userId || id,
+        propertyId: doc.propertyId || '',
+        formData,
+        isSubmitted: status === 'complete',
+        currentStep: doc.currentStep ?? 0,
+        stepStatus: doc.stepStatus || {},
+        createdAt: doc.createdAt || null,
+        updatedAt: doc.updatedAt || null,
+        submittedAt: doc.submittedAt || null,
+        lastSaved: doc.updatedAt || doc.lastSaved || null,
+      },
+    };
+  }
+
+  private scorePassport(doc: any): number {
+    const form = this.flattenPassportForm(doc);
+    const status = this.landlordStatus(doc, form);
+    const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor']
+      .filter((key) => this.sectionHasContent(form[key])).length;
+    return (status === 'complete' ? 100 : status === 'in-progress' ? 10 : 0) + sections;
+  }
+
+  private async readReferencingDoc(docId: string): Promise<{ id: string; data: any } | null> {
     const col = this.collection;
-    if (!col) return { status: 'none' };
+    if (!col || !docId) return null;
     try {
-      const snapshot = await col
-        .where('email', '==', email.toLowerCase().trim())
-        .limit(1)
-        .get();
-      if (snapshot.empty) return { status: 'none' };
-      const data = snapshot.docs[0].data();
-      return { status: data.status || 'draft', submissionId: snapshot.docs[0].id };
-    } catch {
-      return { status: 'none' };
+      const snap = await col.doc(docId).get();
+      if (!snap.exists) return null;
+      return { id: snap.id, data: snap.data() };
+    } catch (err: any) {
+      this.logger.warn(`readReferencingDoc failed for ${docId}: ${err?.message || err}`);
+      return null;
+    }
+  }
+
+  /**
+   * Tenant applications are stored by user id, with the email nested in
+   * identity — not as a top-level email the old query expected.
+   */
+  private async findReferencingByEmail(email: string): Promise<{ id: string; data: any } | null> {
+    const col = this.collection;
+    const db = this.db;
+    if (!col || !db) return null;
+
+    const candidates = this.emailCandidates(email);
+    if (!candidates.length) return null;
+
+    const found = new Map<string, any>();
+    const remember = (id: string, data: any) => {
+      if (id && data) found.set(id, data);
+    };
+
+    for (const candidate of candidates) {
+      try {
+        const users = await db.collection('users').where('email', '==', candidate).limit(5).get();
+        for (const user of users.docs) {
+          for (const docId of [user.id, `general_${user.id}`]) {
+            const doc = await this.readReferencingDoc(docId);
+            if (doc) remember(doc.id, doc.data);
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`users email lookup failed: ${err?.message || err}`);
+      }
+    }
+
+    const fields = ['email', 'tenantEmail', 'identity.email', 'formData.identity.email'];
+    for (const field of fields) {
+      for (const candidate of candidates) {
+        try {
+          const snap = await col.where(field, '==', candidate).limit(5).get();
+          snap.docs.forEach((doc) => remember(doc.id, doc.data()));
+        } catch (err: any) {
+          this.logger.warn(`referencing query ${field} failed: ${err?.message || err}`);
+        }
+      }
+    }
+
+    let best: { id: string; data: any; score: number } | null = null;
+    for (const [id, data] of found) {
+      const score = this.scorePassport(data);
+      if (!best || score > best.score) best = { id, data, score };
+    }
+    return best ? { id: best.id, data: best.data } : null;
+  }
+
+  private async passportForUser(userId?: string) {
+    if (!userId) return null;
+    let best: { id: string; data: any; score: number } | null = null;
+    for (const docId of [userId, `general_${userId}`]) {
+      const doc = await this.readReferencingDoc(docId);
+      if (!doc) continue;
+      const score = this.scorePassport(doc.data);
+      if (!best || score > best.score) best = { id: doc.id, data: doc.data, score };
+    }
+    return best ? this.passportEnvelope(best.id, best.data) : null;
+  }
+
+  async getReferencingStatusByEmail(email: string) {
+    const empty = { status: 'not-started' as const, submissionId: null, data: null };
+    if (!this.collection) return empty;
+    try {
+      const match = await this.findReferencingByEmail(email);
+      if (!match) return empty;
+      return this.passportEnvelope(match.id, match.data);
+    } catch (err: any) {
+      this.logger.warn(`getReferencingStatusByEmail failed for ${email}: ${err?.message || err}`);
+      return empty;
     }
   }
 
@@ -431,16 +603,27 @@ export class ReferencingService {
 
     let tenantName  = shareData.tenantName  || '';
     let tenantEmail = shareData.tenantEmail || '';
-    if (db && !tenantName) {
+    if (db && (!tenantName || !tenantEmail)) {
       try {
         const userDoc = await db.collection('users').doc(userId).get();
         if (userDoc.exists) {
           const u = userDoc.data() as any;
-          tenantName  = u.name || u.displayName || u.email || '';
-          tenantEmail = u.email || '';
+          if (!tenantName) tenantName = u.name || u.displayName || '';
+          if (!tenantEmail) tenantEmail = u.email || '';
         }
       } catch { /* non-blocking */ }
     }
+    if (!tenantName || !tenantEmail) {
+      try {
+        const form = this.flattenPassportForm(await this.getFormData(userId));
+        const identity = form.identity || {};
+        if (!tenantName) {
+          tenantName = [identity.firstName, identity.lastName].filter(Boolean).join(' ').trim();
+        }
+        if (!tenantEmail) tenantEmail = identity.email || '';
+      } catch { /* non-blocking */ }
+    }
+    if (!tenantName) tenantName = tenantEmail;
 
     let hasAccount = false;
     if (db && recipientEmail) {
@@ -526,8 +709,8 @@ export class ReferencingService {
           .catch(() => {});
       }
 
-      const formData     = await this.getFormData(shareData.userId).catch(() => ({})) as any;
-      const safeFormData = this.stripBlobs(formData);
+      const rawForm      = await this.getFormData(shareData.userId).catch(() => ({})) as any;
+      const safeFormData = this.flattenPassportForm(rawForm);
 
       return {
         expired: false,
@@ -868,23 +1051,77 @@ export class ReferencingService {
     }
   }
 
-  async getReceivedReferencings(recipientEmail: string) {    const col = this.sharesCollection;
-    if (!col || !recipientEmail) return { success: true, data: [] };
-    try {
-      const snap = await col
-        .where('recipientEmail', '==', recipientEmail.toLowerCase().trim())
-        .get();
+  private async recipientEmailsForLandlord(recipientEmail: string, landlordId?: string): Promise<Set<string>> {
+    const emails = new Set<string>();
+    for (const candidate of this.emailCandidates(recipientEmail)) emails.add(candidate);
 
-      const shares = snap.docs.map(doc => {
+    const db = this.db;
+    if (!db || !landlordId) return emails;
+
+    try {
+      const userDoc = await db.collection('users').doc(landlordId).get();
+      const profileEmail = this.normalizedEmail(userDoc.exists ? (userDoc.data() as any)?.email : '');
+      if (profileEmail) emails.add(profileEmail);
+    } catch { /* non-blocking */ }
+
+    try {
+      if (admin.apps.length) {
+        const record = await admin.auth().getUser(landlordId);
+        const authEmail = this.normalizedEmail(
+          record.email,
+          record.providerData?.map((provider) => provider.email).find(Boolean),
+        );
+        if (authEmail) emails.add(authEmail);
+      }
+    } catch { /* mock users and missing auth records are expected */ }
+
+    return emails;
+  }
+
+  async getReceivedReferencings(recipientEmail: string, landlordId?: string) {
+    const col = this.sharesCollection;
+    if (!col) return { success: true, data: [] };
+
+    try {
+      const emails = await this.recipientEmailsForLandlord(recipientEmail, landlordId);
+      const byId = new Map<string, any>();
+
+      for (const email of emails) {
+        try {
+          const snap = await col.where('recipientEmail', '==', email).get();
+          snap.docs.forEach((doc) => byId.set(doc.id, doc));
+        } catch (err: any) {
+          this.logger.warn(`received share lookup failed for ${email}: ${err?.message || err}`);
+        }
+      }
+
+      if (landlordId) {
+        try {
+          const claimed = await col.where('claimedBy', '==', landlordId).get();
+          claimed.docs.forEach((doc) => byId.set(doc.id, doc));
+        } catch (err: any) {
+          this.logger.warn(`claimed share lookup failed for ${landlordId}: ${err?.message || err}`);
+        }
+      }
+
+      const shares = await Promise.all([...byId.values()].map(async (doc) => {
         const d = doc.data() as any;
+        const passport = await this.passportForUser(d.userId);
+        const formData = passport?.data?.formData || {};
+        const identity = formData.identity || {};
+        const identityName = [identity.firstName, identity.lastName].filter(Boolean).join(' ').trim();
         return {
           id:              doc.id,
-          tenantName:      d.tenantName      || '',
-          tenantEmail:     d.tenantEmail     || '',
+          userId:          d.userId          || '',
+          tenantName:      d.tenantName      || identityName || '',
+          tenantEmail:     d.tenantEmail     || identity.email || '',
+          phone:           identity.phoneNumber || identity.phone || '',
           propertyAddress: d.propertyAddress || '',
           notes:           d.notes           || '',
           recipientRole:   d.recipientRole   || 'landlord',
           status:          d.status          || 'sent',
+          passportStatus:  passport?.status  || 'not-started',
+          formData,
           viewToken:       d.viewToken       || '',
           claimToken:      d.claimToken      || '',
           expiresAt:       d.expiresAt       || '',
@@ -893,7 +1130,7 @@ export class ReferencingService {
             ? d.createdAt.toDate().toISOString()
             : d.createdAt || new Date().toISOString(),
         };
-      });
+      }));
 
       return {
         success: true,

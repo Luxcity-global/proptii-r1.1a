@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { randomUUID } from 'crypto';
+import {
+  isBase64DataUri,
+  uploadBase64ToStorage,
+  uploadBufferToStorage,
+} from '../utils/firebase-storage';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return Promise.race([
@@ -33,28 +39,175 @@ export class ContractService {
     return db ? db.collection('contractTemplates') : null;
   }
 
-  async getContracts(tenantEmail: string) {
+  private normalizedEmail(...values: unknown[]): string {
+    for (const value of values) {
+      if (typeof value !== 'string') continue;
+      const email = value.trim().toLowerCase();
+      if (email.includes('@')) return email;
+    }
+    return '';
+  }
+
+  private emailCandidates(email: string): string[] {
+    const raw = (email || '').trim();
+    const lower = raw.toLowerCase();
+    return [...new Set([lower, raw].filter((value) => value.includes('@')))];
+  }
+
+  private async collectEmails(email: string, userId?: string): Promise<Set<string>> {
+    const emails = new Set<string>(this.emailCandidates(email));
+    const db = this.db;
+    if (!db || !userId) return emails;
+
+    try {
+      const userDoc = await db.collection('users').doc(userId).get();
+      const profileEmail = this.normalizedEmail(userDoc.exists ? (userDoc.data() as any)?.email : '');
+      if (profileEmail) emails.add(profileEmail);
+    } catch { /* profile lookup is optional */ }
+
+    try {
+      if (admin.apps.length) {
+        const record = await admin.auth().getUser(userId);
+        const authEmail = this.normalizedEmail(
+          record.email,
+          record.providerData?.map((provider) => provider.email).find(Boolean),
+        );
+        if (authEmail) emails.add(authEmail);
+      }
+    } catch { /* mock users have no auth record */ }
+
+    return emails;
+  }
+
+  private toDate(value: any): Date | undefined {
+    if (!value) return undefined;
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+    if (typeof value?.toDate === 'function') {
+      const date = value.toDate();
+      if (date instanceof Date && !Number.isNaN(date.getTime())) return date;
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+
+  /** Preview links use fileUrl. Older rows kept the PDF inline and left fileUrl as "#". */
+  private presentContract(id: string, data: any) {
+    const storedUrl = data.fileUrl || data.documentUrl || '';
+    let fileUrl = storedUrl && storedUrl !== '#' ? storedUrl : '';
+    if (!fileUrl && typeof data.fileBase64 === 'string' && data.fileBase64.length > 0) {
+      fileUrl = data.fileBase64.startsWith('data:')
+        ? data.fileBase64
+        : `data:${data.documentType || 'application/pdf'};base64,${data.fileBase64}`;
+    }
+    return {
+      id,
+      title: data.title || data.contractName || data.templateName || 'Contract',
+      contractName: data.contractName || data.title || data.templateName || 'Contract',
+      fileName: data.fileName || data.documentName || 'contract.pdf',
+      documentName: data.documentName || data.fileName || data.title || 'contract.pdf',
+      fileUrl: fileUrl || data.documentUrl || '',
+      documentUrl: data.documentUrl || fileUrl || '',
+      storagePath: data.storagePath || '',
+      propertyAddress: data.propertyAddress || '',
+      propertyName: data.propertyName || '',
+      propertyId: data.propertyId || '',
+      tenantName: data.tenantName || '',
+      tenantEmail: data.tenantEmail || '',
+      landlordId: data.landlordId || '',
+      landlordEmail: data.landlordEmail || '',
+      userId: data.userId || '',
+      agentName: data.agentName || data.landlordEmail || '',
+      agentEmail: data.agentEmail || data.landlordEmail || '',
+      status: data.status || 'sent',
+      signedBy: data.signedBy || '',
+      contractType: data.contractType || 'tenancy-agreement',
+      additionalInfo: data.additionalInfo || '',
+      templateId: data.templateId || '',
+      sentDate: this.toDate(data.sentDate) || this.toDate(data.createdAt) || new Date(),
+      signedDate: this.toDate(data.signedDate),
+      expiryDate: this.toDate(data.expiryDate),
+      createdAt: this.toDate(data.createdAt),
+      updatedAt: this.toDate(data.updatedAt),
+      emailSent: data.emailSent || false,
+      documentSize: data.documentSize || 0,
+      documentType: data.documentType || 'application/pdf',
+    };
+  }
+
+  private async rememberQuery(
+    col: admin.firestore.CollectionReference,
+    field: string,
+    value: string,
+    into: Map<string, any>,
+  ) {
+    if (!value) return;
+    try {
+      const snap = await withTimeout(col.where(field, '==', value).get());
+      snap.docs.forEach((doc) => into.set(doc.id, doc));
+    } catch (err: any) {
+      this.logger.warn(`contract query ${field} failed: ${err?.message || err}`);
+    }
+  }
+
+  /**
+   * Store the PDF in Cloud Storage. Firestore only keeps the URL.
+   * A small inline copy is kept only when storage is unavailable, so the
+   * record itself still saves.
+   */
+  private async storeContractDocument(
+    ownerId: string,
+    file?: { buffer?: Buffer; mimetype?: string },
+    base64?: string | null,
+  ): Promise<{ fileUrl: string; storagePath: string; inlineBase64: string | null }> {
+    const inline = (value?: string | null) => {
+      const MAX = 700_000;
+      if (!value || value.length > MAX) return { fileUrl: '', storagePath: '', inlineBase64: null as string | null };
+      const fileUrl = value.startsWith('data:')
+        ? value
+        : `data:application/pdf;base64,${value}`;
+      return { fileUrl, storagePath: '', inlineBase64: value };
+    };
+
+    const hasFile = Boolean(file?.buffer?.length);
+    const hasBase64 = typeof base64 === 'string' && base64.length > 20;
+    if (!hasFile && !hasBase64) return { fileUrl: '', storagePath: '', inlineBase64: null };
+    if (!admin.apps.length) return inline(base64 || null);
+
+    try {
+      const storagePath = `contracts/${ownerId || 'shared'}/${randomUUID()}.pdf`;
+      if (hasFile) {
+        const uploaded = await uploadBufferToStorage(file!.buffer!, storagePath, file?.mimetype || 'application/pdf');
+        return { fileUrl: uploaded.downloadUrl, storagePath: uploaded.storagePath, inlineBase64: null };
+      }
+      if (isBase64DataUri(base64)) {
+        const uploaded = await uploadBase64ToStorage(base64 as string, storagePath);
+        return { fileUrl: uploaded.downloadUrl, storagePath: uploaded.storagePath, inlineBase64: null };
+      }
+      const uploaded = await uploadBufferToStorage(Buffer.from(base64 as string, 'base64'), storagePath, 'application/pdf');
+      return { fileUrl: uploaded.downloadUrl, storagePath: uploaded.storagePath, inlineBase64: null };
+    } catch (err: any) {
+      this.logger.warn(`contract file upload failed: ${err?.message || err}`);
+      return inline(base64 || null);
+    }
+  }
+
+  async getContracts(tenantEmail: string, userId?: string) {
     const col = this.contractsCol;
     if (!col) return { success: true, data: [] };
 
     try {
-      const snapshot = await withTimeout(col
-        .where('tenantEmail', '==', tenantEmail.toLowerCase().trim())
-        .select('landlordId', 'landlordEmail', 'tenantEmail', 'tenantName', 'propertyId', 'propertyAddress', 'contractName', 'title', 'fileUrl', 'documentUrl', 'templateId', 'status', 'sentDate', 'signedDate', 'expiryDate', 'documentName', 'documentSize', 'documentType', 'agentName', 'agentEmail', 'emailSent', 'emailSentDate', 'createdAt', 'updatedAt')
-        .get());
-      const data = snapshot.docs.map(doc => {
-        const docData = doc.data();
-        return {
-          id: doc.id,
-          ...docData,
-          sentDate: docData.sentDate?.toDate?.() || docData.sentDate,
-          signedDate: docData.signedDate?.toDate?.() || docData.signedDate,
-          expiryDate: docData.expiryDate?.toDate?.() || docData.expiryDate,
-        };
-      });
+      const emails = await this.collectEmails(tenantEmail, userId);
+      const byId = new Map<string, any>();
+      for (const email of emails) {
+        await this.rememberQuery(col, 'tenantEmail', email, byId);
+      }
+      if (userId) await this.rememberQuery(col, 'userId', userId, byId);
 
-      data.sort((a: any, b: any) => new Date(b.sentDate || 0).getTime() - new Date(a.sentDate || 0).getTime());
-      return { success: true, data };
+      const data = [...byId.values()].map((doc) => this.presentContract(doc.id, doc.data()));
+      const ids = new Set(data.map((contract) => contract.id));
+      const visible = data.filter((contract) => !contract.templateId || contract.templateId === 'template-id' || !ids.has(contract.templateId));
+      visible.sort((a, b) => (b.sentDate?.getTime?.() || 0) - (a.sentDate?.getTime?.() || 0));
+      return { success: true, data: visible };
     } catch (error: any) {
       this.logger.warn(`Error getting contracts: ${error?.message || error}`);
       return { success: true, data: [] };
@@ -147,11 +300,16 @@ export class ContractService {
   async sendContractToTenant(landlordId: string, landlordEmail: string, body: any, file?: any) {
     const col = this.contractsCol;
     const docId = `contract_${landlordId}_${Date.now()}`;
+    const stored = await this.storeContractDocument(
+      landlordId,
+      file,
+      body.fileBase64 || body.base64Data || null,
+    );
     const payload = {
       id: docId,
       landlordId,
-      landlordEmail: (body.landlordEmail || landlordEmail || '').toLowerCase().trim(),
-      tenantEmail: (body.tenantEmail || body.recipientEmail || '').toLowerCase().trim(),
+      landlordEmail: this.normalizedEmail(body.landlordEmail, landlordEmail),
+      tenantEmail: this.normalizedEmail(body.tenantEmail, body.recipientEmail),
       tenantName: body.tenantName || body.recipientName || '',
       propertyId: body.propertyId || '',
       propertyAddress: body.propertyAddress || '',
@@ -159,8 +317,9 @@ export class ContractService {
       contractName: body.contractName || body.title || 'Tenancy Agreement',
       contractType: body.contractType || 'tenancy-agreement',
       fileName: file?.originalname || body.fileName || 'contract.pdf',
-      fileUrl: body.fileUrl || '',
-      fileBase64: body.fileBase64 || body.base64Data || (file?.buffer ? file.buffer.toString('base64') : null),
+      fileUrl: stored.fileUrl || body.fileUrl || '',
+      storagePath: stored.storagePath || '',
+      ...(stored.inlineBase64 ? { fileBase64: stored.inlineBase64 } : {}),
       templateId: body.templateId || '',
       status: body.status || 'sent',
       sentDate: body.sentDate || new Date().toISOString(),
@@ -187,14 +346,15 @@ export class ContractService {
     const docId = contractData.id || `contract_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const landlordId = contractData.ownerUserId || userId || contractData.landlordId || 'unknown';
 
-    const payload = {
+    const stored = await this.storeContractDocument(landlordId, undefined, body.base64Data || contractData.fileBase64 || null);
+    const payload: any = {
       ...contractData,
       id: docId,
       title: contractData.title || contractData.contractName || 'Tenancy Agreement',
       contractName: contractData.contractName || contractData.title || 'Tenancy Agreement',
       landlordId,
-      landlordEmail: (contractData.landlordEmail || '').toLowerCase().trim(),
-      tenantEmail: (contractData.tenantEmail || contractData.recipientEmail || '').toLowerCase().trim(),
+      landlordEmail: this.normalizedEmail(contractData.landlordEmail),
+      tenantEmail: this.normalizedEmail(contractData.tenantEmail, contractData.recipientEmail),
       tenantName: contractData.tenantName || contractData.recipientName || '',
       propertyAddress: contractData.propertyAddress || '',
       contractType: contractData.contractType || 'tenancy-agreement',
@@ -202,12 +362,15 @@ export class ContractService {
       sentDate: contractData.sentDate ? new Date(contractData.sentDate).toISOString() : new Date().toISOString(),
       expiryDate: contractData.expiryDate ? new Date(contractData.expiryDate).toISOString() : null,
       fileName: body.fileName || contractData.fileName || 'contract.pdf',
-      fileBase64: body.base64Data || contractData.fileBase64 || null,
-      fileUrl: contractData.fileUrl || '#',
+      fileUrl: stored.fileUrl || contractData.fileUrl || '',
+      storagePath: stored.storagePath || contractData.storagePath || '',
       additionalInfo: contractData.additionalInfo || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
+    if (stored.inlineBase64) payload.fileBase64 = stored.inlineBase64;
+    else delete payload.fileBase64;
+    delete payload.base64Data;
 
     if (col) {
       try {
@@ -233,38 +396,17 @@ export class ContractService {
     if (!col) return { success: true, contracts: [] };
 
     try {
-      let query: admin.firestore.Query = col;
       const targetUserId = filters.userId || filters.landlordId;
-      const targetEmail = (filters.landlordEmail || '').toLowerCase().trim();
+      const emails = await this.collectEmails(filters.landlordEmail || '', targetUserId);
+      const byId = new Map<string, any>();
 
-      if (targetUserId) {
-        query = query.where('landlordId', '==', targetUserId);
-      } else if (targetEmail) {
-        query = query.where('landlordEmail', '==', targetEmail);
+      if (targetUserId) await this.rememberQuery(col, 'landlordId', targetUserId, byId);
+      for (const email of emails) {
+        await this.rememberQuery(col, 'landlordEmail', email, byId);
+        await this.rememberQuery(col, 'agentEmail', email, byId);
       }
 
-      const snapshot = await withTimeout(query.get(), 3500);
-      let contracts = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          title: d.title || d.contractName || 'Contract',
-          fileName: d.fileName || d.documentName || 'contract.pdf',
-          fileUrl: d.fileUrl || d.documentUrl || '#',
-          propertyAddress: d.propertyAddress || '',
-          tenantName: d.tenantName || '',
-          tenantEmail: d.tenantEmail || '',
-          status: d.status || 'sent',
-          sentDate: d.sentDate?.toDate?.() || d.sentDate ? new Date(d.sentDate) : new Date(),
-          signedDate: d.signedDate?.toDate?.() || (d.signedDate ? new Date(d.signedDate) : undefined),
-          expiryDate: d.expiryDate?.toDate?.() || (d.expiryDate ? new Date(d.expiryDate) : undefined),
-          contractType: d.contractType || 'tenancy-agreement',
-          additionalInfo: d.additionalInfo || '',
-          landlordId: d.landlordId || '',
-          landlordEmail: d.landlordEmail || '',
-          propertyId: d.propertyId || '',
-        };
-      });
+      let contracts = [...byId.values()].map((doc) => this.presentContract(doc.id, doc.data()));
 
       if (filters.status && filters.status !== 'all') {
         contracts = contracts.filter(c => c.status === filters.status);
@@ -273,7 +415,7 @@ export class ContractService {
         contracts = contracts.filter(c => c.propertyId === filters.propertyId);
       }
 
-      contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
+      contracts.sort((a, b) => (b.sentDate?.getTime?.() || 0) - (a.sentDate?.getTime?.() || 0));
       return { success: true, contracts };
     } catch (err: any) {
       this.logger.warn(`getLandlordContracts error: ${err?.message || err}`);
@@ -291,17 +433,7 @@ export class ContractService {
         return { success: false, contract: null };
       }
       const d = doc.data() || {};
-      const contract = {
-        id: doc.id,
-        ...d,
-        title: d.title || d.contractName || 'Contract',
-        fileName: d.fileName || d.documentName || 'contract.pdf',
-        fileUrl: d.fileUrl || d.documentUrl || '#',
-        sentDate: d.sentDate?.toDate?.() || (d.sentDate ? new Date(d.sentDate) : new Date()),
-        signedDate: d.signedDate?.toDate?.() || (d.signedDate ? new Date(d.signedDate) : undefined),
-        expiryDate: d.expiryDate?.toDate?.() || (d.expiryDate ? new Date(d.expiryDate) : undefined),
-      };
-      return { success: true, contract };
+      return { success: true, contract: this.presentContract(doc.id, d) };
     } catch (err: any) {
       this.logger.warn(`getContractById error: ${err?.message || err}`);
       return { success: false, contract: null };
@@ -384,10 +516,21 @@ export class ContractService {
     const docId = body.id || `signed_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const effectiveUserId = userId || body.userId || 'unknown';
 
+    const landlordEmail = this.normalizedEmail(body.landlordEmail, body.agentEmail);
+    const agentEmail = this.normalizedEmail(body.agentEmail, body.landlordEmail);
     const payload = {
       ...body,
       id: docId,
       userId: effectiveUserId,
+      title: body.title || body.contractName || body.templateName || 'Contract',
+      contractName: body.contractName || body.title || body.templateName || 'Contract',
+      tenantEmail: this.normalizedEmail(body.tenantEmail) || body.tenantEmail || '',
+      tenantName: body.tenantName || '',
+      propertyAddress: body.propertyAddress || '',
+      fileUrl: body.fileUrl || body.documentUrl || '',
+      documentUrl: body.documentUrl || body.fileUrl || '',
+      fileName: body.fileName || body.documentName || 'contract.pdf',
+      ...(landlordEmail ? { landlordEmail, agentEmail: agentEmail || landlordEmail } : {}),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -395,12 +538,39 @@ export class ContractService {
     if (col) {
       try {
         await withTimeout(col.doc(docId).set(payload));
+        await this.reflectSignatureOnSource(col, docId, body);
       } catch (err: any) {
         this.logger.warn(`saveSignedContract error: ${err?.message || err}`);
       }
     }
 
     return { success: true, id: docId, contractId: docId, ...payload };
+  }
+
+  /** When a tenant signs a contract the landlord already sent, update that same row. */
+  private async reflectSignatureOnSource(
+    col: admin.firestore.CollectionReference,
+    signedId: string,
+    body: any,
+  ) {
+    const sourceId = String(body.contractId || body.sourceContractId || body.templateId || '');
+    if (!sourceId || sourceId === signedId || sourceId === 'template-id' || sourceId === 'template') return;
+    try {
+      const existing = await col.doc(sourceId).get();
+      if (!existing.exists) return;
+      const current = existing.data() || {};
+      const documentUrl = body.documentUrl || body.fileUrl || '';
+      await col.doc(sourceId).set({
+        status: 'signed',
+        signedDate: body.signedDate || new Date().toISOString(),
+        signedBy: 'tenant',
+        ...(documentUrl ? { documentUrl, fileUrl: documentUrl } : {}),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      this.logger.log(`Marked source contract ${sourceId} signed (was ${current.status || 'sent'})`);
+    } catch (err: any) {
+      this.logger.warn(`reflectSignatureOnSource failed for ${sourceId}: ${err?.message || err}`);
+    }
   }
 
   async syncContractToLandlord(body: any) {
@@ -426,17 +596,31 @@ export class ContractService {
   async contractExists(tenantEmail: string, title: string, landlordEmail: string) {
     const col = this.contractsCol;
     if (!col) return { exists: false };
+    const tenant = this.normalizedEmail(tenantEmail);
+    const landlord = this.normalizedEmail(landlordEmail);
+    const name = (title || '').trim();
     try {
       const snap = await withTimeout(col
-        .where('tenantEmail', '==', tenantEmail.toLowerCase().trim())
-        .where('landlordEmail', '==', landlordEmail.toLowerCase().trim())
-        .where('title', '==', title)
+        .where('tenantEmail', '==', tenant)
+        .where('landlordEmail', '==', landlord)
+        .where('title', '==', name)
         .limit(1)
         .get());
       return { exists: !snap.empty };
     } catch (err: any) {
-      this.logger.warn(`contractExists error: ${err?.message || err}`);
-      return { exists: false };
+      this.logger.warn(`contractExists composite query failed, checking in memory: ${err?.message || err}`);
+      try {
+        const snap = await withTimeout(col.where('tenantEmail', '==', tenant).get());
+        const exists = snap.docs.some((doc) => {
+          const data = doc.data() as any;
+          return (data.landlordEmail || '').toLowerCase() === landlord
+            && (data.title || data.contractName || '') === name;
+        });
+        return { exists };
+      } catch (fallbackErr: any) {
+        this.logger.warn(`contractExists error: ${fallbackErr?.message || fallbackErr}`);
+        return { exists: false };
+      }
     }
   }
 
