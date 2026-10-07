@@ -552,3 +552,52 @@
   .ll-an-header h1 { font-size: 22px; }
   .ll-an-kpi-value { font-size: 24px; }
 }
+
+/* ── Mobile responsiveness additions ───────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .ll-an {
+    padding: 0 12px 32px;
+  }
+
+  .ll-an-header {
+    position: static;
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .ll-an-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-an-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .ll-an-filters-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ll-an-filter {
+    width: 100%;
+  }
+
+  .ll-an-chart-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 480px) {
+  .ll-an-kpi-value {
+    font-size: 22px;
+  }
+}

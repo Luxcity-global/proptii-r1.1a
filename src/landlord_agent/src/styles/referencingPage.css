@@ -1351,3 +1351,58 @@
   .ll-pass-panel { padding: 20px; }
   .ll-pass-step { flex-direction: column; align-items: flex-start; }
 }
+
+/* ── Mobile responsiveness additions ───────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .ll-ref {
+    padding: 0 12px 32px;
+  }
+
+  .ll-ref-header {
+    position: static;
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .ll-ref-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-ref-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .ll-ref-filters {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ll-ref-filter,
+  .ll-ref-search {
+    width: 100%;
+  }
+
+  .ll-ref-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ll-ref-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .ll-ref-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}

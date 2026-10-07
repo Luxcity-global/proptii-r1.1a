@@ -1772,3 +1772,56 @@
     display: none;
   }
 }
+
+/* ── Mobile responsiveness additions ───────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /* Scope/display bar: scroll horizontally instead of wrapping */
+  .ll-docs-scope {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .ll-docs-scope::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Toolbar: tighten padding */
+  .ll-docs-toolbar {
+    padding: 12px 14px;
+  }
+
+  /* Search full width */
+  .ll-docs-search {
+    width: 100%;
+  }
+
+  /* KPI grid gap tighten */
+  .ll-docs-kpi-grid {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Attach/upload modal: bottom sheet on mobile */
+  .ll-docs-attach-modal {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    border-radius: 20px 20px 0 0;
+    align-self: flex-end;
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  /* KPI values smaller */
+  .ll-docs-kpi-value {
+    font-size: 24px;
+  }
+
+  /* Header unstick */
+  .ll-docs-header {
+    position: static;
+  }
+}

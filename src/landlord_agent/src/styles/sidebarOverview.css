@@ -238,3 +238,78 @@
 .ll-sidebar-mobile .ll-sidebar-nav {
   gap: 10px;
 }
+
+/* ── Mobile sidebar: off-canvas drawer ─────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* Sidebar slides off-screen by default on mobile */
+  .ll-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    height: 100dvh; /* dynamic viewport height on mobile browsers */
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.28s ease;
+    box-shadow: none;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Open state — toggled by JS adding .is-open */
+  .ll-sidebar.is-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.18);
+  }
+
+  /* Keep brand visible on the mobile drawer (never collapse labels) */
+  .ll-sidebar.is-collapsed .ll-sidebar-brand-title,
+  .ll-sidebar.is-collapsed .ll-sidebar-nav-label,
+  .ll-sidebar.is-collapsed .ll-sidebar-user-email {
+    opacity: 1;
+    width: auto;
+    overflow: visible;
+    display: block;
+  }
+
+  /* Hide desktop-only collapse toggle on mobile */
+  .ll-sidebar-collapse {
+    display: none;
+  }
+
+  /* Backdrop overlay */
+  .ll-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: ll-backdrop-in 0.22s ease forwards;
+  }
+
+  .ll-sidebar-backdrop.is-visible {
+    display: block;
+  }
+
+  @keyframes ll-backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Main content area: full width — no sidebar offset */
+  .ll-main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Sidebar takes most but not all of the screen width on very small devices */
+  .ll-sidebar {
+    width: min(280px, 85vw);
+  }
+}

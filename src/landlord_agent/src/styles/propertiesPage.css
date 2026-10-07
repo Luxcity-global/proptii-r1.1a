@@ -1568,3 +1568,91 @@
     font-size: 28px;
   }
 }
+
+/* ── Mobile responsiveness additions ───────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /* Header actions stack vertically */
+  .ll-props-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-props-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .ll-props-btn-add,
+  .ll-props-btn-insights {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  /* Toolbar filters wrap and take full width */
+  .ll-props-toolbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ll-props-search {
+    min-width: 0;
+    width: 100%;
+    flex: none;
+  }
+
+  .ll-props-filter,
+  .ll-props-view-switch {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* KPI cards: reduce min-height on very small screens */
+  .ll-props-kpi {
+    min-height: 160px;
+  }
+
+  .ll-props-kpi-value {
+    font-size: 24px;
+  }
+
+  /* Pagination: stack controls */
+  .ll-props-pager {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ll-props-pager-left {
+    justify-content: center;
+  }
+
+  /* Bulk actions: full-width rows */
+  .ll-props-bulk {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-props-bulk-left,
+  .ll-props-bulk-actions {
+    width: 100%;
+  }
+
+  .ll-props-bulk-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  /* Count row */
+  .ll-props-count-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

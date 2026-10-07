@@ -1369,3 +1369,102 @@
     display: none;
   }
 }
+
+/* ── Mobile responsiveness additions ───────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /* Header: stack vertically */
+  .ll-vw-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-vw-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .ll-vw-btn-add,
+  .ll-vw-btn-insights {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  /* Filters: stack */
+  .ll-vw-filters {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ll-vw-search {
+    width: 100%;
+  }
+
+  .ll-vw-filter-group {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ll-vw-filter {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  /* Tab navigation: horizontal scroll */
+  .ll-vw-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .ll-vw-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Table scroll */
+  .ll-vw-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Bulk actions */
+  .ll-vw-bulk {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-vw-bulk-label,
+  .ll-vw-bulk-actions {
+    width: 100%;
+  }
+
+  .ll-vw-bulk-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  /* KPI value */
+  .ll-vw-kpi-value {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ll-vw-kpi {
+    min-height: 160px;
+  }
+
+  /* Pagination */
+  .ll-vw-pager {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+}

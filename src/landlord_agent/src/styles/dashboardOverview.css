@@ -1265,3 +1265,74 @@
     font-size: 22px;
   }
 }
+
+/* ── Mobile responsiveness additions ───────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /* Content boxes: tighten padding */
+  .ll-content-box {
+    padding: 14px;
+  }
+
+  /* Properties section header */
+  .ll-properties-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .ll-properties-header > * {
+    flex-shrink: 0;
+  }
+
+  /* Filter pills: ensure they wrap cleanly */
+  .ll-filter-pills {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Header actions: stack on narrow screens */
+  .ll-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .ll-header-add,
+  .ll-header-insights {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  /* Stat cards: reduce height further */
+  .ll-stat-card {
+    min-height: 160px;
+  }
+
+  /* Occupancy section: stack donut + stats vertically */
+  .ll-occupancy-body {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ll-donut-wrap {
+    width: min(120px, 100%);
+    height: min(120px, 100%);
+  }
+
+  /* Subtitle / description: smaller */
+  .ll-header-bar p,
+  .ll-header-sub {
+    font-size: 13px;
+  }
+}
