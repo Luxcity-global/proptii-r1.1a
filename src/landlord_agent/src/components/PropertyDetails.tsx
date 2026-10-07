@@ -5,10 +5,19 @@
  *   Left (2/3): tab panel (Overview · Documents · Photos)
  *   Right (1/3): sticky sidebar — Quick Actions, Tenant card, Compliance, Summary
  *
+ * Photos tab is fully self-contained:
+ *   - Drag-and-drop / file-picker upload direct to backend storage
+ *   - Room tagging per photo
+ *   - Set cover photo
+ *   - Drag-to-reorder
+ *   - Remove photo
+ *   - Unsaved-changes save banner
+ *   No separate PhotoManagement page needed.
+ *
  * Colours: primary blue #136C9E · accent orange #DC5F12
  * Fonts:   Archivo headings · Nunito Sans body
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   ArrowLeft,
   Edit3,
@@ -36,8 +45,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Upload,
+  X,
+  Star,
+  GripVertical,
+  Save,
+  Loader2,
+  Download,
 } from 'lucide-react';
-import { Property, Tenant } from '../App';
+import { Property, PropertyPhoto, Tenant } from '../App';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from './ui/select';
@@ -47,6 +63,8 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from './ui/dialog';
+import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
+import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -80,19 +98,14 @@ function initials(name: string): string {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
 }
 
-function coverUrl(property: Property): string | null {
-  const valid = (property.photos ?? []).filter(p => p?.url && !p.url.startsWith('blob:'));
-  return valid.find(p => p.isCover)?.url ?? valid[0]?.url ?? null;
-}
-
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
 type StatusKey = 'occupied' | 'vacant' | 'under-renovation';
 
 const STATUS_META: Record<StatusKey, { label: string; dot: string; bg: string; text: string }> = {
-  'occupied':         { label: 'Occupied',          dot: '#10b981', bg: '#dcfce7', text: '#15803d' },
-  'vacant':           { label: 'Vacant',             dot: '#f43f5e', bg: '#fee2e2', text: '#b91c1c' },
-  'under-renovation': { label: 'Under Renovation',   dot: '#f59e0b', bg: '#fef9c3', text: '#92400e' },
+  'occupied':         { label: 'Occupied',        dot: '#10b981', bg: '#dcfce7', text: '#15803d' },
+  'vacant':           { label: 'Vacant',           dot: '#f43f5e', bg: '#fee2e2', text: '#b91c1c' },
+  'under-renovation': { label: 'Under Renovation', dot: '#f59e0b', bg: '#fef9c3', text: '#92400e' },
 };
 
 function StatusPill({ status }: { status: Property['status'] }) {
@@ -114,10 +127,10 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 };
 
 function DocStatusIcon({ status }: { status: string }) {
-  if (status === 'valid')         return <CheckCircle size={15} className="text-green-600 shrink-0" />;
-  if (status === 'expiring-soon') return <Clock       size={15} className="text-amber-500 shrink-0" />;
+  if (status === 'valid')         return <CheckCircle  size={15} className="text-green-600 shrink-0" />;
+  if (status === 'expiring-soon') return <Clock        size={15} className="text-amber-500 shrink-0" />;
   if (status === 'expired')       return <AlertTriangle size={15} className="text-red-500 shrink-0" />;
-  return                                 <Clock       size={15} className="text-gray-400 shrink-0" />;
+  return                                 <Clock        size={15} className="text-gray-400 shrink-0" />;
 }
 
 // ─── Shared card shell ────────────────────────────────────────────────────────
@@ -131,6 +144,13 @@ function SCard({ children, className = '' }: { children: React.ReactNode; classN
   );
 }
 
+// ─── Room types ───────────────────────────────────────────────────────────────
+
+const ROOM_TYPES = [
+  'Living Room', 'Kitchen', 'Bedroom', 'Bathroom',
+  'Dining Room', 'Exterior', 'Garden', 'Parking', 'Other',
+];
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface PropertyDetailsProps {
@@ -139,7 +159,6 @@ interface PropertyDetailsProps {
   onBack: () => void;
   onEdit: (property: Property) => void;
   onManageDocuments: () => void;
-  onManagePhotos: () => void;
   updateProperty: (propertyId: string, updates: Partial<Property>) => void;
   onViewTenant?: (tenantId: string) => void;
   onAddTenant?: () => void;
@@ -152,15 +171,39 @@ interface PropertyDetailsProps {
 
 export function PropertyDetails({
   property, tenants = [], onBack, onEdit,
-  onManageDocuments, onManagePhotos, updateProperty,
+  onManageDocuments, updateProperty,
   onViewTenant, onAddTenant, onSelectExistingTenant,
   onRemoveTenant, onChangeTenant,
 }: PropertyDetailsProps) {
+
+  // ── Tab & hero state ──────────────────────────────────────────────────────
   const [activeTab,              setActiveTab]              = useState<'overview'|'documents'|'photos'>('overview');
-  const [photoIdx,               setPhotoIdx]               = useState(0);
+  const [heroIdx,                setHeroIdx]                = useState(0);
   const [showChangeTenantDialog, setShowChangeTenantDialog] = useState(false);
   const [newTenantId,            setNewTenantId]            = useState('');
 
+  // ── Photo management state ─────────────────────────────────────────────────
+  const [localPhotos,     setLocalPhotos]     = useState<PropertyPhoto[]>([]);
+  const [hasChanges,      setHasChanges]      = useState(false);
+  const [isSavingPhotos,  setIsSavingPhotos]  = useState(false);
+  const [photoSaveError,  setPhotoSaveError]  = useState<string | null>(null);
+  const [uploadingCount,  setUploadingCount]  = useState(0);
+  const [draggedIdx,      setDraggedIdx]      = useState<number | null>(null);
+  const [previewPhoto,    setPreviewPhoto]    = useState<PropertyPhoto | null>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const skipSyncRef   = useRef(false);
+
+  // Sync photos from prop whenever property changes (not during unsaved edits)
+  useEffect(() => {
+    if (!property) return;
+    if (skipSyncRef.current) { skipSyncRef.current = false; return; }
+    if (!hasChanges) setLocalPhotos((property.photos ?? []).filter(p => p?.url && !p.url.startsWith('blob:')));
+  }, [property?.id, property?.photos]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset hero index when photos change
+  useEffect(() => { setHeroIdx(0); }, [property?.id]);
+
+  // ── Tenant helpers ─────────────────────────────────────────────────────────
   const availableTenants = useMemo(() =>
     tenants.filter(t => !t.propertyId || t.propertyId === '' || t.propertyId !== property?.id),
     [tenants, property?.id],
@@ -169,7 +212,6 @@ export function PropertyDetails({
     property?.tenant ? [property.tenant, ...availableTenants] : availableTenants,
     [availableTenants, property?.tenant],
   );
-
   const dates = useMemo(() => {
     if (!property) return {} as Record<string, any>;
     return {
@@ -177,10 +219,109 @@ export function PropertyDetails({
       leaseEnd:  fmt(property.tenant?.leaseEnd),
       lastPaid:  fmt(property.tenant?.lastPaymentDate),
       docs: Object.fromEntries(
-        (property.documents ?? []).map(d => [d.id, { issue: fmt(d.issueDate), expiry: d.expiryDate ? fmt(d.expiryDate) : null }])
+        (property.documents ?? []).map(d => [d.id, {
+          issue: fmt(d.issueDate),
+          expiry: d.expiryDate ? fmt(d.expiryDate) : null,
+        }])
       ),
     };
   }, [property]);
+
+  // ── Photo upload ──────────────────────────────────────────────────────────
+
+  const uploadFiles = useCallback(async (files: FileList | null) => {
+    if (!files || !property) return;
+    const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!arr.length) return;
+    setUploadingCount(n => n + arr.length);
+    const apiBase = getResolvedApiBaseUrl();
+
+    for (let i = 0; i < arr.length; i++) {
+      const file = arr[i];
+      try {
+        const fd = new FormData();
+        fd.append('file', file, file.name);
+        fd.append('folder', 'properties/photos');
+        const token = await getAccessTokenForApiRequest().catch(() => null);
+        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(`${apiBase}/storage/upload`, { method: 'POST', headers, body: fd });
+        if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+        const data = await res.json();
+        if (!data.url) throw new Error('No URL returned');
+        const newPhoto: PropertyPhoto = {
+          id: `${Date.now()}-${i}`,
+          url: data.url,
+          filename: file.name,
+          isCover: false,
+          room: undefined,
+        };
+        setLocalPhotos(prev => {
+          const updated = [...prev, newPhoto];
+          // Auto-set cover if this is the first photo
+          if (!updated.some(p => p.isCover)) updated[0] = { ...updated[0], isCover: true };
+          return updated;
+        });
+        setHasChanges(true);
+      } catch (err: any) {
+        setPhotoSaveError(`Upload failed for ${file.name}: ${err.message}`);
+        setTimeout(() => setPhotoSaveError(null), 5000);
+      } finally {
+        setUploadingCount(n => n - 1);
+      }
+    }
+  }, [property]);
+
+  const removePhoto = useCallback((id: string) => {
+    setLocalPhotos(prev => {
+      const next = prev.filter(p => p.id !== id);
+      if (next.length > 0 && !next.some(p => p.isCover)) next[0] = { ...next[0], isCover: true };
+      return next;
+    });
+    setHasChanges(true);
+  }, []);
+
+  const setRoom = useCallback((id: string, room: string) => {
+    setLocalPhotos(prev => prev.map(p => p.id === id ? { ...p, room: room === 'none' ? undefined : room } : p));
+    setHasChanges(true);
+  }, []);
+
+  const setCover = useCallback((id: string) => {
+    setLocalPhotos(prev => prev.map(p => ({ ...p, isCover: p.id === id })));
+    setHasChanges(true);
+  }, []);
+
+  const savePhotos = useCallback(async () => {
+    if (!property) return;
+    setIsSavingPhotos(true);
+    setPhotoSaveError(null);
+    try {
+      await updateProperty(property.id, { photos: localPhotos });
+      setHasChanges(false);
+      skipSyncRef.current = true;
+    } catch (err: any) {
+      setPhotoSaveError(err?.message || 'Failed to save photos');
+    } finally {
+      setIsSavingPhotos(false);
+    }
+  }, [property, localPhotos, updateProperty]);
+
+  // Drag-to-reorder
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    setDraggedIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const handleDragEnter = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (draggedIdx === null || draggedIdx === idx) return;
+    setLocalPhotos(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(draggedIdx, 1);
+      next.splice(idx, 0, moved);
+      return next;
+    });
+    setDraggedIdx(idx);
+    setHasChanges(true);
+  };
 
   // ── Guard ──────────────────────────────────────────────────────────────────
   if (!property) {
@@ -199,7 +340,7 @@ export function PropertyDetails({
     );
   }
 
-  const validPhotos = (property.photos ?? []).filter(p => p?.url && !p.url.startsWith('blob:'));
+  const validPhotos = localPhotos.filter(p => p?.url && !p.url.startsWith('blob:'));
   const expiredDocCount = (property.documents ?? []).filter(d => d.status === 'expiring-soon' || d.status === 'expired').length;
 
   const TAB_CLASS = (t: typeof activeTab) =>
@@ -212,7 +353,7 @@ export function PropertyDetails({
   return (
     <div className="min-h-screen" style={{ background: '#f8fafc', fontFamily: 'Nunito Sans,sans-serif' }}>
 
-      {/* ── Sticky header ────────────────────────────────────────────────── */}
+      {/* ── Sticky header ─────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 h-[64px] flex items-center justify-between px-5"
         style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(226,232,240,0.7)' }}>
         <div className="flex items-center gap-3">
@@ -244,7 +385,7 @@ export function PropertyDetails({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-[14px] border-[#e2e8f0] p-1.5 min-w-[180px]">
               <DropdownMenuItem className="rounded-[10px] cursor-pointer text-[13px]"
-                onSelect={() => onManagePhotos()}>
+                onSelect={() => { setActiveTab('photos'); }}>
                 <Camera size={14} className="mr-2 text-[#64748b]" /> Manage Photos
               </DropdownMenuItem>
               <DropdownMenuItem className="rounded-[10px] cursor-pointer text-[13px]"
@@ -260,54 +401,52 @@ export function PropertyDetails({
         </div>
       </header>
 
-      {/* ── Hero photo strip ──────────────────────────────────────────────── */}
+      {/* ── Hero photo strip ───────────────────────────────────────────────── */}
       {validPhotos.length > 0 ? (
         <div className="relative bg-[#1e293b]" style={{ height: 320 }}>
-          <img src={validPhotos[photoIdx]?.url} alt="Property cover"
+          <img src={validPhotos[heroIdx]?.url} alt="Property"
             className="w-full h-full object-cover opacity-95" />
           {/* Counter */}
           <span className="absolute bottom-4 right-4 text-[12px] font-semibold text-white px-3 py-1 rounded-full"
             style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-            {photoIdx + 1} / {validPhotos.length}
+            {heroIdx + 1} / {validPhotos.length}
           </span>
-          {/* Prev/next */}
           {validPhotos.length > 1 && (
             <>
               <button type="button"
-                onClick={() => setPhotoIdx(i => (i - 1 + validPhotos.length) % validPhotos.length)}
+                onClick={() => setHeroIdx(i => (i - 1 + validPhotos.length) % validPhotos.length)}
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center text-white transition-all hover:bg-white/30"
                 style={{ background: 'rgba(0,0,0,0.30)' }}>
                 <ChevronLeft size={18} />
               </button>
               <button type="button"
-                onClick={() => setPhotoIdx(i => (i + 1) % validPhotos.length)}
+                onClick={() => setHeroIdx(i => (i + 1) % validPhotos.length)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center text-white transition-all hover:bg-white/30"
                 style={{ background: 'rgba(0,0,0,0.30)' }}>
                 <ChevronRight size={18} />
               </button>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                {validPhotos.slice(0, 8).map((p, i) => (
+                  <button key={p.id} type="button" onClick={() => setHeroIdx(i)}
+                    className="w-2 h-2 rounded-full transition-all"
+                    style={{ background: i === heroIdx ? 'white' : 'rgba(255,255,255,0.45)' }} />
+                ))}
+              </div>
             </>
           )}
-          {/* Thumbnail strip */}
-          {validPhotos.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-              {validPhotos.slice(0, 8).map((p, i) => (
-                <button key={p.id} type="button" onClick={() => setPhotoIdx(i)}
-                  className="w-2 h-2 rounded-full transition-all"
-                  style={{ background: i === photoIdx ? 'white' : 'rgba(255,255,255,0.45)' }} />
-              ))}
-            </div>
-          )}
-          {/* Manage Photos shortcut */}
-          <button type="button" onClick={onManagePhotos}
+          {/* Add photos shortcut on hero */}
+          <button type="button"
+            onClick={() => { setActiveTab('photos'); fileInputRef.current?.click(); }}
             className="absolute top-4 right-4 flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-[10px] text-white transition-all hover:bg-white/25"
             style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', fontFamily: 'Archivo,sans-serif' }}>
-            <Camera size={13} /> Manage Photos
+            <Camera size={13} /> Add Photos
           </button>
         </div>
       ) : (
         <div className="flex items-center justify-center"
           style={{ height: 220, background: 'linear-gradient(135deg,#1e3a4f 0%,#0f1e2e 100%)' }}>
-          <button type="button" onClick={onManagePhotos}
+          <button type="button"
+            onClick={() => { setActiveTab('photos'); fileInputRef.current?.click(); }}
             className="flex flex-col items-center gap-3 text-white/70 hover:text-white transition-colors">
             <div className="w-14 h-14 rounded-[18px] flex items-center justify-center"
               style={{ background: 'rgba(255,255,255,0.1)' }}>
@@ -320,17 +459,27 @@ export function PropertyDetails({
         </div>
       )}
 
-      {/* ── Body ─────────────────────────────────────────────────────────── */}
+      {/* Hidden global file input — triggered from multiple places */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*"
+        className="hidden"
+        onChange={e => { uploadFiles(e.target.files); e.target.value = ''; }}
+      />
+
+      {/* ── Body ──────────────────────────────────────────────────────────── */}
       <div className="max-w-[1120px] mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
 
-          {/* ── Left: tabs ──────────────────────────────────────────────── */}
+          {/* ── Left: tabs ─────────────────────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-4">
 
             {/* Tab bar */}
             <div className="flex items-center gap-1 p-1 rounded-[14px] bg-[#f1f5f9]" style={{ width: 'fit-content' }}>
-              <button className={TAB_CLASS('overview')}   onClick={() => setActiveTab('overview')}>Overview</button>
-              <button className={TAB_CLASS('documents')}  onClick={() => setActiveTab('documents')}>
+              <button className={TAB_CLASS('overview')}  onClick={() => setActiveTab('overview')}>Overview</button>
+              <button className={TAB_CLASS('documents')} onClick={() => setActiveTab('documents')}>
                 Documents
                 {expiredDocCount > 0 && (
                   <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold">
@@ -338,15 +487,17 @@ export function PropertyDetails({
                   </span>
                 )}
               </button>
-              <button className={TAB_CLASS('photos')}     onClick={() => setActiveTab('photos')}>
+              <button className={TAB_CLASS('photos')} onClick={() => setActiveTab('photos')}>
                 Photos ({validPhotos.length})
+                {hasChanges && (
+                  <span className="ml-1.5 w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                )}
               </button>
             </div>
 
-            {/* ── Overview tab ────────────────────────────────────────── */}
+            {/* ── Overview tab ─────────────────────────────────────────── */}
             {activeTab === 'overview' && (
               <div className="space-y-4">
-                {/* Key specs */}
                 <SCard>
                   <div className="px-5 pt-5 pb-1">
                     <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-4"
@@ -354,10 +505,10 @@ export function PropertyDetails({
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#f1f5f9]">
                     {[
-                      { icon: BedDouble,      label: 'Bedrooms',    value: String(property.bedrooms) },
-                      { icon: Bath,           label: 'Bathrooms',   value: typeof (property as any).bathrooms === 'number' ? String((property as any).bathrooms) : '—' },
-                      { icon: Maximize2,      label: 'Size',        value: typeof (property as any).squareFootage === 'number' ? `${(property as any).squareFootage} sq ft` : '—' },
-                      { icon: PoundSterling,  label: 'Monthly Rent', value: `£${(property.rent ?? 0).toLocaleString()}` },
+                      { icon: BedDouble,     label: 'Bedrooms',    value: String(property.bedrooms) },
+                      { icon: Bath,          label: 'Bathrooms',   value: typeof (property as any).bathrooms === 'number' ? String((property as any).bathrooms) : '—' },
+                      { icon: Maximize2,     label: 'Size',        value: typeof (property as any).squareFootage === 'number' ? `${(property as any).squareFootage} sq ft` : '—' },
+                      { icon: PoundSterling, label: 'Monthly Rent', value: `£${(property.rent ?? 0).toLocaleString()}` },
                     ].map(({ icon: Icon, label, value }) => (
                       <div key={label} className="bg-white px-5 py-4 flex items-center gap-3">
                         <span className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
@@ -379,7 +530,6 @@ export function PropertyDetails({
                   </div>
                 </SCard>
 
-                {/* Amenities */}
                 {(property.amenities ?? []).length > 0 && (
                   <SCard className="px-5 py-5">
                     <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3"
@@ -395,7 +545,6 @@ export function PropertyDetails({
                   </SCard>
                 )}
 
-                {/* Notes */}
                 {property.notes && (
                   <SCard className="px-5 py-5">
                     <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-2"
@@ -406,7 +555,7 @@ export function PropertyDetails({
               </div>
             )}
 
-            {/* ── Documents tab ────────────────────────────────────────── */}
+            {/* ── Documents tab ─────────────────────────────────────────── */}
             {activeTab === 'documents' && (
               <SCard>
                 <div className="flex items-center justify-between px-5 pt-5 pb-4"
@@ -453,54 +602,163 @@ export function PropertyDetails({
               </SCard>
             )}
 
-            {/* ── Photos tab ───────────────────────────────────────────── */}
+            {/* ── Photos tab — fully inline management ──────────────────── */}
             {activeTab === 'photos' && (
-              <SCard>
-                <div className="flex items-center justify-between px-5 pt-5 pb-4"
-                  style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <p className="text-[14px] font-bold text-[#1e293b]"
-                    style={{ fontFamily: 'Archivo,sans-serif' }}>Property Photos</p>
-                  <button type="button" onClick={onManagePhotos}
-                    className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
-                    style={{ color: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
-                    <Camera size={14} /> Manage Photos
-                  </button>
-                </div>
-                {validPhotos.length === 0 ? (
-                  <div className="flex flex-col items-center py-12 text-center px-5">
+              <div className="space-y-4">
+
+                {/* Error banner */}
+                {photoSaveError && (
+                  <div className="flex items-center gap-2 p-3 rounded-[12px] border border-red-200 bg-red-50 text-[13px] text-red-700">
+                    <AlertTriangle size={15} className="shrink-0" />{photoSaveError}
+                  </div>
+                )}
+
+                {/* Upload zone */}
+                <SCard>
+                  <div
+                    className="m-5 border-2 border-dashed rounded-[16px] p-8 text-center cursor-pointer transition-all hover:border-[#136C9E] hover:bg-[#f0f8fd]"
+                    style={{ borderColor: '#e2e8f0' }}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); uploadFiles(e.dataTransfer.files); }}>
+                    {uploadingCount > 0 ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 size={28} className="text-[#136C9E] animate-spin" />
+                        <p className="text-[13px] font-semibold text-[#136C9E]">
+                          Uploading {uploadingCount} photo{uploadingCount > 1 ? 's' : ''}…
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload size={28} className="mx-auto mb-3 text-[#94a3b8]" />
+                        <p className="text-[14px] font-semibold text-[#334155]"
+                          style={{ fontFamily: 'Archivo,sans-serif' }}>
+                          Drag & drop or click to upload
+                        </p>
+                        <p className="text-[12px] text-[#64748b] mt-1">JPG, PNG, HEIC — max 10 MB each</p>
+                      </>
+                    )}
+                  </div>
+                </SCard>
+
+                {/* Photo grid */}
+                {validPhotos.length === 0 && uploadingCount === 0 ? (
+                  <SCard className="flex flex-col items-center py-12 text-center px-5">
                     <div className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
                       style={{ background: '#f1f5f9' }}>
                       <ImageIcon size={24} className="text-[#94a3b8]" />
                     </div>
                     <p className="text-[14px] font-semibold text-[#1e293b] mb-1">No photos yet</p>
-                    <p className="text-[13px] text-[#64748b] mb-4">Properties with photos attract significantly more enquiries.</p>
-                    <button type="button" onClick={onManagePhotos}
-                      className="text-[13px] font-semibold px-4 py-2.5 rounded-[12px] transition-all hover:opacity-90"
-                      style={{ background: '#136C9E', color: 'white', fontFamily: 'Archivo,sans-serif' }}>
-                      Add Photos
+                    <p className="text-[13px] text-[#64748b]">Properties with photos attract significantly more enquiries.</p>
+                  </SCard>
+                ) : (
+                  <SCard className="p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[13px] font-bold text-[#1e293b]"
+                        style={{ fontFamily: 'Archivo,sans-serif' }}>
+                        {validPhotos.length} photo{validPhotos.length !== 1 ? 's' : ''}
+                        {hasChanges && <span className="ml-2 text-[11px] text-amber-500 font-semibold">• unsaved changes</span>}
+                      </p>
+                      <button type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
+                        style={{ color: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
+                        <Plus size={14} /> Add More
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {validPhotos.map((photo, i) => (
+                        <div
+                          key={photo.id}
+                          draggable
+                          onDragStart={e => handleDragStart(e, i)}
+                          onDragEnter={e => handleDragEnter(e, i)}
+                          onDragEnd={() => setDraggedIdx(null)}
+                          className="group relative rounded-[12px] overflow-hidden bg-[#f1f5f9] cursor-grab active:cursor-grabbing"
+                          style={{ opacity: draggedIdx === i ? 0.5 : 1 }}>
+
+                          {/* Image */}
+                          <div className="aspect-video">
+                            <img src={photo.url} alt={photo.room ?? 'Property'}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          </div>
+
+                          {/* Drag handle */}
+                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <GripVertical size={14} className="text-white drop-shadow" />
+                          </div>
+
+                          {/* Cover badge */}
+                          {photo.isCover && (
+                            <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                              style={{ background: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
+                              <Star size={9} fill="currentColor" /> Cover
+                            </span>
+                          )}
+
+                          {/* Hover overlay actions */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button type="button" title="Preview"
+                              onClick={e => { e.stopPropagation(); setPreviewPhoto(photo); }}
+                              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all">
+                              <Eye size={14} />
+                            </button>
+                            <button type="button" title="Download"
+                              onClick={e => { e.stopPropagation(); window.open(photo.url, '_blank', 'noopener'); }}
+                              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all">
+                              <Download size={14} />
+                            </button>
+                            <button type="button" title="Remove"
+                              onClick={e => { e.stopPropagation(); removePhoto(photo.id); }}
+                              className="w-8 h-8 rounded-full bg-red-500/70 hover:bg-red-500 flex items-center justify-center text-white transition-all">
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          {/* Room tag + set cover — below image */}
+                          <div className="p-2 space-y-1.5 bg-white border-t border-[#f1f5f9]">
+                            <Select value={photo.room || 'none'} onValueChange={v => setRoom(photo.id, v)}>
+                              <SelectTrigger className="h-7 text-[11px] rounded-[8px] border-[#e2e8f0] px-2">
+                                <SelectValue placeholder="Tag room" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No tag</SelectItem>
+                                {ROOM_TYPES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            {!photo.isCover && (
+                              <button type="button"
+                                onClick={() => setCover(photo.id)}
+                                className="w-full h-6 text-[10.5px] font-semibold rounded-[8px] border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9] flex items-center justify-center gap-1 transition-all">
+                                <Star size={9} /> Set as cover
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </SCard>
+                )}
+
+                {/* Unsaved changes save bar */}
+                {hasChanges && (
+                  <div className="flex items-center justify-between p-4 rounded-[16px] border"
+                    style={{ background: '#fffbeb', borderColor: '#fde68a' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      <p className="text-[13px] font-semibold text-amber-800">You have unsaved photo changes</p>
+                    </div>
+                    <button type="button" onClick={savePhotos} disabled={isSavingPhotos}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white transition-all disabled:opacity-50 hover:opacity-90"
+                      style={{ background: '#DC5F12', fontFamily: 'Archivo,sans-serif' }}>
+                      {isSavingPhotos
+                        ? <><Loader2 size={14} className="animate-spin" />Saving…</>
+                        : <><Save size={14} />Save Photos</>}
                     </button>
                   </div>
-                ) : (
-                  <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {validPhotos.map((photo, i) => (
-                      <button key={photo.id} type="button"
-                        onClick={() => { setPhotoIdx(i); setActiveTab('overview'); }}
-                        className="relative group rounded-[12px] overflow-hidden aspect-video bg-[#f1f5f9] block">
-                        <img src={photo.url} alt={photo.room ?? 'Property'}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        {photo.isCover && (
-                          <span className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
-                            style={{ background: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>Cover</span>
-                        )}
-                        {photo.room && (
-                          <span className="absolute bottom-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full text-white"
-                            style={{ background: 'rgba(0,0,0,0.5)' }}>{photo.room}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
                 )}
-              </SCard>
+              </div>
             )}
           </div>
 
@@ -513,9 +771,9 @@ export function PropertyDetails({
                 style={{ fontFamily: 'Archivo,sans-serif' }}>Quick Actions</p>
               <div className="space-y-2">
                 {[
-                  { label: 'Edit Property',     icon: Edit3,     action: () => onEdit(property) },
-                  { label: 'Manage Photos',      icon: Camera,    action: onManagePhotos },
-                  { label: 'Manage Documents',   icon: FileText,  action: onManageDocuments },
+                  { label: 'Edit Property',   icon: Edit3,     action: () => onEdit(property) },
+                  { label: 'Add Photos',       icon: Camera,    action: () => { setActiveTab('photos'); fileInputRef.current?.click(); } },
+                  { label: 'Manage Documents', icon: FileText,  action: onManageDocuments },
                 ].map(({ label, icon: Icon, action }) => (
                   <button key={label} type="button" onClick={action}
                     className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-[12px] text-[13px] font-semibold text-[#334155] transition-all hover:bg-[#f1f5f9] hover:text-[#136C9E] text-left"
@@ -544,7 +802,7 @@ export function PropertyDetails({
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                         property.tenant.paymentStatus === 'current'  ? 'bg-green-400/30 text-green-100' :
                         property.tenant.paymentStatus === 'overdue'  ? 'bg-red-400/30 text-red-100' :
-                                                                       'bg-amber-400/30 text-amber-100'
+                                                                        'bg-amber-400/30 text-amber-100'
                       }`}>
                         {property.tenant.paymentStatus === 'current' ? '✓ Up to date' :
                          property.tenant.paymentStatus === 'overdue' ? '⚠ Overdue' : 'Payment plan'}
@@ -577,8 +835,6 @@ export function PropertyDetails({
                       Lease ends {dates.leaseEnd}
                     </div>
                   )}
-
-                  {/* Overdue alert */}
                   {property.tenant.paymentStatus === 'overdue' && (property.tenant as any).overdueAmount && (
                     <div className="flex items-start gap-2 p-2.5 rounded-[10px] bg-red-50 border border-red-200">
                       <AlertTriangle size={13} className="text-red-500 mt-0.5 shrink-0" />
@@ -592,8 +848,6 @@ export function PropertyDetails({
                       </div>
                     </div>
                   )}
-
-                  {/* Tenant action buttons */}
                   <div className="flex flex-col gap-2 pt-1">
                     {onViewTenant && property.tenant.id && (
                       <button type="button" onClick={() => onViewTenant(property.tenant!.id)}
@@ -699,19 +953,19 @@ export function PropertyDetails({
               </SCard>
             )}
 
-            {/* Property summary */}
+            {/* Summary */}
             <SCard className="p-4">
               <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-1"
                 style={{ fontFamily: 'Archivo,sans-serif' }}>Summary</p>
               <ul className="space-y-2.5">
                 {[
-                  ['Type',      fmtType(property.type)],
-                  ['Bedrooms',  String(property.bedrooms)],
-                  ['Bathrooms', typeof (property as any).bathrooms === 'number' ? String((property as any).bathrooms) : '—'],
-                  ['Sq Ft',     typeof (property as any).squareFootage === 'number' ? `${(property as any).squareFootage}` : '—'],
+                  ['Type',         fmtType(property.type)],
+                  ['Bedrooms',     String(property.bedrooms)],
+                  ['Bathrooms',    typeof (property as any).bathrooms === 'number' ? String((property as any).bathrooms) : '—'],
+                  ['Sq Ft',        typeof (property as any).squareFootage === 'number' ? `${(property as any).squareFootage}` : '—'],
                   ['Monthly Rent', `£${(property.rent ?? 0).toLocaleString()}`],
-                  ['Photos',    String(validPhotos.length)],
-                  ['Documents', String((property.documents ?? []).length)],
+                  ['Photos',       String(validPhotos.length)],
+                  ['Documents',    String((property.documents ?? []).length)],
                 ].map(([label, value]) => (
                   <li key={label} className="flex items-center justify-between">
                     <span className="text-[12.5px] text-[#64748b]">{label}</span>
@@ -724,7 +978,7 @@ export function PropertyDetails({
         </div>
       </div>
 
-      {/* ── Change Tenant Dialog ──────────────────────────────────────────── */}
+      {/* ── Change Tenant Dialog ─────────────────────────────────────────── */}
       <Dialog open={showChangeTenantDialog} onOpenChange={setShowChangeTenantDialog}>
         <DialogContent className="rounded-[20px]">
           <DialogHeader>
@@ -744,8 +998,7 @@ export function PropertyDetails({
                 ) : (
                   swappableTenants.map(t => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                      {t.propertyId === property.id ? ' (current)' : ''}
+                      {t.name}{t.propertyId === property.id ? ' (current)' : ''}
                     </SelectItem>
                   ))
                 )}
@@ -771,6 +1024,31 @@ export function PropertyDetails({
               Confirm Change
             </button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Photo preview lightbox ────────────────────────────────────────── */}
+      <Dialog open={!!previewPhoto} onOpenChange={() => setPreviewPhoto(null)}>
+        <DialogContent className="max-w-3xl rounded-[20px] p-0 overflow-hidden">
+          {previewPhoto && (
+            <div className="relative bg-black">
+              <img src={previewPhoto.url} alt={previewPhoto.filename}
+                className="w-full max-h-[70vh] object-contain" />
+              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between"
+                style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.6))' }}>
+                <div className="text-white">
+                  <p className="text-[13px] font-semibold">{previewPhoto.filename}</p>
+                  {previewPhoto.room && <p className="text-[11px] text-white/70">{previewPhoto.room}</p>}
+                </div>
+                <button type="button"
+                  onClick={() => window.open(previewPhoto.url, '_blank', 'noopener')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white"
+                  style={{ background: 'rgba(255,255,255,0.15)' }}>
+                  <Download size={13} /> Download
+                </button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
