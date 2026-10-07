@@ -42,11 +42,12 @@ import {
   Building2,
   FolderOpen,
   RefreshCw,
+  Eye,
 } from 'lucide-react';
 import { Property, PropertyDocument } from '../App';
 import { propertyService } from '../services/propertyService';
 import { documentService, LandlordDocument } from '../services/documentService';
-import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
+import { downloadPropertyDocument, previewPropertyDocument } from '../utils/downloadPropertyDocument';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 
@@ -129,6 +130,8 @@ export function DocumentManagement({
   const [selectedForms,       setSelectedForms]        = useState<SelectedDocumentForm[]>([]);
   const [isUploading,         setIsUploading]          = useState(false);
   const [deletingId,          setDeletingId]           = useState<string | null>(null);
+  const [downloadingId,       setDownloadingId]        = useState<string | null>(null);
+  const [downloadError,       setDownloadError]        = useState<string | null>(null);
   /** Vault mode: documents returned from the backend */
   const [vaultDocs,           setVaultDocs]            = useState<LandlordDocument[]>([]);
   const [vaultLoaded,         setVaultLoaded]          = useState(false);
@@ -566,6 +569,14 @@ export function DocumentManagement({
           </div>
         </Card>
 
+        {/* Download error banner */}
+        {downloadError && (
+          <div className="flex items-center gap-2 p-3 mb-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {downloadError}
+          </div>
+        )}
+
         {/* Document list */}
         {loadingVault ? (
           <Card className="p-12 text-center">
@@ -632,12 +643,50 @@ export function DocumentManagement({
                         </Button>
                       )}
 
+                      {/* Preview */}
+                      <Button variant="outline" size="sm"
+                        title="Preview document"
+                        onClick={() => {
+                          const url = (doc as any).url;
+                          if (!url) {
+                            setDownloadError('Document URL not available');
+                            setTimeout(() => setDownloadError(null), 3000);
+                            return;
+                          }
+                          try { previewPropertyDocument(url); }
+                          catch (err) {
+                            setDownloadError((err as Error).message);
+                            setTimeout(() => setDownloadError(null), 3000);
+                          }
+                        }}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+
                       {/* Download */}
                       <Button variant="outline" size="sm"
-                        onClick={() => (doc as any).url
-                          ? downloadPropertyDocument((doc as any).url, doc.name)
-                          : alert('Document URL not available')}>
-                        <Download className="w-4 h-4" />
+                        title="Download document"
+                        disabled={downloadingId === doc.id}
+                        onClick={async () => {
+                          const url = (doc as any).url;
+                          if (!url) {
+                            setDownloadError('Document URL not available');
+                            setTimeout(() => setDownloadError(null), 3000);
+                            return;
+                          }
+                          setDownloadingId(doc.id);
+                          setDownloadError(null);
+                          try {
+                            await downloadPropertyDocument(url, doc.name);
+                          } catch (err) {
+                            setDownloadError((err as Error).message);
+                            setTimeout(() => setDownloadError(null), 3000);
+                          } finally {
+                            setDownloadingId(null);
+                          }
+                        }}>
+                        {downloadingId === doc.id
+                          ? <Clock className="w-4 h-4 animate-spin" />
+                          : <Download className="w-4 h-4" />}
                       </Button>
 
                       {/* Delete */}
