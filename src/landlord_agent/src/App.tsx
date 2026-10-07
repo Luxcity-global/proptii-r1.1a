@@ -403,8 +403,17 @@ export function AppContent() {
   const { user: hostUser, isAuthenticated: hostIsAuthenticated, isLoading: hostIsLoading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
   const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
-  // Sync URL pathname → navigation state (do not depend on navigationScreen to avoid races)
+  // Sync URL pathname → navigation state.
+  // Only fires on actual URL changes (e.g. initial load, external navigation).
+  // Does NOT override popstate restorations — those are handled by the
+  // popstate listener above which runs synchronously before React Router
+  // updates location. We guard by checking if the history state already
+  // carries a proptiiScreen so we don't snap a full-screen back to main-app.
   useEffect(() => {
+    const state = window.history.state as { proptiiScreen?: Screen } | null;
+    // If the current history entry was pushed by us and has a known screen,
+    // let the popstate handler deal with it — don't override.
+    if (state?.proptiiScreen && state.proptiiScreen !== 'main-app') return;
     const targetScreen = screenFromPathname(location.pathname);
     if (targetScreen) {
       setNavigationScreen(targetScreen);
@@ -422,18 +431,22 @@ export function AppContent() {
     if (isEmbeddedInParent()) {
       try {
         const base = `${window.location.pathname}${window.location.search}`;
-        window.history.replaceState(null, '', `${base}#${path}`);
+        window.history.replaceState(
+          { proptiiScreen: 'main-app', proptiiNavSection: screen },
+          '',
+          `${base}#${path}`
+        );
       } catch { /* ignore */ }
       return;
     }
 
     const targetUrl = `/landlord${path === '/' ? '' : path}`;
-    if (window.location.pathname !== targetUrl) {
-      window.history.pushState(null, '', targetUrl);
-      // Notify React Router. pushState alone leaves the router on /landlord,
-      // so the pathname effect snaps every section back to the dashboard.
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    }
+    // Use pushState so sidebar tabs are reachable via browser Back
+    window.history.pushState(
+      { proptiiScreen: 'main-app', proptiiNavSection: screen },
+      '',
+      targetUrl
+    );
   }, []);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -1002,51 +1015,106 @@ export function AppContent() {
     setAlerts([]);
   }, []);
 
+  // ── Browser back/forward support ─────────────────────────────────────────
+  //
+  // The app uses a custom currentScreen state machine, not React Router routes,
+  // so the browser history stack is unaware of full-screen navigations
+  // (property-details, add-tenant, edit-property, etc.).
+  //
+  // Fix: every navigateToScreen call pushes a history entry whose state carries
+  // { proptiiScreen, proptiiNavSection } so the browser Back button can restore
+  // the exact screen the user was on rather than always snapping to the sidebar
+  // section derived from the URL pathname.
+  //
+  // navigateToMainApp uses replaceState (not pushState) for sidebar tab switches
+  // so those don't pollute the back stack — only full-screen transitions are
+  // true history entries.
+
+  React.useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const state = e.state as { proptiiScreen?: Screen; proptiiNavSection?: NavigationScreen } | null;
+      if (state?.proptiiScreen) {
+        // Restore the exact screen the user was on
+        setCurrentScreen(state.proptiiScreen);
+        if (state.proptiiNavSection) setNavigationScreen(state.proptiiNavSection);
+        if (state.proptiiScreen === 'main-app') {
+          setSelectedProperty(null);
+          try { sessionStorage.removeItem('proptii_current_screen'); } catch { /* ignore */ }
+        } else {
+          try { sessionStorage.setItem('proptii_current_screen', state.proptiiScreen); } catch { /* ignore */ }
+        }
+      } else {
+        // Fallback: derive from URL (sidebar section changes without state)
+        const targetSection = screenFromPathname(window.location.pathname);
+        if (targetSection) {
+          setNavigationScreen(targetSection);
+          setCurrentScreen('main-app');
+          try { sessionStorage.removeItem('proptii_current_screen'); } catch { /* ignore */ }
+        }
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const navigateToScreen = (screen: Screen) => {
-    setIsTransitioning(true);
     trackEvent('landlord_screen_navigation', { screen, from_screen: currentScreen });
-    // State updates are batched synchronously — no setTimeout needed.
-    // The old 2ms delay caused a visible double-render: one frame with
-    // isTransitioning=true (opacity-0 scale-75) then another when setState fired,
-    // which produced the URL-changes-but-nothing-happens / dashboard-flash bug
-    // when navigating back from the property wizard.
     setCurrentScreen(screen);
     setIsTransitioning(false);
 
-    // Persist current screen to sessionStorage (survives reload within same tab)
+    // Persist to sessionStorage (survives reload)
     try {
-      sessionStorage.setItem('proptii_current_screen', screen);
-    } catch (e) {
-      // Ignore storage errors
+      if (screen === 'main-app') {
+        sessionStorage.removeItem('proptii_current_screen');
+      } else {
+        sessionStorage.setItem('proptii_current_screen', screen);
+      }
+    } catch { /* ignore */ }
+
+    // Push a history entry so browser Back can restore this screen
+    if (!isEmbeddedInParent()) {
+      const base = window.location.pathname + window.location.search;
+      window.history.pushState(
+        { proptiiScreen: screen, proptiiNavSection: navigationScreen },
+        '',
+        base
+      );
     }
 
-    // Clear selected property when navigating back to main app
+    // Clear selected property when going back to main app
     if (screen === 'main-app') {
       setSelectedProperty(null);
-      try {
-        sessionStorage.removeItem('proptii_selected_property_id');
-      } catch (e) {}
+      try { sessionStorage.removeItem('proptii_selected_property_id'); } catch { /* ignore */ }
     }
   };
 
   /**
-   * Navigate to a main-app section atomically — sets currentScreen, navigationScreen,
-   * and clears the wizard-screen sessionStorage key in one synchronous batch.
-   * Use this instead of navigateToScreen('main-app') when you also need to control
-   * which sidebar section is active (prevents the "dashboard not found" flash).
+   * Navigate to a main-app section atomically — sets currentScreen + navigationScreen
+   * and updates the URL. Uses replaceState so sidebar tab switches don't
+   * accumulate in the back stack (only full-screen transitions do).
    */
   const navigateToMainApp = (section: NavigationScreen) => {
     trackEvent('landlord_screen_navigation', { screen: 'main-app', from_screen: currentScreen });
     setCurrentScreen('main-app');
     setNavigationScreen(section);
     setIsTransitioning(false);
+    setSelectedProperty(null);
     try {
-      // Remove the wizard screen so a page reload doesn't re-open the wizard
       sessionStorage.removeItem('proptii_current_screen');
       sessionStorage.removeItem('proptii_previous_screen');
       sessionStorage.removeItem('proptii_selected_property_id');
-    } catch (e) {}
-    setSelectedProperty(null);
+    } catch { /* ignore */ }
+
+    if (!isEmbeddedInParent()) {
+      const path = SCREEN_TO_PATH[section] || '/dashboard';
+      const targetUrl = `/landlord${path === '/' ? '' : path}`;
+      // replaceState — sidebar switches don't add to back stack
+      window.history.replaceState(
+        { proptiiScreen: 'main-app', proptiiNavSection: section },
+        '',
+        targetUrl
+      );
+    }
   };
 
   const completeOnboarding = () => {
