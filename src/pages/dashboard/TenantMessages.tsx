@@ -79,6 +79,7 @@ const TenantMessages: React.FC = () => {
   const [search, setSearch] = useState('');
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>({});
+  const [mobileShowThread, setMobileShowThread] = useState(false);
   const [readCursors, setReadCursors] = useState<Record<string, string | null>>({});
   const [prefilledDrafts, setPrefilledDrafts] = useState<Record<string, string>>({});
   const pendingConversationRef = useRef<{ id: string; conversation?: Conversation; prefilledMessage?: string } | null>(null);
@@ -163,6 +164,7 @@ const TenantMessages: React.FC = () => {
     const prevCursor = readCursors[id] ?? null;
     if (conv && isUnread(conv, prevCursor)) decrementUnreadCount(1);
     setReadCursors((prev) => ({ ...prev, [id]: new Date().toISOString() }));
+    setMobileShowThread(true); // navigate to thread panel on mobile
   }, [activeConversationId, setActiveConversationId, conversations, readCursors, decrementUnreadCount]);
 
   const handleSend = useCallback((message: Message, file?: File) => {
@@ -178,6 +180,14 @@ const TenantMessages: React.FC = () => {
     });
     setTimeout(scrollToBottom, 0);
   }, [activeConversationId, scrollToBottom]);
+
+  const handleSendError = useCallback(() => {
+    if (!activeConversationId) return;
+    setOptimisticMessages((prev) => {
+      const current = prev[activeConversationId] ?? [];
+      return { ...prev, [activeConversationId]: current.slice(0, -1) };
+    });
+  }, [activeConversationId]);
 
   const currentUserId = user?.id ?? '';
   const userName = (user as { name?: string; displayName?: string } | null)?.name
@@ -291,8 +301,8 @@ const TenantMessages: React.FC = () => {
           </button>
         </div>
 
-        <div className="tn-msg-split">
-          <aside className="tn-msg-list" aria-label="Conversations">
+        <div className={`tn-msg-split${mobileShowThread ? ' is-thread-active' : ''}`}>
+          <aside className={`tn-msg-list${mobileShowThread ? ' tn-msg-list--hidden-mobile' : ''}`} aria-label="Conversations">
             <div className="tn-msg-search">
               <Search size={16} />
               <input
@@ -344,10 +354,19 @@ const TenantMessages: React.FC = () => {
             </div>
           </aside>
 
-          <main className="tn-msg-thread" aria-label="Message thread">
+          <main className={`tn-msg-thread${mobileShowThread ? ' tn-msg-thread--active-mobile' : ''}`} aria-label="Message thread">
             {activeConversationId ? (
               <>
                 <div className="tn-msg-thread-head">
+                  {/* Mobile back-to-list button */}
+                  <button
+                    type="button"
+                    className="tn-msg-back-to-list"
+                    onClick={() => setMobileShowThread(false)}
+                    aria-label="Back to conversations"
+                  >
+                    ← Back
+                  </button>
                   <span className={`tn-msg-avatar ${avatarTone(activeConversation ? participantName(activeConversation) : 'Landlord')}`}>
                     {getInitials(activeConversation ? participantName(activeConversation) : 'Landlord')}
                   </span>
@@ -384,6 +403,7 @@ const TenantMessages: React.FC = () => {
                 <ComposeBox
                   conversationId={activeConversationId}
                   onSend={handleSend}
+                  onSendError={handleSendError}
                   senderRole="tenant"
                   recipientId={activeConversation?.landlordId}
                   agentEmail={activeConversation?.agentEmail}

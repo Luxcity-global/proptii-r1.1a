@@ -148,9 +148,12 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
       const prevCursor = readCursors[id] ?? null;
       if (conv && isUnread(conv, prevCursor)) decrementUnreadCount(1);
       setReadCursors((prev) => ({ ...prev, [id]: new Date().toISOString() }));
+      setMobileShowThread(true); // navigate to thread on mobile
     },
     [setActiveConversationId, conversations, readCursors, decrementUnreadCount],
   );
+
+  const [mobileShowThread, setMobileShowThread] = useState(false);
 
   const handleSend = useCallback(
     (message: Message, file?: File) => {
@@ -163,6 +166,15 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
     },
     [activeConversationId, scrollToBottom],
   );
+
+  const handleSendError = useCallback(() => {
+    if (!activeConversationId) return;
+    // Remove the last optimistic message for this conversation (the one that failed)
+    setOptimisticMessages((prev) => {
+      const current = prev[activeConversationId] ?? [];
+      return { ...prev, [activeConversationId]: current.slice(0, -1) };
+    });
+  }, [activeConversationId]);
 
   const currentUserId = user?.id ?? '';
   const userName = userProfile?.name || (user as { name?: string; displayName?: string } | null)?.name || (user as { displayName?: string } | null)?.displayName || 'Landlord';
@@ -291,8 +303,8 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
           </button>
         </div>
 
-        <div className="ll-msg-split">
-          <aside className="ll-msg-list" aria-label="Conversations">
+        <div className={`ll-msg-split${mobileShowThread ? ' is-thread-active' : ''}`}>
+          <aside className={`ll-msg-list${mobileShowThread ? ' ll-msg-list--hidden-mobile' : ''}`} aria-label="Conversations">
             <div className="ll-msg-search">
               <Search size={16} />
               <input
@@ -346,10 +358,19 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
             </div>
           </aside>
 
-          <main className="ll-msg-thread" aria-label="Message thread">
+          <main className={`ll-msg-thread${mobileShowThread ? ' ll-msg-thread--active-mobile' : ''}`} aria-label="Message thread">
             {activeConversationId ? (
               <>
                 <div className="ll-msg-thread-head">
+                  {/* Mobile back-to-list button */}
+                  <button
+                    type="button"
+                    className="ll-msg-back-to-list"
+                    onClick={() => setMobileShowThread(false)}
+                    aria-label="Back to conversations"
+                  >
+                    ← Back
+                  </button>
                   <span className={`ll-msg-avatar ${avatarTone(activeConversation?.tenantName || 'Tenant')}`}>
                     {getInitials(activeConversation?.tenantName || 'Tenant')}
                   </span>
@@ -381,6 +402,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                 <ComposeBox
                   conversationId={activeConversationId}
                   onSend={handleSend}
+                  onSendError={handleSendError}
                   senderRole="landlord"
                   recipientId={activeConversation?.tenantId}
                 />

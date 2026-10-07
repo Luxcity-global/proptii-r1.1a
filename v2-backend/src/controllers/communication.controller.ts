@@ -1,10 +1,21 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, Req, NotFoundException, Sse, MessageEvent, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, Req, NotFoundException, Sse, MessageEvent, Logger, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CommunicationService } from '../services/communication.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { randomUUID } from 'crypto';
+
+// ── In-memory SSE ticket store ────────────────────────────────────────────────
+// Short-lived (60s) opaque tickets that let the client connect to SSE without
+// exposing the Bearer token in the URL / server access logs.
+const sseTickets = new Map<string, { uid: string; email: string; role: string; expiresAt: number }>();
+
+setInterval(() => {
+  const now = Date.now();
+  sseTickets.forEach((v, k) => { if (v.expiresAt < now) sseTickets.delete(k); });
+}, 30_000);
 
 @ApiTags('Communication')
 @ApiBearerAuth('bearer')
@@ -18,15 +29,50 @@ export class CommunicationController {
     private readonly eventsService: EventsService,
   ) {}
 
+  // ── SSE ticket exchange — call with Bearer token, get back a 60s opaque ticket
+  @Post('sse-ticket')
+  @HttpCode(200)
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Exchange Bearer token for a short-lived SSE ticket' })
+  @ApiResponse({ status: 200, description: 'One-time SSE ticket valid for 60 seconds' })
+  issueSseTicket(@Req() req: any) {
+    const ticket = randomUUID();
+    sseTickets.set(ticket, {
+      uid:       req.user.uid,
+      email:     req.user.email || '',
+      role:      req.user.role  || '',
+      expiresAt: Date.now() + 60_000,
+    });
+    return { ticket };
+  }
+
   @Sse('events')
   @SkipThrottle()
   @ApiOperation({ summary: 'Subscribe to real-time communication events stream (SSE)' })
-  sendCommunicationEvents(@Req() req: any): Observable<MessageEvent> {
-    const userId = req.user.uid;
-    const email = req.user.email;
-    const role = req.user.role;
-    this.logger.log(`[SSE:Communication] Client connected uid=${userId} email=${email}`);
-    return this.eventsService.subscribe(userId, email, role);
+  sendCommunicationEvents(@Req() req: any, @Query('ticket') ticket?: string): Observable<MessageEvent> {
+    // Accept either ticket-based auth (preferred — token never in URL) or fall
+    // back to the legacy req.user populated by FirebaseAuthGuard for backwards compat.
+    let uid: string;
+    let email: string;
+    let role: string;
+
+    if (ticket) {
+      const info = sseTickets.get(ticket);
+      if (!info || info.expiresAt < Date.now()) {
+        throw new UnauthorizedException('SSE ticket is invalid or has expired');
+      }
+      sseTickets.delete(ticket); // one-time use
+      uid   = info.uid;
+      email = info.email;
+      role  = info.role;
+    } else {
+      uid   = req.user?.uid   || '';
+      email = req.user?.email || '';
+      role  = req.user?.role  || '';
+    }
+
+    this.logger.log(`[SSE:Communication] Client connected uid=${uid} email=${email}`);
+    return this.eventsService.subscribe(uid, email, role);
   }
 
   @Get('conversations')

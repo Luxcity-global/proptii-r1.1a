@@ -54,6 +54,8 @@ class SseService {
 
   /**
    * Connect to an SSE channel (e.g. 'viewing-requests', 'contracts', 'communication', 'alerts')
+   * Uses a short-lived SSE ticket (exchanged via POST /communication/sse-ticket) so the
+   * Bearer token is never exposed in the URL or server access logs.
    */
   async ensureConnected(channel: string): Promise<EventSource | null> {
     if (this.sources.has(channel)) {
@@ -71,9 +73,39 @@ class SseService {
     this.isConnecting.set(channel, true);
 
     try {
-      const token = await getAccessTokenForApiRequest();
       const baseUrl = getResolvedApiBaseUrl().replace(/\/$/, '');
-      const sseUrl = `${baseUrl}/${channel}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      let sseUrl: string;
+
+      // For the communication channel, exchange the Bearer token for a short-lived
+      // opaque ticket so the token never appears in URLs / server logs.
+      if (channel === 'communication') {
+        try {
+          const token = await getAccessTokenForApiRequest();
+          const ticketRes = await fetch(`${baseUrl}/communication/sse-ticket`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          });
+          if (ticketRes.ok) {
+            const { ticket } = await ticketRes.json();
+            sseUrl = `${baseUrl}/${channel}/events?ticket=${encodeURIComponent(ticket)}`;
+          } else {
+            // Ticket exchange failed — fall back to legacy token-in-URL
+            const fallbackToken = await getAccessTokenForApiRequest().catch(() => null);
+            sseUrl = `${baseUrl}/${channel}/events${fallbackToken ? `?token=${encodeURIComponent(fallbackToken)}` : ''}`;
+          }
+        } catch {
+          // Network error — fall back to legacy
+          const fallbackToken = await getAccessTokenForApiRequest().catch(() => null);
+          sseUrl = `${baseUrl}/${channel}/events${fallbackToken ? `?token=${encodeURIComponent(fallbackToken)}` : ''}`;
+        }
+      } else {
+        // Other channels: legacy token-in-URL (can be migrated similarly later)
+        const token = await getAccessTokenForApiRequest().catch(() => null);
+        sseUrl = `${baseUrl}/${channel}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      }
 
       const source = new EventSource(sseUrl);
 

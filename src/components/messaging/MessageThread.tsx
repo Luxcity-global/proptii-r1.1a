@@ -19,7 +19,24 @@ import sseService from '../../services/sseService';
 import AttachmentPill from './AttachmentPill';
 
 // ---------------------------------------------------------------------------
-// AttachmentLoader — fetches a SAS URL then delegates rendering to AttachmentPill
+// InlineAttachment — renders an already-hydrated attachment object directly.
+// The backend now embeds attachment metadata in each message, eliminating
+// the N+1 network fetches that AttachmentLoader used to make.
+// ---------------------------------------------------------------------------
+
+interface InlineAttachmentProps {
+    attachment: { id: string; filename?: string; blobUrl?: string; url?: string };
+    isSent: boolean;
+}
+
+const InlineAttachment: React.FC<InlineAttachmentProps> = ({ attachment, isSent }) => {
+    const url = attachment.blobUrl || attachment.url || null;
+    const fileName = attachment.filename || 'Attachment';
+    return <AttachmentPill url={url} fileName={fileName} isSent={isSent} isError={!url} />;
+};
+
+// ---------------------------------------------------------------------------
+// AttachmentLoader — lazy fallback for messages without embedded attachments
 // ---------------------------------------------------------------------------
 
 interface AttachmentLoaderProps {
@@ -206,7 +223,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 <p style={{ margin: 0, wordBreak: 'break-word' }}>{message.body}</p>
                             ) : null}
 
-                            {/* Attachment download pills */}
+                            {/* Attachments — use embedded data when available, lazy-load otherwise */}
                             {message.attachmentIds && message.attachmentIds.length > 0 && (
                                 <div
                                     style={{
@@ -217,28 +234,50 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                         alignItems: isSent ? 'flex-end' : 'flex-start',
                                     }}
                                 >
-                                    {message.attachmentIds.map((attachmentId) => (
-                                        <AttachmentLoader
-                                            key={attachmentId}
-                                            attachmentId={attachmentId}
-                                            conversationId={message.conversationId}
-                                            isSent={isSent}
-                                        />
-                                    ))}
+                                    {message.attachmentIds.map((attachmentId, idx) => {
+                                        // If the backend embedded the attachment object, use it directly.
+                                        // Otherwise fall back to the lazy AttachmentLoader.
+                                        const embedded = (message as any).attachments?.[idx];
+                                        return embedded
+                                            ? <InlineAttachment key={attachmentId} attachment={embedded} isSent={isSent} />
+                                            : <AttachmentLoader key={attachmentId} attachmentId={attachmentId} conversationId={message.conversationId} isSent={isSent} />;
+                                    })}
                                 </div>
                             )}
 
-                            {message.sentAt && !isNaN(new Date(message.sentAt).getTime()) && (
-                                <time
-                                    dateTime={message.sentAt}
-                                    style={{ fontSize: '0.75rem', opacity: 0.7, display: 'block', marginTop: '4px' }}
-                                >
-                                    {new Date(message.sentAt).toLocaleTimeString([], {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                    })}
-                                </time>
-                            )}
+                            {/* Timestamp + read receipt */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: isSent ? 'flex-end' : 'flex-start', marginTop: '4px' }}>
+                                {message.sentAt && !isNaN(new Date(message.sentAt).getTime()) && (
+                                    <time
+                                        dateTime={message.sentAt}
+                                        style={{ fontSize: '0.7rem', opacity: 0.65 }}
+                                    >
+                                        {new Date(message.sentAt).toLocaleTimeString([], {
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                        })}
+                                    </time>
+                                )}
+                                {/* Read receipt — only shown on sent messages */}
+                                {isSent && (
+                                    <span
+                                        title={message.readAt ? `Read ${new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Delivered'}
+                                        style={{ fontSize: '0.65rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '1px' }}
+                                    >
+                                        {message.readAt ? (
+                                            // Double tick — seen
+                                            <svg width="14" height="10" viewBox="0 0 14 10" fill="currentColor" aria-label="Read">
+                                                <path d="M1 5l3 3L10 1M5 5l3 3L14 1" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        ) : (
+                                            // Single tick — delivered
+                                            <svg width="8" height="10" viewBox="0 0 8 10" fill="currentColor" aria-label="Delivered">
+                                                <path d="M1 5l3 3L8 1" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        )}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 );

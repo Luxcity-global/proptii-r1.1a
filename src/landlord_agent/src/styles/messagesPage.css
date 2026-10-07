@@ -502,3 +502,109 @@
   .ll-msg-header h1 { font-size: 22px; }
   .ll-msg-list, .ll-msg-thread { min-height: 420px; }
 }
+
+/* ── Mobile messaging — split-pane navigation ──────────────────────────────── */
+
+/* Back-to-list button: hidden on desktop, shown on mobile inside thread panel */
+.ll-msg-back-to-list {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #136c9e;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0 8px 0;
+  font-family: 'Archivo', sans-serif;
+}
+
+@media (max-width: 767px) {
+  /* Page padding */
+  .ll-msg {
+    padding: 0 12px 32px;
+  }
+
+  /* Header: unstick + simplify */
+  .ll-msg-header {
+    position: static;
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .ll-msg-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-msg-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ll-msg-btn-add,
+  .ll-msg-btn-insights {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Split: default show list, hide thread */
+  .ll-msg-split {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .ll-msg-list {
+    display: block;
+    border-radius: 16px;
+    min-height: 0;
+  }
+
+  .ll-msg-thread {
+    display: none;
+    border-radius: 16px;
+    min-height: 0;
+  }
+
+  /* When a conversation is selected: hide list, show thread */
+  .ll-msg-split.is-thread-active .ll-msg-list,
+  .ll-msg-list--hidden-mobile {
+    display: none !important;
+  }
+
+  .ll-msg-split.is-thread-active .ll-msg-thread,
+  .ll-msg-thread--active-mobile {
+    display: flex !important;
+    flex-direction: column;
+    min-height: 70vh;
+  }
+
+  /* Show back button inside thread on mobile */
+  .ll-msg-back-to-list {
+    display: flex;
+  }
+
+  /* Tabs scroll on mobile */
+  .ll-msg-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .ll-msg-tabs::-webkit-scrollbar { display: none; }
+
+  /* Toolbar row stacks */
+  .ll-msg-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ll-msg-export {
+    align-self: flex-end;
+  }
+}

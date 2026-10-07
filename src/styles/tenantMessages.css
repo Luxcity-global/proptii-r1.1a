@@ -393,3 +393,67 @@
   .tn-msg-list,
   .tn-msg-thread { min-height: 420px; }
 }
+
+/* ── Mobile messaging — split-pane navigation ──────────────────────────────── */
+
+.tn-msg-back-to-list {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #136c9e;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0 8px 0;
+}
+
+@media (max-width: 767px) {
+  .tn-msg-split {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .tn-msg-list {
+    display: block;
+    border-radius: 16px;
+    min-height: 0;
+  }
+
+  .tn-msg-thread {
+    display: none;
+    border-radius: 16px;
+    min-height: 0;
+  }
+
+  /* Conversation selected: hide list, show thread */
+  .tn-msg-split.is-thread-active .tn-msg-list,
+  .tn-msg-list--hidden-mobile {
+    display: none !important;
+  }
+
+  .tn-msg-split.is-thread-active .tn-msg-thread,
+  .tn-msg-thread--active-mobile {
+    display: flex !important;
+    flex-direction: column;
+    min-height: 70vh;
+  }
+
+  .tn-msg-back-to-list {
+    display: flex;
+  }
+
+  .tn-msg-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .tn-msg-tabs::-webkit-scrollbar { display: none; }
+
+  .tn-msg-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+}

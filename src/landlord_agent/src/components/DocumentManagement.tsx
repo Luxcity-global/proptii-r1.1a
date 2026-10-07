@@ -622,8 +622,8 @@ export function DocumentManagement({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="text-right text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4 flex-wrap">
+                      <div className="text-right text-xs text-muted-foreground shrink-0">
                         <p>Issued: {formatDate((doc as any).issueDate)}</p>
                         {(doc as any).expiryDate && <p>Expires: {formatDate((doc as any).expiryDate)}</p>}
                       </div>

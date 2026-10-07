@@ -1336,3 +1336,60 @@
     font-size: 13px;
   }
 }
+
+/* ── Dashboard — additional mobile fixes (property tab + document management) ─ */
+
+@media (max-width: 767px) {
+  /* Property tab cards in dashboard: full width */
+  .ll-property-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Mid content grid: single column */
+  .ll-mid-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Analytics sub-grid */
+  .ll-analytics-sub {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Hero stat cards: tighten padding */
+  .ll-stat-card {
+    padding: 16px !important;
+  }
+
+  /* Top stat cards: single column already handled at 1024px,
+     but make sure gap is tight on phones */
+  .ll-top-stat-grid {
+    gap: 10px !important;
+  }
+
+  /* Pill stats inside the profile card */
+  .ll-pill-stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Revenue chart: allow horizontal scroll on very small screens */
+  .ll-revenue-chart {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Filter row / property list header */
+  .ll-section-header,
+  .ll-properties-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+
+  /* Alerts / notices: stack */
+  .ll-alert-row,
+  .ll-notice-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

@@ -21,8 +21,8 @@ import communicationService from '../../services/communicationService';
 // ---------------------------------------------------------------------------
 
 const MAX_CHARS = 4000;
-const ALLOWED_ACCEPT = '.pdf,.doc,.docx,.txt';
-const MAX_ATTACHMENT_MB = 5; // Must match AttachmentService.MAX_FILE_SIZE_BYTES
+const ALLOWED_ACCEPT = '.pdf,.doc,.docx,.txt,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.webp,.zip';
+const MAX_ATTACHMENT_MB = 10; // Increased from 5MB — images and xlsx can be larger
 
 // ---------------------------------------------------------------------------
 // Props
@@ -31,6 +31,8 @@ const MAX_ATTACHMENT_MB = 5; // Must match AttachmentService.MAX_FILE_SIZE_BYTES
 export interface ComposeBoxProps {
     conversationId: string;
     onSend: (message: Message, attachedFile?: File) => void;
+    /** Called when send fails after optimistic render — lets the parent clean up */
+    onSendError?: () => void;
     senderRole?: 'tenant' | 'landlord';
     recipientId?: string;
     agentEmail?: string;
@@ -84,6 +86,7 @@ const SpinnerIcon = () => (
 const ComposeBox: React.FC<ComposeBoxProps> = ({
     conversationId,
     onSend,
+    onSendError,
     senderRole = 'tenant',
     recipientId,
     agentEmail,
@@ -156,6 +159,8 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
             if (fileInputRef.current) fileInputRef.current.value = '';
         } catch {
             toast.error('Failed to send message. Please try again.');
+            // Notify the parent so it can remove any optimistic render
+            onSendError?.();
         } finally {
             setSending(false);
         }

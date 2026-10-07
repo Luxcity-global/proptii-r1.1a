@@ -13,7 +13,7 @@ import communicationService from '../services/communicationService';
 import sseService from '../services/sseService';
 import { useAuth } from '../contexts/AuthContext';
 
-const DEFAULT_INTERVAL_MS = 60_000; // 60s backup interval (SSE is primary)
+const DEFAULT_INTERVAL_MS = 15_000; // 15s for active tab — fast enough to catch missed SSE events
 
 export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): void {
     const { _setConversations, _setUnreadCount } = useContext(MessagingContext);

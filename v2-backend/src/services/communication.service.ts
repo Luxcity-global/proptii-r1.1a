@@ -160,6 +160,48 @@ export class CommunicationService {
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .sort((a: any, b: any) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
 
+      // ── Embed attachment objects to eliminate N+1 client-side fetches ──────
+      // Instead of the client calling GET /attachments/:id once per attachment
+      // per message, we hydrate them here in a single batched Firestore read.
+      const attachmentsCol = this.attachmentsCol;
+      if (attachmentsCol) {
+        // Collect all unique attachment IDs across all messages
+        const allAttachmentIds: string[] = [];
+        for (const msg of messages as any[]) {
+          if (Array.isArray(msg.attachmentIds)) {
+            allAttachmentIds.push(...msg.attachmentIds);
+          }
+        }
+        const uniqueIds = [...new Set(allAttachmentIds)];
+
+        if (uniqueIds.length > 0) {
+          // Firestore 'in' operator supports up to 30 values per query
+          const chunks: string[][] = [];
+          for (let i = 0; i < uniqueIds.length; i += 30) {
+            chunks.push(uniqueIds.slice(i, i + 30));
+          }
+          const attachmentMap = new Map<string, any>();
+          await Promise.all(
+            chunks.map(async (chunk) => {
+              const snap = await attachmentsCol.where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+              snap.docs.forEach(doc => attachmentMap.set(doc.id, { id: doc.id, ...doc.data() }));
+            })
+          );
+          // Attach the hydrated objects alongside the IDs
+          for (const msg of messages as any[]) {
+            if (Array.isArray(msg.attachmentIds) && msg.attachmentIds.length > 0) {
+              msg.attachments = msg.attachmentIds
+                .map((id: string) => attachmentMap.get(id))
+                .filter(Boolean);
+            } else {
+              msg.attachments = [];
+            }
+          }
+        } else {
+          (messages as any[]).forEach(msg => { msg.attachments = []; });
+        }
+      }
+
       return { data: messages };
     } catch (err: any) {
       if (err instanceof ForbiddenException) throw err;
