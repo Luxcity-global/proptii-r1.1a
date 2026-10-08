@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import { sendEmail } from '../utils/resend';
+import { renderProptiiEmail } from '../utils/emailLayout';
 
 @Injectable()
 export class RefereeGuarantorService {
@@ -236,28 +237,19 @@ export class RefereeGuarantorService {
     // 1. Email to Tenant
     if (tenantEmail) {
       const subjectToTenant = `Great news! ${guarantorName} has completed their Guarantor Form`;
-      const htmlToTenant = `
-        <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;">
-          <div style="background: linear-gradient(135deg, #136C9E, #0D4E73); padding: 24px; border-radius: 8px; text-align: center;">
-            <h1 style="color: #fff; margin: 0; font-size: 20px;">Guarantor Verification Received</h1>
+      const htmlToTenant = renderProptiiEmail({
+        title: 'Guarantor Verification Received',
+        buttonLabel: 'View Referencing Passport',
+        buttonHref: `${this.frontendUrl}/dashboard/tenant-referencing`,
+        bodyHtml: `
+          <p>Hi ${tenantName},</p>
+          <p>Your guarantor, <strong>${guarantorName}</strong> (<em>${guarantorEmail}</em>), has successfully submitted their guarantor details and verification on Proptii.</p>
+          <div class="details">
+            <p style="margin: 0; color: #166534; font-weight: bold;">Status: Guarantor Section Complete</p>
+            <p style="margin: 6px 0 0 0; color: #15803d; font-size: 14px;">Your referencing passport has been automatically updated with their submitted details.</p>
           </div>
-          <div style="padding: 24px 8px;">
-            <p>Hi ${tenantName},</p>
-            <p>Your guarantor, <strong>${guarantorName}</strong> (<em>${guarantorEmail}</em>), has successfully submitted their guarantor details and verification on Proptii.</p>
-            <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 14px 18px; border-radius: 6px; margin: 20px 0;">
-              <p style="margin: 0; color: #166534; font-weight: bold;">Status: Guarantor Section Complete</p>
-              <p style="margin: 6px 0 0 0; color: #15803d; font-size: 14px;">Your referencing passport has been automatically updated with their submitted details.</p>
-            </div>
-            <div style="text-align: center; margin: 28px 0;">
-              <a href="${this.frontendUrl}/dashboard/tenant-referencing" style="background: #136C9E; color: #fff; padding: 12px 28px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-block;">
-                View Referencing Passport
-              </a>
-            </div>
-            <hr style="border: 1px solid #eee; margin: 24px 0;" />
-            <p style="font-size: 12px; color: #9ca3af;">The Proptii Referencing Team</p>
-          </div>
-        </div>
-      `;
+        `,
+      });
       try {
         await sendEmail({ to: tenantEmail, subject: subjectToTenant, html: htmlToTenant });
         this.logger.log(`Guarantor completion notification email sent to tenant: ${tenantEmail}`);
@@ -269,20 +261,17 @@ export class RefereeGuarantorService {
     // 2. Receipt email to Guarantor
     if (guarantorEmail) {
       const subjectToGuarantor = `Confirmation: Guarantor Submission for ${tenantName}`;
-      const htmlToGuarantor = `
-        <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;">
-          <div style="background: linear-gradient(135deg, #136C9E, #0D4E73); padding: 24px; border-radius: 8px; text-align: center;">
-            <h1 style="color: #fff; margin: 0; font-size: 20px;">Thank You for Your Submission</h1>
-          </div>
-          <div style="padding: 24px 8px;">
-            <p>Hi ${guarantorName},</p>
-            <p>Thank you for submitting your guarantor verification and information for <strong>${tenantName}</strong>'s rental application.</p>
-            <p>Your details have been securely recorded and attached to the application.</p>
-            <hr style="border: 1px solid #eee; margin: 24px 0;" />
-            <p style="font-size: 12px; color: #9ca3af;">If you have any questions or did not authorize this, please contact <a href="mailto:contactus@theluxcity.co.uk">contactus@theluxcity.co.uk</a>.</p>
-          </div>
-        </div>
-      `;
+      const htmlToGuarantor = renderProptiiEmail({
+        title: 'Thank You for Your Submission',
+        buttonLabel: 'Open Proptii',
+        buttonHref: this.frontendUrl,
+        bodyHtml: `
+          <p>Hi ${guarantorName},</p>
+          <p>Thank you for submitting your guarantor verification and information for <strong>${tenantName}</strong>'s rental application.</p>
+          <p>Your details have been securely recorded and attached to the application.</p>
+          <p style="font-size: 12px; color: #9ca3af;">If you have any questions or did not authorize this, please contact <a href="mailto:contactus@theluxcity.co.uk">contactus@theluxcity.co.uk</a>.</p>
+        `,
+      });
       try {
         await sendEmail({ to: guarantorEmail, subject: subjectToGuarantor, html: htmlToGuarantor });
         this.logger.log(`Guarantor completion confirmation sent to guarantor: ${guarantorEmail}`);
@@ -363,29 +352,21 @@ export class RefereeGuarantorService {
 
     // 1. Send invitation email to Guarantor
     const subjectToGuarantor = `Guarantor Request from ${tenantName || 'a tenant'} on Proptii`;
-    const htmlToGuarantor = `
-      <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;">
-        <div style="background: linear-gradient(135deg, #136C9E, #0D4E73); padding: 24px; border-radius: 8px; text-align: center;">
-          <h1 style="color: #fff; margin: 0; font-size: 20px;">Guarantor Request</h1>
-        </div>
-        <div style="padding: 24px 8px;">
-          <p>Hi ${guarantorName || 'there'},</p>
-          <p><strong>${tenantName}</strong> has listed you as their guarantor for their rental application on Proptii.</p>
-          ${message ? `<div style="background: #f8fafc; border-left: 4px solid #136C9E; padding: 12px 16px; border-radius: 6px; margin: 18px 0; font-style: italic; color: #334155;">"${message}"</div>` : ''}
-          <p>Please click the button below to review the request, enter your details, and securely upload your ID document:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${formUrl}" style="background: #DC5F12; color: #fff; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 15px; text-decoration: none; display: inline-block; box-shadow: 0 4px 12px rgba(220, 95, 18, 0.25);">
-              Complete Guarantor Form
-            </a>
-          </div>
-          <p style="font-size: 13px; color: #64748b;">If the button above does not work, copy and paste this link into your browser:<br/>
-            <a href="${formUrl}" style="color: #136C9E; word-break: break-all;">${formUrl}</a>
-          </p>
-          <hr style="border: 1px solid #eee; margin: 24px 0;" />
-          <p style="font-size: 12px; color: #9ca3af;">This request was generated via Proptii Referencing. If you did not expect this, please contact <a href="mailto:contactus@theluxcity.co.uk">contactus@theluxcity.co.uk</a>.</p>
-        </div>
-      </div>
-    `;
+    const htmlToGuarantor = renderProptiiEmail({
+      title: 'Guarantor Request',
+      buttonLabel: 'Complete Guarantor Form',
+      buttonHref: formUrl,
+      bodyHtml: `
+        <p>Hi ${guarantorName || 'there'},</p>
+        <p><strong>${tenantName}</strong> has listed you as their guarantor for their rental application on Proptii.</p>
+        ${message ? `<div class="details"><p style="font-style: italic; color: #334155;">"${message}"</p></div>` : ''}
+        <p>Please click the button below to review the request, enter your details, and securely upload your ID document.</p>
+        <p style="font-size: 13px; color: #64748b;">If the button above does not work, copy and paste this link into your browser:<br/>
+          <a href="${formUrl}" style="color: #136C9E; word-break: break-all;">${formUrl}</a>
+        </p>
+        <p style="font-size: 12px; color: #9ca3af;">This request was generated via Proptii Referencing. If you did not expect this, please contact <a href="mailto:contactus@theluxcity.co.uk">contactus@theluxcity.co.uk</a>.</p>
+      `,
+    });
 
     let emailSent = false;
     let emailError: string | undefined;
@@ -405,24 +386,20 @@ export class RefereeGuarantorService {
     // 2. Send confirmation email to Tenant
     if (tenantEmail) {
       const subjectToTenant = `Guarantor Invitation Sent to ${guarantorName}`;
-      const htmlToTenant = `
-        <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;">
-          <div style="background: linear-gradient(135deg, #136C9E, #0D4E73); padding: 24px; border-radius: 8px; text-align: center;">
-            <h1 style="color: #fff; margin: 0; font-size: 20px;">Guarantor Invitation Dispatched</h1>
+      const htmlToTenant = renderProptiiEmail({
+        title: 'Guarantor Invitation Dispatched',
+        buttonLabel: 'Open Proptii',
+        buttonHref: this.frontendUrl,
+        bodyHtml: `
+          <p>Hi ${tenantName},</p>
+          <p>We've sent an invitation email to your guarantor, <strong>${guarantorName}</strong> (<em>${guarantorEmail}</em>), with instructions to complete their guarantor section.</p>
+          <p>You can also share this direct link with them if needed:</p>
+          <div class="details" style="word-break: break-all; font-size: 13px;">
+            ${formUrl}
           </div>
-          <div style="padding: 24px 8px;">
-            <p>Hi ${tenantName},</p>
-            <p>We've sent an invitation email to your guarantor, <strong>${guarantorName}</strong> (<em>${guarantorEmail}</em>), with instructions to complete their guarantor section.</p>
-            <p>You can also share this direct link with them if needed:</p>
-            <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 8px; word-break: break-all; font-size: 13px; color: #1e293b; margin: 16px 0;">
-              ${formUrl}
-            </div>
-            <p>We will notify you via email as soon as ${guarantorName} completes their submission.</p>
-            <hr style="border: 1px solid #eee; margin: 24px 0;" />
-            <p style="font-size: 12px; color: #9ca3af;">The Proptii Referencing Team</p>
-          </div>
-        </div>
-      `;
+          <p>We will notify you via email as soon as ${guarantorName} completes their submission.</p>
+        `,
+      });
 
       try {
         await sendEmail({ to: tenantEmail, subject: subjectToTenant, html: htmlToTenant });
@@ -457,17 +434,18 @@ export class RefereeGuarantorService {
       ? `Reference Request for ${tenantName}`
       : `Guarantor Request for ${tenantName}`;
 
-    const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; background: #fff; border-radius: 8px;">
-        <h2 style="color: #136C9E;">Proptii Referencing Request</h2>
+    const htmlBody = renderProptiiEmail({
+      title: 'Proptii Referencing Request',
+      buttonLabel: `Complete ${type === 'referee' ? 'Reference' : 'Guarantor'} Form`,
+      buttonHref: formUrl,
+      bodyHtml: `
         <p>Hi,</p>
         <p>You have been asked to provide a <strong>${type === 'referee' ? 'reference' : 'guarantor confirmation'}</strong> for <strong>${tenantName}</strong> as part of their rental application.</p>
-        <p>Please click the link below to complete the form:</p>
-        <p><a href="${formUrl}" style="background: #DC5F12; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">Complete ${type === 'referee' ? 'Reference' : 'Guarantor'} Form</a></p>
+        <p>Please click the link below to complete the form.</p>
         <p>If you have any questions, please contact us at <a href="mailto:contactus@theluxcity.co.uk">contactus@theluxcity.co.uk</a>.</p>
-        <p>Best regards,<br>${senderName}</p>
-      </div>
-    `;
+        <p>Sent by ${senderName}.</p>
+      `,
+    });
 
     try {
       const id = await sendEmail({ to, subject, html: htmlBody });

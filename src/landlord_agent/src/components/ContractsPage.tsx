@@ -29,11 +29,13 @@ import {
 } from './ui/dropdown-menu';
 import { SendContractModal } from './SendContractModal';
 import { contractService } from '../services/contractService';
+import { fetchContractPdfFile } from '../../../services/contractPdf';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { getLandlordTwoDummyContracts, isLandlordTwoTestAccount } from '../data/landlordTwoDummyContracts';
 import { getAgentDummyContracts, isAgentTestAccount } from '../data/agentTestPersona';
 import { Property, UserProfile } from '../App';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
+import { renderProptiiEmail } from '../../../utils/proptiiEmailLayout';
 import { useAuth } from '../../../contexts/AuthContext';
 import DocumentSigningViewer from '../../../components/contract/DocumentSigningViewer';
 import '../styles/contractsPage.css';
@@ -479,43 +481,16 @@ export function ContractsPage({
         const formData = new FormData();
         formData.append('to', contractData.recipientEmail);
         formData.append('subject', `Contract for Review: ${contractData.file.name}`);
-        formData.append('html', `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-              }
-              .cta-button {
-                display: inline-block;
-                background-color: #DC5F12;
-                color: white !important;
-                padding: 12px 30px;
-                text-decoration: none;
-                border-radius: 50px;
-                margin: 20px 0;
-                font-weight: bold;
-                text-align: center;
-              }
-            </style>
-          </head>
-          <body>
-            <h2>Hello ${contractData.recipientName}!</h2>
+        formData.append('html', renderProptiiEmail({
+          title: 'Contract for Review',
+          buttonLabel: 'View Contracts',
+          buttonHref: `${(typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://proptii.co'}/contracts`,
+          bodyHtml: `
+            <p>Hello ${contractData.recipientName}!</p>
             <p>Please find attached your contract for review.</p>
             ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
-            <div style="text-align: center;">
-              <a href="${((import.meta as any)?.env?.VITE_APP_URL || (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://proptii.co')}/contracts" class="cta-button">View Contracts</a>
-            </div>
-            <p>Best regards,<br>Proptii Team</p>
-          </body>
-          </html>
-        `);
+          `,
+        }));
         
         // Send base64 data separately so backend can decode it
         formData.append('attachmentBase64', base64Content);
@@ -632,43 +607,16 @@ export function ContractsPage({
         const formData = new FormData();
         formData.append('to', contractData.recipientEmail);
         formData.append('subject', 'Test Email from Proptii');
-        formData.append('html', `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-              }
-              .cta-button {
-                display: inline-block;
-                background-color: #DC5F12;
-                color: white !important;
-                padding: 12px 30px;
-                text-decoration: none;
-                border-radius: 50px;
-                margin: 20px 0;
-                font-weight: bold;
-                text-align: center;
-              }
-            </style>
-          </head>
-          <body>
-            <h2>Hello ${contractData.recipientName}!</h2>
+        formData.append('html', renderProptiiEmail({
+          title: 'Test Email from Proptii',
+          buttonLabel: 'View Contracts',
+          buttonHref: `${(typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://proptii.co'}/contracts`,
+          bodyHtml: `
+            <p>Hello ${contractData.recipientName}!</p>
             <p>This is a test email from Proptii Property Management System.</p>
             ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
-            <div style="text-align: center;">
-              <a href="${((import.meta as any)?.env?.VITE_APP_URL || (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://proptii.co')}/contracts" class="cta-button">View Contracts</a>
-            </div>
-            <p>Best regards,<br>Proptii Team</p>
-          </body>
-          </html>
-        `);
+          `,
+        }));
         
         const response = await axios.post(`${API_BASE_URL}/email/send`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -695,20 +643,22 @@ export function ContractsPage({
     setOpeningSignature(true);
     try {
       const name = contract.fileName || `${contract.title || 'contract'}.pdf`;
-      const full = await contractService.getContract(contract.id);
-      const record = (full || contract) as Contract & { fileBase64?: string; documentUrl?: string; base64Data?: string };
-      const sources = [
-        record.fileBase64,
-        record.base64Data,
-        record.fileUrl,
-        record.documentUrl,
-        contract.fileUrl,
-      ];
-      let file: File | null = null;
-      for (const source of sources) {
-        if (!source) continue;
-        file = await pdfFileFromSource(source, name);
-        if (file) break;
+      let file = await fetchContractPdfFile(contract.id, name);
+      if (!file) {
+        const full = await contractService.getContract(contract.id);
+        const record = (full || contract) as Contract & { fileBase64?: string; documentUrl?: string; base64Data?: string };
+        const sources = [
+          record.fileBase64,
+          record.base64Data,
+          record.fileUrl,
+          record.documentUrl,
+          contract.fileUrl,
+        ];
+        for (const source of sources) {
+          if (!source) continue;
+          file = await pdfFileFromSource(source, name);
+          if (file) break;
+        }
       }
       if (!file) {
         alert('This contract does not include a PDF yet, so it cannot be signed.');
@@ -733,19 +683,49 @@ export function ContractsPage({
     await loadContracts();
   };
 
-  const handleViewContract = (contract: Contract) => {
+  const openStoredPdf = async (contract: Contract, download: boolean) => {
+    const name = contract.fileName || `${contract.title || 'contract'}.pdf`;
+    const localUrl = contract.fileUrl && (contract.fileUrl.startsWith('data:') || contract.fileUrl.startsWith('blob:'))
+      ? contract.fileUrl
+      : '';
+    if (localUrl && !download) {
+      window.open(localUrl, '_blank');
+      return;
+    }
+    const file = localUrl
+      ? await pdfFileFromSource(localUrl, name)
+      : await fetchContractPdfFile(contract.id, name);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      if (download) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = name;
+        link.click();
+      } else {
+        window.open(url, '_blank');
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
     if (contract.fileUrl && contract.fileUrl !== '#') {
-      window.open(contract.fileUrl, '_blank');
+      if (download) {
+        const link = document.createElement('a');
+        link.href = contract.fileUrl;
+        link.download = name;
+        link.click();
+      } else {
+        window.open(contract.fileUrl, '_blank');
+      }
     }
   };
 
+  const handleViewContract = (contract: Contract) => {
+    void openStoredPdf(contract, false);
+  };
+
   const handleDownloadContract = (contract: Contract) => {
-    if (contract.fileUrl && contract.fileUrl !== '#') {
-      const link = document.createElement('a');
-      link.href = contract.fileUrl;
-      link.download = contract.fileName;
-      link.click();
-    }
+    void openStoredPdf(contract, true);
   };
 
   const handleClearSelection = () => {

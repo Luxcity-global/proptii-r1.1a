@@ -1,4 +1,5 @@
 import apiService from './api';
+import { renderProptiiEmail } from '../utils/proptiiEmailLayout';
 
 interface ContractEmailParams {
   to: string;
@@ -20,85 +21,42 @@ class ContractEmailService {
   private generateContractEmailTemplate(params: ContractEmailParams): string {
     const { recipientName, contractName, senderName = 'Proptii Team' } = params;
     
-    // Get the base URL for links in the email
     const baseUrl = window.location.origin;
-    
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charSet="utf-8" />
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f5f7fa; padding: 24px 0; margin: 0; }
-          .container { max-width: 640px; margin: 0 auto; padding: 32px 24px; background: #ffffff; box-shadow: 0 8px 24px rgba(19, 108, 158, 0.12); border-radius: 12px; }
-          .header { color: #136C9E; font-size: 24px; font-weight: 700; margin-bottom: 24px; }
-          .details { background: #f5f8fb; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid rgba(19, 108, 158, 0.08); }
-          .details h3 { margin-top: 0; color: #136C9E; font-size: 16px; }
-          .details p { margin: 8px 0; }
-          .footer { margin-top: 40px; font-size: 14px; color: #666; text-align: left; }
-          .footer hr { border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }
-          a { color: #136C9E; }
-          .cta { text-align: center; margin: 28px 0; }
-          .button { display: inline-block; background: linear-gradient(135deg, #DC5F12 0%, #FF6B1A 100%); color: #ffffff !important; padding: 14px 32px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(220, 95, 18, 0.25); transition: all 0.3s ease; }
-          .button:hover { box-shadow: 0 12px 24px rgba(220, 95, 18, 0.35); transform: translateY(-1px); }
-          .grid { display: grid; gap: 16px; }
-          .muted { color: #4b5563; }
-          .attachment-notice { background: #e0f2fe; padding: 16px; border-radius: 10px; margin: 20px 0; text-align: center; border: 1px solid #bae6fd; }
-          .attachment-notice strong { color: #DC5F12; }
-          .list { margin: 0; padding-left: 18px; }
-          .list li { margin: 6px 0; }
-          .status-badge { display: inline-block; background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 6px; font-weight: 600; font-size: 14px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">📄 Signed Contract Ready</div>
-          
-          <p>Hi ${recipientName},</p>
-          
-          <p>Great news! Your contract has been successfully signed and is ready for your records.</p>
-          
-          <div class="details">
-            <h3>Contract Details</h3>
-            <p><strong>Contract Name:</strong> ${contractName}</p>
-            <p><strong>Signed Date:</strong> ${new Date().toLocaleDateString('en-GB', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}</p>
-            <p><strong>Status:</strong> <span class="status-badge">✅ Fully Executed</span></p>
-          </div>
-          
-          <div class="attachment-notice">
-            <strong>📎 Contract Attachment</strong><br>
-            Your signed contract is attached to this email as a PDF document. Please save it to your records.
-          </div>
-          
-          <div class="details">
-            <h3>Next Steps</h3>
-            <ul class="list">
-              <li>Download and save the attached contract to your device</li>
-              <li>Keep a copy for your records</li>
-              <li>Contact your agent if you have any questions about the contract terms</li>
-            </ul>
-          </div>
-          
-          <div class="cta">
-            <a href="${baseUrl}/landlord/contracts?tab=signed" class="button">👉 View All Signed Contracts</a>
-          </div>
-          
-          <p>If you have any questions about this contract or need assistance, please don't hesitate to reach out to us.</p>
-          
-          <div class="footer">
-            <p>Best regards,<br>${senderName}</p>
-            <hr />
-            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.co">here</a>.</em>
-          </div>
+
+    return renderProptiiEmail({
+      title: 'Signed Contract Ready',
+      buttonLabel: 'View All Signed Contracts',
+      buttonHref: `${baseUrl}/landlord/contracts?tab=signed`,
+      bodyHtml: `
+        <p>Hi ${recipientName},</p>
+        <p>Great news! Your contract has been successfully signed and is ready for your records.</p>
+        <div class="details">
+          <h3>Contract Details</h3>
+          <p><strong>Contract Name:</strong> ${contractName}</p>
+          <p><strong>Signed Date:</strong> ${new Date().toLocaleDateString('en-GB', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}</p>
+          <p><strong>Status:</strong> Fully Executed</p>
         </div>
-      </body>
-      </html>
-    `;
+        <div class="details">
+          <h3>Contract Attachment</h3>
+          <p>Your signed contract is attached to this email as a PDF document. Please save it to your records.</p>
+        </div>
+        <div class="details">
+          <h3>Next Steps</h3>
+          <ul>
+            <li>Download and save the attached contract to your device</li>
+            <li>Keep a copy for your records</li>
+            <li>Contact your agent if you have any questions about the contract terms</li>
+          </ul>
+        </div>
+        <p>If you have any questions about this contract or need assistance, please don't hesitate to reach out to us.</p>
+        <p>Sent by ${senderName}.</p>
+      `,
+    });
   }
 
   async sendSignedContractEmail(params: ContractEmailParams): Promise<ContractEmailResponse> {

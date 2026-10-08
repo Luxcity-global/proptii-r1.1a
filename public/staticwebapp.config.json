@@ -19,6 +19,18 @@
       "rewrite": "/landlord/index.html"
     },
     {
+      "route": "/referencing/*",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/claim-referencing",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/claim-referencing/*",
+      "rewrite": "/index.html"
+    },
+    {
       "route": "/billing/*",
       "rewrite": "/index.html"
     },

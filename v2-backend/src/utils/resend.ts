@@ -1,4 +1,5 @@
 import * as https from 'https';
+import { applyProptiiEmailLayout } from './emailLayout';
 
 export interface ResendEmailPayload {
   to: string | string[];
@@ -30,7 +31,7 @@ export async function sendEmail(payload: ResendEmailPayload): Promise<string> {
     from: `Proptii <${from}>`,
     to: Array.isArray(payload.to) ? payload.to : [payload.to],
     subject: payload.subject,
-    html: payload.html,
+    html: applyProptiiEmailLayout(payload.html),
     ...(payload.attachments?.length ? { attachments: payload.attachments } : {}),
   });
 

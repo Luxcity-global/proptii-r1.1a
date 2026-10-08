@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import CustomizePage from './CustomizePage';
 import { contractService, ContractTemplate } from '../../services/contractService';
 import signedContractsFirestoreService from '../../services/signedContractsFirestoreService';
+import { fetchContractPdfFile } from '../../services/contractPdf';
 import { useAuth } from '../../contexts/AuthContext';
 interface ContractModalProps {
   isOpen: boolean;
@@ -155,8 +156,10 @@ async function prepareReceivedPdf(contract: any): Promise<{
     );
 
   let record = contract;
-  let file: File | null = null;
-  for (const source of sourcesOf(contract)) {
+  let file: File | null = contract?.id
+    ? await fetchContractPdfFile(String(contract.id), receivedContractName(contract))
+    : null;
+  for (const source of file ? [] : sourcesOf(contract)) {
     file = await fileFromSource(source, receivedContractName(contract));
     if (file) break;
   }
@@ -176,17 +179,9 @@ async function prepareReceivedPdf(contract: any): Promise<{
     throw new Error('This contract does not include a PDF yet. Ask the sender to send it again.');
   }
 
-  let fileData: string | undefined;
-  try {
-    fileData = await convertFileToBase64(file);
-  } catch {
-    fileData = undefined;
-  }
-
   return {
     file,
     url: URL.createObjectURL(file),
-    fileData,
     name: receivedContractName(record),
     sender: senderOf(record),
   };

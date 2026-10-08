@@ -30,6 +30,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { invitationService } from '../services/invitationService';
 import { tenantService } from '../services/tenantService';
+import { renderProptiiEmail } from '../../../utils/proptiiEmailLayout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,54 +60,22 @@ function buildEmailHtml(
   inviteLink: string,
   customMessage?: string
 ): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: Arial, sans-serif; background: #E6F2F8; margin: 0; padding: 20px; }
-    .wrap { max-width: 600px; margin: 0 auto; }
-    .header { background: #E6F2F8; color: #136C9E; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-    .header h1 { margin: 0; font-size: 22px; font-weight: 600; color: #136C9E; }
-    .body { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; }
-    .prop { background: white; padding: 16px 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #136C9E; }
-    .prop h3 { margin: 0 0 4px; color: #374957; font-size: 14px; }
-    .prop p { margin: 0; color: #555; font-size: 14px; }
-    .msg { background: #f5f5f5; padding: 14px; border-radius: 5px; margin: 20px 0; font-style: italic; border-left: 3px solid #136C9E; font-size: 14px; }
-    .cta { text-align: center; margin: 28px 0; }
-    .btn { display: inline-block; background: #DC5F12; color: white !important; padding: 13px 32px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 15px; }
-    .footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #888; text-align: center; }
-    .footer img { height: 36px; }
-    p { font-size: 14px; color: #444; line-height: 1.6; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="header"><h1>Tenant Invitation</h1></div>
-    <div class="body">
+  return renderProptiiEmail({
+    title: 'Tenant Invitation',
+    buttonLabel: 'Create Account & Complete Profile',
+    buttonHref: inviteLink,
+    bodyHtml: `
       <p>Hello,</p>
       <p>You have been invited to create your tenant profile on Proptii.</p>
-      <div class="prop">
+      <div class="details">
         <h3>Property</h3>
         <p>${propertyAddress}</p>
       </div>
-      ${customMessage ? `<div class="msg"><strong>Message from your landlord:</strong><br/>${customMessage}</div>` : ''}
-      <p>Click the button below to create your account and complete your tenant profile:</p>
-      <div class="cta">
-        <a href="${inviteLink}" class="btn">Create Account &amp; Complete Profile</a>
-      </div>
+      ${customMessage ? `<div class="details"><p><strong>Message from your landlord:</strong><br/>${customMessage}</p></div>` : ''}
+      <p>Click the button below to create your account and complete your tenant profile.</p>
       <p>If you have any questions, please contact your landlord directly.</p>
-      <p>Best regards,<br/>The Proptii Team</p>
-    </div>
-    <div class="footer">
-      <p>This is an automated message from Proptii</p>
-      <img src="https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii" />
-      <p><em>Proptii — the AI platform for tenants, agents and landlords.</em></p>
-    </div>
-  </div>
-</body>
-</html>`;
+    `,
+  });
 }
 
 function buildInviteLink(

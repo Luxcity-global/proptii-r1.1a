@@ -90,10 +90,17 @@ const ReferencingView: React.FC = () => {
   useEffect(() => {
     if (!viewToken) { setNotFound(true); setLoading(false); return; }
 
-    fetch(`${API}/referencing/public/${viewToken}`)
-      .then(r => r.json())
-      .then(json => {
-        if (!json.success || json.expired) { setExpired(true); return; }
+    fetch(`${API}/referencing/public/${encodeURIComponent(viewToken)}`)
+      .then(async (response) => {
+        const json = await response.json().catch(() => ({}));
+        if (json.expired) {
+          setExpired(true);
+          return;
+        }
+        if (!response.ok || !json.success || !json.share) {
+          setNotFound(true);
+          return;
+        }
         setShare(json.share);
         setForm(json.formData || {});
       })
@@ -128,10 +135,10 @@ const ReferencingView: React.FC = () => {
       if (json.success && json.conversationId) {
         navigate('/landlord/messages', { state: { conversationId: json.conversationId } });
       } else {
-        navigate('/landlord');
+        navigate('/landlord/dashboard');
       }
     } catch {
-      navigate('/landlord');
+      navigate('/landlord/dashboard');
     } finally {
       setClaiming(false);
     }

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException, ForbiddenException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException, ForbiddenException, ServiceUnavailableException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { ReferencingService } from '../services/referencing.service';
@@ -298,7 +298,11 @@ export class ReferencingController {
   @ApiOperation({ summary: 'Create a new share link or grant access to referencing passport' })
   @ApiResponse({ status: 200, description: 'Share record and share link' })
   async sharePassport(@Req() req: any, @Body() shareData: any) {
-    return await this.referencingService.shareReferencingPassport(req.user.uid, shareData);
+    const result = await this.referencingService.shareReferencingPassport(req.user.uid, shareData);
+    if (result && (result as { success?: boolean }).success === false) {
+      throw new ServiceUnavailableException((result as { error?: string }).error || 'Could not save this referencing link.');
+    }
+    return result;
   }
 
   @Get('referencing/shares')

@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
   HttpCode,
   Sse,
   MessageEvent,
@@ -28,6 +29,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import type { Response } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { ContractService } from '../services/contract.service';
 import { EventsService } from '../services/events.service';
@@ -269,6 +271,15 @@ export class ContractController {
     });
   }
 
+  @Get('landlord/:id/file')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Download the contract PDF' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'PDF file' })
+  async getLandlordContractFile(@Param('id') id: string, @Res() res: Response) {
+    return this.sendContractFile(id, res);
+  }
+
   @Get('landlord/:id')
   @UseGuards(FirebaseAuthGuard)
   @ApiOperation({ summary: 'Get single landlord contract by ID' })
@@ -362,6 +373,15 @@ export class ContractController {
 
   // ── Generic Contract ID Routes (placed last to prevent route collision) ────
 
+  @Get(':id/file')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Download the contract PDF' })
+  @ApiParam({ name: 'id', description: 'Contract ID' })
+  @ApiResponse({ status: 200, description: 'PDF file' })
+  async getContractFile(@Param('id') id: string, @Res() res: Response) {
+    return this.sendContractFile(id, res);
+  }
+
   @Get(':id')
   @UseGuards(FirebaseAuthGuard)
   @ApiOperation({ summary: 'Get single contract by ID' })
@@ -390,5 +410,19 @@ export class ContractController {
   @ApiResponse({ status: 200, description: 'Contract deleted' })
   async deleteContract(@Param('id') id: string) {
     return await this.contractService.deleteContract(id);
+  }
+
+  private async sendContractFile(id: string, res: Response) {
+    const file = await this.contractService.readContractFile(id);
+    if (!file) {
+      res.status(404).json({ success: false, message: 'Contract file not found' });
+      return;
+    }
+    const safeName = file.fileName.replace(/"/g, '');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+    res.setHeader('Content-Length', String(file.buffer.length));
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(file.buffer);
   }
 }

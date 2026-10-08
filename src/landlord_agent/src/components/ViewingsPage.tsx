@@ -31,6 +31,7 @@ import {
   BookViewingRequest
 } from '../../../services/bookViewingRequestService';
 import emailService from '../../../services/emailService';
+import { renderProptiiEmail } from '../../../utils/proptiiEmailLayout';
 import landlordUserService from '../../../services/landlordUserService';
 import { useIsMobile } from './ui/use-mobile';
 import { Button } from './ui/button';
@@ -1247,16 +1248,21 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             const emailResult = await emailService.sendEmail({
               to: applicantEmail,
               subject: `Your viewing is scheduled - ${address}`,
-              html: `
-                <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+              html: renderProptiiEmail({
+                title: 'Your viewing is scheduled',
+                buttonLabel: 'View My Viewings on Proptii',
+                buttonHref: `${typeof window !== 'undefined' ? window.location.origin : 'https://proptii.co'}/dashboard/viewings`,
+                bodyHtml: `
                   <p>Hi ${safe(requestForm.tenantName || 'there')},</p>
                   <p>${safe(managerName || 'Your landlord')} has scheduled a property viewing for you.</p>
-                  <p><strong>Property:</strong> ${safe(address)}</p>
-                  <p><strong>When:</strong> ${safe(when)}</p>
-                  <p><strong>Type:</strong> ${safe(requestForm.preference)}</p>
+                  <div class="details">
+                    <p><strong>Property:</strong> ${safe(address)}</p>
+                    <p><strong>When:</strong> ${safe(when)}</p>
+                    <p><strong>Type:</strong> ${safe(requestForm.preference)}</p>
+                  </div>
                   <p>Sign in to Proptii to see it under Viewings.</p>
-                </div>
-              `,
+                `,
+              }),
               formData: {
                 property: propertyPayload,
                 viewing: viewingDetails,

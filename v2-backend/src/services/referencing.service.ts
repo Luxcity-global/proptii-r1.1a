@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
+import { renderProptiiEmail } from '../utils/emailLayout';
 import { ComplianceTransformService } from '../gov-data/services/compliance-transform.service';
 import {
   getSignedDownloadUrl,
@@ -611,9 +612,9 @@ export class ReferencingService {
     const col = this.sharesCollection;
     const db  = this.db;
 
-    const shareId    = `share_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const viewToken  = randomUUID();
     const claimToken = randomUUID();
+    const shareId    = viewToken;
     const expiresAt  = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const recipientEmail = (shareData.recipientEmail || '').toLowerCase().trim();
@@ -674,12 +675,14 @@ export class ReferencingService {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    if (col) {
-      try {
-        await col.doc(shareId).set(payload);
-      } catch (err: any) {
-        this.logger.warn(`shareReferencingPassport Firestore write failed: ${err?.message || err}`);
-      }
+    if (!col) {
+      return { success: false, error: 'Could not save this referencing link. Please try again.' };
+    }
+    try {
+      await col.doc(shareId).set(payload);
+    } catch (err: any) {
+      this.logger.warn(`shareReferencingPassport Firestore write failed: ${err?.message || err}`);
+      return { success: false, error: 'Could not save this referencing link. Please try again.' };
     }
 
     this.emailService.sendReferencingShareNotification({
@@ -710,10 +713,20 @@ export class ReferencingService {
     if (!col) return null;
 
     try {
-      const snap = await col.where('viewToken', '==', viewToken).limit(1).get();
-      if (snap.empty) return null;
+      let shareDoc: FirebaseFirestore.DocumentSnapshot | null = null;
+      const direct = await col.doc(viewToken).get();
+      if (direct.exists) {
+        shareDoc = direct;
+      } else {
+        try {
+          const snap = await col.where('viewToken', '==', viewToken).limit(1).get();
+          if (!snap.empty) shareDoc = snap.docs[0];
+        } catch (err: any) {
+          this.logger.warn(`passport token query failed: ${err?.message || err}`);
+        }
+      }
+      if (!shareDoc?.exists) return null;
 
-      const shareDoc  = snap.docs[0];
       const shareData = shareDoc.data() as any;
 
       if (shareData.expiresAt && new Date(shareData.expiresAt) < new Date()) {
@@ -1019,39 +1032,29 @@ export class ReferencingService {
       ? `<p style="margin:0 0 16px;">They are requesting your referencing details in connection with the property at <strong>${propertyAddress}</strong>.</p>`
       : '';
 
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#136C9E,#0D4E73);padding:28px 32px;">
-          <img src="${frontendUrl}/images/proptii-logo.png" alt="Proptii" style="height:32px;margin-bottom:12px;" onerror="this.style.display='none'"/>
-          <h1 style="color:#fff;margin:0;font-size:20px;">Referencing Request</h1>
-        </div>
-        <div style="padding:32px;">
-          <p style="margin:0 0 16px;">Hello ${tenantName},</p>
-          <p style="margin:0 0 16px;">
-            <strong>${landlordName}</strong> has asked you to complete your referencing on Proptii.
-          </p>
-          ${addressLine}
-          <p style="margin:0 0 24px;">
-            Proptii referencing is quick to complete. Fill it in once and share it with as many landlords or agents as you need — no re-filling required.
-          </p>
-          <div style="text-align:center;margin:32px 0;">
-            <a href="${referencingUrl}"
-               style="background:#136C9E;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;display:inline-block;">
-              Complete My Referencing
-            </a>
-          </div>
-          <p style="font-size:13px;color:#6b7280;">
-            If the button doesn't work, copy this link into your browser:<br/>
-            <a href="${referencingUrl}" style="color:#136C9E;">${referencingUrl}</a>
-          </p>
-          <hr style="border:1px solid #e5e7eb;margin:24px 0;"/>
-          <p style="font-size:12px;color:#9ca3af;">
-            This request was sent via Proptii on behalf of ${landlordName}.
-            If you did not expect this email you can safely ignore it.
-          </p>
-        </div>
-      </div>
-    `;
+    const html = renderProptiiEmail({
+      title: 'Referencing Request',
+      buttonLabel: 'Complete My Referencing',
+      buttonHref: referencingUrl,
+      bodyHtml: `
+        <p style="margin:0 0 16px;">Hello ${tenantName},</p>
+        <p style="margin:0 0 16px;">
+          <strong>${landlordName}</strong> has asked you to complete your referencing on Proptii.
+        </p>
+        ${addressLine}
+        <p style="margin:0 0 24px;">
+          Proptii referencing is quick to complete. Fill it in once and share it with as many landlords or agents as you need — no re-filling required.
+        </p>
+        <p style="font-size:13px;color:#6b7280;">
+          If the button doesn't work, copy this link into your browser:<br/>
+          <a href="${referencingUrl}" style="color:#136C9E;">${referencingUrl}</a>
+        </p>
+        <p style="font-size:12px;color:#9ca3af;">
+          This request was sent via Proptii on behalf of ${landlordName}.
+          If you did not expect this email you can safely ignore it.
+        </p>
+      `,
+    });
 
     try {
       const { sendEmail } = await import('../utils/resend');

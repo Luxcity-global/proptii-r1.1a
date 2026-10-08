@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import apiService from './api';
+import { renderProptiiEmail } from '../utils/proptiiEmailLayout';
 
 interface EmailAttachment {
   filename: string;
@@ -49,17 +50,21 @@ function viewingNoticeHtml(emailContent: EmailContent): string {
   const address = [property.street, property.town, property.city, property.postcode].filter(Boolean).join(', ');
   const message = viewing.rescheduleMessage || viewing.cancelMessage || '';
   const fromName = user.name || manager.name || '';
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
-      <p>${escapeHtml(emailContent.subject)}</p>
-      <p><strong>Property:</strong> ${escapeHtml(address || 'Property viewing')}</p>
-      ${viewing.date ? `<p><strong>Date:</strong> ${escapeHtml(viewing.date)}</p>` : ''}
-      ${viewing.time ? `<p><strong>Time:</strong> ${escapeHtml(viewing.time)}</p>` : ''}
-      ${viewing.preference ? `<p><strong>Type:</strong> ${escapeHtml(viewing.preference)}</p>` : ''}
-      ${fromName ? `<p><strong>From:</strong> ${escapeHtml(fromName)}${user.email ? ` (${escapeHtml(user.email)})` : ''}</p>` : ''}
-      ${message ? `<p><strong>Message:</strong> ${escapeHtml(message)}</p>` : ''}
-    </div>
-  `;
+  return renderProptiiEmail({
+    title: emailContent.subject || 'Viewing update',
+    buttonLabel: 'Open Proptii',
+    buttonHref: 'https://proptii.co',
+    bodyHtml: `
+      <div class="details">
+        <p><strong>Property:</strong> ${escapeHtml(address || 'Property viewing')}</p>
+        ${viewing.date ? `<p><strong>Date:</strong> ${escapeHtml(viewing.date)}</p>` : ''}
+        ${viewing.time ? `<p><strong>Time:</strong> ${escapeHtml(viewing.time)}</p>` : ''}
+        ${viewing.preference ? `<p><strong>Type:</strong> ${escapeHtml(viewing.preference)}</p>` : ''}
+        ${fromName ? `<p><strong>From:</strong> ${escapeHtml(fromName)}${user.email ? ` (${escapeHtml(user.email)})` : ''}</p>` : ''}
+        ${message ? `<p><strong>Message:</strong> ${escapeHtml(message)}</p>` : ''}
+      </div>
+    `,
+  });
 }
 
 interface MultiEmailResponse {
@@ -102,26 +107,11 @@ class EmailService {
                     (typeof window !== 'undefined' && window.location ? window.location.origin : 
                     (import.meta.env.DEV ? 'http://localhost:5173' : 'https://proptii.co'));
 
-    const htmlString = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .section { margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
-          .section-title { color: #136C9E; margin-bottom: 10px; font-weight: bold; }
-          .info-item { margin: 5px 0; }
-          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
-          .footer-logo { display: flex; align-items: center; margin-top: 16px; }
-          .footer-logo img { height: 40px; margin-right: 10px; }
-          .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
-          .footer-link { color: #136C9E; text-decoration: underline; }
-          hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
-        </style>
-      </head>
-      <body>
-        <h2>Referencing Application</h2>
-        
+    const htmlString = renderProptiiEmail({
+      title: 'Referencing Application',
+      buttonLabel: 'Review Documents in Proptii',
+      buttonHref: `${baseUrl}/landlord/clients`,
+      bodyHtml: `
         <p>Hi ${agentDetails.firstName || ''},</p>
         <p>${identity.firstName || ''} ${identity.lastName || ''} has uploaded their verification documents. ${residential.propertyAddress || ''} </p>
         <p>The documents include:</p>
@@ -175,29 +165,9 @@ class EmailService {
         
         <p>Once completed, you will receive the confirmation forms from the Referee and Guarantor. Please review all submissions and verify the documents. 
         Once confirmed, you may proceed to accept the user as a tenant.</p>
-
-        <div style="margin: 24px 0; text-align: center;">
-          <a href="${baseUrl}/landlord/clients" 
-             style="display: inline-block; background: linear-gradient(135deg, #DC5F12 0%, #FF6B1A 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(220, 95, 18, 0.3); transition: all 0.3s ease;">
-            👉 Review Documents in Proptii
-          </a>
-        </div>
-        
         <p>If you need any assistance during the verification process, please contact our support team through your Proptii dashboard.</p>
-        
-        <div style="margin-top: 32px;">
-          Best regards,<br>
-          The Proptii Team
-        </div>
-        <hr />
-        <div class="footer-desc">
-          <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.co" class="footer-link">here</a>.</em>
-        </div>
-        <div class="footer-logo">
-          <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
-        </div>
-      </body>
-      </html>`;
+      `,
+    });
 
     console.log('Generated email HTML:', htmlString);
     return htmlString;

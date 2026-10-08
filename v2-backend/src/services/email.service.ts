@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { sendEmail } from '../utils/resend';
+import { proptiiButton, renderProptiiEmail } from '../utils/emailLayout';
 
 @Injectable()
 export class EmailService {
@@ -7,7 +8,7 @@ export class EmailService {
   private readonly frontendUrl: string;
 
   constructor() {
-    this.frontendUrl = process.env.FRONTEND_URL || 'https://proptii.co';
+    this.frontendUrl = (process.env.FRONTEND_URL || 'https://proptii.co').replace(/\/+$/, '');
   }
 
   private truncate(str: string, maxLength: number): string {
@@ -39,24 +40,19 @@ export class EmailService {
     const greeting = safeRecipientName ? `Hello ${safeRecipientName},` : 'Hello,';
     const subject  = `New message regarding ${safePropertyTitle}`;
 
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;">
-        <h2 style="color:#136C9E;">New Message on Proptii</h2>
+    const html = renderProptiiEmail({
+      title: 'New Message on Proptii',
+      buttonLabel: 'View and Reply',
+      buttonHref: actionUrl,
+      bodyHtml: `
         <p>${greeting}</p>
         <p>You have received a new message from <strong>${safeSenderName}</strong> regarding <strong>${safePropertyTitle}</strong>.</p>
-        <div style="margin:30px 0;">
-          <a href="${actionUrl}" style="background:#136C9E;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">
-            View and Reply
-          </a>
-        </div>
         <p style="font-size:0.85em;color:#666;">
           If the button doesn't work, copy and paste this link:<br>
           <a href="${actionUrl}">${actionUrl}</a>
         </p>
-        <hr style="border:1px solid #eee;margin-top:30px;">
-        <p style="font-size:0.8em;color:#999;">The Proptii Team</p>
-      </div>
-    `;
+      `,
+    });
 
     try {
       const id = await sendEmail({ to: recipientEmail, subject, html });
@@ -75,23 +71,18 @@ export class EmailService {
 
     const actionUrl = `${this.frontendUrl}/claim?token=${guestToken}`;
 
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;">
-        <h2 style="color:#136C9E;">Claim your Proptii account</h2>
+    const html = renderProptiiEmail({
+      title: 'Claim your Proptii account',
+      buttonLabel: 'Claim Account',
+      buttonHref: actionUrl,
+      bodyHtml: `
         <p>Click the link below to claim your account and view your messages securely.</p>
-        <div style="margin:30px 0;">
-          <a href="${actionUrl}" style="background:#136C9E;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">
-            Claim Account
-          </a>
-        </div>
         <p style="font-size:0.85em;color:#666;">
           If the button doesn't work, copy and paste this link:<br>
           <a href="${actionUrl}">${actionUrl}</a>
         </p>
-        <hr style="border:1px solid #eee;margin-top:30px;">
-        <p style="font-size:0.8em;color:#999;">The Proptii Team</p>
-      </div>
-    `;
+      `,
+    });
 
     try {
       const id = await sendEmail({ to: recipientEmail, subject: 'Claim your Proptii account', html });
@@ -103,9 +94,7 @@ export class EmailService {
 
   // ─── Referencing Passport Share ───────────────────────────────────────────
   // Sent when a tenant shares their referencing passport with a landlord/agent.
-  // Two variants:
-  //   hasAccount = true  → recipient already has an account; directs them to login.
-  //   hasAccount = false → no account; provides public view link + create-account CTA.
+  // Both variants open the public passport page. Login and account creation stay as text links.
 
   async sendReferencingShareNotification(opts: {
     recipientEmail: string;
@@ -130,68 +119,46 @@ export class EmailService {
     const safeAddress = this.truncate(propertyAddress || '', 80);
     const safeNotes   = this.truncate(notes || '', 200);
     const greeting    = safeName ? `Hello ${safeName},` : 'Hello,';
-    const viewUrl     = `${this.frontendUrl}/referencing/view/${viewToken}`;
-    const claimUrl    = `${this.frontendUrl}/claim-referencing?token=${claimToken}`;
-    const loginUrl    = `${this.frontendUrl}/login?redirect=/landlord`;
+    const viewPath    = `/referencing/view/${viewToken}`;
+    const viewUrl     = `${this.frontendUrl}${viewPath}`;
+    const claimUrl    = `${this.frontendUrl}/claim-referencing?token=${encodeURIComponent(claimToken)}`;
+    const loginUrl    = `${this.frontendUrl}/login?redirect=${encodeURIComponent(viewPath)}`;
     const expiry      = new Date(expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     const subject     = `${safeTenant} has shared their referencing passport with you`;
 
     let html: string;
 
     if (hasAccount) {
-      html = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
-          <div style="background:linear-gradient(135deg,#136C9E,#0D4E73);padding:28px 32px;">
-            <img src="${this.frontendUrl}/images/proptii-logo.png" alt="Proptii" style="height:32px;margin-bottom:12px;" onerror="this.style.display='none'"/>
-            <h1 style="color:#fff;margin:0;font-size:20px;">Referencing Passport Received</h1>
-          </div>
-          <div style="padding:32px;">
-            <p style="margin:0 0 16px;">${greeting}</p>
-            <p style="margin:0 0 16px;">
-              <strong>${safeTenant}</strong> has shared their referencing passport with you on Proptii.
-              ${safeAddress ? `They are interested in the property at <strong>${safeAddress}</strong>.` : ''}
-            </p>
-            ${safeNotes ? `<div style="background:#f0f9ff;border-left:4px solid #136C9E;padding:12px 16px;border-radius:4px;margin:0 0 24px;font-size:14px;color:#374957;"><strong>Message from ${safeTenant}:</strong><br/>${safeNotes}</div>` : ''}
-            <p style="margin:0 0 24px;">Log in to your Proptii dashboard to view the referencing details, review documents, and start a conversation.</p>
-            <div style="text-align:center;margin:32px 0;">
-              <a href="${loginUrl}" style="background:#136C9E;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;display:inline-block;">
-                Log In to View Referencing
-              </a>
-            </div>
-            <hr style="border:1px solid #e5e7eb;margin:24px 0;"/>
-            <p style="font-size:12px;color:#9ca3af;">If you did not expect this email, you can safely ignore it.</p>
-          </div>
-        </div>
-      `;
+      html = renderProptiiEmail({
+        title: 'Referencing Passport Received',
+        bodyHtml: `
+          <p style="margin:0 0 16px;">${greeting}</p>
+          <p style="margin:0 0 16px;">
+            <strong>${safeTenant}</strong> has shared their referencing passport with you on Proptii.
+            ${safeAddress ? `They are interested in the property at <strong>${safeAddress}</strong>.` : ''}
+          </p>
+          ${safeNotes ? `<div class="details"><p><strong>Message from ${safeTenant}:</strong><br/>${safeNotes}</p></div>` : ''}
+          <p style="margin:0 0 24px;">Open the passport to review their referencing details and documents.</p>
+          ${proptiiButton('View Referencing Passport', viewUrl)}
+          <p style="font-size:13px;color:#6b7280;text-align:center;"><a href="${loginUrl}">Log in</a> to message ${safeTenant} from your dashboard.</p>
+          <p style="font-size:12px;color:#9ca3af;">This link expires on <strong>${expiry}</strong>. If you did not expect this email, you can safely ignore it.</p>
+        `,
+      });
     } else {
-      html = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
-          <div style="background:linear-gradient(135deg,#136C9E,#0D4E73);padding:28px 32px;">
-            <img src="${this.frontendUrl}/images/proptii-logo.png" alt="Proptii" style="height:32px;margin-bottom:12px;" onerror="this.style.display='none'"/>
-            <h1 style="color:#fff;margin:0;font-size:20px;">You've Received a Referencing Passport</h1>
-          </div>
-          <div style="padding:32px;">
-            <p style="margin:0 0 16px;">${greeting}</p>
-            <p style="margin:0 0 16px;">
-              <strong>${safeTenant}</strong> has shared their referencing passport with you via Proptii.
-              ${safeAddress ? `They are applying for the property at <strong>${safeAddress}</strong>.` : ''}
-            </p>
-            ${safeNotes ? `<div style="background:#f0f9ff;border-left:4px solid #136C9E;padding:12px 16px;border-radius:4px;margin:0 0 24px;font-size:14px;color:#374957;"><strong>Message from ${safeTenant}:</strong><br/>${safeNotes}</div>` : ''}
-            <p style="margin:0 0 8px;font-weight:bold;">What would you like to do?</p>
-            <div style="display:flex;flex-direction:column;gap:12px;margin:24px 0;">
-              <a href="${viewUrl}" style="background:#136C9E;color:#fff;padding:14px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;display:block;text-align:center;">
-                View Referencing Passport
-              </a>
-              <a href="${claimUrl}" style="background:#DC5F12;color:#fff;padding:14px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;display:block;text-align:center;">
-                Create Account &amp; Manage Tenant
-              </a>
-            </div>
-            <p style="font-size:13px;color:#6b7280;text-align:center;">No account needed to view. Create a free account to message ${safeTenant} and manage their application.</p>
-            <hr style="border:1px solid #e5e7eb;margin:24px 0;"/>
-            <p style="font-size:12px;color:#9ca3af;">This link expires on <strong>${expiry}</strong>. If you did not expect this email, you can safely ignore it.</p>
-          </div>
-        </div>
-      `;
+      html = renderProptiiEmail({
+        title: "You've Received a Referencing Passport",
+        bodyHtml: `
+          <p style="margin:0 0 16px;">${greeting}</p>
+          <p style="margin:0 0 16px;">
+            <strong>${safeTenant}</strong> has shared their referencing passport with you via Proptii.
+            ${safeAddress ? `They are applying for the property at <strong>${safeAddress}</strong>.` : ''}
+          </p>
+          ${safeNotes ? `<div class="details"><p><strong>Message from ${safeTenant}:</strong><br/>${safeNotes}</p></div>` : ''}
+          ${proptiiButton('View Referencing Passport', viewUrl)}
+          <p style="font-size:13px;color:#6b7280;text-align:center;">No account needed to view. <a href="${claimUrl}">Create a free account</a> to message ${safeTenant} and manage their application.</p>
+          <p style="font-size:12px;color:#9ca3af;">This link expires on <strong>${expiry}</strong>. If you did not expect this email, you can safely ignore it.</p>
+        `,
+      });
     }
 
     try {

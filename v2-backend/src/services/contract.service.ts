@@ -7,6 +7,7 @@ import {
   uploadBase64ToStorage,
   uploadBufferToStorage,
 } from '../utils/firebase-storage';
+import { renderProptiiEmail } from '../utils/emailLayout';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return Promise.race([
@@ -91,15 +92,12 @@ export class ContractService {
     return Number.isNaN(date.getTime()) ? undefined : date;
   }
 
-  /** Preview links use fileUrl. Older rows kept the PDF inline and left fileUrl as "#". */
+  /** Preview links use fileUrl. Inline copies stay on the record and are served by the file route. */
   private presentContract(id: string, data: any) {
     const storedUrl = data.fileUrl || data.documentUrl || '';
-    let fileUrl = storedUrl && storedUrl !== '#' ? storedUrl : '';
-    if (!fileUrl && typeof data.fileBase64 === 'string' && data.fileBase64.length > 0) {
-      fileUrl = data.fileBase64.startsWith('data:')
-        ? data.fileBase64
-        : `data:${data.documentType || 'application/pdf'};base64,${data.fileBase64}`;
-    }
+    const fileUrl = storedUrl && storedUrl !== '#' && !String(storedUrl).startsWith('data:')
+      ? storedUrl
+      : '';
     return {
       id,
       title: data.title || data.contractName || data.templateName || 'Contract',
@@ -424,31 +422,14 @@ export class ContractService {
     }
   }
 
-  /** The stored file link expires. Signing needs the PDF bytes or a fresh link. */
+  /**
+   * Contract JSON for screens that list or open a contract.
+   * The PDF stays a file. This does not download it or encode it.
+   */
   private async contractForViewer(id: string, data: any) {
     const presented = this.presentContract(id, data);
-    let fileBase64 = typeof data.fileBase64 === 'string' ? data.fileBase64 : '';
-    if (!fileBase64 && typeof data.base64Data === 'string') fileBase64 = data.base64Data;
-
-    if (!fileBase64 && data.storagePath && admin.apps.length) {
-      try {
-        const bucketName = process.env.FIREBASE_STORAGE_BUCKET
-          || `${process.env.FIREBASE_PROJECT_ID || 'proptii-16946'}.firebasestorage.app`;
-        const bucket = admin.storage().bucket(bucketName);
-        const plainPath = String(data.storagePath).startsWith('gs://')
-          ? String(data.storagePath).replace(`gs://${bucket.name}/`, '')
-          : String(data.storagePath);
-        const [bytes] = await bucket.file(plainPath).download();
-        if (bytes?.length && bytes.length < 8_000_000) {
-          fileBase64 = `data:application/pdf;base64,${bytes.toString('base64')}`;
-        }
-      } catch (err: any) {
-        this.logger.warn(`contract file read failed for ${id}: ${err?.message || err}`);
-      }
-    }
-
     let fileUrl = presented.fileUrl || '';
-    if (data.storagePath) {
+    if (data.storagePath && admin.apps.length) {
       try {
         const fresh = await getSignedDownloadUrl(String(data.storagePath));
         if (fresh) fileUrl = fresh;
@@ -456,14 +437,51 @@ export class ContractService {
         this.logger.warn(`contract link refresh failed for ${id}: ${err?.message || err}`);
       }
     }
-    if (fileBase64) {
-      const inline = fileBase64.startsWith('data:')
-        ? fileBase64
-        : `data:application/pdf;base64,${fileBase64}`;
-      if (!fileUrl || fileUrl === '#') fileUrl = inline;
-      return { ...presented, fileUrl, documentUrl: presented.documentUrl || fileUrl, fileBase64: inline };
-    }
     return { ...presented, fileUrl, documentUrl: presented.documentUrl || fileUrl };
+  }
+
+  /**
+   * PDF bytes for signing, viewing, and download.
+   * Reads the Storage file. Older rows that only have an inline copy are decoded once here.
+   */
+  async readContractFile(contractId: string): Promise<{ buffer: Buffer; fileName: string } | null> {
+    const col = this.contractsCol;
+    if (!col) return null;
+
+    const doc = await withTimeout(col.doc(contractId).get(), 8000);
+    if (!doc.exists) return null;
+    const data = doc.data() || {};
+    const rawName = String(data.fileName || data.documentName || 'contract.pdf');
+    const fileName = rawName.replace(/[^\w.\- ]/g, '_').trim() || 'contract.pdf';
+
+    const storagePath = typeof data.storagePath === 'string' ? data.storagePath : '';
+    const plainPath = storagePath.startsWith('gs://')
+      ? storagePath.split('/').slice(3).join('/')
+      : storagePath;
+    if (plainPath && admin.apps.length) {
+      try {
+        const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'proptii-16946.firebasestorage.app';
+        const [bytes] = await admin.storage().bucket(bucketName).file(plainPath).download();
+        if (bytes?.length && bytes.length <= 25_000_000) return { buffer: bytes, fileName };
+      } catch (err: any) {
+        this.logger.warn(`contract file read failed for ${contractId}: ${err?.message || err}`);
+      }
+    }
+
+    const inline = typeof data.fileBase64 === 'string'
+      ? data.fileBase64
+      : (typeof data.base64Data === 'string'
+        ? data.base64Data
+        : (typeof data.fileUrl === 'string' && data.fileUrl.startsWith('data:') ? data.fileUrl : ''));
+    if (!inline) return null;
+    const payload = inline.includes(',') ? inline.split(',').pop() || '' : inline;
+    try {
+      const buffer = Buffer.from(payload, 'base64');
+      if (buffer.length > 5 && buffer.length <= 25_000_000) return { buffer, fileName };
+    } catch {
+      return null;
+    }
+    return null;
   }
 
   async getContractById(contractId: string) {
@@ -715,16 +733,17 @@ export class ContractService {
         }];
       }
 
-      const safeHtml = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <h2 style="color: #111827; margin-bottom: 16px;">Signed Document Available</h2>
+      const safeHtml = renderProptiiEmail({
+        title: 'Signed Document Available',
+        buttonLabel: 'Open Proptii',
+        buttonHref: 'https://proptii.co',
+        bodyHtml: `
           <p>Hello ${safeRecipientName},</p>
           <p>Please find attached the signed contract document: <strong>${safeContractName}</strong>.</p>
           <p style="margin-top: 16px; font-size: 14px; color: #6b7280;">Sent by: ${safeSenderName}</p>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
           <p style="font-size: 12px; color: #9ca3af;">This email was sent via Proptii on behalf of ${safeSenderName}. If you were not expecting this document, please contact support.</p>
-        </div>
-      `;
+        `,
+      });
 
       const id = await sendEmail({
         to: body.to.toLowerCase().trim(),

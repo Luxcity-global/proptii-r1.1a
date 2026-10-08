@@ -7,7 +7,14 @@
 /welcome     /welcome/index.html   200
 
 # Landlord App
+/landlord/index.html  /landlord/index.html  200
 /landlord/*  /landlord/index.html  200
+/landlord  /landlord/index.html  200
+
+# Passport links stay on the main app
+/referencing/*  /index.html  200
+/claim-referencing  /index.html  200
+/claim-referencing/*  /index.html  200
 
 # Main App (Catch-all)
 /billing/*  /index.html  200
