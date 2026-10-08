@@ -7,6 +7,7 @@ import {
   uploadBase64ToStorage,
   uploadBufferToStorage,
 } from '../utils/firebase-storage';
+import { createContractFileAccess } from '../utils/contract-file-access';
 import { renderProptiiEmail } from '../utils/emailLayout';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
@@ -426,8 +427,13 @@ export class ContractService {
    * Contract JSON for screens that list or open a contract.
    * The PDF stays a file. This does not download it or encode it.
    */
-  private async contractForViewer(id: string, data: any) {
+  private async contractForViewer(id: string, data: any, apiBase?: string) {
     const presented = this.presentContract(id, data);
+    const access = apiBase ? createContractFileAccess(id) : '';
+    if (apiBase && access) {
+      const fileUrl = `${apiBase}/api/contracts/${encodeURIComponent(id)}/file?access=${encodeURIComponent(access)}`;
+      return { ...presented, fileUrl, documentUrl: fileUrl };
+    }
     let fileUrl = presented.fileUrl || '';
     if (data.storagePath && admin.apps.length) {
       try {
@@ -462,7 +468,10 @@ export class ContractService {
       try {
         const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'proptii-16946.firebasestorage.app';
         const [bytes] = await admin.storage().bucket(bucketName).file(plainPath).download();
-        if (bytes?.length && bytes.length <= 25_000_000) return { buffer: bytes, fileName };
+        if (bytes?.length && bytes.length <= 25_000_000) {
+          this.logger.log(`Serving contract file ${contractId} from storage (${bytes.length} bytes)`);
+          return { buffer: bytes, fileName };
+        }
       } catch (err: any) {
         this.logger.warn(`contract file read failed for ${contractId}: ${err?.message || err}`);
       }
@@ -473,18 +482,25 @@ export class ContractService {
       : (typeof data.base64Data === 'string'
         ? data.base64Data
         : (typeof data.fileUrl === 'string' && data.fileUrl.startsWith('data:') ? data.fileUrl : ''));
-    if (!inline) return null;
+    if (!inline) {
+      this.logger.warn(`No contract file for ${contractId}`);
+      return null;
+    }
     const payload = inline.includes(',') ? inline.split(',').pop() || '' : inline;
     try {
       const buffer = Buffer.from(payload, 'base64');
-      if (buffer.length > 5 && buffer.length <= 25_000_000) return { buffer, fileName };
+      if (buffer.length > 5 && buffer.length <= 25_000_000) {
+        this.logger.log(`Serving legacy inline contract file ${contractId} (${buffer.length} bytes)`);
+        return { buffer, fileName };
+      }
     } catch {
       return null;
     }
+    this.logger.warn(`No contract file for ${contractId}`);
     return null;
   }
 
-  async getContractById(contractId: string) {
+  async getContractById(contractId: string, apiBase?: string) {
     const col = this.contractsCol;
     if (!col) return { success: false, contract: null };
 
@@ -494,7 +510,7 @@ export class ContractService {
         return { success: false, contract: null };
       }
       const d = doc.data() || {};
-      return { success: true, contract: await this.contractForViewer(doc.id, d) };
+      return { success: true, contract: await this.contractForViewer(doc.id, d, apiBase) };
     } catch (err: any) {
       this.logger.warn(`getContractById error: ${err?.message || err}`);
       return { success: false, contract: null };

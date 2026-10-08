@@ -1,5 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { contractFileAccessValid } from '../utils/contract-file-access';
 
 function emailFromToken(decoded: any): string {
   const identities = decoded?.firebase?.identities?.email;
@@ -71,6 +72,13 @@ function ensureFirebaseInitialized() {
 export class FirebaseAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    const requestUrl = String(request.originalUrl || request.url || '');
+    const contractId = typeof request.params?.id === 'string' ? request.params.id : '';
+    const access = typeof request.query?.access === 'string' ? request.query.access : '';
+    if (requestUrl.includes('/contracts/') && requestUrl.includes('/file') && contractFileAccessValid(contractId, access)) {
+      request.user = { uid: 'contract-file', email: '', roles: ['contract-file'] };
+      return true;
+    }
     const authHeader = request.headers.authorization;
     let token: string | undefined;
 

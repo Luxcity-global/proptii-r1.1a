@@ -285,8 +285,8 @@ export class ContractController {
   @ApiOperation({ summary: 'Get single landlord contract by ID' })
   @ApiParam({ name: 'id', description: 'Contract ID' })
   @ApiResponse({ status: 200, description: 'Contract details' })
-  async getLandlordContractById(@Param('id') id: string) {
-    return await this.contractService.getContractById(id);
+  async getLandlordContractById(@Req() req: any, @Param('id') id: string) {
+    return await this.contractService.getContractById(id, this.apiBase(req));
   }
 
   @Put(['landlord/:id', 'landlord/:id/status'])
@@ -387,8 +387,8 @@ export class ContractController {
   @ApiOperation({ summary: 'Get single contract by ID' })
   @ApiParam({ name: 'id', description: 'Contract ID' })
   @ApiResponse({ status: 200, description: 'Contract object' })
-  async getContractById(@Param('id') id: string) {
-    return await this.contractService.getContractById(id);
+  async getContractById(@Req() req: any, @Param('id') id: string) {
+    return await this.contractService.getContractById(id, this.apiBase(req));
   }
 
   @Put(':id/status')
@@ -412,9 +412,17 @@ export class ContractController {
     return await this.contractService.deleteContract(id);
   }
 
+  private apiBase(req: any): string {
+    const forwarded = req.headers?.['x-forwarded-proto'];
+    const proto = (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : '') || 'https';
+    const host = req.get?.('host') || req.headers?.host || '';
+    return `${proto}://${host}`;
+  }
+
   private async sendContractFile(id: string, res: Response) {
     const file = await this.contractService.readContractFile(id);
     if (!file) {
+      this.logger.warn(`Contract file request missed for ${id}`);
       res.status(404).json({ success: false, message: 'Contract file not found' });
       return;
     }
