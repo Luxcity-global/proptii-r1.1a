@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import {
   getSignedDownloadUrl,
+  storageObjectFromDownloadUrl,
   uploadBufferToStorage,
 } from '../utils/firebase-storage';
 import { createContractFileAccess } from '../utils/contract-file-access';
@@ -469,9 +470,78 @@ export class ContractService {
     return { ...presented, fileUrl, documentUrl: presented.documentUrl || fileUrl };
   }
 
+  private configuredBuckets(): Set<string> {
+    const project = process.env.FIREBASE_PROJECT_ID || 'proptii-16946';
+    const configured = process.env.FIREBASE_STORAGE_BUCKET || `${project}.firebasestorage.app`;
+    return new Set([
+      configured,
+      `${project}.firebasestorage.app`,
+      `${project}.appspot.com`,
+      'proptii-16946.firebasestorage.app',
+      'proptii-16946.appspot.com',
+    ]);
+  }
+
+  /** gs:// or plain object path stored on the contract. */
+  private plainStoragePath(storagePath: string): { bucket: string; path: string } | null {
+    const value = storagePath.trim();
+    if (!value || value.includes('..')) return null;
+    const buckets = this.configuredBuckets();
+    if (value.startsWith('gs://')) {
+      const withoutScheme = value.slice('gs://'.length);
+      const slash = withoutScheme.indexOf('/');
+      if (slash <= 0) return null;
+      const bucket = withoutScheme.slice(0, slash);
+      const path = withoutScheme.slice(slash + 1);
+      if (!buckets.has(bucket) || !path) return null;
+      return { bucket, path };
+    }
+    return { bucket: process.env.FIREBASE_STORAGE_BUCKET || 'proptii-16946.firebasestorage.app', path: value };
+  }
+
+  /** Path to write back when the contract only has a download link. */
+  private storagePathForUrl(url: string): string {
+    const object = storageObjectFromDownloadUrl(url);
+    if (!object || !this.configuredBuckets().has(object.bucket)) return '';
+    return `gs://${object.bucket}/${object.path}`;
+  }
+
+  private async downloadContractObject(bucketName: string, objectPath: string): Promise<Buffer | null> {
+    if (!objectPath || !admin.apps.length || !this.configuredBuckets().has(bucketName)) return null;
+    try {
+      const [bytes] = await admin.storage().bucket(bucketName).file(objectPath).download();
+      if (bytes?.length && bytes.length <= 25_000_000) return bytes;
+    } catch (err: any) {
+      this.logger.warn(`contract object read failed for ${objectPath}: ${err?.message || err}`);
+    }
+    return null;
+  }
+
+  /**
+   * Read a stored PDF on the server. The browser cannot fetch the Storage link:
+   * the bucket does not send Access-Control-Allow-Origin for the app origin.
+   */
+  private async downloadContractHttps(url: string): Promise<Buffer | null> {
+    const object = storageObjectFromDownloadUrl(url);
+    if (!object || !this.configuredBuckets().has(object.bucket)) return null;
+    const fromAdmin = await this.downloadContractObject(object.bucket, object.path);
+    if (fromAdmin) return fromAdmin;
+    try {
+      const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+      if (!response.ok) return null;
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length > 5 && bytes.length <= 25_000_000 && bytes.subarray(0, 4).toString() === '%PDF') {
+        return bytes;
+      }
+    } catch (err: any) {
+      this.logger.warn(`contract url read failed: ${err?.message || err}`);
+    }
+    return null;
+  }
+
   /**
    * PDF bytes for signing, viewing, and download.
-   * Reads the Storage file. Older rows that only have an inline copy are decoded once here.
+   * Reads the Storage file behind the saved link. Older rows that only have an inline copy are decoded once here.
    */
   async readContractFile(contractId: string): Promise<{ buffer: Buffer; fileName: string } | null> {
     const col = this.contractsCol;
@@ -483,20 +553,26 @@ export class ContractService {
     const rawName = String(data.fileName || data.documentName || 'contract.pdf');
     const fileName = rawName.replace(/[^\w.\- ]/g, '_').trim() || 'contract.pdf';
 
-    const storagePath = typeof data.storagePath === 'string' ? data.storagePath : '';
-    const plainPath = storagePath.startsWith('gs://')
-      ? storagePath.split('/').slice(3).join('/')
-      : storagePath;
-    if (plainPath && admin.apps.length) {
-      try {
-        const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'proptii-16946.firebasestorage.app';
-        const [bytes] = await admin.storage().bucket(bucketName).file(plainPath).download();
-        if (bytes?.length && bytes.length <= 25_000_000) {
-          this.logger.log(`Serving contract file ${contractId} from storage (${bytes.length} bytes)`);
-          return { buffer: bytes, fileName };
-        }
-      } catch (err: any) {
-        this.logger.warn(`contract file read failed for ${contractId}: ${err?.message || err}`);
+    const storedUrls = [data.fileUrl, data.documentUrl].filter(
+      (value): value is string => typeof value === 'string' && value.startsWith('https://'),
+    );
+    const seenUrls = new Set<string>();
+    for (const url of storedUrls) {
+      if (seenUrls.has(url)) continue;
+      seenUrls.add(url);
+      const bytes = await this.downloadContractHttps(url);
+      if (bytes) {
+        this.logger.log(`Serving contract file ${contractId} from stored url (${bytes.length} bytes)`);
+        return { buffer: bytes, fileName };
+      }
+    }
+
+    const storedObject = this.plainStoragePath(typeof data.storagePath === 'string' ? data.storagePath : '');
+    if (storedObject) {
+      const bytes = await this.downloadContractObject(storedObject.bucket, storedObject.path);
+      if (bytes) {
+        this.logger.log(`Serving contract file ${contractId} from storage (${bytes.length} bytes)`);
+        return { buffer: bytes, fileName };
       }
     }
 
@@ -625,6 +701,9 @@ export class ContractService {
       fileUrl = stored.fileUrl;
       storagePath = stored.storagePath || storagePath;
     }
+    if (!storagePath && typeof fileUrl === 'string') {
+      storagePath = this.storagePathForUrl(fileUrl);
+    }
     const payload = this.withoutInlinePdf({
       ...body,
       id: docId,
@@ -668,11 +747,13 @@ export class ContractService {
       if (!existing.exists) return;
       const current = existing.data() || {};
       const documentUrl = body.documentUrl || body.fileUrl || '';
+      const storagePath = (typeof documentUrl === 'string' && this.storagePathForUrl(documentUrl)) || body.storagePath || '';
       await col.doc(sourceId).set({
         status: 'signed',
         signedDate: body.signedDate || new Date().toISOString(),
         signedBy: 'tenant',
         ...(documentUrl ? { documentUrl, fileUrl: documentUrl } : {}),
+        ...(storagePath ? { storagePath } : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
       this.logger.log(`Marked source contract ${sourceId} signed (was ${current.status || 'sent'})`);

@@ -26,6 +26,44 @@ export interface StorageUploadResult {
   size: number;
 }
 
+export interface StorageObjectRef {
+  bucket: string;
+  path: string;
+}
+
+/**
+ * The bucket object behind a Firebase or Cloud Storage download link.
+ * Other hosts are ignored so a contract record cannot point the server at an arbitrary URL.
+ */
+export function storageObjectFromDownloadUrl(url: string): StorageObjectRef | null {
+  if (!url || !/^https:\/\//i.test(url)) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+
+  let bucket = '';
+  let path = '';
+  if (parsed.hostname === 'firebasestorage.googleapis.com') {
+    const match = parsed.pathname.match(/\/b\/([^/]+)\/o\/(.+)$/);
+    if (!match) return null;
+    bucket = decodeURIComponent(match[1]);
+    path = decodeURIComponent(match[2]);
+  } else if (parsed.hostname === 'storage.googleapis.com') {
+    const parts = parsed.pathname.replace(/^\//, '').split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+    bucket = decodeURIComponent(parts[0]);
+    path = parts.slice(1).map((part) => decodeURIComponent(part)).join('/');
+  } else {
+    return null;
+  }
+
+  if (!bucket || !path || path.includes('..') || path.startsWith('/')) return null;
+  return { bucket, path };
+}
+
 /**
  * Generate a signed read URL for a file already in Storage.
  * Uses the service account credential — requires client_email + private_key.
