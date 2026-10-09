@@ -32,6 +32,7 @@ import {
 } from '../data/agentTestPersona';
 import { PassportModal, derivePassportSteps } from './PassportModal';
 import { CommsModal } from './CommsModal';
+import { useAuth } from '../../../contexts/AuthContext';
 import '../styles/referencingPage.css';
 
 const API = getResolvedApiBaseUrl();
@@ -221,6 +222,8 @@ function ReceivedPassports({
   onOpenMessages?: () => void;
   onRequestTab: () => void;
 }) {
+  const { user } = useAuth();
+  const currentUserId = (user as any)?.id || (user as any)?.uid || '';
   const [search, setSearch] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [passportShare, setPassportShare] = useState<ReceivedShare | null>(null);
@@ -476,6 +479,7 @@ function ReceivedPassports({
           avatarTone={avatarTone(commsShare.tenantName || commsShare.tenantEmail)}
           onClose={() => setCommsShare(null)}
           onOpenMessages={onOpenMessages}
+          landlordId={currentUserId}
         />
       ) : null}
     </div>

@@ -37,8 +37,8 @@ export class CommunicationService {
 
     try {
       const [tenantSnap, landlordSnap] = await Promise.all([
-        col.where('tenantId', '==', userId).get(),
-        col.where('landlordId', '==', userId).get(),
+        col.where('tenantId', '==', userId).where('isDeleted', '==', false).get(),
+        col.where('landlordId', '==', userId).where('isDeleted', '==', false).get(),
       ]);
 
       const convMap = new Map<string, any>();
@@ -59,21 +59,30 @@ export class CommunicationService {
   }
 
   async getUnreadCount(userId: string) {
-    const convsRes = await this.getConversations(userId);
-    const convIds = convsRes.data.map((c: any) => c.id);
-    if (!convIds.length) return { data: { unreadCount: 0 } };
-
-    const col = this.messagesCol;
+    // Fast path: sum the stored unread counter fields instead of a cross-collection scan
+    const col = this.conversationsCol;
     if (!col) return { data: { unreadCount: 0 } };
 
     try {
-      const snapshot = await col
-        .where('readAt', '==', null)
-        .where('senderId', '!=', userId)
-        .get();
+      const [tenantSnap, landlordSnap] = await Promise.all([
+        col.where('tenantId', '==', userId).where('isDeleted', '==', false).get(),
+        col.where('landlordId', '==', userId).where('isDeleted', '==', false).get(),
+      ]);
 
-      const userUnread = snapshot.docs.filter(doc => convIds.includes(doc.data().conversationId));
-      return { data: { unreadCount: userUnread.length } };
+      const convMap = new Map<string, any>();
+      tenantSnap.docs.forEach(doc => convMap.set(doc.id, doc.data()));
+      landlordSnap.docs.forEach(doc => convMap.set(doc.id, doc.data()));
+
+      let unreadCount = 0;
+      for (const [, conv] of convMap) {
+        // For each conversation, add the counter for the field that applies to userId
+        if (conv.tenantId === userId) {
+          unreadCount += (conv.unreadForTenant ?? 0);
+        } else if (conv.landlordId === userId) {
+          unreadCount += (conv.unreadForLandlord ?? 0);
+        }
+      }
+      return { data: { unreadCount } };
     } catch {
       return { data: { unreadCount: 0 } };
     }
@@ -114,7 +123,10 @@ export class CommunicationService {
       tenantName: dto.tenantName || 'Tenant',
       createdAt: now,
       updatedAt: now,
-      lastMessageAt: now,
+      lastMessageAt: null,       // null until the first real message is sent
+      lastMessagePreview: null,
+      unreadForTenant: 0,
+      unreadForLandlord: 0,
       isDeleted: false,
     };
 
@@ -129,9 +141,9 @@ export class CommunicationService {
     return { data: { ...payload, messages: [] } };
   }
 
-  async getMessages(conversationId: string, user?: { uid: string; email?: string; admin?: boolean; role?: string }) {
+  async getMessages(conversationId: string, user?: { uid: string; email?: string; admin?: boolean; role?: string }, before?: string, limit = 50) {
     const col = this.messagesCol;
-    if (!col) return { data: [] };
+    if (!col) return { data: [], hasMore: false };
 
     // Verify participant authorization if caller user context is provided
     if (user && user.admin !== true && user.role !== 'admin' && this.conversationsCol) {
@@ -152,13 +164,25 @@ export class CommunicationService {
     }
 
     try {
-      const snapshot = await col
+      // Build cursor-paginated query — newest-first then reverse for display
+      let query = col
         .where('conversationId', '==', conversationId)
-        .get();
+        .where('isDeleted', '==', false)
+        .orderBy('sentAt', 'desc')
+        .limit(limit + 1); // Fetch one extra to determine hasMore
 
-      const messages = snapshot.docs
+      if (before) {
+        query = query.startAfter(before);
+      }
+
+      const snapshot = await query.get();
+      const hasMore = snapshot.docs.length > limit;
+      const docs = hasMore ? snapshot.docs.slice(0, limit) : snapshot.docs;
+
+      // Reverse to chronological order for display
+      const messages = docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .sort((a: any, b: any) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+        .reverse();
 
       // ── Embed attachment objects to eliminate N+1 client-side fetches ──────
       // Instead of the client calling GET /attachments/:id once per attachment
@@ -202,11 +226,11 @@ export class CommunicationService {
         }
       }
 
-      return { data: messages };
+      return { data: messages, hasMore };
     } catch (err: any) {
       if (err instanceof ForbiddenException) throw err;
       this.logger.warn(`Error getting messages for ${conversationId}: ${err?.message || err}`);
-      return { data: [] };
+      return { data: [], hasMore: false };
     }
   }
 
@@ -249,8 +273,18 @@ export class CommunicationService {
       try {
         await col.doc(id).set(message);
         if (this.conversationsCol) {
+          // Determine which counter to increment based on sender role
+          const convSnap = await this.conversationsCol.doc(conversationId).get();
+          const conv = convSnap.exists ? convSnap.data() : null;
+          const recipientField = conv?.tenantId === userId ? 'unreadForLandlord' : 'unreadForTenant';
+
           await this.conversationsCol.doc(conversationId).set(
-            { updatedAt: timestamp, lastMessageAt: timestamp },
+            {
+              updatedAt: timestamp,
+              lastMessageAt: timestamp,
+              lastMessagePreview: (message.body || '').substring(0, 80),
+              [recipientField]: admin.firestore.FieldValue.increment(1),
+            },
             { merge: true }
           );
         }
@@ -274,6 +308,16 @@ export class CommunicationService {
     if (!convSnap.exists) return;
     const conv = convSnap.data();
     if (!conv) return;
+
+    // ── Email deduplication: skip if notified within the last 10 minutes ──
+    const TEN_MINUTES_MS = 10 * 60 * 1000;
+    if (conv.lastNotifiedAt) {
+      const lastNotified = new Date(conv.lastNotifiedAt).getTime();
+      if (Date.now() - lastNotified < TEN_MINUTES_MS) {
+        this.logger.debug(`[notify] Skipping — notified ${Math.round((Date.now() - lastNotified) / 1000)}s ago`);
+        return;
+      }
+    }
 
     let recipientId = '';
     let isGuest = false;
@@ -312,16 +356,52 @@ export class CommunicationService {
         senderName,
         conv.propertyTitle || 'a property',
         isGuest,
-        isGuest ? conv.guestToken : undefined
+        isGuest ? conv.guestToken : undefined,
+        (message.body || '').substring(0, 200), // Pass preview to email
       );
+
+      // Record the notification timestamp to prevent duplicates
+      try {
+        await this.conversationsCol.doc(conversationId).set(
+          { lastNotifiedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      } catch { /* non-fatal */ }
     }
   }
 
-  async markRead(messageId: string) {
+  async markRead(messageId: string, userId?: string) {
     const col = this.messagesCol;
     if (col) {
       try {
-        await col.doc(messageId).set({ readAt: new Date().toISOString() }, { merge: true });
+        const msgDoc = await col.doc(messageId).get();
+        if (msgDoc.exists) {
+          const msg = msgDoc.data()!;
+          // Only mark read if not already read (avoid double decrement)
+          if (!msg.readAt) {
+            await col.doc(messageId).set({ readAt: new Date().toISOString() }, { merge: true });
+
+            // Decrement the stored unread counter for the reading user
+            if (userId && this.conversationsCol && msg.conversationId) {
+              const convSnap = await this.conversationsCol.doc(msg.conversationId).get();
+              if (convSnap.exists) {
+                const conv = convSnap.data()!;
+                const counterField = conv.tenantId === userId ? 'unreadForTenant' : 'unreadForLandlord';
+                // Decrement but never below 0
+                const current = conv[counterField] ?? 0;
+                if (current > 0) {
+                  await this.conversationsCol.doc(msg.conversationId).set(
+                    { [counterField]: admin.firestore.FieldValue.increment(-1) },
+                    { merge: true }
+                  );
+                }
+              }
+            }
+          }
+        } else {
+          // Fallback: just set readAt directly
+          await col.doc(messageId).set({ readAt: new Date().toISOString() }, { merge: true });
+        }
       } catch {}
     }
     return { data: { success: true } };
@@ -365,15 +445,17 @@ export class CommunicationService {
       try { 
         await col.doc(id).set(payload); 
         
-        // Auto-sync to the "Files/Documents" tab globally (stored in referencing_files)
+        // Auto-sync to the "Files/Documents" tab (referencing_files) — tenant uploads only
+        // Landlord attachments (replies, contracts) should not appear in the tenant's file vault
+        const isLandlordUpload = dto.senderRole === 'landlord';
         const filesCol = this.db?.collection('referencing_files');
-        if (filesCol && userId && userId !== 'guest') {
+        if (filesCol && userId && userId !== 'guest' && !isLandlordUpload) {
           await filesCol.doc(`${userId}_${Date.now()}`).set({
             userId,
             fileName: payload.filename,
             contentType: payload.mimeType,
             size: payload.size,
-            category: 'Messaging', // Identifies this as an attachment
+            category: 'Messaging',
             url: payload.blobUrl,
             uploadDate: admin.firestore.FieldValue.serverTimestamp(),
           });

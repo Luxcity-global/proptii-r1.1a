@@ -51,9 +51,7 @@ import type { FactFlag } from '../types/govData';
 import { useMessagingContext } from '../contexts/MessagingContext';
 import communicationService from '../services/communicationService';
 import QuickRequestModal from '../components/enquiry/QuickRequestModal';
-import MessageThread from '../components/messaging/MessageThread';
-import ComposeBox from '../components/messaging/ComposeBox';
-import type { Conversation, Message } from '../types/messaging';
+import type { Conversation } from '../types/messaging';
 import '../styles/searchResults.css';
 
 type SortOption = 'Relevance' | 'Newest' | 'Price (low)' | 'Price (high)';

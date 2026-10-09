@@ -76,7 +76,7 @@ commApi.interceptors.response.use(
                     setBearerAuth(originalRequest, freshToken);
                     return commApi.request(originalRequest);
                 }
-            } catch {
+            } catch (_e) {
                 // Fresh token acquisition failed — fall through to error handling
             }
         }
@@ -122,17 +122,24 @@ const communicationService = {
     },
 
     /**
-     * Retrieve all messages for a conversation.
-     * GET /api/communication/conversations/{id}/messages
+     * Retrieve messages for a conversation with optional cursor pagination.
+     * GET /api/communication/conversations/{id}/messages?before={sentAt}&limit={n}
      * Requirements: 6.3
      */
-    async getMessages(conversationId: string): Promise<Message[]> {
+    async getMessages(conversationId: string, before?: string, limit = 50): Promise<{ messages: Message[]; hasMore: boolean }> {
         try {
-            const { data } = await commApi.get(`/conversations/${conversationId}/messages`);
-            return unwrap<Message[]>(data) || [];
+            const params = new URLSearchParams({ limit: String(limit) });
+            if (before) params.set('before', before);
+            const { data } = await commApi.get(`/conversations/${conversationId}/messages?${params}`);
+            const body = unwrap<{ data: Message[]; hasMore: boolean } | Message[]>(data);
+            // Handle both wrapped { data, hasMore } and legacy flat array shapes
+            if (Array.isArray(body)) {
+                return { messages: body, hasMore: false };
+            }
+            return { messages: (body as any).data ?? [], hasMore: (body as any).hasMore ?? false };
         } catch (err) {
             console.warn('⚠️ Communication service getMessages failed:', err);
-            return [];
+            return { messages: [], hasMore: false };
         }
     },
 
@@ -248,7 +255,16 @@ const communicationService = {
     },
 
     /**
-     * Get attachment metadata (including Firebase Storage blobUrl).
+     * Broadcast a typing indicator to conversation participants (fire-and-forget).
+     * POST /api/communication/conversations/{id}/typing
+     */
+    async sendTyping(conversationId: string): Promise<void> {
+        try {
+            await commApi.post(`/conversations/${conversationId}/typing`, {});
+        } catch (_e) { /* non-fatal — typing indicators are best-effort */ }
+    },
+
+    /**
      * GET /api/communication/attachments/{id}
      * Requirements: 7.4
      */

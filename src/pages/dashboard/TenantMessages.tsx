@@ -340,6 +340,9 @@ const TenantMessages: React.FC = () => {
                           ) : null}
                         </div>
                         {property ? <div className="tn-msg-conv-sub">{property}</div> : null}
+                        {(conv as any).lastMessagePreview ? (
+                          <div className="tn-msg-conv-preview">{(conv as any).lastMessagePreview}</div>
+                        ) : null}
                       </div>
                     </button>
                   );

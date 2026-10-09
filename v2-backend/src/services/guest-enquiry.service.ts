@@ -199,22 +199,48 @@ export class GuestEnquiryService {
     let migratedCount = 0;
     if (col) {
       try {
-        const snap = await col.where('guestEmail', '==', email.toLowerCase().trim()).get();
+        const snap = await col
+          .where('guestEmail', '==', email.toLowerCase().trim())
+          .where('isDeleted', '==', false)
+          .get();
         for (const doc of snap.docs) {
-          await doc.ref.set({ 
-            tenantId: userId, 
+          await doc.ref.set({
+            tenantId: userId,
             status: 'claimed',
-            guestToken: null // Clear token after claim
+            guestToken: null,
           }, { merge: true });
           migratedCount++;
         }
       } catch {}
     }
 
+    // Post-claim validation: verify migrated conversations are queryable by userId
+    // This catches Firestore propagation delays and index issues early.
+    let verifiedCount = 0;
+    if (col && migratedCount > 0) {
+      try {
+        // Small delay to allow Firestore index propagation
+        await new Promise(resolve => setTimeout(resolve, 400));
+        const verifySnap = await col
+          .where('tenantId', '==', userId)
+          .where('isDeleted', '==', false)
+          .get();
+        verifiedCount = verifySnap.docs.length;
+        if (verifiedCount === 0) {
+          this.logger.warn(`[autoMerge] Migration wrote ${migratedCount} docs but none found by tenantId=${userId} — index may be building`);
+        } else {
+          this.logger.log(`[autoMerge] Verified ${verifiedCount} conversations queryable for tenantId=${userId}`);
+        }
+      } catch (err: any) {
+        this.logger.warn(`[autoMerge] Post-claim verification failed: ${err?.message}`);
+      }
+    }
+
     return {
       data: {
         success: true,
         migratedCount,
+        verifiedCount,
       },
     };
   }

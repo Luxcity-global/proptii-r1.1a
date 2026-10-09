@@ -28,28 +28,34 @@ export class EmailService {
     propertyTitle: string,
     isGuest: boolean,
     guestToken?: string,
+    messagePreview?: string,
   ) {
     if (!recipientEmail) return;
 
     const safeRecipientName = this.truncate(recipientName || '', 50);
     const safeSenderName    = this.truncate(senderName || 'A user', 50);
     const safePropertyTitle = this.truncate(propertyTitle || 'a property', 60);
+    const safePreview       = messagePreview ? this.truncate(messagePreview, 200) : null;
     const actionUrl = isGuest && guestToken
       ? `${this.frontendUrl}/claim?token=${guestToken}`
-      : `${this.frontendUrl}/login`;
+      : `${this.frontendUrl}/dashboard/messages`;
     const greeting = safeRecipientName ? `Hello ${safeRecipientName},` : 'Hello,';
-    const subject  = `New message regarding ${safePropertyTitle}`;
+    const subject  = `New message from ${safeSenderName} — ${safePropertyTitle}`;
+
+    const previewBlock = safePreview
+      ? `<div style="background:#f8fafc;border-left:4px solid #136C9E;padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;color:#334155;font-style:italic;">"${safePreview}"</div>`
+      : '';
 
     const html = renderProptiiEmail({
       title: 'New Message on Proptii',
-      buttonLabel: 'View and Reply',
+      buttonLabel: 'View &amp; Reply →',
       buttonHref: actionUrl,
       bodyHtml: `
-        <p>${greeting}</p>
-        <p>You have received a new message from <strong>${safeSenderName}</strong> regarding <strong>${safePropertyTitle}</strong>.</p>
-        <p style="font-size:0.85em;color:#666;">
-          If the button doesn't work, copy and paste this link:<br>
-          <a href="${actionUrl}">${actionUrl}</a>
+        <p style="margin:0 0 12px;">${greeting}</p>
+        <p style="margin:0 0 8px;">You have a new message from <strong>${safeSenderName}</strong> about <strong>${safePropertyTitle}</strong>:</p>
+        ${previewBlock}
+        <p style="font-size:0.8em;color:#94a3b8;margin-top:16px;">
+          If the button doesn't work: <a href="${actionUrl}" style="color:#136C9E;">${actionUrl}</a>
         </p>
       `,
     });

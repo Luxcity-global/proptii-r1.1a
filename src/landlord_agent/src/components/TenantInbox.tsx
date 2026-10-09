@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Download, MessageSquare, Plus, Search, Settings, Sparkles } from 'lucide-react';
+import { Bell, Download, MessageSquare, Plus, Search, Settings, Sparkles, Edit, X, Loader2, ChevronDown } from 'lucide-react';
 import { useMessagingContext } from '../../../contexts/MessagingContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import communicationService from '../../../services/communicationService';
@@ -14,6 +14,7 @@ import ComposeBox from '../../../components/messaging/ComposeBox';
 import AttachmentPill from '../../../components/messaging/AttachmentPill';
 import type { Conversation, Message } from '../../../types/messaging';
 import type { UserProfile } from '../App';
+import { useTenants } from '../hooks/useTenants';
 import '../styles/messagesPage.css';
 
 type TabId = 'inbox' | 'unread' | 'draft';
@@ -106,6 +107,20 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   );
   const [readCursors, setReadCursors] = useState<Record<string, string | null>>({});
 
+  // ── New Message compose modal state ────────────────────────────────────────
+  const [showCompose,        setShowCompose]        = useState(false);
+  const [composeTenantId,    setComposeTenantId]    = useState('');
+  const [composePropertyId,  setComposePropertyId]  = useState('');
+  const [composePropertyTitle, setComposePropertyTitle] = useState('');
+  const [composeTenantName,  setComposeTenantName]  = useState('');
+  const [composeCreating,    setComposeCreating]    = useState(false);
+  const [composeError,       setComposeError]       = useState<string | null>(null);
+
+  // Load tenants for the compose picker
+  const { tenants: allTenants } = useTenants({
+    userId: (user as any)?.id || (user as any)?.uid || null,
+  });
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const optimisticBottomRef = useRef<HTMLDivElement>(null);
   // Track last seen lastMessageAt per conversation to detect when real messages arrive
@@ -179,6 +194,38 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   const currentUserId = user?.id ?? '';
   const userName = userProfile?.name || (user as { name?: string; displayName?: string } | null)?.name || (user as { displayName?: string } | null)?.displayName || 'Landlord';
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
+
+  // ── Open a new conversation from the compose picker ────────────────────────
+  const handleOpenCompose = async () => {
+    setComposeError(null);
+    setComposeTenantId('');
+    setComposePropertyId('');
+    setComposePropertyTitle('');
+    setComposeTenantName('');
+    setShowCompose(true);
+  };
+
+  const handleStartConversation = async () => {
+    if (!composeTenantId || !currentUserId) return;
+    setComposeCreating(true);
+    setComposeError(null);
+    try {
+      const conv = await communicationService.getOrCreateConversation({
+        propertyId:    composePropertyId || `direct-${composeTenantId}`,
+        tenantId:      composeTenantId,
+        landlordId:    currentUserId,
+        propertyTitle: composePropertyTitle || 'Property',
+        tenantName:    composeTenantName || 'Tenant',
+      });
+      setShowCompose(false);
+      handleSelect(conv.id);
+      _setConversations(prev => prev.some(c => c.id === conv.id) ? prev : [conv, ...prev]);
+    } catch {
+      setComposeError('Could not start conversation. Please try again.');
+    } finally {
+      setComposeCreating(false);
+    }
+  };
 
   const unreadConvs = conversations.filter((c) => isUnread(c, readCursors[c.id] ?? null));
   const draftConvs = conversations.filter((c) => !c.lastMessageAt);
@@ -267,6 +314,13 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                 Add Tenant
               </button>
             ) : null}
+            {/* New Message button — lets landlord initiate a conversation */}
+            <button type="button" className="ll-msg-btn-add" onClick={handleOpenCompose}
+              style={{ background: '#DC5F12' }}
+              title="Start a new conversation">
+              <Edit size={15} strokeWidth={2.5} />
+              New Message
+            </button>
           </div>
         </div>
       </header>
@@ -344,6 +398,9 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                           ) : null}
                         </div>
                         {property ? <div className="ll-msg-conv-sub">{property}</div> : null}
+                        {(conv as any).lastMessagePreview ? (
+                          <div className="ll-msg-conv-preview">{(conv as any).lastMessagePreview}</div>
+                        ) : null}
                       </div>
                     </button>
                   );
@@ -374,10 +431,38 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                   <span className={`ll-msg-avatar ${avatarTone(activeConversation?.tenantName || 'Tenant')}`}>
                     {getInitials(activeConversation?.tenantName || 'Tenant')}
                   </span>
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <h3>{activeConversation?.tenantName || 'Tenant'}</h3>
                     <p>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
                   </div>
+                  {/* Export full conversation */}
+                  <button
+                    type="button"
+                    title="Export conversation"
+                    onClick={async () => {
+                      if (!activeConversationId) return;
+                      const { messages: msgs } = await communicationService.getMessages(activeConversationId);
+                      const rows = [
+                        ['Sender', 'Role', 'Time', 'Message'],
+                        ...msgs.map((m: any) => [
+                          m.senderId === currentUserId ? (userName || 'Landlord') : (activeConversation?.tenantName || 'Tenant'),
+                          m.senderRole || '',
+                          m.sentAt ? new Date(m.sentAt).toLocaleString('en-GB') : '',
+                          (m.body || '').replace(/"/g, '""'),
+                        ]),
+                      ];
+                      const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url; a.download = `conversation-${activeConversation?.tenantName?.replace(/\s+/g,'-') || 'export'}.csv`;
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 11, fontWeight: 600, color: '#64748b', cursor: 'pointer' }}
+                  >
+                    Export
+                  </button>
                 </div>
 
                 <div ref={scrollContainerRef} className="ll-msg-feed">
@@ -413,6 +498,90 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
           </main>
         </div>
       </div>
+
+      {/* ── New Message compose modal ──────────────────────────────────────── */}
+      {showCompose && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowCompose(false); }}
+        >
+          <div style={{ background: '#fff', borderRadius: 24, padding: '28px 30px 32px', width: '100%', maxWidth: 440, boxShadow: '0 24px 60px rgba(0,0,0,0.2)', fontFamily: 'Archivo,sans-serif' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <p style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', margin: 0 }}>New Message</p>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0' }}>Start a conversation with a tenant</p>
+              </div>
+              <button type="button" onClick={() => setShowCompose(false)}
+                style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Tenant picker */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Select Tenant *
+              </label>
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={composeTenantId}
+                  onChange={e => {
+                    const tid = e.target.value;
+                    setComposeTenantId(tid);
+                    const t = allTenants.find(t => t.id === tid);
+                    if (t) {
+                      setComposeTenantName(t.name);
+                      setComposePropertyId(t.propertyId || '');
+                      setComposePropertyTitle(t.propertyAddress || '');
+                    }
+                  }}
+                  style={{ width: '100%', height: 44, border: '2px solid #e2e8f0', borderRadius: 12, padding: '0 36px 0 14px', fontSize: 14, color: '#1e293b', background: '#fff', appearance: 'none', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="">Choose a tenant…</option>
+                  {allTenants.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} {t.propertyAddress ? `— ${t.propertyAddress.split(',')[0]}` : ''}</option>
+                  ))}
+                </select>
+                <ChevronDown size={16} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+              </div>
+            </div>
+
+            {/* Property override (optional) */}
+            {composeTenantId && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Property (auto-filled)
+                </label>
+                <input
+                  type="text"
+                  value={composePropertyTitle}
+                  onChange={e => setComposePropertyTitle(e.target.value)}
+                  placeholder="Property address"
+                  style={{ width: '100%', height: 44, border: '2px solid #e2e8f0', borderRadius: 12, padding: '0 14px', fontSize: 14, color: '#1e293b', background: '#f8fafc', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            )}
+
+            {composeError && (
+              <p style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{composeError}</p>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button type="button" onClick={() => setShowCompose(false)}
+                style={{ flex: 1, height: 44, borderRadius: 12, border: '1.5px solid #e2e8f0', background: '#fff', fontWeight: 600, fontSize: 14, color: '#64748b', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button type="button" onClick={handleStartConversation}
+                disabled={!composeTenantId || composeCreating}
+                style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: composeCreating || !composeTenantId ? '#94a3b8' : '#136C9E', color: '#fff', fontWeight: 600, fontSize: 14, cursor: composeTenantId && !composeCreating ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                {composeCreating ? <><Loader2 size={15} className="animate-spin" /> Opening…</> : 'Start Conversation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -102,13 +102,34 @@ export class CommunicationController {
     return await this.communicationService.getOrCreateConversation(dto, userId);
   }
 
+  @Post('conversations/:id/typing')
+  @HttpCode(200)
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Broadcast a typing indicator to conversation participants' })
+  @ApiParam({ name: 'id', description: 'Conversation ID' })
+  async sendTyping(@Param('id') conversationId: string, @Req() req: any) {
+    const userId = req.user.uid;
+    this.eventsService.emit({
+      type: 'typing_start',
+      userId,
+      data: { conversationId, senderId: userId },
+    });
+    return { data: { ok: true } };
+  }
+
   @Get('conversations/:id/messages')
   @HttpCode(200)
   @ApiOperation({ summary: 'Get messages for a conversation' })
   @ApiParam({ name: 'id', description: 'Conversation ID' })
   @ApiResponse({ status: 200, description: 'Array of conversation messages' })
-  async getMessages(@Param('id') id: string, @Req() req: any) {
-    return await this.communicationService.getMessages(id, req.user);
+  async getMessages(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Query('before') before?: string,
+    @Query('limit') limitStr?: string,
+  ) {
+    const limit = limitStr ? Math.min(parseInt(limitStr, 10) || 50, 100) : 50;
+    return await this.communicationService.getMessages(id, req.user, before, limit);
   }
 
   @Post('conversations/:id/messages')
@@ -140,14 +161,12 @@ export class CommunicationController {
   @ApiResponse({ status: 200, description: 'Message marked read' })
   async markRead(@Param('id') messageId: string, @Req() req: any) {
     const userId = req?.user?.uid;
-    const result = await this.communicationService.markRead(messageId);
+    const result = await this.communicationService.markRead(messageId, userId);
 
     this.eventsService.emit({
       type: 'message_read',
       userId,
-      data: {
-        messageId,
-      },
+      data: { messageId },
     });
 
     return result;

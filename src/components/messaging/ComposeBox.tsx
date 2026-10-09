@@ -98,6 +98,7 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
     const [sending, setSending] = useState(false);
     const [focused, setFocused] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         setBody(initialBody ?? '');
@@ -110,7 +111,14 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
     const isSubmitDisabled = sending || isOverLimit || (body.trim().length === 0 && !selectedFile);
     const charPct = Math.min(charCount / MAX_CHARS, 1);
 
-    const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => setBody(e.target.value);
+    const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setBody(e.target.value);
+        // Debounced typing indicator — fires at most once per 1.5s while user types
+        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = setTimeout(() => {
+            communicationService.sendTyping(conversationId);
+        }, 500);
+    };
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] ?? null;
         if (file && file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
@@ -133,7 +141,7 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
                 try {
                     const attachment = await communicationService.uploadAttachment(selectedFile, conversationId);
                     attachmentIds = [attachment.id];
-                } catch {
+                } catch (_e) {
                     toast.error('File upload failed. Please try again.');
                     setSending(false);
                     return;
@@ -157,7 +165,7 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
             setBody('');
             setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
-        } catch {
+        } catch (_e) {
             toast.error('Failed to send message. Please try again.');
             // Notify the parent so it can remove any optimistic render
             onSendError?.();

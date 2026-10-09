@@ -92,6 +92,10 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
     const [messages, setMessages] = useState<Message[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Sentinel element at the bottom of the list — scrolled into view after every render
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -110,28 +114,41 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
         setError(null);
 
         try {
-            const fetched = await communicationService.getMessages(conversationId);
-
-            // Sort ascending by sentAt (API should already return sorted, but enforce it)
+            const { messages: fetched, hasMore: more } = await communicationService.getMessages(conversationId);
             const sorted = [...fetched].sort(
                 (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
             );
-
             setMessages(sorted);
+            setHasMore(more);
 
-            // Mark each unread message as read
             const unread = sorted.filter(
                 (m) => m.readAt === null && m.senderId !== currentUserId,
             );
             await Promise.all(
                 unread.map((m) => communicationService.markRead(m.id, conversationId)),
             );
-        } catch {
+        } catch (_e) {
             setError('Failed to load messages. Please try again.');
         } finally {
             setLoading(false);
         }
     }, [conversationId, currentUserId]);
+
+    const loadEarlier = useCallback(async () => {
+        if (!conversationId || !messages.length || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const oldest = messages[0]?.sentAt;
+            const { messages: older, hasMore: more } = await communicationService.getMessages(conversationId, oldest);
+            const sorted = [...older].sort(
+                (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
+            );
+            setMessages(prev => [...sorted.filter(m => !prev.some(p => p.id === m.id)), ...prev]);
+            setHasMore(more);
+        } catch (_e) { /* silent */ } finally {
+            setLoadingMore(false);
+        }
+    }, [conversationId, messages, loadingMore]);
 
     useEffect(() => {
         fetchAndMarkRead();
@@ -144,18 +161,26 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
             const data = event.data as any;
             if (data?.conversationId === conversationId && data?.message) {
                 setMessages((prev) => {
-                    // Check if we already have this message (prevent duplicates)
                     if (prev.some(m => m.id === data.message.id)) return prev;
                     return [...prev, data.message];
                 });
-                
-                // If it's not our own message, mark it as read
                 if (data.message.senderId !== currentUserId) {
                     communicationService.markRead(data.message.id, conversationId).catch(console.error);
                 }
             }
         });
-        return unsubscribe;
+
+        // Typing indicator — show for 3s then auto-hide
+        const unsubscribeTyping = sseService.on('typing_start', (event) => {
+            const data = event.data as any;
+            if (data?.conversationId === conversationId && data?.senderId !== currentUserId) {
+                setIsTyping(true);
+                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
+            }
+        });
+
+        return () => { unsubscribe(); unsubscribeTyping(); };
     }, [conversationId, currentUserId]);
 
     // Scroll to bottom whenever the message list changes (new fetch or new messages)
@@ -170,6 +195,25 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
             data-testid="message-thread"
             style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}
         >
+            {/* Load earlier messages button */}
+            {hasMore && (
+                <div style={{ textAlign: 'center', paddingBottom: 4 }}>
+                    <button
+                        type="button"
+                        onClick={loadEarlier}
+                        disabled={loadingMore}
+                        style={{
+                            fontSize: '0.75rem', fontWeight: 600,
+                            color: '#136c9e', background: '#eaf3f8',
+                            border: '1px solid #bfdbfe', borderRadius: 20,
+                            padding: '5px 14px', cursor: loadingMore ? 'default' : 'pointer',
+                            opacity: loadingMore ? 0.6 : 1,
+                        }}
+                    >
+                        {loadingMore ? 'Loading…' : '↑ Load earlier messages'}
+                    </button>
+                </div>
+            )}
             {/* Inline error banner */}
             {error && (
                 <div
@@ -290,6 +334,30 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                     style={{ textAlign: 'center', color: '#6b7280', padding: '32px' }}
                 >
                     No messages yet. Start the conversation!
+                </div>
+            )}
+
+            {/* Typing indicator bubble */}
+            {isTyping && (
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <div style={{
+                        padding: '8px 14px', borderRadius: 12,
+                        backgroundColor: '#f3f4f6', color: '#6b7280',
+                        fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                        <span style={{ display: 'flex', gap: 3 }}>
+                            {[0,1,2].map(i => (
+                                <span key={i} style={{
+                                    width: 6, height: 6, borderRadius: '50%', background: '#9ca3af',
+                                    animation: 'typingDot 1.2s infinite',
+                                    animationDelay: `${i * 0.2}s`,
+                                    display: 'inline-block',
+                                }} />
+                            ))}
+                        </span>
+                        typing…
+                        <style>{`@keyframes typingDot { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }`}</style>
+                    </div>
                 </div>
             )}
 
