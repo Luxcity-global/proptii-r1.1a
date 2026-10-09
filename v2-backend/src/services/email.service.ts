@@ -119,7 +119,10 @@ export class EmailService {
     const safeAddress = this.truncate(propertyAddress || '', 80);
     const safeNotes   = this.truncate(notes || '', 200);
     const greeting    = safeName ? `Hello ${safeName},` : 'Hello,';
-    const viewPath    = `/referencing/view/${viewToken}`;
+    // /view-passport is a real published file (see copy-spa-fallbacks). A path
+    // param such as /referencing/view/<token> is not, and Render serves 404.html
+    // for it. The token stays in the query string so the same page can load.
+    const viewPath    = `/view-passport?token=${encodeURIComponent(viewToken)}`;
     const viewUrl     = `${this.frontendUrl}${viewPath}`;
     const claimUrl    = `${this.frontendUrl}/claim-referencing?token=${encodeURIComponent(claimToken)}`;
     const loginUrl    = `${this.frontendUrl}/login?redirect=${encodeURIComponent(viewPath)}`;

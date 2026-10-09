@@ -3,8 +3,6 @@ import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import {
   getSignedDownloadUrl,
-  isBase64DataUri,
-  uploadBase64ToStorage,
   uploadBufferToStorage,
 } from '../utils/firebase-storage';
 import { createContractFileAccess } from '../utils/contract-file-access';
@@ -150,45 +148,54 @@ export class ContractService {
   }
 
   /**
-   * Store the PDF in Cloud Storage. Firestore only keeps the URL.
-   * A small inline copy is kept only when storage is unavailable, so the
-   * record itself still saves.
+   * Store the PDF bytes in Cloud Storage. Firestore keeps the URL only.
+   * An incoming base64 string is decoded once so it can be written as a file,
+   * then discarded. It is never saved on the contract record.
    */
   private async storeContractDocument(
     ownerId: string,
     file?: { buffer?: Buffer; mimetype?: string },
     base64?: string | null,
-  ): Promise<{ fileUrl: string; storagePath: string; inlineBase64: string | null }> {
-    const inline = (value?: string | null) => {
-      const MAX = 700_000;
-      if (!value || value.length > MAX) return { fileUrl: '', storagePath: '', inlineBase64: null as string | null };
-      const fileUrl = value.startsWith('data:')
-        ? value
-        : `data:application/pdf;base64,${value}`;
-      return { fileUrl, storagePath: '', inlineBase64: value };
-    };
-
-    const hasFile = Boolean(file?.buffer?.length);
-    const hasBase64 = typeof base64 === 'string' && base64.length > 20;
-    if (!hasFile && !hasBase64) return { fileUrl: '', storagePath: '', inlineBase64: null };
-    if (!admin.apps.length) return inline(base64 || null);
+  ): Promise<{ fileUrl: string; storagePath: string }> {
+    let buffer = file?.buffer?.length ? file.buffer : null;
+    const contentType = file?.mimetype || 'application/pdf';
+    if (!buffer && typeof base64 === 'string' && base64.length > 20) {
+      const payload = base64.includes(',') ? base64.split(',').pop() || '' : base64;
+      try {
+        const decoded = Buffer.from(payload, 'base64');
+        if (decoded.length > 5) buffer = decoded;
+      } catch {
+        buffer = null;
+      }
+    }
+    if (!buffer?.length || !admin.apps.length) {
+      return { fileUrl: '', storagePath: '' };
+    }
 
     try {
       const storagePath = `contracts/${ownerId || 'shared'}/${randomUUID()}.pdf`;
-      if (hasFile) {
-        const uploaded = await uploadBufferToStorage(file!.buffer!, storagePath, file?.mimetype || 'application/pdf');
-        return { fileUrl: uploaded.downloadUrl, storagePath: uploaded.storagePath, inlineBase64: null };
-      }
-      if (isBase64DataUri(base64)) {
-        const uploaded = await uploadBase64ToStorage(base64 as string, storagePath);
-        return { fileUrl: uploaded.downloadUrl, storagePath: uploaded.storagePath, inlineBase64: null };
-      }
-      const uploaded = await uploadBufferToStorage(Buffer.from(base64 as string, 'base64'), storagePath, 'application/pdf');
-      return { fileUrl: uploaded.downloadUrl, storagePath: uploaded.storagePath, inlineBase64: null };
+      const uploaded = await uploadBufferToStorage(buffer, storagePath, contentType);
+      return { fileUrl: uploaded.downloadUrl, storagePath: uploaded.storagePath };
     } catch (err: any) {
       this.logger.warn(`contract file upload failed: ${err?.message || err}`);
-      return inline(base64 || null);
+      return { fileUrl: '', storagePath: '' };
     }
+  }
+
+  /** Drop encoded PDF strings before a Firestore write. */
+  private withoutInlinePdf(record: Record<string, any>) {
+    const next = { ...record };
+    delete next.fileBase64;
+    delete next.base64Data;
+    delete next.attachmentBase64;
+    delete next.documentBase64;
+    if (typeof next.fileData === 'string' && (next.fileData.startsWith('data:') || next.fileData.length > 200)) {
+      delete next.fileData;
+    }
+    for (const key of ['fileUrl', 'documentUrl'] as const) {
+      if (typeof next[key] === 'string' && next[key].startsWith('data:')) delete next[key];
+    }
+    return next;
   }
 
   async getContracts(tenantEmail: string, userId?: string) {
@@ -217,13 +224,24 @@ export class ContractService {
   async saveTemplate(userId: string, body: any) {
     const col = this.templatesCol;
     const templateId = `${userId}_${Date.now()}`;
-    const payload = {
+    const rawFile = body.fileData || body.fileBase64 || body.base64Data;
+    let fileUrl = typeof body.fileUrl === 'string' && !body.fileUrl.startsWith('data:') ? body.fileUrl : '';
+    let storagePath = body.storagePath || '';
+    if (!fileUrl && typeof rawFile === 'string' && !rawFile.startsWith('stored_')) {
+      const stored = await this.storeContractDocument(userId, undefined, rawFile);
+      fileUrl = stored.fileUrl;
+      storagePath = stored.storagePath;
+    }
+    const payload = this.withoutInlinePdf({
       id: templateId,
       userId,
       ...body,
+      fileUrl,
+      storagePath,
+      fileData: 'stored_via_backend_storage',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    });
 
     if (!col) return { success: true, templateId };
 
@@ -317,9 +335,8 @@ export class ContractService {
       contractName: body.contractName || body.title || 'Tenancy Agreement',
       contractType: body.contractType || 'tenancy-agreement',
       fileName: file?.originalname || body.fileName || 'contract.pdf',
-      fileUrl: stored.fileUrl || body.fileUrl || '',
+      fileUrl: stored.fileUrl || (typeof body.fileUrl === 'string' && !body.fileUrl.startsWith('data:') ? body.fileUrl : ''),
       storagePath: stored.storagePath || '',
-      ...(stored.inlineBase64 ? { fileBase64: stored.inlineBase64 } : {}),
       templateId: body.templateId || '',
       status: body.status || 'sent',
       sentDate: body.sentDate || new Date().toISOString(),
@@ -329,9 +346,13 @@ export class ContractService {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
+    if (admin.apps.length && (file?.buffer?.length || body.fileBase64 || body.base64Data) && !payload.fileUrl) {
+      return { success: false, error: 'Could not store the contract file.' };
+    }
+
     if (col) {
       try {
-        await withTimeout(col.doc(docId).set(payload));
+        await withTimeout(col.doc(docId).set(this.withoutInlinePdf(payload)));
       } catch (err: any) {
         this.logger.warn(`sendContractToTenant error: ${err?.message || err}`);
       }
@@ -362,26 +383,28 @@ export class ContractService {
       sentDate: contractData.sentDate ? new Date(contractData.sentDate).toISOString() : new Date().toISOString(),
       expiryDate: contractData.expiryDate ? new Date(contractData.expiryDate).toISOString() : null,
       fileName: body.fileName || contractData.fileName || 'contract.pdf',
-      fileUrl: stored.fileUrl || contractData.fileUrl || '',
+      fileUrl: stored.fileUrl || (typeof contractData.fileUrl === 'string' && !String(contractData.fileUrl).startsWith('data:') ? contractData.fileUrl : ''),
       storagePath: stored.storagePath || contractData.storagePath || '',
       additionalInfo: contractData.additionalInfo || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
-    if (stored.inlineBase64) payload.fileBase64 = stored.inlineBase64;
-    else delete payload.fileBase64;
-    delete payload.base64Data;
+    const cleanPayload = this.withoutInlinePdf(payload);
+
+    if (admin.apps.length && (body.base64Data || contractData.fileBase64) && !cleanPayload.fileUrl) {
+      return { success: false, error: 'Could not store the contract file.' };
+    }
 
     if (col) {
       try {
-        await withTimeout(col.doc(docId).set(payload));
-        this.logger.log(`Created contract ${docId} with base64 attachment for user ${landlordId}`);
+        await withTimeout(col.doc(docId).set(cleanPayload));
+        this.logger.log(`Created contract ${docId} from stored file for user ${landlordId}`);
       } catch (err: any) {
         this.logger.warn(`createContractWithBase64 error: ${err?.message || err}`);
       }
     }
 
-    return { success: true, id: docId, contractId: docId, ...payload };
+    return { success: true, id: docId, contractId: docId, ...cleanPayload };
   }
 
   async getLandlordContracts(filters: {
@@ -595,7 +618,14 @@ export class ContractService {
 
     const landlordEmail = this.normalizedEmail(body.landlordEmail, body.agentEmail);
     const agentEmail = this.normalizedEmail(body.agentEmail, body.landlordEmail);
-    const payload = {
+    let fileUrl = body.fileUrl || body.documentUrl || '';
+    let storagePath = body.storagePath || '';
+    if (typeof fileUrl === 'string' && fileUrl.startsWith('data:')) {
+      const stored = await this.storeContractDocument(effectiveUserId, undefined, fileUrl);
+      fileUrl = stored.fileUrl;
+      storagePath = stored.storagePath || storagePath;
+    }
+    const payload = this.withoutInlinePdf({
       ...body,
       id: docId,
       userId: effectiveUserId,
@@ -604,13 +634,14 @@ export class ContractService {
       tenantEmail: this.normalizedEmail(body.tenantEmail) || body.tenantEmail || '',
       tenantName: body.tenantName || '',
       propertyAddress: body.propertyAddress || '',
-      fileUrl: body.fileUrl || body.documentUrl || '',
-      documentUrl: body.documentUrl || body.fileUrl || '',
+      fileUrl: typeof fileUrl === 'string' && !fileUrl.startsWith('data:') ? fileUrl : '',
+      documentUrl: typeof fileUrl === 'string' && !fileUrl.startsWith('data:') ? fileUrl : '',
+      storagePath,
       fileName: body.fileName || body.documentName || 'contract.pdf',
       ...(landlordEmail ? { landlordEmail, agentEmail: agentEmail || landlordEmail } : {}),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    });
 
     if (col) {
       try {

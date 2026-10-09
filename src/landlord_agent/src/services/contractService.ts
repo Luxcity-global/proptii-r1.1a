@@ -143,14 +143,11 @@ class ContractService {
     ]);
     const contract = landlordCopy || sharedCopy;
     if (!contract) return null;
-    const fileBase64 = [landlordCopy?.fileBase64, sharedCopy?.fileBase64, landlordCopy?.base64Data, sharedCopy?.base64Data]
-      .find((value) => typeof value === 'string' && value.length > 80) || contract.fileBase64;
-    const fileUrl = [fileBase64, landlordCopy?.fileUrl, sharedCopy?.fileUrl, landlordCopy?.documentUrl, sharedCopy?.documentUrl]
-      .find((value) => typeof value === 'string' && value && value !== '#') || contract.fileUrl;
+    const fileUrl = [landlordCopy?.fileUrl, sharedCopy?.fileUrl, landlordCopy?.documentUrl, sharedCopy?.documentUrl]
+      .find((value) => typeof value === 'string' && /^https?:\/\//i.test(value)) || contract.fileUrl;
     return this.normalizeContract({
       ...sharedCopy,
       ...landlordCopy,
-      fileBase64,
       fileUrl,
       documentUrl: fileUrl || contract.documentUrl,
     });
@@ -184,9 +181,9 @@ class ContractService {
     const fileName = baseName.toLowerCase().endsWith('.pdf')
       ? baseName.replace(/\.pdf$/i, '_signed.pdf')
       : `${baseName}_signed.pdf`;
-    const storedUrl = /^https?:\/\//i.test(documentUrl) || documentUrl.startsWith('data:application/pdf')
+    const storedUrl = /^https?:\/\//i.test(documentUrl)
       ? documentUrl
-      : (contract.fileUrl && contract.fileUrl !== '#' ? contract.fileUrl : '');
+      : (contract.fileUrl && /^https?:\/\//i.test(contract.fileUrl) ? contract.fileUrl : '');
     await apiService.post('/contracts', {
       id: contract.id,
       title: contract.title,

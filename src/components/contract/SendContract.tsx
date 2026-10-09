@@ -284,8 +284,7 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
         if (!user?.id) throw new Error('You must be signed in to save a contract.');
         const userId = user.id;
         
-        // Convert signed PDF bytes to base64 data URL (using Promise wrapper)
-        // Convert Uint8Array to ArrayBuffer for Blob constructor
+        // Keep the signed PDF as bytes and upload that file. Do not encode it.
         const pdfArrayBuffer = signedPdfBytes.buffer instanceof ArrayBuffer
           ? signedPdfBytes.buffer.slice(
               signedPdfBytes.byteOffset,
@@ -300,28 +299,14 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
         }
         
         const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
-        const blobUrl = URL.createObjectURL(pdfBlob);
 
-        const signedDataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ''));
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(pdfBlob);
-        });
-        
-        // Upload to Firebase Storage
         console.log('☁️ Uploading signed document to storage...');
-        let finalDocumentUrl = blobUrl;
-        try {
-          const file = new File([pdfBlob], `${(contractData.title || 'contract').replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`, { type: 'application/pdf' });
-          const uploadRes = await uploadToFirebaseStorage(file, 'contracts');
-          if (uploadRes.success && uploadRes.url) {
-            finalDocumentUrl = uploadRes.url;
-            console.log('✅ Document uploaded successfully:', finalDocumentUrl);
-          }
-        } catch (uploadErr) {
-          console.error('❌ Failed to upload document to storage:', uploadErr);
+        const file = new File([pdfBlob], `${(contractData.title || 'contract').replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`, { type: 'application/pdf' });
+        const uploadRes = await uploadToFirebaseStorage(file, 'contracts');
+        if (!uploadRes.success || !uploadRes.url || !/^https?:\/\//i.test(uploadRes.url)) {
+          throw new Error(uploadRes.error || 'Could not store the signed contract.');
         }
+        const finalDocumentUrl = uploadRes.url;
         
         // Save complete contract data to Firestore
         const signedContractData = {
@@ -334,7 +319,6 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
             signerName: user?.name,
             signerEmail: user?.email,
             uploadedUrl: finalDocumentUrl,
-            dataUrl: signedDataUrl,
             byteLength: signedPdfBytes.length,
           }),
           signedDate: new Date().toISOString(),

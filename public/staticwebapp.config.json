@@ -19,6 +19,14 @@
       "rewrite": "/landlord/index.html"
     },
     {
+      "route": "/view-passport",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/view-passport/*",
+      "rewrite": "/index.html"
+    },
+    {
       "route": "/referencing/*",
       "rewrite": "/index.html"
     },

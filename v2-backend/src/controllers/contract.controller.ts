@@ -172,7 +172,7 @@ export class ContractController {
 
   @Post('landlord')
   @UseGuards(FirebaseAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
   @HttpCode(201)
   @ApiOperation({ summary: 'Landlord sends contract agreement to tenant' })
   @ApiConsumes('multipart/form-data', 'application/json')

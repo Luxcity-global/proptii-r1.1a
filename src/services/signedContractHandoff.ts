@@ -9,9 +9,9 @@ export interface SignedReturnSource {
   contractType?: string;
 }
 
-/** A browser blob link only exists for the person who signed. Store a real file instead. */
-export function durableDocumentUrl(uploadedUrl: string, dataUrl: string): string {
-  return /^https?:\/\//i.test(uploadedUrl) ? uploadedUrl : dataUrl;
+/** Only a storage URL is durable. Blob links and base64 copies are not stored. */
+export function durableDocumentUrl(uploadedUrl: string): string {
+  return /^https?:\/\//i.test(uploadedUrl) ? uploadedUrl : '';
 }
 
 /**
@@ -27,11 +27,10 @@ export function buildSignedContractSave(input: {
   signerName?: string;
   signerEmail?: string;
   uploadedUrl: string;
-  dataUrl: string;
   byteLength: number;
 }) {
   const source = input.source;
-  const documentUrl = durableDocumentUrl(input.uploadedUrl, input.dataUrl);
+  const documentUrl = durableDocumentUrl(input.uploadedUrl);
   const title = input.title || source?.title || 'Contract Document';
   const propertyAddress = source?.propertyAddress || input.propertyAddress || '';
   return {

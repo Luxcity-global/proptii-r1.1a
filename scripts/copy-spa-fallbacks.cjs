@@ -1,9 +1,10 @@
 /**
- * Copy index.html to deep client-route paths so Stripe return URLs and hard
- * refreshes work on static hosts without SPA rewrite rules (e.g. Render staging
- * previews that serve public/404.html for unknown paths).
+ * Copy index.html to deep client-route paths so Stripe return URLs, passport
+ * links, and hard refreshes work on static hosts that only serve real files.
  *
- * See: https://render.com/docs/redirects-rewrites
+ * Render serves public/404.html for any path that is not a file, and it does
+ * not apply _redirects. Do not replace dist/landlord/index.html — that file is
+ * the standalone landlord app.
  */
 const fs = require('fs');
 const path = require('path');
@@ -26,7 +27,10 @@ const SPA_ROUTE_DIRS = [
   'admin',
   'admin/leads',
   'ProptiiAdmin',
-  'landlord',
+  'view-passport',
+  'claim-referencing',
+  'referencing',
+  'referencing/invite',
   'landlord/dashboard',
   'landlord/properties',
   'landlord/documents',
@@ -60,6 +64,10 @@ function main() {
 
   // Also write 200.html fallback for hosts supporting standard SPA rewrites
   fs.writeFileSync(path.join(DIST, '200.html'), indexHtml);
+  // Unknown paths, including /referencing/view/<token> from emails already sent,
+  // must boot the app. Render serves this file with a 404 status; the document
+  // is still the SPA, so client routes render instead of the static 404 page.
+  fs.writeFileSync(path.join(DIST, '404.html'), indexHtml);
 
   console.log(
     `copy-spa-fallbacks: ensured ${SPA_ROUTE_DIRS.length} SPA shell paths (${created} written)`,

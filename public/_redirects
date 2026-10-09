@@ -12,6 +12,8 @@
 /landlord  /landlord/index.html  200
 
 # Passport links stay on the main app
+/view-passport  /index.html  200
+/view-passport/*  /index.html  200
 /referencing/*  /index.html  200
 /claim-referencing  /index.html  200
 /claim-referencing/*  /index.html  200

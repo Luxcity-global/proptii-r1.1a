@@ -8,6 +8,7 @@ import CustomizePage from './CustomizePage';
 import { contractService, ContractTemplate } from '../../services/contractService';
 import signedContractsFirestoreService from '../../services/signedContractsFirestoreService';
 import { fetchContractPdfFile } from '../../services/contractPdf';
+import { uploadToFirebaseStorage } from '../../services/storageService';
 import { useAuth } from '../../contexts/AuthContext';
 interface ContractModalProps {
   isOpen: boolean;
@@ -28,33 +29,7 @@ interface Template {
   firestoreId?: string; // Firestore document ID
 }
 
-// Helper functions for Firestore operations
-const convertFileToBase64 = async (file: File): Promise<string> => {
-  try {
-    console.log("Converting file to base64, size:", file.size, "bytes");
-    const arrayBuffer = await file.arrayBuffer();
-    console.log("ArrayBuffer created, size:", arrayBuffer.byteLength, "bytes");
-    
-    const uint8Array = new Uint8Array(arrayBuffer);
-    console.log("Uint8Array created, length:", uint8Array.length);
-    
-    // Convert to base64 in chunks to avoid memory issues with large files
-    const chunkSize = 8192; // 8KB chunks
-    let base64 = '';
-    
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.slice(i, i + chunkSize);
-      base64 += btoa(String.fromCharCode(...chunk));
-    }
-    
-    console.log("Base64 conversion completed, length:", base64.length);
-    return base64;
-  } catch (error) {
-    console.error("Error converting file to base64:", error);
-    throw new Error(`Failed to convert file to base64: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
-
+// Older templates saved the PDF inside the Firestore row. New uploads use a storage URL.
 const convertBase64ToFile = (base64: string, fileName: string, fileType: string): File => {
   try {
     console.log('🔄 Converting base64 to file:', fileName);
@@ -621,17 +596,16 @@ const findCustomizedTemplate = () => {
         // Continue without preview - this is not critical
       }
 
-      // Convert file to base64 for Firestore storage
-      console.log("Converting file to base64...");
-      const fileData = await convertFileToBase64(file);
-      console.log("Converted file to base64, size:", fileData.length);
+      const uploadRes = await uploadToFirebaseStorage(file, `contractTemplates/${userId}`);
+      if (!uploadRes.success || !uploadRes.url) {
+        throw new Error(uploadRes.error || 'Could not store the contract file.');
+      }
 
-      // Save to Firestore
-      console.log("Saving to Firestore...");
       const contractData = {
         name: file.name,
         uploadDate: new Date().toLocaleDateString(),
-        fileData,
+        fileData: 'stored_via_backend_storage',
+        fileUrl: uploadRes.url,
         fileSize: file.size,
         fileType: file.type,
         imagePreview: imagePreview || undefined,
@@ -649,7 +623,7 @@ const findCustomizedTemplate = () => {
           fileUrl,
           imagePreview,
           file: file,
-          fileData,
+          fileData: 'stored_via_backend_storage',
           fileSize: file.size,
           firestoreId: result.templateId
         };

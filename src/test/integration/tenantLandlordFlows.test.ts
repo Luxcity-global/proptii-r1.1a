@@ -282,7 +282,6 @@ describe('tenant and landlord flows', () => {
         signerName: 'Tenant One',
         signerEmail: TENANT_EMAIL,
         uploadedUrl: 'https://files.example/signed.pdf',
-        dataUrl: 'data:application/pdf;base64,JVBERg==',
         byteLength: 1200,
       });
 
@@ -292,8 +291,8 @@ describe('tenant and landlord flows', () => {
       expect(stored.landlordEmail).toBe(AGENT_EMAIL);
       expect(stored.tenantEmail).toBe(TENANT_EMAIL);
 
-      expect(durableDocumentUrl('blob:http://localhost/tmp', 'data:application/pdf;base64,JVBERg=='))
-        .toBe('data:application/pdf;base64,JVBERg==');
+      expect(durableDocumentUrl('blob:http://localhost/tmp')).toBe('');
+      expect(durableDocumentUrl('data:application/pdf;base64,JVBERg==')).toBe('');
 
       const freshSend = buildSignedContractSave({
         title: 'New agreement',
@@ -302,7 +301,6 @@ describe('tenant and landlord flows', () => {
         signerName: 'Tenant One',
         signerEmail: TENANT_EMAIL,
         uploadedUrl: 'https://files.example/new.pdf',
-        dataUrl: 'data:application/pdf;base64,JVBERg==',
         byteLength: 800,
       });
       expect(freshSend.id).toBeUndefined();

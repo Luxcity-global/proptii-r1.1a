@@ -38,6 +38,7 @@ import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { renderProptiiEmail } from '../../../utils/proptiiEmailLayout';
 import { useAuth } from '../../../contexts/AuthContext';
 import DocumentSigningViewer from '../../../components/contract/DocumentSigningViewer';
+import { uploadToFirebaseStorage } from '../../../services/storageService';
 import '../styles/contractsPage.css';
 
 export interface Contract {
@@ -366,58 +367,6 @@ export function ContractsPage({
     }
   };
 
-  // Convert File to base64 data URL (similar to property image upload)
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      // Check file size before conversion
-      const maxSize = 50 * 1024 * 1024; // 50MB
-      if (file.size > maxSize) {
-        reject(new Error(`File is too large. Maximum size is 50MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`));
-        return;
-      }
-
-      // Warn about large files
-      if (file.size > 20 * 1024 * 1024) {
-        console.log('Processing large file:', file.name, `${(file.size / (1024 * 1024)).toFixed(2)}MB. This may take a moment...`);
-      }
-
-      const reader = new FileReader();
-      
-      // Set timeout for very large files (5 minutes)
-      const timeout = setTimeout(() => {
-        reader.abort();
-        reject(new Error('File conversion timed out. The file may be too large. Please try a smaller file or compress it.'));
-      }, 5 * 60 * 1000);
-
-      reader.onload = () => {
-        clearTimeout(timeout);
-        const result = reader.result as string;
-        console.log('File converted to base64. Original size:', file.size, 'bytes. Base64 size:', result.length, 'bytes');
-        resolve(result);
-      };
-      
-      reader.onerror = (error) => {
-        clearTimeout(timeout);
-        console.error('Error converting file to base64:', error);
-        reject(new Error('Failed to process file. Please try again or use a different file.'));
-      };
-      
-      reader.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percentLoaded = Math.round((event.loaded / event.total) * 100);
-          console.log(`File conversion progress: ${percentLoaded}%`);
-        }
-      };
-
-      try {
-        reader.readAsDataURL(file);
-      } catch (error) {
-        clearTimeout(timeout);
-        reject(error);
-      }
-    });
-  };
-
   const handleSendContract = async (contractData: {
     file?: File;
     recipientName: string;
@@ -432,32 +381,17 @@ export function ContractsPage({
       const API_BASE_URL = PRIMARY_API_BASE_URL;
       
       if (contractData.file) {
-        // Convert file to base64 and send email with attachment
-        console.log('Converting file to base64:', contractData.file.name, `(${(contractData.file.size / (1024 * 1024)).toFixed(2)}MB)`);
-        
-        let base64Data: string;
-        try {
-          base64Data = await fileToBase64(contractData.file);
-        } catch (conversionError: any) {
-          console.error('Error converting file to base64:', conversionError);
-          const errorMessage = conversionError?.message || 'Failed to process file. The file may be too large or corrupted.';
+        const fileSizeMB = contractData.file.size / (1024 * 1024);
+        if (fileSizeMB > 25) {
+          const errorMessage = 'File is too large. Maximum size is 25MB.';
           setError(errorMessage);
-          alert(`Error: ${errorMessage}\n\nPlease try:\n- Compressing the file\n- Using a smaller file\n- Checking the file is not corrupted`);
+          alert(errorMessage);
           return;
         }
-        
-        // Extract base64 content (remove data:application/pdf;base64, prefix)
-        const base64Content = base64Data.split(',')[1];
-        const mimeType = base64Data.split(',')[0].split(':')[1].split(';')[0];
-        
-        console.log('File converted to base64, size:', base64Content.length, 'bytes');
 
-        // ── Save contract record BEFORE sending the email ──────────────────
-        // This ensures we always have a Firestore record even if the email fails.
-        let savedContractId: string | null = null;
         try {
           const currentUserId = userId ?? '';
-          savedContractId = await contractService.createContractWithBase64({
+          const savedContractId = await contractService.createContract({
             title: contractData.file.name.replace(/\.[^/.]+$/, ''),
             propertyAddress: '',
             tenantName: contractData.recipientName,
@@ -468,16 +402,16 @@ export function ContractsPage({
             sentDate: new Date(),
             expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
             landlordEmail: landlordEmail || undefined,
-          } as any, contractData.file.name, base64Data, currentUserId || 'unknown');
-          console.log('✅ Contract saved to Firestore before email send:', savedContractId);
+          } as any, contractData.file, currentUserId || 'unknown');
+          console.log('Contract file stored:', savedContractId);
         } catch (saveError: any) {
           console.error('Failed to save contract record:', saveError);
           const saveMsg = saveError?.message || 'Failed to save the contract record. Please try again.';
           setError(saveMsg);
           alert(`Could not save contract: ${saveMsg}`);
-          return; // Abort — don't send email if we can't track the contract
+          return;
         }
-        
+
         const formData = new FormData();
         formData.append('to', contractData.recipientEmail);
         formData.append('subject', `Contract for Review: ${contractData.file.name}`);
@@ -491,24 +425,7 @@ export function ContractsPage({
             ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
           `,
         }));
-        
-        // Send base64 data separately so backend can decode it
-        formData.append('attachmentBase64', base64Content);
-        formData.append('attachmentFilename', contractData.file.name);
-        formData.append('attachmentMimeType', mimeType);
-        
-        // Log request details for debugging
-        const fileSizeMB = contractData.file.size / (1024 * 1024);
-        const base64SizeMB = base64Content.length / (1024 * 1024);
-        console.log(`Sending file:`, {
-          fileName: contractData.file.name,
-          originalSize: `${fileSizeMB.toFixed(2)}MB`,
-          base64Size: `${base64SizeMB.toFixed(2)}MB`,
-          base64Length: base64Content.length,
-          recipientEmail: contractData.recipientEmail,
-          hasSubject: !!formData.get('subject'),
-          hasHtml: !!formData.get('html')
-        });
+        formData.append('attachments', contractData.file, contractData.file.name);
         
         // Calculate timeout based on file size (minimum 30s, add 1s per MB)
         const timeout = Math.max(30000, 30000 + (fileSizeMB * 1000)); // 30s base + 1s per MB
@@ -517,7 +434,7 @@ export function ContractsPage({
         
         let response;
         try {
-          response = await axios.post(`${API_BASE_URL}/email/send-base64`, formData, {
+          response = await axios.post(`${API_BASE_URL}/email/send`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: timeout,
             maxContentLength: Infinity,
@@ -1263,12 +1180,16 @@ export function ContractsPage({
               onPersistSigned={async (bytes, documentUrl) => {
                 let stored = documentUrl;
                 if (!/^https?:\/\//i.test(documentUrl)) {
-                  let binary = '';
-                  const chunk = 8192;
-                  for (let i = 0; i < bytes.length; i += chunk) {
-                    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+                  const signedFile = new File(
+                    [bytes],
+                    `${signingContract.contract.title || 'contract'}_signed.pdf`,
+                    { type: 'application/pdf' },
+                  );
+                  const uploadRes = await uploadToFirebaseStorage(signedFile, 'contracts');
+                  if (!uploadRes.success || !uploadRes.url) {
+                    throw new Error(uploadRes.error || 'Could not store the signed contract.');
                   }
-                  stored = `data:application/pdf;base64,${btoa(binary)}`;
+                  stored = uploadRes.url;
                 }
                 await handleLandlordSigned(signingContract.contract, stored);
               }}

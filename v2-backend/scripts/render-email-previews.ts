@@ -50,7 +50,7 @@ const pages: Array<{ file: string; title: string; when: string; html: string }> 
         <p><strong>Alex Tenant</strong> has shared their referencing passport with you on Proptii. They are interested in the property at <strong>10 High Street</strong>.</p>
         <div class="details"><p><strong>Message from Alex Tenant:</strong><br/>Please review my completed referencing.</p></div>
         <p>Open the passport to review their referencing details and documents.</p>
-        ${proptiiButton('View Referencing Passport', 'https://proptii.co/referencing/view/sample')}
+        ${proptiiButton('View Referencing Passport', 'https://proptii.co/view-passport?token=sample')}
         <p style="font-size:13px;color:#6b7280;text-align:center;"><a href="https://proptii.co/login?redirect=%2Freferencing%2Fview%2Fsample">Log in</a> to message Alex Tenant from your dashboard.</p>
         <p style="font-size:12px;color:#9ca3af;">This link expires on <strong>8 November 2026</strong>. If you did not expect this email, you can safely ignore it.</p>
       `,
@@ -65,7 +65,7 @@ const pages: Array<{ file: string; title: string; when: string; html: string }> 
       bodyHtml: `
         <p>Hello,</p>
         <p><strong>Alex Tenant</strong> has shared their referencing passport with you via Proptii. They are applying for the property at <strong>10 High Street</strong>.</p>
-        ${proptiiButton('View Referencing Passport', 'https://proptii.co/referencing/view/sample')}
+        ${proptiiButton('View Referencing Passport', 'https://proptii.co/view-passport?token=sample')}
         <p style="font-size:13px;color:#6b7280;text-align:center;">No account needed to view. <a href="https://proptii.co/claim-referencing?token=sample">Create a free account</a> to message Alex Tenant and manage their application.</p>
         <p style="font-size:12px;color:#9ca3af;">This link expires on <strong>1 November 2026</strong>. If you did not expect this email, you can safely ignore it.</p>
       `,

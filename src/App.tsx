@@ -152,6 +152,7 @@ export const App: React.FC = () => {
                 <Route path="/claim" element={<ClaimAccount />} />
                 <Route path="/thread/:token" element={<GuestThreadPage />} />
                 <Route path="/referencing/view/:viewToken" element={<ReferencingView />} />
+                <Route path="/view-passport" element={<ReferencingView />} />
                 <Route path="/claim-referencing" element={<ClaimReferencing />} />
                 <Route path="/guarantor-reference" element={<GuarantorReferencePage />} />
                 <Route path="/guarantor-form" element={<GuarantorReferencePage />} />

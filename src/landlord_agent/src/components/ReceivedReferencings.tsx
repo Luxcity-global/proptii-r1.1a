@@ -61,7 +61,7 @@ const ReceivedReferencings: React.FC<Props> = ({ onOpenMessages }) => {
   }, []);
 
   const handleView = (share: ReceivedShare) => {
-    window.open(`/referencing/view/${share.viewToken}`, '_blank', 'noopener');
+    window.open(`/view-passport?token=${encodeURIComponent(share.viewToken)}`, '_blank', 'noopener');
   };
 
   const handleMessage = async (share: ReceivedShare) => {

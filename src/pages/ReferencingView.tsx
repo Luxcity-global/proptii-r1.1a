@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User, Briefcase, Home, PoundSterling, Users,
   CheckCircle, AlertTriangle, Loader2, Copy, Check,
@@ -75,7 +75,9 @@ function SectionCard({
 // ─── Main component ────────────────────────────────────────────────────────────
 
 const ReferencingView: React.FC = () => {
-  const { viewToken } = useParams<{ viewToken: string }>();
+  const { viewToken: pathToken } = useParams<{ viewToken: string }>();
+  const [searchParams] = useSearchParams();
+  const viewToken = pathToken || searchParams.get('token') || '';
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
 
