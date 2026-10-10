@@ -479,7 +479,7 @@ export function ImportPropertiesDialog({ isOpen, onClose, onImport }: ImportProp
                 )}
 
                 {importedProperties.length > 0 && (
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     <div className="text-center p-6 bg-green-50 rounded-lg">
                       <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3" />
                       <p className="text-3xl font-bold text-green-600">{validProperties.length}</p>
@@ -543,7 +543,7 @@ export function ImportPropertiesDialog({ isOpen, onClose, onImport }: ImportProp
                           </Badge>
                         </div>
                       </div>
-                      <div className="grid grid-cols-4 gap-8 text-sm text-gray-600">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-sm text-gray-600">
                         <div>
                           <span className="font-medium">Amenities:</span><br/>
                           <span className="text-xs">{property.amenities.join(', ') || 'None'}</span>

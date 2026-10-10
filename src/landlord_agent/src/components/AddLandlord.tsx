@@ -327,7 +327,7 @@ export function AddLandlord({ onSave, onBack }: { onSave: (landlord: any) => voi
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
             <TabsTrigger value="personal">Personal</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
             <TabsTrigger value="investment">Investment</TabsTrigger>

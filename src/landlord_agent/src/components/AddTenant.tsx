@@ -512,7 +512,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
                 <p className="text-[13px] text-[#64748b]">{form.email} · {form.phone}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-[13px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4 text-[13px]">
               {[
                 ['Assigned Property', property?.address || '—'],
                 ['Agreed Rent', `£${parseFloat(form.rentAmount||'0').toLocaleString('en-GB')} / ${form.paymentFrequency}`],
@@ -573,7 +573,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
             style={{fontFamily:'Archivo,sans-serif'}}>
             <Home size={14} className="text-[#64748b]"/> Tenancy
           </div>
-          <div className="grid grid-cols-2 gap-y-2.5 gap-x-4 text-[13px] mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2.5 gap-x-4 text-[13px] mb-4">
             {[
               ['Property', property?.address || '—'],
               ['Monthly rent', `£${parseFloat(form.rentAmount||'0').toLocaleString('en-GB')}`],
@@ -595,7 +595,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
               style={{fontFamily:'Archivo,sans-serif'}}>
               <Users size={14} className="text-[#64748b]"/> Emergency Contact
             </div>
-            <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-[13px] mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 text-[13px] mb-3">
               {form.emergencyName && <div><p className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#94a3b8]">Name</p><p className="font-semibold text-[#1e293b] mt-0.5 text-[12.5px]">{form.emergencyName}</p></div>}
               {form.emergencyPhone && <div><p className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#94a3b8]">Phone</p><p className="font-semibold text-[#1e293b] mt-0.5 text-[12.5px]">{form.emergencyPhone}</p></div>}
               {form.emergencyRelationship && <div><p className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#94a3b8]">Relationship</p><p className="font-semibold text-[#1e293b] mt-0.5 text-[12.5px]">{form.emergencyRelationship}</p></div>}
@@ -608,7 +608,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
               style={{fontFamily:'Archivo,sans-serif'}}>
               <Briefcase size={14} className="text-[#64748b]"/> Employment
             </div>
-            <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-[13px] mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 text-[13px] mb-3">
               {form.employmentType && <div><p className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#94a3b8]">Type</p><p className="font-semibold text-[#1e293b] mt-0.5 text-[12.5px]">{form.employmentType}</p></div>}
               {form.employer && <div><p className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#94a3b8]">Employer</p><p className="font-semibold text-[#1e293b] mt-0.5 text-[12.5px]">{form.employer}</p></div>}
               {form.annualIncome && <div><p className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#94a3b8]">Annual income</p><p className="font-semibold text-[#1e293b] mt-0.5 text-[12.5px]">£{parseFloat(form.annualIncome).toLocaleString('en-GB')}/yr</p></div>}
@@ -699,7 +699,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
             </div>
           </Fld>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Fld label="Monthly rent (£)" required error={errors.rentAmount}>
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#64748b] font-bold text-[15px] pointer-events-none">£</span>
               <input type="number" min="1" value={form.rentAmount} onChange={e=>sf('rentAmount',e.target.value)}
@@ -722,7 +722,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
               className={`${INP} pl-11 ${errors.firstPaymentDate?INP_ERR:''}`}/>
           </Fld>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Fld label="Rent start" required error={errors.leaseStart}>
               <input type="date" value={form.leaseStart} onChange={e=>sf('leaseStart',e.target.value)}
                 className={`${INP} ${errors.leaseStart?INP_ERR:''}`}/>
@@ -779,7 +779,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
             <input type="text" value={form.emergencyName} onChange={e=>sf('emergencyName',e.target.value)}
               placeholder="Full name" className={INP}/>
           </Fld>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Fld label="Phone">
               <input type="tel" value={form.emergencyPhone} onChange={e=>sf('emergencyPhone',e.target.value)}
                 placeholder="+44 7000 …" className={INP}/>
@@ -801,7 +801,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
             style={{fontFamily:'Archivo,sans-serif'}}>
             <Briefcase size={15} className="text-[#64748b]"/> Employment
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Fld label="Type">
               <Select value={form.employmentType} onValueChange={v=>sf('employmentType',v)}>
                 <SelectTrigger className={`${INP} h-12`}><SelectValue placeholder="Select…"/></SelectTrigger>

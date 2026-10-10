@@ -380,7 +380,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                       placeholder="Full name" className={`${F} pl-10 ${errors.name ? FE : ''}`} />
                   </div>
                 </Field>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Email address" required error={errors.email}>
                     <div className="relative">
                       <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -421,7 +421,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                   </Select>
                 </Field>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Monthly rent (£)" required error={errors.rentAmount}>
                     <div className="relative">
                       <PoundSterling className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -449,7 +449,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                   </div>
                 </Field>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Rent start" required error={errors.leaseStart}>
                     <input type="date" value={form.leaseStart} onChange={e => set('leaseStart', e.target.value)}
                       className={`${F} ${errors.leaseStart ? FE : ''}`} />
@@ -465,7 +465,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
                     <Settings className="w-3.5 h-3.5" /> Tenancy status
                   </p>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <Field label="Status">
                       <Select value={form.status} onValueChange={v => set('status', v as any)}>
                         <SelectTrigger className={`${F} h-auto`}><SelectValue /></SelectTrigger>
@@ -523,7 +523,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                       onChange={e => set('emergencyContactName', e.target.value)}
                       placeholder="Full name" className={F} />
                   </Field>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="Phone">
                       <input type="tel" value={form.emergencyContactPhone}
                         onChange={e => set('emergencyContactPhone', e.target.value)}
@@ -547,7 +547,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Briefcase className="w-3.5 h-3.5" /> Employment
                   </p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="Type">
                       <Select value={form.employmentType} onValueChange={v => set('employmentType', v)}>
                         <SelectTrigger className={`${F} h-auto`}><SelectValue placeholder="Select…" /></SelectTrigger>
@@ -567,7 +567,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                       </div>
                     </Field>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="Employer">
                       <input type="text" value={form.employer} onChange={e => set('employer', e.target.value)}
                         placeholder="Employer name" className={F} />

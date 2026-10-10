@@ -525,7 +525,7 @@ export function AddPropertyWizard({
             {/* ── STEP 1: Property Type ─────────────────────────────────────── */}
             {step === 1 && (
               <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {PROPERTY_TYPES.map(pt => {
                     const Icon = pt.icon;
                     const sel  = form.propertyType === pt.id;
@@ -583,7 +583,7 @@ export function AddPropertyWizard({
                     placeholder="1200"
                     className={`${INP} pl-11 ${errors.monthlyRent ? INP_ERR : ''}`} />
                 </Fld>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Fld label="Bedrooms" required error={errors.bedrooms} icon={BedDouble}>
                     <input type="number" min="0" max="50" value={form.bedrooms}
                       onChange={e => sf('bedrooms', e.target.value)}
@@ -648,7 +648,7 @@ export function AddPropertyWizard({
             {/* ── STEP 3: Amenities ─────────────────────────────────────────── */}
             {step === 3 && (
               <div className="space-y-5">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-1 sm:grid-cols-3 gap-3">
                   {AMENITIES.map(a => {
                     const Icon = a.icon;
                     const sel  = form.amenities.includes(a.id);
@@ -717,7 +717,7 @@ export function AddPropertyWizard({
 
                 {/* Photo grid */}
                 {form.images.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {form.images.map((src, i) => (
                       <div key={i} className="relative group aspect-video rounded-[12px] overflow-hidden bg-[#f1f5f9]">
                         <img src={src} alt="" className="w-full h-full object-cover" />
@@ -805,7 +805,7 @@ export function AddPropertyWizard({
                   </div>
 
                   {/* Spec grid */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { label: 'Bedrooms',   value: form.bedrooms   || '—' },
                       { label: 'Bathrooms',  value: form.bathrooms  || '—' },

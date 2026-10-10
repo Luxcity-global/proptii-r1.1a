@@ -462,7 +462,7 @@ export function EditProperty({ property, userProfile, onSave, onBack }: EditProp
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 pt-2 mb-3">
                     <Wifi className="w-3.5 h-3.5" /> Amenities
                   </p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {AMENITIES.map(a => {
                       const Icon = a.icon;
                       const sel  = form.amenities.includes(a.id);
@@ -513,7 +513,7 @@ export function EditProperty({ property, userProfile, onSave, onBack }: EditProp
             />
             {open[3] && (
               <div className="px-6 pb-6 pt-1 border-t border-gray-100">
-                <div className="grid grid-cols-3 gap-3 mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
                   {([
                     { value: 'vacant',           label: 'Vacant',           dot: '#f43f5e', bg: '#fee2e2', text: '#b91c1c' },
                     { value: 'occupied',         label: 'Occupied',         dot: '#10b981', bg: '#dcfce7', text: '#15803d' },

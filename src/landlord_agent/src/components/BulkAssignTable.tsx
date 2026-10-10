@@ -285,7 +285,7 @@ export function BulkAssignTable({ tenants, properties, onBack, onComplete }: Bul
                         </div>
 
                         {/* Tenant + Property row */}
-                        <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                           <div>
                             <label className="block text-[11.5px] font-semibold text-[#475569] mb-1.5" style={{ fontFamily: 'Archivo,sans-serif' }}>Tenant *</label>
                             <Select value={a.tenantId} onValueChange={v => updateRow(idx, 'tenantId', v)}>
@@ -340,7 +340,7 @@ export function BulkAssignTable({ tenants, properties, onBack, onComplete }: Bul
                         </div>
 
                         {/* Rent + dates */}
-                        <div className="grid grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                           <div>
                             <label className="block text-[11px] font-semibold text-[#475569] mb-1.5" style={{ fontFamily: 'Archivo,sans-serif' }}>Rent (£/mo) *</label>
                             <div className="relative">

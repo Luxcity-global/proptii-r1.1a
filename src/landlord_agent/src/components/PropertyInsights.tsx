@@ -276,7 +276,7 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
         </div>
 
         <Tabs defaultValue="location" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
             <TabsTrigger value="location">Location</TabsTrigger>
             <TabsTrigger value="demographics">Demographics</TabsTrigger>
             <TabsTrigger value="market">Market Trends</TabsTrigger>

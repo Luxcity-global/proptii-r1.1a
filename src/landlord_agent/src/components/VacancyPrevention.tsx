@@ -449,7 +449,7 @@ function AIMarketingAssistant({ alert, assets, onAssetsChange, onApprove, onCanc
         {/* Virtual Staging */}
         <div>
           <Label className="text-base mb-3 block">Virtual Staging Images</Label>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {assets.virtualStagingImages.map((image, index) => (
               <div key={index} className="relative">
                 <img
