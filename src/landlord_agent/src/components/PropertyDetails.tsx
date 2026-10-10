@@ -532,7 +532,8 @@ export function PropertyDetails({
                       style={{ fontFamily: 'Archivo,sans-serif' }}>Notes</p>
                     <p className="text-[13.5px] text-[#475569] leading-relaxed">{property.notes}</p>
                   </SCard>
-                </div>
+                )}
+              </div>
 
             {/* ── Photos Section ─────────────────────────────────────────── */}
             <div id="photos-section" className="scroll-mt-[140px] space-y-4 pt-6">
