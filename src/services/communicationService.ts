@@ -163,6 +163,24 @@ const communicationService = {
     },
 
     /**
+     * Edit a message body.
+     * PATCH /api/communication/messages/{id}/body
+     */
+    async editMessage(messageId: string, body: string): Promise<Message> {
+        const { data } = await commApi.patch(`/messages/${messageId}/body`, { body });
+        return unwrap<Message>(data);
+    },
+
+    /**
+     * Delete a message (soft delete).
+     * DELETE /api/communication/messages/{id}
+     */
+    async deleteMessage(messageId: string): Promise<Message> {
+        const { data } = await commApi.delete(`/messages/${messageId}`);
+        return unwrap<Message>(data);
+    },
+
+    /**
      * Mark a message as read.
      * PATCH /api/communication/messages/{id}/read?conversationId={conversationId}
      * Requirements: 6.5

@@ -117,7 +117,7 @@ export class CommunicationService {
 
         if (!snapshot.empty) {
           const doc = snapshot.docs[0];
-          return { data: { id: doc.id, ...doc.data(), messages: [] } };
+          return { data: { id: doc.id, ...doc.data(), messages: [] }, isNew: false };
         }
       } catch (err: any) {
         this.logger.warn(`Error finding conversation: ${err?.message || err}`);
@@ -150,7 +150,7 @@ export class CommunicationService {
       }
     }
 
-    return { data: { ...payload, messages: [] } };
+    return { data: { ...payload, messages: [] }, isNew: true };
   }
 
   async getMessages(conversationId: string, user?: { uid: string; email?: string; admin?: boolean; role?: string }, before?: string, limit = 50) {
@@ -318,6 +318,58 @@ export class CommunicationService {
     }
 
     return { data: message };
+  }
+
+  async editMessage(messageId: string, newBody: string, userId: string) {
+    if (!this.messagesCol) return { data: null };
+    
+    const docRef = this.messagesCol.doc(messageId);
+    const snap = await docRef.get();
+    
+    if (!snap.exists) {
+      throw new NotFoundException('Message not found');
+    }
+    
+    const msg = snap.data();
+    if (msg?.senderId !== userId) {
+      throw new ForbiddenException('You can only edit your own messages');
+    }
+    
+    if (msg?.isDeleted) {
+      throw new ForbiddenException('Cannot edit a deleted message');
+    }
+
+    const editedAt = new Date().toISOString();
+    await docRef.update({ 
+      body: newBody,
+      editedAt
+    });
+
+    return { data: { ...msg, body: newBody, editedAt } };
+  }
+
+  async deleteMessage(messageId: string, userId: string) {
+    if (!this.messagesCol) return { data: null };
+    
+    const docRef = this.messagesCol.doc(messageId);
+    const snap = await docRef.get();
+    
+    if (!snap.exists) {
+      throw new NotFoundException('Message not found');
+    }
+    
+    const msg = snap.data();
+    if (msg?.senderId !== userId) {
+      throw new ForbiddenException('You can only delete your own messages');
+    }
+
+    const deletedAt = new Date().toISOString();
+    await docRef.update({ 
+      isDeleted: true,
+      deletedAt
+    });
+
+    return { data: { ...msg, isDeleted: true, deletedAt } };
   }
 
   private async notifyRecipient(conversationId: string, message: any, senderId: string) {

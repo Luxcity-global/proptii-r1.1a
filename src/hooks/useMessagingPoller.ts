@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 const DEFAULT_INTERVAL_MS = 15_000; // 15s for active tab — fast enough to catch missed SSE events
 
 export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): void {
-    const { _setConversations, _setUnreadCount } = useContext(MessagingContext);
+    const { _setConversations, _setUnreadCount, _setOnlineUsers } = useContext(MessagingContext);
     const { user } = useAuth();
 
     useEffect(() => {
@@ -71,9 +71,16 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
         void fetchData();
 
         // Register SSE real-time listener for instant push updates
-        const unsubscribeSse = sseService.on(['message_new', 'message_read'], () => {
+        const unsubscribeSse = sseService.on(['message_new', 'message_read', 'conversation_new'], () => {
             console.debug('[useMessagingPoller] SSE message event received, updating inbox immediately');
             void fetchData();
+        });
+
+        const unsubscribePresence = sseService.on('presence_update', (event) => {
+            const data = event.data as any;
+            if (data?.userId && typeof data.isOnline === 'boolean') {
+                _setOnlineUsers(prev => ({ ...prev, [data.userId]: data.isOnline }));
+            }
         });
 
         // Start the fallback interval (only if the tab is currently visible)
@@ -86,6 +93,7 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
         // Cleanup on unmount
         return () => {
             unsubscribeSse();
+            unsubscribePresence();
             stopInterval();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };

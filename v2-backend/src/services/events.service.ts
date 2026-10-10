@@ -28,35 +28,51 @@ export class EventsService {
   subscribe(userId?: string, userEmail?: string, userRole?: string): Observable<MessageEvent> {
     const normalizedEmail = userEmail?.toLowerCase().trim();
 
-    return this.eventSubject.asObservable().pipe(
-      filter(event => {
-        // Global broadcast if no specific target
-        if (!event.userId && !event.targetEmail && !event.targetRole) {
-          return true;
-        }
+    return new Observable<MessageEvent>((observer) => {
+      if (userId) {
+        // Emit presence immediately, using a slight delay to allow the connection to establish
+        setTimeout(() => {
+          this.emit({ type: 'presence_update', data: { userId, isOnline: true } });
+        }, 100);
+      }
 
-        // Match by userId
-        if (event.userId && userId && event.userId === userId) {
-          return true;
-        }
+      const subscription = this.eventSubject.asObservable().pipe(
+        filter(event => {
+          // Global broadcast if no specific target
+          if (!event.userId && !event.targetEmail && !event.targetRole) {
+            return true;
+          }
 
-        // Match by email
-        if (event.targetEmail && normalizedEmail && event.targetEmail.toLowerCase().trim() === normalizedEmail) {
-          return true;
-        }
+          // Match by userId
+          if (event.userId && userId && event.userId === userId) {
+            return true;
+          }
 
-        // Match by role (e.g. 'landlord' or 'agent' or 'tenant')
-        if (event.targetRole && userRole && event.targetRole === userRole) {
-          return true;
-        }
+          // Match by email
+          if (event.targetEmail && normalizedEmail && event.targetEmail.toLowerCase().trim() === normalizedEmail) {
+            return true;
+          }
 
-        return false;
-      }),
-      map(event => ({
-        data: event,
-        type: event.type,
-        id: `${event.type}_${event.timestamp || Date.now()}`,
-      }))
-    );
+          // Match by role (e.g. 'landlord' or 'agent' or 'tenant')
+          if (event.targetRole && userRole && event.targetRole === userRole) {
+            return true;
+          }
+
+          return false;
+        }),
+        map(event => ({
+          data: event,
+          type: event.type,
+          id: `${event.type}_${event.timestamp || Date.now()}`,
+        }))
+      ).subscribe(observer);
+
+      return () => {
+        subscription.unsubscribe();
+        if (userId) {
+          this.emit({ type: 'presence_update', data: { userId, isOnline: false } });
+        }
+      };
+    });
   }
 }

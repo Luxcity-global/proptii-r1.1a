@@ -69,7 +69,7 @@ const EmptyState: React.FC<{ message: string; sub: string }> = ({ message, sub }
 );
 
 const TenantMessages: React.FC = () => {
-  const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount, markConversationAsRead, refreshConversations } = useMessagingContext();
+  const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount, markConversationAsRead, refreshConversations, onlineUsers } = useMessagingContext();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -329,7 +329,15 @@ const TenantMessages: React.FC = () => {
                       aria-pressed={conv.id === activeConversationId}
                       aria-label={`Conversation with ${name} about ${property || 'a property'}`}
                     >
-                      <span className={`tn-msg-avatar ${avatarTone(name + property)}`}>{getInitials(name)}</span>
+                      <div style={{ position: 'relative' }}>
+                        <span className={`tn-msg-avatar ${avatarTone(name + property)}`}>{getInitials(name)}</span>
+                        {onlineUsers[conv.landlordId] && (
+                          <span style={{
+                            position: 'absolute', bottom: 0, right: 0, width: 10, height: 10,
+                            borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid white'
+                          }} />
+                        )}
+                      </div>
                       <div className="tn-msg-conv-main">
                         <div className="tn-msg-conv-top">
                           <h4>{name}</h4>
@@ -368,9 +376,17 @@ const TenantMessages: React.FC = () => {
                   >
                     ← Back
                   </button>
-                  <span className={`tn-msg-avatar ${avatarTone(activeConversation ? participantName(activeConversation) : 'Landlord')}`}>
-                    {getInitials(activeConversation ? participantName(activeConversation) : 'Landlord')}
-                  </span>
+                  <div style={{ position: 'relative' }}>
+                    <span className={`tn-msg-avatar ${avatarTone(activeConversation ? participantName(activeConversation) : 'Landlord')}`}>
+                      {getInitials(activeConversation ? participantName(activeConversation) : 'Landlord')}
+                    </span>
+                    {activeConversation && onlineUsers[activeConversation.landlordId] && (
+                      <span style={{
+                        position: 'absolute', bottom: 0, right: 0, width: 10, height: 10,
+                        borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid white'
+                      }} />
+                    )}
+                  </div>
                   <div>
                     <h3>{activeConversation ? participantName(activeConversation) : 'Landlord'}</h3>
                     <p>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>

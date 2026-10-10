@@ -17,6 +17,7 @@ import { useAuth } from './AuthContext';
 export interface MessagingContextType {
     conversations: Conversation[];
     unreadCount: number;
+    onlineUsers: Record<string, boolean>;
     activeConversationId: string | null;
     setActiveConversationId: (id: string | null) => void;
     refreshConversations: () => Promise<void>;
@@ -32,6 +33,8 @@ export interface MessagingContextType {
     _setConversations: (conversations: Conversation[] | ((prev: Conversation[]) => Conversation[])) => void;
     /** Internal setter used by useMessagingPoller */
     _setUnreadCount: (count: number) => void;
+    /** Internal setter used by useMessagingPoller */
+    _setOnlineUsers: (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +44,7 @@ export interface MessagingContextType {
 export const MessagingContext = createContext<MessagingContextType>({
     conversations: [],
     unreadCount: 0,
+    onlineUsers: {},
     activeConversationId: null,
     setActiveConversationId: () => { },
     refreshConversations: async () => { },
@@ -48,6 +52,7 @@ export const MessagingContext = createContext<MessagingContextType>({
     decrementUnreadCount: () => { },
     _setConversations: () => { },
     _setUnreadCount: () => { },
+    _setOnlineUsers: () => { },
 });
 
 // ---------------------------------------------------------------------------
@@ -58,12 +63,14 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const { user } = useAuth();
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [unreadCount, setUnreadCount] = useState<number>(0);
+    const [onlineUsers, setOnlineUsers] = useState<Record<string, boolean>>({});
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
     // Clear state on user change to prevent data bleed
     useEffect(() => {
         setConversations([]);
         setUnreadCount(0);
+        setOnlineUsers({});
         setActiveConversationId(null);
     }, [user?.id]);
 
@@ -114,6 +121,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             value={{
                 conversations,
                 unreadCount,
+                onlineUsers,
                 activeConversationId,
                 setActiveConversationId,
                 refreshConversations,
@@ -121,6 +129,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 decrementUnreadCount,
                 _setConversations: setConversations,
                 _setUnreadCount: setUnreadCount,
+                _setOnlineUsers: setOnlineUsers,
             }}
         >
             {children}

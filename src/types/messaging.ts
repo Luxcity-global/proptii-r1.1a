@@ -59,6 +59,7 @@ export interface Message {
     readAt: string | null;
     isDeleted: boolean;
     deletedAt: string | null;
+    editedAt?: string | null;
 }
 
 /**

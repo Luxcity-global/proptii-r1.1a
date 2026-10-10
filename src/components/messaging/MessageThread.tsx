@@ -97,6 +97,31 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
     const [isTyping, setIsTyping] = useState(false);
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    const handleEdit = async (messageId: string, currentBody: string) => {
+        const newBody = window.prompt('Edit your message:', currentBody);
+        if (newBody !== null && newBody.trim() !== '' && newBody !== currentBody) {
+            try {
+                const res = await communicationService.editMessage(messageId, newBody.trim());
+                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, body: res.body, editedAt: res.editedAt } : m));
+            } catch (err) {
+                console.error(err);
+                alert('Failed to edit message.');
+            }
+        }
+    };
+
+    const handleDelete = async (messageId: string) => {
+        if (window.confirm('Are you sure you want to delete this message?')) {
+            try {
+                const res = await communicationService.deleteMessage(messageId);
+                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isDeleted: true, deletedAt: res.deletedAt } : m));
+            } catch (err) {
+                console.error(err);
+                alert('Failed to delete message.');
+            }
+        }
+    };
+
     // Sentinel element at the bottom of the list — scrolled into view after every render
     const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -170,7 +195,6 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
             }
         });
 
-        // Typing indicator — show for 3s then auto-hide
         const unsubscribeTyping = sseService.on('typing_start', (event) => {
             const data = event.data as any;
             if (data?.conversationId === conversationId && data?.senderId !== currentUserId) {
@@ -180,7 +204,29 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
             }
         });
 
-        return () => { unsubscribe(); unsubscribeTyping(); };
+        const unsubscribeEdit = sseService.on('message_edit', (event) => {
+            const data = event.data as any;
+            if (data?.messageId) {
+                setMessages((prev) => prev.map((m) =>
+                    m.id === data.messageId
+                        ? { ...m, body: data.body, editedAt: data.editedAt }
+                        : m
+                ));
+            }
+        });
+
+        const unsubscribeDelete = sseService.on('message_delete', (event) => {
+            const data = event.data as any;
+            if (data?.messageId) {
+                setMessages((prev) => prev.map((m) =>
+                    m.id === data.messageId
+                        ? { ...m, isDeleted: true, deletedAt: data.deletedAt }
+                        : m
+                ));
+            }
+        });
+
+        return () => { unsubscribe(); unsubscribeTyping(); unsubscribeEdit(); unsubscribeDelete(); };
     }, [conversationId, currentUserId]);
 
     // Scroll to bottom whenever the message list changes (new fetch or new messages)
@@ -263,12 +309,18 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 textAlign: isSent ? 'right' : 'left',
                             }}
                         >
-                            {message.body ? (
-                                <p style={{ margin: 0, wordBreak: 'break-word' }}>{message.body}</p>
-                            ) : null}
+                            {message.isDeleted ? (
+                                <p style={{ margin: 0, fontStyle: 'italic', opacity: 0.7 }}>This message was deleted</p>
+                            ) : (
+                                <>
+                                    {message.body ? (
+                                        <p style={{ margin: 0, wordBreak: 'break-word' }}>{message.body}</p>
+                                    ) : null}
+                                </>
+                            )}
 
                             {/* Attachments — use embedded data when available, lazy-load otherwise */}
-                            {message.attachmentIds && message.attachmentIds.length > 0 && (
+                            {!message.isDeleted && message.attachmentIds && message.attachmentIds.length > 0 && (
                                 <div
                                     style={{
                                         display: 'flex',
@@ -279,8 +331,6 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                     }}
                                 >
                                     {message.attachmentIds.map((attachmentId, idx) => {
-                                        // If the backend embedded the attachment object, use it directly.
-                                        // Otherwise fall back to the lazy AttachmentLoader.
                                         const embedded = (message as any).attachments?.[idx];
                                         return embedded
                                             ? <InlineAttachment key={attachmentId} attachment={embedded} isSent={isSent} />
@@ -300,7 +350,26 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                             hour: '2-digit',
                                             minute: '2-digit',
                                         })}
+                                        {message.editedAt && !message.isDeleted && ' (edited)'}
                                     </time>
+                                )}
+                                
+                                {/* Edit/Delete actions */}
+                                {isSent && !message.isDeleted && (
+                                    <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+                                        <button 
+                                            onClick={() => handleEdit(message.id, message.body)} 
+                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.65rem', color: 'inherit', opacity: 0.8, textDecoration: 'underline' }}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDelete(message.id)} 
+                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.65rem', color: 'inherit', opacity: 0.8, textDecoration: 'underline' }}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 )}
                                 {/* Read receipt — only shown on sent messages */}
                                 {isSent && (

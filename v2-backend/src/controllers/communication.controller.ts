@@ -91,7 +91,16 @@ export class CommunicationController {
   @ApiResponse({ status: 201, description: 'Conversation record' })
   async getOrCreateConversation(@Req() req: any, @Body() dto: any) {
     const userId = req.user.uid;
-    return await this.communicationService.getOrCreateConversation(dto, userId);
+    const result = await this.communicationService.getOrCreateConversation(dto, userId);
+    
+    if (result.isNew) {
+      this.eventsService.emit({
+        type: 'conversation_new',
+        data: result.data,
+      });
+    }
+    
+    return { data: result.data };
   }
 
   @Post('conversations/:id/typing')
@@ -159,6 +168,47 @@ export class CommunicationController {
       type: 'message_read',
       userId,
       data: { messageId },
+    });
+
+    return result;
+  }
+
+  @Patch('messages/:id/body')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Edit message body' })
+  @ApiParam({ name: 'id', description: 'Message ID' })
+  @ApiResponse({ status: 200, description: 'Message updated' })
+  async editMessage(@Param('id') messageId: string, @Body() dto: { body: string }, @Req() req: any) {
+    const userId = req.user.uid;
+    const result = await this.communicationService.editMessage(messageId, dto.body, userId);
+
+    this.eventsService.emit({
+      type: 'message_edit',
+      data: {
+        messageId,
+        body: dto.body,
+        editedAt: new Date().toISOString(),
+      },
+    });
+
+    return result;
+  }
+
+  @Delete('messages/:id')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete a message' })
+  @ApiParam({ name: 'id', description: 'Message ID' })
+  @ApiResponse({ status: 200, description: 'Message deleted' })
+  async deleteMessage(@Param('id') messageId: string, @Req() req: any) {
+    const userId = req.user.uid;
+    const result = await this.communicationService.deleteMessage(messageId, userId);
+
+    this.eventsService.emit({
+      type: 'message_delete',
+      data: {
+        messageId,
+        deletedAt: new Date().toISOString(),
+      },
     });
 
     return result;

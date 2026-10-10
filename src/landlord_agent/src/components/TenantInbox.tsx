@@ -82,7 +82,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   onAddTenant,
   onBack,
 }) => {
-  const { conversations, activeConversationId, setActiveConversationId, _setConversations, markConversationAsRead } =
+  const { conversations, activeConversationId, setActiveConversationId, _setConversations, markConversationAsRead, onlineUsers } =
     useMessagingContext();
   const { user } = useAuth();
   // Note: useNavigate is from react-router-dom but the landlord app uses MemoryRouter.
@@ -408,7 +408,15 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                       aria-pressed={conv.id === activeConversationId}
                       aria-label={`Conversation with ${name} about ${property || 'a property'}`}
                     >
-                      <span className={`ll-msg-avatar ${avatarTone(name)}`}>{getInitials(name)}</span>
+                      <div style={{ position: 'relative' }}>
+                        <span className={`ll-msg-avatar ${avatarTone(name)}`}>{getInitials(name)}</span>
+                        {onlineUsers[conv.tenantId] && (
+                          <span style={{
+                            position: 'absolute', bottom: 0, right: 0, width: 10, height: 10,
+                            borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid white'
+                          }} />
+                        )}
+                      </div>
                       <div className="ll-msg-conv-main">
                         <div className="ll-msg-conv-top">
                           <h4>{name}</h4>
@@ -447,9 +455,17 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                   >
                     ← Back
                   </button>
-                  <span className={`ll-msg-avatar ${avatarTone(activeConversation?.tenantName || 'Tenant')}`}>
-                    {getInitials(activeConversation?.tenantName || 'Tenant')}
-                  </span>
+                  <div style={{ position: 'relative' }}>
+                    <span className={`ll-msg-avatar ${avatarTone(activeConversation?.tenantName || 'Tenant')}`}>
+                      {getInitials(activeConversation?.tenantName || 'Tenant')}
+                    </span>
+                    {activeConversation && onlineUsers[activeConversation.tenantId] && (
+                      <span style={{
+                        position: 'absolute', bottom: 0, right: 0, width: 10, height: 10,
+                        borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid white'
+                      }} />
+                    )}
+                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h3>{activeConversation?.tenantName || 'Tenant'}</h3>
                     <p>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
