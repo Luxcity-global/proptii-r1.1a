@@ -17,7 +17,7 @@ import type { Message } from '../../types/messaging';
 import communicationService from '../../services/communicationService';
 import sseService from '../../services/sseService';
 import AttachmentPill from './AttachmentPill';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Ban } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // InlineAttachment — renders an already-hydrated attachment object directly.
@@ -312,7 +312,10 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                             }}
                         >
                             {message.isDeleted ? (
-                                <p style={{ margin: 0, fontStyle: 'italic', opacity: 0.7 }}>This message was deleted</p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.65, fontStyle: 'italic', color: isSent ? '#e0e0e0' : '#6b7280' }}>
+                                    <Ban size={14} />
+                                    <span style={{ fontSize: '0.9rem' }}>This message was deleted</span>
+                                </div>
                             ) : (
                                 <>
                                     {message.body ? (
