@@ -32,8 +32,8 @@ function avatarTone(name: string): 'sky' | 'orange' | 'green' | 'rose' | 'violet
   return tones[sum % tones.length];
 }
 
-function isUnread(conv: Conversation, cursor: string | null): boolean {
-  return conv.lastMessageAt !== null && (cursor === null || new Date(conv.lastMessageAt) > new Date(cursor));
+function isUnread(conv: Conversation): boolean {
+  return (conv.unreadForLandlord ?? 0) > 0;
 }
 
 function formatTime(iso: string | null): { label: string; fresh: boolean } {
@@ -82,7 +82,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   onAddTenant,
   onBack,
 }) => {
-  const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount } =
+  const { conversations, activeConversationId, setActiveConversationId, _setConversations, markConversationAsRead } =
     useMessagingContext();
   const { user } = useAuth();
   // Note: useNavigate is from react-router-dom but the landlord app uses MemoryRouter.
@@ -103,9 +103,8 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   const [activeTab, setActiveTab] = useState<TabId>('inbox');
   const [search, setSearch] = useState('');
   const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>(
-    {},
+    {}
   );
-  const [readCursors, setReadCursors] = useState<Record<string, string | null>>({});
 
   // ── New Message compose modal state ────────────────────────────────────────
   const [showCompose,        setShowCompose]        = useState(false);
@@ -176,15 +175,12 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
       // if the user just sent a message and immediately clicked away and back.
       // Initialise lastSeenAt sentinel so the poller won't wipe optimistics on first tick.
       const conv = conversations.find((c) => c.id === id);
-      if (!(id in lastSeenAt.current)) {
-        lastSeenAt.current[id] = conv?.lastMessageAt ?? null;
+      if (conv && isUnread(conv)) {
+        markConversationAsRead(id);
       }
-      const prevCursor = readCursors[id] ?? null;
-      if (conv && isUnread(conv, prevCursor)) decrementUnreadCount(1);
-      setReadCursors((prev) => ({ ...prev, [id]: new Date().toISOString() }));
       setMobileShowThread(true); // navigate to thread on mobile
     },
-    [setActiveConversationId, conversations, readCursors, decrementUnreadCount],
+    [setActiveConversationId, conversations, markConversationAsRead],
   );
 
   const [mobileShowThread, setMobileShowThread] = useState(false);
@@ -248,7 +244,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
     }
   };
 
-  const unreadConvs = conversations.filter((c) => isUnread(c, readCursors[c.id] ?? null));
+  const unreadConvs = conversations.filter(isUnread);
   const draftConvs = conversations.filter((c) => !c.lastMessageAt);
 
   const tabCounts: Record<TabId, number> = {

@@ -31,9 +31,8 @@ function avatarTone(name: string): 'sky' | 'orange' | 'green' | 'rose' | 'violet
   return tones[sum % tones.length];
 }
 
-function isUnread(conv: Conversation, cursor: string | null): boolean {
-  return conv.lastMessageAt !== null &&
-    (cursor === null || new Date(conv.lastMessageAt) > new Date(cursor));
+function isUnread(conv: Conversation): boolean {
+  return (conv.unreadForTenant ?? 0) > 0;
 }
 
 function participantName(conv: Conversation): string {
@@ -70,7 +69,7 @@ const EmptyState: React.FC<{ message: string; sub: string }> = ({ message, sub }
 );
 
 const TenantMessages: React.FC = () => {
-  const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount, refreshConversations } = useMessagingContext();
+  const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount, markConversationAsRead, refreshConversations } = useMessagingContext();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,7 +79,6 @@ const TenantMessages: React.FC = () => {
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>({});
   const [mobileShowThread, setMobileShowThread] = useState(false);
-  const [readCursors, setReadCursors] = useState<Record<string, string | null>>({});
   const [prefilledDrafts, setPrefilledDrafts] = useState<Record<string, string>>({});
   const pendingConversationRef = useRef<{ id: string; conversation?: Conversation; prefilledMessage?: string } | null>(null);
 
@@ -139,14 +137,14 @@ const TenantMessages: React.FC = () => {
           setActiveTab('external');
         } else if (!activeConv.lastMessageAt) {
           setActiveTab('draft');
-        } else if (isUnread(activeConv, readCursors[activeConv.id] ?? null)) {
+        } else if (isUnread(activeConv)) {
           setActiveTab('inbox');
         } else {
           setActiveTab('read');
         }
       }
     }
-  }, [activeConversationId, conversations, readCursors]);
+  }, [activeConversationId, conversations]);
 
   const handleSelect = useCallback((id: string) => {
     setActiveConversationId(id);
@@ -161,11 +159,11 @@ const TenantMessages: React.FC = () => {
     }
 
     const conv = conversations.find((c) => c.id === id);
-    const prevCursor = readCursors[id] ?? null;
-    if (conv && isUnread(conv, prevCursor)) decrementUnreadCount(1);
-    setReadCursors((prev) => ({ ...prev, [id]: new Date().toISOString() }));
+    if (conv && isUnread(conv)) {
+      markConversationAsRead(id);
+    }
     setMobileShowThread(true); // navigate to thread panel on mobile
-  }, [activeConversationId, setActiveConversationId, conversations, readCursors, decrementUnreadCount]);
+  }, [activeConversationId, setActiveConversationId, conversations, markConversationAsRead]);
 
   const handleSend = useCallback((message: Message, file?: File) => {
     if (!activeConversationId) return;
@@ -195,8 +193,8 @@ const TenantMessages: React.FC = () => {
     ?? 'Tenant';
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
-  const inboxConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && isUnread(c, readCursors[c.id] ?? null));
-  const readConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && c.lastMessageAt && !isUnread(c, readCursors[c.id] ?? null));
+  const inboxConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && isUnread(c));
+  const readConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && c.lastMessageAt && !isUnread(c));
   const draftConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && !c.lastMessageAt);
   const externalConvs = conversations.filter((c) => c.landlordId === 'UNCLAIMED');
 

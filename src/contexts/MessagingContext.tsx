@@ -20,6 +20,8 @@ export interface MessagingContextType {
     activeConversationId: string | null;
     setActiveConversationId: (id: string | null) => void;
     refreshConversations: () => Promise<void>;
+    /** Optimistically marks a conversation as read in the global state */
+    markConversationAsRead: (id: string) => void;
     /**
      * Immediately decrements the unread badge by `by` (clamped to 0).
      * Called when a conversation is opened so the badge updates in real time
@@ -42,6 +44,7 @@ export const MessagingContext = createContext<MessagingContextType>({
     activeConversationId: null,
     setActiveConversationId: () => { },
     refreshConversations: async () => { },
+    markConversationAsRead: () => { },
     decrementUnreadCount: () => { },
     _setConversations: () => { },
     _setUnreadCount: () => { },
@@ -89,6 +92,23 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setUnreadCount((prev) => Math.max(0, prev - by));
     }, []);
 
+    const markConversationAsRead = useCallback((id: string) => {
+        setConversations(prev => prev.map(c => {
+            const isLandlord = c.landlordId === user?.id;
+            const unread = isLandlord ? (c.unreadForLandlord ?? 0) : (c.unreadForTenant ?? 0);
+            
+            if (c.id === id && unread > 0) {
+                setUnreadCount(count => Math.max(0, count - unread));
+                return { 
+                    ...c, 
+                    unreadForLandlord: isLandlord ? 0 : c.unreadForLandlord,
+                    unreadForTenant: !isLandlord ? 0 : c.unreadForTenant
+                };
+            }
+            return c;
+        }));
+    }, [user?.id]);
+
     return (
         <MessagingContext.Provider
             value={{
@@ -97,6 +117,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 activeConversationId,
                 setActiveConversationId,
                 refreshConversations,
+                markConversationAsRead,
                 decrementUnreadCount,
                 _setConversations: setConversations,
                 _setUnreadCount: setUnreadCount,

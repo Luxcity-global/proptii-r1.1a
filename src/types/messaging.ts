@@ -34,6 +34,8 @@ export interface Conversation {
     agentEmail?: string;
     propertyTitle?: string;
     tenantName?: string;
+    unreadForTenant?: number;
+    unreadForLandlord?: number;
 }
 
 /**
