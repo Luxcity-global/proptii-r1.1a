@@ -131,8 +131,17 @@ const communicationService = {
             const params = new URLSearchParams({ limit: String(limit) });
             if (before) params.set('before', before);
             const { data } = await commApi.get(`/conversations/${conversationId}/messages?${params}`);
+            
+            // Bypass unwrap here because unwrap naively strips out hasMore if the data object looks like an envelope
+            if (data && 'data' in data && Array.isArray(data.data)) {
+                return { messages: data.data, hasMore: !!data.hasMore };
+            }
+            if (Array.isArray(data)) {
+                return { messages: data, hasMore: false };
+            }
+            
+            // Fallback (should not be reached if backend behaves correctly)
             const body = unwrap<{ data: Message[]; hasMore: boolean } | Message[]>(data);
-            // Handle both wrapped { data, hasMore } and legacy flat array shapes
             if (Array.isArray(body)) {
                 return { messages: body, hasMore: false };
             }

@@ -183,16 +183,18 @@ export class CommunicationService {
       //    which may not exist in all environments. Filter client-side instead.
       let query: any = col
         .where('conversationId', '==', conversationId)
-        .orderBy('sentAt', 'desc')
-        .limit(limit + 1);
-
-      if (before) {
-        query = query.startAfter(before);
-      }
+        .limit(200); // Temporary fallback to avoid missing composite index error
 
       const snapshot = await query.get();
-      const hasMore = snapshot.docs.length > limit;
-      const docs = hasMore ? snapshot.docs.slice(0, limit) : snapshot.docs;
+      const hasMore = false; // Disable pagination while using fallback
+      const docs = snapshot.docs;
+      
+      // Sort in memory instead
+      docs.sort((a: any, b: any) => {
+        const tA = new Date(a.data().sentAt).getTime();
+        const tB = new Date(b.data().sentAt).getTime();
+        return tB - tA; // desc
+      });
 
       // Filter out soft-deleted messages in code (avoids composite index requirement)
       const allMessages = docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
