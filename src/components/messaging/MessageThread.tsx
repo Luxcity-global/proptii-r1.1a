@@ -17,6 +17,7 @@ import type { Message } from '../../types/messaging';
 import communicationService from '../../services/communicationService';
 import sseService from '../../services/sseService';
 import AttachmentPill from './AttachmentPill';
+import { Pencil, Trash2 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // InlineAttachment — renders an already-hydrated attachment object directly.
@@ -304,9 +305,10 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 maxWidth: '70%',
                                 padding: '10px 14px',
                                 borderRadius: '12px',
-                                backgroundColor: isSent ? '#3b82f6' : '#f3f4f6',
+                                backgroundColor: isSent ? '#136C9E' : '#f3f4f6',
                                 color: isSent ? '#ffffff' : '#111827',
                                 textAlign: isSent ? 'right' : 'left',
+                                position: 'relative',
                             }}
                         >
                             {message.isDeleted ? (
@@ -356,18 +358,20 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 
                                 {/* Edit/Delete actions */}
                                 {isSent && !message.isDeleted && (
-                                    <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+                                    <div style={{ display: 'flex', gap: '8px', marginLeft: '6px', opacity: 0.8 }}>
                                         <button 
                                             onClick={() => handleEdit(message.id, message.body)} 
-                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.65rem', color: 'inherit', opacity: 0.8, textDecoration: 'underline' }}
+                                            title="Edit Message"
+                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', alignItems: 'center' }}
                                         >
-                                            Edit
+                                            <Pencil size={12} />
                                         </button>
                                         <button 
                                             onClick={() => handleDelete(message.id)} 
-                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.65rem', color: 'inherit', opacity: 0.8, textDecoration: 'underline' }}
+                                            title="Delete Message"
+                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', alignItems: 'center' }}
                                         >
-                                            Delete
+                                            <Trash2 size={12} />
                                         </button>
                                     </div>
                                 )}
