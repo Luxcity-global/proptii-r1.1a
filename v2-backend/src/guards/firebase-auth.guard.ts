@@ -153,18 +153,13 @@ export class FirebaseAuthGuard implements CanActivate {
           } catch {}
         }
 
-        // Default to 'landlord' — users authenticated via Firebase who have
-        // not yet had a role written to their Firestore record should be treated as
-        // landlords so that property/tenant creation is not blocked by RolesGuard.
-        const effectiveRole = role || 'landlord';
-
         request.user = {
           ...decodedToken,
           uid: decodedToken.uid,
           sub: decodedToken.uid,
           email: emailFromToken(decodedToken),
-          // Ensure effectiveRole wins over any stale value baked into the JWT
-          role: effectiveRole,
+          // Pass the role as-is so new users can be correctly directed to /select-role
+          role: role || null,
         };
 
         return true;
