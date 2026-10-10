@@ -97,31 +97,44 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
     const [loadingMore, setLoadingMore] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+    const [editText, setEditText] = useState('');
+    const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleEdit = async (messageId: string, currentBody: string) => {
-        const newBody = window.prompt('Edit your message:', currentBody);
-        if (newBody !== null && newBody.trim() !== '' && newBody !== currentBody) {
+    const startEditing = (messageId: string, currentBody: string) => {
+        setEditingMessageId(messageId);
+        setEditText(currentBody);
+    };
+
+    const confirmEdit = async () => {
+        if (!editingMessageId) return;
+        const currentMsg = messages.find(m => m.id === editingMessageId);
+        if (!currentMsg) return;
+        
+        const newBody = editText.trim();
+        if (newBody !== '' && newBody !== currentMsg.body) {
             try {
-                const res = await communicationService.editMessage(messageId, newBody.trim());
-                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, body: res.body, editedAt: res.editedAt } : m));
+                const res = await communicationService.editMessage(editingMessageId, newBody);
+                setMessages(prev => prev.map(m => m.id === editingMessageId ? { ...m, body: res.body, editedAt: res.editedAt } : m));
             } catch (err) {
                 console.error(err);
                 alert('Failed to edit message.');
             }
         }
+        setEditingMessageId(null);
     };
 
-    const handleDelete = async (messageId: string) => {
-        if (window.confirm('Are you sure you want to delete this message?')) {
-            try {
-                const res = await communicationService.deleteMessage(messageId);
-                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isDeleted: true, deletedAt: res.deletedAt } : m));
-            } catch (err) {
-                console.error(err);
-                alert('Failed to delete message.');
-            }
+    const confirmDelete = async () => {
+        if (!messageToDelete) return;
+        try {
+            const res = await communicationService.deleteMessage(messageToDelete);
+            setMessages(prev => prev.map(m => m.id === messageToDelete ? { ...m, isDeleted: true, deletedAt: res.deletedAt } : m));
+        } catch (err) {
+            console.error(err);
+            alert('Failed to delete message.');
         }
+        setMessageToDelete(null);
     };
 
     // Sentinel element at the bottom of the list — scrolled into view after every render
@@ -319,15 +332,38 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                             }}
                         >
                             {message.isDeleted ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.65, fontStyle: 'italic', color: isSent ? '#e0e0e0' : '#6b7280' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9, fontStyle: 'italic', color: isSent ? '#ffffff' : '#4b5563' }}>
                                     <Ban size={14} />
                                     <span style={{ fontSize: '0.9rem' }}>This message was deleted</span>
                                 </div>
                             ) : (
                                 <>
-                                    {message.body ? (
-                                        <p style={{ margin: 0, wordBreak: 'break-word' }}>{message.body}</p>
-                                    ) : null}
+                                    {editingMessageId === message.id ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '240px' }}>
+                                            <textarea 
+                                                value={editText} 
+                                                onChange={(e) => setEditText(e.target.value)}
+                                                style={{ width: '100%', minHeight: '60px', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.3)', resize: 'none', color: '#111827', backgroundColor: '#ffffff', fontSize: '0.95rem', fontFamily: 'inherit' }}
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        confirmEdit();
+                                                    } else if (e.key === 'Escape') {
+                                                        setEditingMessageId(null);
+                                                    }
+                                                }}
+                                            />
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                                <button onClick={() => setEditingMessageId(null)} style={{ padding: '4px 10px', fontSize: '12px', background: 'transparent', color: isSent ? '#ffffff' : '#111827', border: '1px solid currentColor', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                                                <button onClick={confirmEdit} style={{ padding: '4px 12px', fontSize: '12px', background: isSent ? '#ffffff' : '#136c9e', color: isSent ? '#136c9e' : '#ffffff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        message.body ? (
+                                            <p style={{ margin: 0, wordBreak: 'break-word' }}>{message.body}</p>
+                                        ) : null
+                                    )}
                                 </>
                             )}
 
@@ -389,7 +425,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                         </div>
 
                         {/* Edit/Delete Floating Action Bar */}
-                        {isSent && !message.isDeleted && hoveredMessageId === message.id && (
+                        {isSent && !message.isDeleted && hoveredMessageId === message.id && editingMessageId !== message.id && (
                             <div style={{
                                 position: 'absolute',
                                 top: '-6px',
@@ -405,7 +441,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 zIndex: 10,
                             }}>
                                 <button 
-                                    onClick={() => handleEdit(message.id, message.body)} 
+                                    onClick={() => startEditing(message.id, message.body)} 
                                     title="Edit Message"
                                     style={{ background: 'none', border: 'none', padding: '6px', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', borderRadius: '50%' }}
                                     onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
@@ -415,7 +451,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 </button>
                                 <div style={{ width: '1px', height: '14px', backgroundColor: '#e5e7eb', margin: '0 2px' }} />
                                 <button 
-                                    onClick={() => handleDelete(message.id)} 
+                                    onClick={() => setMessageToDelete(message.id)} 
                                     title="Delete Message"
                                     style={{ background: 'none', border: 'none', padding: '6px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', borderRadius: '50%' }}
                                     onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
@@ -465,6 +501,34 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
 
             {/* Scroll anchor — always at the bottom of the list */}
             <div ref={bottomRef} data-testid="scroll-anchor" />
+
+            {/* Custom Delete Modal */}
+            {messageToDelete && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '380px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)', fontFamily: 'Archivo, sans-serif' }}>
+                        <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>Delete Message</h3>
+                        <p style={{ margin: '0 0 24px 0', color: '#6b7280', fontSize: '14px', lineHeight: 1.5 }}>Are you sure you want to delete this message? This action cannot be undone.</p>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <button 
+                                onClick={() => setMessageToDelete(null)} 
+                                style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', color: '#374151', borderRadius: '8px', border: 'none', fontWeight: 500, cursor: 'pointer', fontSize: '14px', transition: 'background 0.2s' }}
+                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
+                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={confirmDelete} 
+                                style={{ padding: '8px 16px', backgroundColor: '#ef4444', color: '#ffffff', borderRadius: '8px', border: 'none', fontWeight: 500, cursor: 'pointer', fontSize: '14px', transition: 'background 0.2s' }}
+                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
