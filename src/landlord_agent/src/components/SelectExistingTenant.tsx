@@ -9,7 +9,7 @@
  * New design:
  *  - Search is purely client-side, filtering existingTenants by name/email
  *  - No external API calls on mount
- *  - Two steps: pick tenant + property → fill lease terms
+ *  - Two steps: pick tenant + property → fill rent terms
  *  - All created tenants are status: 'active' (not 'pending')
  *  - Success screen shown only after confirmed backend write
  */
@@ -161,13 +161,13 @@ export function SelectExistingTenant({
     if (!lease.firstPaymentDate || !fromISODate(lease.firstPaymentDate))
       e.firstPaymentDate = 'Valid first payment date is required';
     if (!lease.leaseStart || !fromISODate(lease.leaseStart))
-      e.leaseStart = 'Valid lease start date is required';
+      e.leaseStart = 'Valid rent start date is required';
     if (!lease.leaseEnd || !fromISODate(lease.leaseEnd)) {
-      e.leaseEnd = 'Valid lease end date is required';
+      e.leaseEnd = 'Valid rent end date is required';
     } else {
       const s = fromISODate(lease.leaseStart);
       const en = fromISODate(lease.leaseEnd);
-      if (s && en && en < s) e.leaseEnd = 'Lease end must be after lease start';
+      if (s && en && en < s) e.leaseEnd = 'Rent end must be after rent start';
     }
     setLeaseErrors(e);
     return Object.keys(e).length === 0;
@@ -264,7 +264,7 @@ export function SelectExistingTenant({
           </button>
           <div className="min-w-0">
             <h1 className="text-base font-bold" style={{ color: '#136C9E' }}>
-              Lease terms
+              Rent terms
             </h1>
             <p className="text-xs text-gray-500 truncate">
               {selectedTenant?.name} → {selectedProperty?.address}
@@ -356,11 +356,11 @@ export function SelectExistingTenant({
               )}
             </div>
 
-            {/* Lease dates */}
+            {/* Rent dates */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={LABEL} htmlFor="leaseStart">
-                  Lease start <span className="text-red-500">*</span>
+                  Rent start <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="leaseStart"
@@ -377,7 +377,7 @@ export function SelectExistingTenant({
               </div>
               <div>
                 <label className={LABEL} htmlFor="leaseEnd">
-                  Lease end <span className="text-red-500">*</span>
+                  Rent end <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="leaseEnd"
@@ -511,7 +511,7 @@ export function SelectExistingTenant({
               <Users className="w-10 h-10 text-gray-300 mx-auto" />
               <p className="text-sm text-gray-500 font-medium">No previous tenants found</p>
               <p className="text-xs text-gray-400">
-                Tenants whose lease has ended will appear here.
+                Tenants whose rent has ended will appear here.
               </p>
             </div>
           )}

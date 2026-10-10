@@ -252,24 +252,23 @@ const S: Record<string, React.CSSProperties> = {
     animation: 'spin 0.8s linear infinite',
   },
 
-  // Page: soft gradient matching the reference colour stops
+  // Page: full screen gradient
   page: {
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     padding: '24px 16px',
-    background: 'linear-gradient(135deg, #CBE6FF 0%, #f0f7ff 35%, #fffdf8 65%, #FFEFD4 100%)',
+    background: 'url(/images/pti_home_background.png) center/cover no-repeat',
     fontFamily: 'Archivo, Inter, sans-serif',
   },
 
-  // Outer card — white, large radius, subtle shadow
+  // Outer container — full screen, no card styling
   card: {
-    background: '#ffffff',
-    borderRadius: 24,
-    boxShadow: '0 8px 48px rgba(54,65,83,0.12)',
-    padding: '40px 36px 28px',
-    maxWidth: 900,
+    background: 'transparent',
+    borderRadius: 0,
+    boxShadow: 'none',
+    padding: '20px 16px',
     width: '100%',
   },
 

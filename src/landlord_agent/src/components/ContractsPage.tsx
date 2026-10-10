@@ -782,7 +782,7 @@ export function ContractsPage({
         <div className="ll-ct-inner ll-ct-header-inner">
           <div>
             <h1>Contracts</h1>
-            <p>Manage, track, and send property lease agreements.</p>
+            <p>Manage, track, and send property rent agreements.</p>
           </div>
           <div className="ll-ct-header-actions">
             <button type="button" className="ll-ct-header-icon" title="Settings" onClick={onViewSettings}>
@@ -1004,7 +1004,7 @@ export function ContractsPage({
                             <p>
                               {filtersActive
                                 ? `No contracts in "${subsection.toUpperCase()}" match your current filter or search criteria.`
-                                : 'Send a contract to start tracking lease agreements here.'}
+                                : 'Send a contract to start tracking rent agreements here.'}
                             </p>
                             {filtersActive ? (
                               <button type="button" onClick={resetFilters}>
@@ -1089,7 +1089,7 @@ export function ContractsPage({
                     <p>
                       {filtersActive
                         ? `No contracts in "${subsection.toUpperCase()}" match your current filter or search criteria.`
-                        : 'Send a contract to start tracking lease agreements here.'}
+                        : 'Send a contract to start tracking rent agreements here.'}
                     </p>
                     {filtersActive ? (
                       <button type="button" onClick={resetFilters}>

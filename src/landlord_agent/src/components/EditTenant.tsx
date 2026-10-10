@@ -404,7 +404,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
             {/* ── Section 2: Tenancy terms ────────────────────── */}
             <SectionHeader
               num={2} icon={Home} iconColor="#136C9E" iconBg="#E8F4F8"
-              title="Tenancy terms" subtitle="Property, rent, lease dates and status"
+              title="Tenancy terms" subtitle="Property, rent, rent dates and status"
               complete={s2ok} open={open[1]} onToggle={() => toggle(1)}
             />
 
@@ -450,11 +450,11 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                 </Field>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Lease start" required error={errors.leaseStart}>
+                  <Field label="Rent start" required error={errors.leaseStart}>
                     <input type="date" value={form.leaseStart} onChange={e => set('leaseStart', e.target.value)}
                       className={`${F} ${errors.leaseStart ? FE : ''}`} />
                   </Field>
-                  <Field label="Lease end" required error={errors.leaseEnd}>
+                  <Field label="Rent end" required error={errors.leaseEnd}>
                     <input type="date" value={form.leaseEnd} onChange={e => set('leaseEnd', e.target.value)}
                       className={`${F} ${errors.leaseEnd ? FE : ''}`} />
                   </Field>

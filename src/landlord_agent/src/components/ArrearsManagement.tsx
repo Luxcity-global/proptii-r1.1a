@@ -252,7 +252,7 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                     <span className="font-medium">£{tenant.rentAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Lease End</span>
+                    <span className="text-sm text-muted-foreground">Rent End</span>
                     <span className="font-medium">{safeDate(tenant.leaseEnd)}</span>
                   </div>
                   <div className="flex justify-between">

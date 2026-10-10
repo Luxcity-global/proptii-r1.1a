@@ -348,7 +348,7 @@ export function AddPropertyWizard({
   if (showModeModal && onBulkImport) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4"
-        style={{ background: '#f7fafc', fontFamily: 'Nunito Sans,sans-serif' }}>
+        style={{ background: 'url(/images/pti_home_background.png) center/cover no-repeat', fontFamily: 'Nunito Sans,sans-serif' }}>
         <div style={{
           background: '#fff', borderRadius: 26, padding: '40px 44px', maxWidth: 500, width: '100%',
           boxShadow: '0 25px 60px -15px rgba(0,0,0,0.14), 0 8px 24px rgba(0,0,0,0.06)',
@@ -454,7 +454,7 @@ export function AddPropertyWizard({
   // ─── Shell ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#f7fafc', fontFamily: 'Nunito Sans,sans-serif' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'url(/images/pti_home_background.png) center/cover no-repeat', fontFamily: 'Nunito Sans,sans-serif' }}>
       {/* Navbar */}
       <header className="h-[68px] px-6 flex items-center justify-between sticky top-0 z-50"
         style={{ backdropFilter: 'blur(12px)', background: 'rgba(255,255,255,0.80)', borderBottom: '1px solid rgba(226,232,240,0.65)' }}>
@@ -778,11 +778,11 @@ export function AddPropertyWizard({
             {step === 5 && (
               <div className="space-y-5">
                 {/* Dossier */}
-                <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[18px] p-5 space-y-4">
+                <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[18px] p-8 space-y-6">
 
                   {/* Cover photo */}
                   {form.images.length > 0 && (
-                    <div className="rounded-[12px] overflow-hidden aspect-video">
+                    <div className="rounded-[12px] overflow-hidden aspect-square">
                       <img src={form.images[0]} alt="" className="w-full h-full object-cover" />
                     </div>
                   )}

@@ -1,0 +1,152 @@
+                  <div className="flex items-center gap-2 p-3 rounded-[12px] border border-red-200 bg-red-50 text-[13px] text-red-700">
+                    <AlertTriangle size={15} className="shrink-0" />{photoSaveError}
+                  </div>
+                )}
+
+                {/* Upload zone */}
+                <SCard>
+                  <div
+                    className="m-5 border-2 border-dashed rounded-[16px] p-8 text-center cursor-pointer transition-all hover:border-[#136C9E] hover:bg-[#f0f8fd]"
+                    style={{ borderColor: '#e2e8f0' }}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); uploadFiles(e.dataTransfer.files); }}>
+                    {uploadingCount > 0 ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 size={28} className="text-[#136C9E] animate-spin" />
+                        <p className="text-[13px] font-semibold text-[#136C9E]">
+                          Uploading {uploadingCount} photo{uploadingCount > 1 ? 's' : ''}…
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload size={28} className="mx-auto mb-3 text-[#94a3b8]" />
+                        <p className="text-[14px] font-semibold text-[#334155]"
+                          style={{ fontFamily: 'Archivo,sans-serif' }}>
+                          Drag & drop or click to upload
+                        </p>
+                        <p className="text-[12px] text-[#64748b] mt-1">JPG, PNG, HEIC — max 10 MB each</p>
+                      </>
+                    )}
+                  </div>
+                </SCard>
+
+                {/* Photo grid */}
+                {validPhotos.length === 0 && uploadingCount === 0 ? (
+                  <SCard className="flex flex-col items-center py-12 text-center px-5">
+                    <div className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
+                      style={{ background: '#f1f5f9' }}>
+                      <ImageIcon size={24} className="text-[#94a3b8]" />
+                    </div>
+                    <p className="text-[14px] font-semibold text-[#1e293b] mb-1">No photos yet</p>
+                    <p className="text-[13px] text-[#64748b]">Properties with photos attract significantly more enquiries.</p>
+                  </SCard>
+                ) : (
+                  <SCard className="p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[13px] font-bold text-[#1e293b]"
+                        style={{ fontFamily: 'Archivo,sans-serif' }}>
+                        {validPhotos.length} photo{validPhotos.length !== 1 ? 's' : ''}
+                        {hasChanges && <span className="ml-2 text-[11px] text-amber-500 font-semibold">• unsaved changes</span>}
+                      </p>
+                      <button type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
+                        style={{ color: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
+                        <Plus size={14} /> Add More
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {validPhotos.map((photo, i) => (
+                        <div
+                          key={photo.id}
+                          draggable
+                          onDragStart={e => handleDragStart(e, i)}
+                          onDragEnter={e => handleDragEnter(e, i)}
+                          onDragEnd={() => setDraggedIdx(null)}
+                          className="group relative rounded-[12px] overflow-hidden bg-[#f1f5f9] cursor-grab active:cursor-grabbing"
+                          style={{ opacity: draggedIdx === i ? 0.5 : 1 }}>
+
+                          {/* Image */}
+                          <div className="aspect-video">
+                            <img src={photo.url} alt={photo.room ?? 'Property'}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          </div>
+
+                          {/* Drag handle */}
+                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <GripVertical size={14} className="text-white drop-shadow" />
+                          </div>
+
+                          {/* Cover badge */}
+                          {photo.isCover && (
+                            <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                              style={{ background: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
+                              <Star size={9} fill="currentColor" /> Cover
+                            </span>
+                          )}
+
+                          {/* Hover overlay actions */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button type="button" title="Preview"
+                              onClick={e => { e.stopPropagation(); setPreviewPhoto(photo); }}
+                              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all">
+                              <Eye size={14} />
+                            </button>
+                            <button type="button" title="Download"
+                              onClick={e => { e.stopPropagation(); window.open(photo.url, '_blank', 'noopener'); }}
+                              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all">
+                              <Download size={14} />
+                            </button>
+                            <button type="button" title="Remove"
+                              onClick={e => { e.stopPropagation(); removePhoto(photo.id); }}
+                              className="w-8 h-8 rounded-full bg-red-500/70 hover:bg-red-500 flex items-center justify-center text-white transition-all">
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          {/* Room tag + set cover — below image */}
+                          <div className="p-2 space-y-1.5 bg-white border-t border-[#f1f5f9]">
+                            <Select value={photo.room || 'none'} onValueChange={v => setRoom(photo.id, v)}>
+                              <SelectTrigger className="h-7 text-[11px] rounded-[8px] border-[#e2e8f0] px-2">
+                                <SelectValue placeholder="Tag room" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No tag</SelectItem>
+                                {ROOM_TYPES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            {!photo.isCover && (
+                              <button type="button"
+                                onClick={() => setCover(photo.id)}
+                                className="w-full h-6 text-[10.5px] font-semibold rounded-[8px] border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9] flex items-center justify-center gap-1 transition-all">
+                                <Star size={9} /> Set as cover
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </SCard>
+                )}
+
+                {/* Unsaved changes save bar */}
+                {hasChanges && (
+                  <div className="flex items-center justify-between p-4 rounded-[16px] border"
+                    style={{ background: '#fffbeb', borderColor: '#fde68a' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      <p className="text-[13px] font-semibold text-amber-800">You have unsaved photo changes</p>
+                    </div>
+                    <button type="button" onClick={savePhotos} disabled={isSavingPhotos}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white transition-all disabled:opacity-50 hover:opacity-90"
+                      style={{ background: '#DC5F12', fontFamily: 'Archivo,sans-serif' }}>
+                      {isSavingPhotos
+                        ? <><Loader2 size={14} className="animate-spin" />Saving…</>
+                        : <><Save size={14} />Save Photos</>}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}

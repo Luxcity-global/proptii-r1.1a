@@ -180,7 +180,7 @@ interface ShellProps {
 
 function Shell({ title, sub, view, stepIndex, done, onBack, onNavStep, onClose, globalError, children }: ShellProps) {
   return (
-    <div className="min-h-screen flex flex-col" style={{ background:'#f7fafc', fontFamily:'Nunito Sans,sans-serif' }}>
+    <div className="min-h-screen flex flex-col" style={{ background:'url(/images/pti_home_background.png) center/cover no-repeat', fontFamily:'Nunito Sans,sans-serif' }}>
       {/* Navbar */}
       <header className="h-[68px] px-6 flex items-center justify-between sticky top-0 z-50"
         style={{ backdropFilter:'blur(12px)', background:'rgba(255,255,255,0.72)', borderBottom:'1px solid rgba(226,232,240,0.65)' }}>
@@ -415,7 +415,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
 
   if (view === 'mode') {
     return (
-      <div className="min-h-screen flex flex-col" style={{ background: '#f7fafc', fontFamily: 'Nunito Sans,sans-serif' }}>
+      <div className="min-h-screen flex flex-col" style={{ background: 'url(/images/pti_home_background.png) center/cover no-repeat', fontFamily: 'Nunito Sans,sans-serif' }}>
         {/* Navbar */}
         <header className="h-[68px] px-6 flex items-center justify-between sticky top-0 z-50"
           style={{ backdropFilter: 'blur(12px)', background: 'rgba(255,255,255,0.72)', borderBottom: '1px solid rgba(226,232,240,0.65)' }}>
@@ -579,8 +579,8 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
               ['Monthly rent', `£${parseFloat(form.rentAmount||'0').toLocaleString('en-GB')}`],
               ['Frequency', freqMap[form.paymentFrequency]||'Monthly'],
               ['First payment', fmtDate(form.firstPaymentDate)],
-              ['Lease start', fmtDate(form.leaseStart)],
-              ['Lease end', fmtDate(form.leaseEnd)],
+              ['Rent start', fmtDate(form.leaseStart)],
+              ['Rent end', fmtDate(form.leaseEnd)],
             ].map(([l,v])=>(
               <div key={l}>
                 <p className="text-[11px] uppercase font-semibold tracking-[0.04em] text-[#94a3b8]">{l}</p>
@@ -723,11 +723,11 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
           </Fld>
 
           <div className="grid grid-cols-2 gap-4">
-            <Fld label="Lease start" required error={errors.leaseStart}>
+            <Fld label="Rent start" required error={errors.leaseStart}>
               <input type="date" value={form.leaseStart} onChange={e=>sf('leaseStart',e.target.value)}
                 className={`${INP} ${errors.leaseStart?INP_ERR:''}`}/>
             </Fld>
-            <Fld label="Lease end" required error={errors.leaseEnd}>
+            <Fld label="Rent end" required error={errors.leaseEnd}>
               <input type="date" value={form.leaseEnd} onChange={e=>sf('leaseEnd',e.target.value)}
                 className={`${INP} ${errors.leaseEnd?INP_ERR:''}`}/>
             </Fld>

@@ -37,6 +37,7 @@ import { EditTenant } from './components/EditTenant';
 import { alertService, type Alert } from './services/alertService';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
+import { TenantSelectionPopup } from "./components/TenantSelectionPopup";
 import { AddLandlordWizard } from './components/AddLandlordWizard';
 import { BulkTenantImport } from './components/BulkTenantImport';
 import { BulkPropertyImport } from './components/BulkPropertyImport';
@@ -474,6 +475,7 @@ export function AppContent() {
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
+  const [showTenantPopup, setShowTenantPopup] = useState(false);
   /** IDs returned from a completed bulk property import — passed to the enrichment queue */
   const importedPropertyIdsRef = React.useRef<string[]>([]);
   /** Where the enrichment queue was launched from: 'import' (post-CSV) or 'direct' (Properties page button) */
@@ -2613,7 +2615,7 @@ export function AppContent() {
             onAddTenant={() => {
               trackEvent('landlord_add_tenant_clicked', { source: 'property_wizard' });
               setPreviousScreen('property-setup-step1');
-              navigateToScreen('tenant-selection');
+              setShowTenantPopup(true);
             }}
             onPublish={async (wizardData: WizardPropertyData) => {
               if (!userProfile) {
@@ -3546,6 +3548,22 @@ export function AppContent() {
             {renderScreen()}
           </Suspense>
         </div>
+        {showTenantPopup && (
+          <TenantSelectionPopup
+            existingTenants={tenants}
+            onClose={() => setShowTenantPopup(false)}
+            onSelectExisting={(tenantId) => {
+              setShowTenantPopup(false);
+              setPreviousScreen(currentScreen);
+              navigateToScreen('select-existing-tenant');
+            }}
+            onAddNew={() => {
+              setShowTenantPopup(false);
+              setPreviousScreen(currentScreen);
+              navigateToScreen('tenant-selection');
+            }}
+          />
+        )}
       </div>
     </AuthContext.Provider>
   );

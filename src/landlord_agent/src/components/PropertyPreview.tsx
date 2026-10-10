@@ -299,76 +299,77 @@ export function PropertyPreview({
         </div>
       </div>
 
+      </div>
+
+      {/* ── Hero photo strip ───────────────────────────────────────────────── */}
+      {property.photos.length > 0 ? (
+        <div className="relative bg-[#1e293b] w-full overflow-hidden flex items-center justify-center" style={{ height: 360 }}>
+          {(() => {
+            const coverPhoto = property.photos.find(p => p.isCover) || property.photos[0];
+            return (
+              <>
+                <img src={coverPhoto.url} alt="" className="absolute inset-0 w-full h-full object-cover blur-[40px] opacity-40 scale-110" />
+                <img src={coverPhoto.url} alt="Property Cover" className="relative z-10 w-full h-full object-contain" />
+              </>
+            );
+          })()}
+          
+          {/* Add photos shortcut on hero */}
+          <div className="absolute z-20 top-4 right-4 flex items-center gap-2">
+            <Button variant="outline" className="bg-black/50 text-white border-white/20 hover:bg-white/20"
+              onClick={() => { document.getElementById('photos-section')?.scrollIntoView({ behavior: 'smooth' }); onManagePhotos(); }}>
+              <ImageIcon className="w-4 h-4 mr-2" /> Manage Photos
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center"
+          style={{ height: 220, background: 'linear-gradient(135deg,#1e3a4f 0%,#0f1e2e 100%)' }}>
+          <button type="button"
+            onClick={onManagePhotos}
+            className="flex flex-col items-center gap-3 text-white/70 hover:text-white transition-colors">
+            <div className="w-14 h-14 rounded-[18px] flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <ImageIcon size={24} />
+            </div>
+            <span className="text-[13px] font-semibold" style={{ fontFamily: 'Archivo,sans-serif' }}>
+              Add Photos
+            </span>
+          </button>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Property Photos */}
-            <Card className="overflow-hidden">
-              {property.photos.length > 0 ? (
-                <div>
-                  <div className="aspect-[16/10] relative overflow-hidden">
-                    <img
-                      src={property.photos[currentPhotoIndex]?.url}
-                      alt="Property"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
-                      {currentPhotoIndex + 1} / {property.photos.length}
-                    </div>
-                  </div>
-                  
-                  {property.photos.length > 1 && (
-                    <div className="p-4 bg-muted/50">
-                      <div className="grid grid-cols-6 gap-2">
-                        {property.photos.map((photo, index) => (
-                          <button
-                            key={photo.id}
-                            className={`aspect-video rounded overflow-hidden ${
-                              index === currentPhotoIndex ? 'ring-2 ring-primary' : ''
-                            }`}
-                            onClick={() => setCurrentPhotoIndex(index)}
-                          >
-                            <img
-                              src={photo.url}
-                              alt={photo.room || 'Property'}
-                              className="w-full h-full object-cover"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="aspect-[16/10] bg-muted flex items-center justify-center">
-                  <div className="text-center">
-                    <ImageIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">No photos uploaded</p>
-                    <Button variant="outline" onClick={onManagePhotos}>
-                      Add Photos
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
 
             {/* Property Information */}
-            <Tabs defaultValue="details" className="space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <TabsList className="w-full md:w-auto overflow-x-auto flex-shrink-0">
-                  <TabsTrigger value="details" className="whitespace-nowrap">Details</TabsTrigger>
-                  <TabsTrigger value="documents" className="whitespace-nowrap">
+            <div className="space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 sticky top-[80px] z-20 bg-background/95 backdrop-blur py-2">
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-slate-100 w-full md:w-auto overflow-x-auto flex-shrink-0">
+                  <button className="px-4 py-2 rounded-md text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-white"
+                    onClick={() => document.getElementById('details-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                    Details
+                  </button>
+                  <button className="px-4 py-2 rounded-md text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-white"
+                    onClick={() => document.getElementById('documents-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
                     Documents
                     {property.documents.some(d => d.status === 'expiring-soon' || d.status === 'expired') && (
                       <Badge variant="destructive" className="ml-2 px-1 text-xs">
                         {property.documents.filter(d => d.status === 'expiring-soon' || d.status === 'expired').length}
                       </Badge>
                     )}
-                  </TabsTrigger>
-                  <TabsTrigger value="photos" className="whitespace-nowrap">Photos ({property.photos.length})</TabsTrigger>
-                  <TabsTrigger value="insights" className="whitespace-nowrap">Insights</TabsTrigger>
-                </TabsList>
+                  </button>
+                  <button className="px-4 py-2 rounded-md text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-white whitespace-nowrap"
+                    onClick={() => document.getElementById('photos-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                    Photos ({property.photos.length})
+                  </button>
+                  <button className="px-4 py-2 rounded-md text-sm font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-white whitespace-nowrap"
+                    onClick={() => document.getElementById('insights-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                    Insights
+                  </button>
+                </div>
                 
                 <Button 
                   type="button"
@@ -440,7 +441,8 @@ export function PropertyPreview({
                 </Button>
               </div>
 
-              <TabsContent value="details">
+              {/* ── Details Section ─────────────────────────────────────────── */}
+              <div id="details-section" className="scroll-mt-[140px]">
                 <Card className="p-6">
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -493,9 +495,10 @@ export function PropertyPreview({
                     </div>
                   </div>
                 </Card>
-              </TabsContent>
+              </div>
 
-              <TabsContent value="documents">
+              {/* ── Documents Section ─────────────────────────────────────────── */}
+              <div id="documents-section" className="scroll-mt-[140px]">
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3>Property Documents</h3>
@@ -542,9 +545,10 @@ export function PropertyPreview({
                     </div>
                   )}
                 </Card>
-              </TabsContent>
+              </div>
 
-              <TabsContent value="photos">
+              {/* ── Photos Section ─────────────────────────────────────────── */}
+              <div id="photos-section" className="scroll-mt-[140px]">
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3>Property Photos</h3>
@@ -593,9 +597,10 @@ export function PropertyPreview({
                     </div>
                   )}
                 </Card>
-              </TabsContent>
+              </div>
 
-              <TabsContent value="insights">
+              {/* ── Insights Section ─────────────────────────────────────────── */}
+              <div id="insights-section" className="scroll-mt-[140px]">
                 <Card className="p-6">
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
@@ -607,8 +612,8 @@ export function PropertyPreview({
                     </p>
                   </div>
                 </Card>
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
           </div>
 
           {/* Sidebar */}

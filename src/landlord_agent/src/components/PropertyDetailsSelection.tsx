@@ -614,7 +614,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-600 mb-2">
-                      Upload property documents (lease agreements, certificates, etc.)
+                      Upload property documents (rent agreements, certificates, etc.)
                     </p>
                     <input
                       type="file"

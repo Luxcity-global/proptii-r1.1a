@@ -73,8 +73,8 @@ function validateRow(row: BulkTenantRow): string[] {
   if (!/^[\+]?[\d\s\-\(\)]{7,}$/.test(row.phone?.trim() || '')) errs.push('Valid phone required');
   const rent = parseFloat(row.rentAmount);
   if (!row.rentAmount || isNaN(rent) || rent <= 0) errs.push('Rent must be a positive number');
-  if (!row.leaseStart || isNaN(Date.parse(row.leaseStart))) errs.push('Lease start invalid (YYYY-MM-DD)');
-  if (!row.leaseEnd || isNaN(Date.parse(row.leaseEnd))) errs.push('Lease end invalid (YYYY-MM-DD)');
+  if (!row.leaseStart || isNaN(Date.parse(row.leaseStart))) errs.push('Rent start invalid (YYYY-MM-DD)');
+  if (!row.leaseEnd || isNaN(Date.parse(row.leaseEnd))) errs.push('Rent end invalid (YYYY-MM-DD)');
   else if (row.leaseStart && new Date(row.leaseEnd) <= new Date(row.leaseStart)) errs.push('End must be after start');
   return errs;
 }
@@ -607,7 +607,7 @@ export function BulkTenantImport({ properties, existingTenants, userProfile, use
                                       <input value={row.phone} onChange={e => editRow(idx, 'phone', e.target.value)} style={{ ...inputStyle, height: 36, fontSize: 12 }} />
                                     </div>
                                     <div>
-                                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Lease End</label>
+                                      <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Rent End</label>
                                       <input type="date" value={row.leaseEnd} onChange={e => editRow(idx, 'leaseEnd', e.target.value)} style={{ ...inputStyle, height: 36, fontSize: 12 }} />
                                     </div>
                                   </div>

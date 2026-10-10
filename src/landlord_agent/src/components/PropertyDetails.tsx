@@ -403,41 +403,21 @@ export function PropertyDetails({
 
       {/* ── Hero photo strip ───────────────────────────────────────────────── */}
       {validPhotos.length > 0 ? (
-        <div className="relative bg-[#1e293b]" style={{ height: 320 }}>
-          <img src={validPhotos[heroIdx]?.url} alt="Property"
-            className="w-full h-full object-cover opacity-95" />
-          {/* Counter */}
-          <span className="absolute bottom-4 right-4 text-[12px] font-semibold text-white px-3 py-1 rounded-full"
-            style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-            {heroIdx + 1} / {validPhotos.length}
-          </span>
-          {validPhotos.length > 1 && (
-            <>
-              <button type="button"
-                onClick={() => setHeroIdx(i => (i - 1 + validPhotos.length) % validPhotos.length)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center text-white transition-all hover:bg-white/30"
-                style={{ background: 'rgba(0,0,0,0.30)' }}>
-                <ChevronLeft size={18} />
-              </button>
-              <button type="button"
-                onClick={() => setHeroIdx(i => (i + 1) % validPhotos.length)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center text-white transition-all hover:bg-white/30"
-                style={{ background: 'rgba(0,0,0,0.30)' }}>
-                <ChevronRight size={18} />
-              </button>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                {validPhotos.slice(0, 8).map((p, i) => (
-                  <button key={p.id} type="button" onClick={() => setHeroIdx(i)}
-                    className="w-2 h-2 rounded-full transition-all"
-                    style={{ background: i === heroIdx ? 'white' : 'rgba(255,255,255,0.45)' }} />
-                ))}
-              </div>
-            </>
-          )}
+        <div className="relative bg-[#1e293b] w-full overflow-hidden flex items-center justify-center" style={{ height: 360 }}>
+          {(() => {
+            const coverPhoto = validPhotos.find(p => p.isCover) || validPhotos[0];
+            return (
+              <>
+                <img src={coverPhoto.url} alt="" className="absolute inset-0 w-full h-full object-cover blur-[40px] opacity-40 scale-110" />
+                <img src={coverPhoto.url} alt="Property Cover" className="relative z-10 w-full h-full object-contain" />
+              </>
+            );
+          })()}
+          
           {/* Add photos shortcut on hero */}
           <button type="button"
-            onClick={() => { setActiveTab('photos'); fileInputRef.current?.click(); }}
-            className="absolute top-4 right-4 flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-[10px] text-white transition-all hover:bg-white/25"
+            onClick={() => { document.getElementById('photos-section')?.scrollIntoView({ behavior: 'smooth' }); fileInputRef.current?.click(); }}
+            className="absolute z-20 top-4 right-4 flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-[10px] text-white transition-all hover:bg-white/25"
             style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', fontFamily: 'Archivo,sans-serif' }}>
             <Camera size={13} /> Add Photos
           </button>
@@ -476,10 +456,14 @@ export function PropertyDetails({
           {/* ── Left: tabs ─────────────────────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-4">
 
-            {/* Tab bar */}
-            <div className="flex items-center gap-1 p-1 rounded-[14px] bg-[#f1f5f9]" style={{ width: 'fit-content' }}>
-              <button className={TAB_CLASS('overview')}  onClick={() => setActiveTab('overview')}>Overview</button>
-              <button className={TAB_CLASS('documents')} onClick={() => setActiveTab('documents')}>
+            {/* Tab bar (Scroll Links) */}
+            <div className="flex items-center gap-1 p-1 rounded-[14px] bg-[#f1f5f9] sticky top-[80px] z-20" style={{ width: 'fit-content' }}>
+              <button className="px-4 py-2.5 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer border-0 outline-none text-[#64748b] hover:text-[#1e293b] hover:bg-white"
+                onClick={() => document.getElementById('overview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                Overview
+              </button>
+              <button className="px-4 py-2.5 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer border-0 outline-none text-[#64748b] hover:text-[#1e293b] hover:bg-white"
+                onClick={() => document.getElementById('documents-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
                 Documents
                 {expiredDocCount > 0 && (
                   <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold">
@@ -487,17 +471,14 @@ export function PropertyDetails({
                   </span>
                 )}
               </button>
-              <button className={TAB_CLASS('photos')} onClick={() => setActiveTab('photos')}>
+              <button className="px-4 py-2.5 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer border-0 outline-none text-[#64748b] hover:text-[#1e293b] hover:bg-white"
+                onClick={() => document.getElementById('photos-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
                 Photos ({validPhotos.length})
-                {hasChanges && (
-                  <span className="ml-1.5 w-2 h-2 rounded-full bg-amber-400 inline-block" />
-                )}
               </button>
             </div>
 
-            {/* ── Overview tab ─────────────────────────────────────────── */}
-            {activeTab === 'overview' && (
-              <div className="space-y-4">
+            {/* ── Overview Section ─────────────────────────────────────────── */}
+            <div id="overview-section" className="scroll-mt-[140px] space-y-4 pt-2">
                 <SCard>
                   <div className="px-5 pt-5 pb-1">
                     <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-4"
@@ -551,60 +532,10 @@ export function PropertyDetails({
                       style={{ fontFamily: 'Archivo,sans-serif' }}>Notes</p>
                     <p className="text-[13.5px] text-[#475569] leading-relaxed">{property.notes}</p>
                   </SCard>
-                )}
-              </div>
-            )}
-
-            {/* ── Documents tab ─────────────────────────────────────────── */}
-            {activeTab === 'documents' && (
-              <SCard>
-                <div className="flex items-center justify-between px-5 pt-5 pb-4"
-                  style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <p className="text-[14px] font-bold text-[#1e293b]"
-                    style={{ fontFamily: 'Archivo,sans-serif' }}>Property Documents</p>
-                  <button type="button" onClick={onManageDocuments}
-                    className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
-                    style={{ color: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
-                    <Plus size={14} /> Upload Document
-                  </button>
                 </div>
-                {(property.documents ?? []).length === 0 ? (
-                  <div className="flex flex-col items-center py-12 text-center px-5">
-                    <div className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
-                      style={{ background: '#f1f5f9' }}>
-                      <FileText size={24} className="text-[#94a3b8]" />
-                    </div>
-                    <p className="text-[14px] font-semibold text-[#1e293b] mb-1">No documents yet</p>
-                    <p className="text-[13px] text-[#64748b] mb-4">Upload EPC certificates, gas safety checks and tenancy agreements.</p>
-                    <button type="button" onClick={onManageDocuments}
-                      className="text-[13px] font-semibold px-4 py-2.5 rounded-[12px] transition-all hover:opacity-90"
-                      style={{ background: '#136C9E', color: 'white', fontFamily: 'Archivo,sans-serif' }}>
-                      Upload Documents
-                    </button>
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-[#f1f5f9]">
-                    {property.documents.map(doc => (
-                      <li key={doc.id} className="flex items-center gap-3 px-5 py-3.5">
-                        <DocStatusIcon status={doc.status} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13.5px] font-semibold text-[#1e293b] truncate">{doc.name}</p>
-                          <p className="text-[11.5px] text-[#64748b]">{DOC_TYPE_LABELS[doc.type] ?? doc.type}</p>
-                        </div>
-                        <div className="text-right text-[11.5px] text-[#94a3b8] shrink-0">
-                          <p>Issued {dates.docs[doc.id]?.issue ?? '—'}</p>
-                          {doc.expiryDate && <p>Expires {dates.docs[doc.id]?.expiry ?? '—'}</p>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </SCard>
-            )}
 
-            {/* ── Photos tab — fully inline management ──────────────────── */}
-            {activeTab === 'photos' && (
-              <div className="space-y-4">
+            {/* ── Photos Section ─────────────────────────────────────────── */}
+            <div id="photos-section" className="scroll-mt-[140px] space-y-4 pt-6">
 
                 {/* Error banner */}
                 {photoSaveError && (
@@ -678,42 +609,41 @@ export function PropertyDetails({
                           className="group relative rounded-[12px] overflow-hidden bg-[#f1f5f9] cursor-grab active:cursor-grabbing"
                           style={{ opacity: draggedIdx === i ? 0.5 : 1 }}>
 
-                          {/* Image */}
-                          <div className="aspect-video">
+                          <div className="relative aspect-video overflow-hidden">
                             <img src={photo.url} alt={photo.room ?? 'Property'}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                          </div>
 
-                          {/* Drag handle */}
-                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <GripVertical size={14} className="text-white drop-shadow" />
-                          </div>
+                            {/* Drag handle */}
+                            <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <GripVertical size={14} className="text-white drop-shadow" />
+                            </div>
 
-                          {/* Cover badge */}
-                          {photo.isCover && (
-                            <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
-                              style={{ background: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
-                              <Star size={9} fill="currentColor" /> Cover
-                            </span>
-                          )}
+                            {/* Cover badge */}
+                            {photo.isCover && (
+                              <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                                style={{ background: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
+                                <Star size={9} fill="currentColor" /> Cover
+                              </span>
+                            )}
 
-                          {/* Hover overlay actions */}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <button type="button" title="Preview"
-                              onClick={e => { e.stopPropagation(); setPreviewPhoto(photo); }}
-                              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all">
-                              <Eye size={14} />
-                            </button>
-                            <button type="button" title="Download"
-                              onClick={e => { e.stopPropagation(); window.open(photo.url, '_blank', 'noopener'); }}
-                              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all">
-                              <Download size={14} />
-                            </button>
-                            <button type="button" title="Remove"
-                              onClick={e => { e.stopPropagation(); removePhoto(photo.id); }}
-                              className="w-8 h-8 rounded-full bg-red-500/70 hover:bg-red-500 flex items-center justify-center text-white transition-all">
-                              <X size={14} />
-                            </button>
+                            {/* Hover overlay actions */}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <button type="button" title="Preview"
+                                onClick={e => { e.stopPropagation(); setPreviewPhoto(photo); }}
+                                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all">
+                                <Eye size={14} />
+                              </button>
+                              <button type="button" title="Download"
+                                onClick={e => { e.stopPropagation(); window.open(photo.url, '_blank', 'noopener'); }}
+                                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all">
+                                <Download size={14} />
+                              </button>
+                              <button type="button" title="Remove"
+                                onClick={e => { e.stopPropagation(); removePhoto(photo.id); }}
+                                className="w-8 h-8 rounded-full bg-red-500/70 hover:bg-red-500 flex items-center justify-center text-white transition-all">
+                                <X size={14} />
+                              </button>
+                            </div>
                           </div>
 
                           {/* Room tag + set cover — below image */}
@@ -759,7 +689,54 @@ export function PropertyDetails({
                   </div>
                 )}
               </div>
-            )}
+
+            {/* ── Documents Section ─────────────────────────────────────────── */}
+            <div id="documents-section" className="scroll-mt-[140px] pt-6">
+              <SCard>
+                <div className="flex items-center justify-between px-5 pt-5 pb-4"
+                  style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <p className="text-[14px] font-bold text-[#1e293b]"
+                    style={{ fontFamily: 'Archivo,sans-serif' }}>Property Documents</p>
+                  <button type="button" onClick={onManageDocuments}
+                    className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
+                    style={{ color: '#136C9E', fontFamily: 'Archivo,sans-serif' }}>
+                    <Plus size={14} /> Upload Document
+                  </button>
+                </div>
+                {(property.documents ?? []).length === 0 ? (
+                  <div className="flex flex-col items-center py-12 text-center px-5">
+                    <div className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
+                      style={{ background: '#f1f5f9' }}>
+                      <FileText size={24} className="text-[#94a3b8]" />
+                    </div>
+                    <p className="text-[14px] font-semibold text-[#1e293b] mb-1">No documents yet</p>
+                    <p className="text-[13px] text-[#64748b] mb-4">Upload EPC certificates, gas safety checks and tenancy agreements.</p>
+                    <button type="button" onClick={onManageDocuments}
+                      className="text-[13px] font-semibold px-4 py-2.5 rounded-[12px] transition-all hover:opacity-90"
+                      style={{ background: '#136C9E', color: 'white', fontFamily: 'Archivo,sans-serif' }}>
+                      Upload Documents
+                    </button>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-[#f1f5f9]">
+                    {property.documents.map(doc => (
+                      <li key={doc.id} className="flex items-center gap-3 px-5 py-3.5">
+                        <DocStatusIcon status={doc.status} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13.5px] font-semibold text-[#1e293b] truncate">{doc.name}</p>
+                          <p className="text-[11.5px] text-[#64748b]">{DOC_TYPE_LABELS[doc.type] ?? doc.type}</p>
+                        </div>
+                        <div className="text-right text-[11.5px] text-[#94a3b8] shrink-0">
+                          <p>Issued {dates.docs[doc.id]?.issue ?? '—'}</p>
+                          {doc.expiryDate && <p>Expires {dates.docs[doc.id]?.expiry ?? '—'}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </SCard>
+            </div>
+
           </div>
 
           {/* ── Right: sidebar ─────────────────────────────────────────── */}
@@ -832,7 +809,7 @@ export function PropertyDetails({
                   {dates.leaseEnd !== '—' && (
                     <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
                       <Calendar size={13} className="text-[#94a3b8] shrink-0" />
-                      Lease ends {dates.leaseEnd}
+                      Rent ends {dates.leaseEnd}
                     </div>
                   )}
                   {property.tenant.paymentStatus === 'overdue' && (property.tenant as any).overdueAmount && (

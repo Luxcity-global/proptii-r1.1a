@@ -288,8 +288,8 @@ export function MainLayout({
           } as React.CSSProperties
         }
       >
-        {isMobile && (
-          <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-[#e2e8f0] md:hidden">
+        {/* Mobile Header */}
+        <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[#e2e8f0]">
             <div className="flex items-center justify-between h-16 px-4">
               <button
                 type="button"
@@ -311,7 +311,6 @@ export function MainLayout({
               <div className="w-10" />
             </div>
           </div>
-        )}
 
         <CustomSidebar
           navigationItems={navigationItems}
@@ -349,7 +348,7 @@ export function MainLayout({
                     : '#F7F7F7',
           }}
         >
-          {isMobile && <div className="h-16" />}
+          <div className="md:hidden h-16" />
           {currentScreen !== 'dashboard' &&
             currentScreen !== 'properties' &&
             currentScreen !== 'contracts' &&
@@ -360,7 +359,7 @@ export function MainLayout({
             currentScreen !== 'inbox' &&
             currentScreen !== 'documents' &&
             currentScreen !== 'viewings' && (
-            <div className={`${isMobile ? 'mt-4 px-4' : 'mt-6 px-5 lg:px-6'} w-full max-w-7xl mx-auto`}>
+            <div className="mt-4 md:mt-6 px-4 lg:px-6 w-full max-w-7xl mx-auto">
               <LandlordDashboardHeader
                 userProfile={userProfile}
                 userRole={userRole}

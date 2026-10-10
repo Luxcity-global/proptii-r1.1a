@@ -782,7 +782,7 @@ const asDate = (value: unknown): Date | null => {
                   </strong>
                 </div>
                 <div className="ll-cd-field">
-                  <span>Lease end</span>
+                  <span>Rent end</span>
                   <strong>{formatDateSafe(displayTenant.leaseEnd)}</strong>
                 </div>
               </div>

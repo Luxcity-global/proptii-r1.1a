@@ -173,7 +173,7 @@ function statusLabel(status: DisplayStatus): string {
     case 'vacant':
       return 'Vacant';
     case 'expiring':
-      return 'Lease Expiring';
+      return 'Rent Expiring';
     case 'renovation':
       return 'Under Renovation';
     default:
@@ -632,7 +632,7 @@ export function PropertiesPage({
     if (filterTab === 'attention') {
       return {
         title: 'No properties need attention',
-        description: 'Great job! All leases, rent collections, and compliance documents across your portfolio are currently up to date.',
+        description: 'Great job! All rent agreements, rent collections, and compliance documents across your portfolio are currently up to date.',
         tone: 'green' as const,
       };
     }
@@ -709,7 +709,7 @@ export function PropertiesPage({
   const cardBadge = (property: Property, tenant?: Tenant): { label: string; className: string } | null => {
     const status = displayStatus(property, tenant);
     if (property.id === latestId) return { label: '★ Latest', className: 'latest' };
-    if (highestRent > 0 && property.rent === highestRent) return { label: '★ Highest Lease', className: 'highest' };
+    if (highestRent > 0 && property.rent === highestRent) return { label: '★ Highest Rent', className: 'highest' };
     if (status === 'expiring') return { label: '★ Expiring Soon', className: 'expiring' };
     if (status === 'vacant') return { label: '★ Vacant', className: 'vacant' };
     return null;
@@ -942,7 +942,7 @@ export function PropertiesPage({
                 ['all', 'All'],
                 ['attention', 'Needs Attention'],
                 ['vacant', 'Vacant'],
-                ['expiring', 'Lease Expiring'],
+                ['expiring', 'Rent Expiring'],
                 ['drafts', 'Drafts'],
               ] as const
             ).map(([id, label]) => (
@@ -969,13 +969,13 @@ export function PropertiesPage({
             />
 
             <FilterDropdown
-              label="Lease status"
+              label="Rent status"
               value={leaseStatusFilter}
               onChange={setLeaseStatusFilter}
               options={[
                 { value: 'all', label: 'All statuses' },
                 { value: 'occupied', label: 'Occupied' },
-                { value: 'expiring', label: 'Lease Expiring' },
+                { value: 'expiring', label: 'Rent Expiring' },
                 { value: 'vacant', label: 'Vacant' },
               ]}
             />
@@ -1070,7 +1070,7 @@ export function PropertiesPage({
                     <th>Status</th>
                     <th>Tenant</th>
                     <th>Rent/Mo</th>
-                    <th>Lease End</th>
+                    <th>Rent End</th>
                     <th className="right">Action</th>
                   </tr>
                 </thead>
@@ -1136,7 +1136,7 @@ export function PropertiesPage({
                     <th>Status</th>
                     <th>Tenant</th>
                     <th>Rent/Mo</th>
-                    <th>Lease End</th>
+                    <th>Rent End</th>
                     <th className="right">Action</th>
                   </tr>
                 </thead>
@@ -1325,7 +1325,7 @@ export function PropertiesPage({
                           <div className="ll-props-tenant-box-head">
                             <div className="ll-props-tenant-label">
                               <span className="dot" style={{ width: 6, height: 6, borderRadius: 99, background: status === 'expiring' ? '#f43f5e' : '#10b981', display: 'inline-block' }} />
-                              {status === 'expiring' ? 'Lease expiring' : 'Occupied'}
+                              {status === 'expiring' ? 'Rent expiring' : 'Occupied'}
                         </div>
                             {status === 'expiring' && <span className="ll-props-action-needed">Action Needed</span>}
                         </div>

@@ -24,7 +24,7 @@ const LandlordDashboardHeader: React.FC<LandlordDashboardHeaderProps> = ({
 
   return (
     <div
-      className={`bg-white shadow-lg rounded-xl ${isMobile ? 'px-4 py-4' : 'px-4 md:px-8 py-4 md:py-6'}`}
+      className={`bg-[#EAF3F8] shadow-lg rounded-xl ${isMobile ? 'px-4 py-4' : 'px-4 md:px-8 py-4 md:py-6'}`}
       style={{ fontFamily: 'Archivo, sans-serif' }}
     >
       {isMobile ? (
@@ -37,9 +37,9 @@ const LandlordDashboardHeader: React.FC<LandlordDashboardHeaderProps> = ({
               <div>
                 <h1
                   className="text-lg font-semibold"
-                  style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}
+                  style={{ color: '#136C9E', fontFamily: 'Archivo, sans-serif' }}
                 >
-                  Welcome <span style={{ color: '#136C9E' }}>{userName}</span>
+                  Welcome <span style={{ color: '#0c4a6e' }}>{userName}</span>
                 </h1>
                 <span className="inline-flex items-center">
                   <span className="w-2 h-2 bg-green-500 rounded-full mr-1" />
@@ -77,9 +77,9 @@ const LandlordDashboardHeader: React.FC<LandlordDashboardHeaderProps> = ({
             <div>
               <h1
                 className="text-xl font-semibold mb-1"
-                style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}
+                style={{ color: '#136C9E', fontFamily: 'Archivo, sans-serif' }}
               >
-                Welcome <span style={{ color: '#136C9E' }}>{userName}</span>
+                Welcome <span style={{ color: '#0c4a6e' }}>{userName}</span>
               </h1>
               <p className="text-sm" style={{ color: '#717182' }}>
                 Here&apos;s what&apos;s happening with your property portfolio

@@ -296,7 +296,7 @@ export function TenantSelection({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-800 text-sm">I have their details</p>
-                      <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">Fill in name, phone, rent, lease dates and more. Added immediately.</p>
+                      <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">Fill in name, phone, rent, rent dates and more. Added immediately.</p>
                     </div>
                   </div>
                   <button onClick={() => onManualInput(trimmedEmail)} className={BTN_PRIMARY} style={{ background: `linear-gradient(135deg, ${PRIMARY_BLUE}, #1a87c4)` }}>

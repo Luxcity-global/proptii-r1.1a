@@ -127,7 +127,7 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex items-center space-x-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">Current Lease End</span>
+                      <span className="text-sm">Current Rent End</span>
                     </div>
                     <span className="font-medium">{safeDate(alert.currentTenantEndDate)}</span>
                   </div>

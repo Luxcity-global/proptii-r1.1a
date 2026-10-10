@@ -1070,7 +1070,7 @@ export function Dashboard({
                         <div className="ll-alert-desc">
                           {alert.propertyAddress ||
                             alert.tenantName ||
-                            (type === "vacancy" ? "Lease ending soon" : "Payment overdue")}
+                            (type === "vacancy" ? "Rent ending soon" : "Payment overdue")}
                         </div>
                       </div>
                     </button>
@@ -1098,7 +1098,7 @@ export function Dashboard({
                 [
                   ["all", "All Properties"],
                   ["latest", "Latest Property"],
-                  ["highest", "Highest Lease"],
+                  ["highest", "Highest Rent"],
                   ["expiring", "Expiring Soon"],
                 ] as const
               ).map(([id, label]) => (
@@ -1153,7 +1153,7 @@ export function Dashboard({
                       )}
                       <div className="ll-prop-badge">
                         {propertyPill === "highest" || showHighest
-                          ? "Highest Lease"
+                          ? "Highest Rent"
                           : property.status === "occupied"
                             ? "Occupied"
                             : property.status === "vacant"

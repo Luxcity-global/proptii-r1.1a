@@ -133,8 +133,8 @@ export function BulkAssignTable({ tenants, properties, onBack, onComplete }: Bul
       if (!a.propertyId)                        errs.push(`Row ${i + 1}: select a property`);
       if (!a.rentAmount || isNaN(parseFloat(a.rentAmount)) || parseFloat(a.rentAmount) <= 0)
                                                  errs.push(`Row ${i + 1}: valid rent required`);
-      if (!a.leaseStart || isNaN(Date.parse(a.leaseStart))) errs.push(`Row ${i + 1}: valid lease start required`);
-      if (!a.leaseEnd   || isNaN(Date.parse(a.leaseEnd)))   errs.push(`Row ${i + 1}: valid lease end required`);
+      if (!a.leaseStart || isNaN(Date.parse(a.leaseStart))) errs.push(`Row ${i + 1}: valid rent start required`);
+      if (!a.leaseEnd   || isNaN(Date.parse(a.leaseEnd)))   errs.push(`Row ${i + 1}: valid rent end required`);
     });
     // duplicate property check
     const propIds = assignments.map(a => a.propertyId).filter(Boolean);
@@ -233,7 +233,7 @@ export function BulkAssignTable({ tenants, properties, onBack, onComplete }: Bul
                 Assign Tenants to Properties
               </h1>
               <p className="text-[13.5px] text-[#64748b] mb-7">
-                Match each tenant to a vacant property. Set rent, lease dates, and payment frequency.
+                Match each tenant to a vacant property. Set rent, rent dates, and payment frequency.
               </p>
 
               {/* Quick-add unassigned tenants */}
@@ -367,7 +367,7 @@ export function BulkAssignTable({ tenants, properties, onBack, onComplete }: Bul
                             <input type="date" value={a.leaseStart} onChange={e => updateRow(idx, 'leaseStart', e.target.value)} className={INP} />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-semibold text-[#475569] mb-1.5" style={{ fontFamily: 'Archivo,sans-serif' }}>Lease End *</label>
+                            <label className="block text-[11px] font-semibold text-[#475569] mb-1.5" style={{ fontFamily: 'Archivo,sans-serif' }}>Rent End *</label>
                             <input type="date" value={a.leaseEnd} onChange={e => updateRow(idx, 'leaseEnd', e.target.value)} className={INP} />
                           </div>
                         </div>
