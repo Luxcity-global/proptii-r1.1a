@@ -78,7 +78,7 @@ describe('Property 22: MessageThread renders messages in chronological order wit
                     );
 
                     // Mock the service to return these messages
-                    mockGetMessages.mockResolvedValueOnce(messages);
+                    mockGetMessages.mockResolvedValueOnce({ messages, hasMore: false });
 
                     const currentUserId = 'current-user-test';
 

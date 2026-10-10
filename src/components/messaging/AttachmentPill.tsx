@@ -76,11 +76,11 @@ const AttachmentPill: React.FC<AttachmentPillProps> = ({
     isError = false,
 }) => {
     // Colour tokens
-    const card = isSent ? 'rgba(255,255,255,0.18)' : '#f0f7ff';
-    const border = isSent ? 'rgba(255,255,255,0.28)' : '#bfdbfe';
-    const name = isSent ? '#ffffff' : '#1d4ed8';
-    const meta = isSent ? 'rgba(255,255,255,0.72)' : '#60a5fa';
-    const dlColor = isSent ? 'rgba(255,255,255,0.85)' : '#3b82f6';
+    const card = isSent ? 'rgba(0, 0, 0, 0.15)' : '#ffffff';
+    const border = isSent ? 'rgba(0, 0, 0, 0.1)' : '#e5e7eb';
+    const name = isSent ? '#ffffff' : '#111827';
+    const meta = isSent ? 'rgba(255, 255, 255, 0.8)' : '#6b7280';
+    const dlColor = isSent ? '#ffffff' : '#4b5563';
 
     const baseStyle: React.CSSProperties = {
         display: 'inline-flex',

@@ -84,7 +84,15 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+.ll-header-actions::-webkit-scrollbar {
+  display: none;
 }
 
 .ll-header-icon {

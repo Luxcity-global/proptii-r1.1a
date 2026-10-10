@@ -93,6 +93,13 @@
   gap: 10px;
   flex-shrink: 0;
   flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px; /* give some breathing room for scrollbar */
+  scrollbar-width: none; /* Firefox */
+}
+.tn-ph-actions::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .tn-ph-icon {

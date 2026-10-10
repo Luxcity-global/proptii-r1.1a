@@ -96,6 +96,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
     const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleEdit = async (messageId: string, currentBody: string) => {
@@ -295,9 +296,14 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                         data-sender-id={message.senderId}
                         data-sent-at={message.sentAt}
                         data-alignment={isSent ? 'right' : 'left'}
+                        onMouseEnter={() => setHoveredMessageId(message.id)}
+                        onMouseLeave={() => setHoveredMessageId(null)}
                         style={{
                             display: 'flex',
                             justifyContent: isSent ? 'flex-end' : 'flex-start',
+                            position: 'relative',
+                            paddingTop: '8px',
+                            paddingBottom: '8px',
                         }}
                     >
                         <div
@@ -309,6 +315,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 color: isSent ? '#ffffff' : '#111827',
                                 textAlign: isSent ? 'right' : 'left',
                                 position: 'relative',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                             }}
                         >
                             {message.isDeleted ? (
@@ -359,25 +366,6 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                     </time>
                                 )}
                                 
-                                {/* Edit/Delete actions */}
-                                {isSent && !message.isDeleted && (
-                                    <div style={{ display: 'flex', gap: '8px', marginLeft: '6px', opacity: 0.8 }}>
-                                        <button 
-                                            onClick={() => handleEdit(message.id, message.body)} 
-                                            title="Edit Message"
-                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', alignItems: 'center' }}
-                                        >
-                                            <Pencil size={12} />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDelete(message.id)} 
-                                            title="Delete Message"
-                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', display: 'flex', alignItems: 'center' }}
-                                        >
-                                            <Trash2 size={12} />
-                                        </button>
-                                    </div>
-                                )}
                                 {/* Read receipt — only shown on sent messages */}
                                 {isSent && (
                                     <span
@@ -399,6 +387,44 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 )}
                             </div>
                         </div>
+
+                        {/* Edit/Delete Floating Action Bar */}
+                        {isSent && !message.isDeleted && hoveredMessageId === message.id && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '-6px',
+                                right: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                backgroundColor: '#ffffff',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '16px',
+                                padding: '2px 6px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                zIndex: 10,
+                            }}>
+                                <button 
+                                    onClick={() => handleEdit(message.id, message.body)} 
+                                    title="Edit Message"
+                                    style={{ background: 'none', border: 'none', padding: '6px', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', borderRadius: '50%' }}
+                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <Pencil size={13} />
+                                </button>
+                                <div style={{ width: '1px', height: '14px', backgroundColor: '#e5e7eb', margin: '0 2px' }} />
+                                <button 
+                                    onClick={() => handleDelete(message.id)} 
+                                    title="Delete Message"
+                                    style={{ background: 'none', border: 'none', padding: '6px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', borderRadius: '50%' }}
+                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <Trash2 size={13} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 );
             })}
