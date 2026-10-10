@@ -37,24 +37,24 @@ header() {
 }
 
 # =============================================================================
-# 1. BACKEND — Jest
+# 1. BACKEND — Vitest
 # =============================================================================
-header "🔧  BACKEND TESTS  (api/ — Jest)"
+header "🔧  BACKEND TESTS  (v2-backend/ — Vitest)"
 
 BACKEND_PATTERN="communication|ConversationService|AttachmentService|NotificationService|conversationParticipantGuard|phoneNormaliser"
 
 if [ "$COVERAGE" = "--coverage" ]; then
-  BACKEND_CMD="npm test -- --verbose --coverage --testPathPattern=\"$BACKEND_PATTERN\""
+  BACKEND_CMD="npm run test -- --coverage \"$BACKEND_PATTERN\""
 else
-  BACKEND_CMD="npm test -- --verbose --testPathPattern=\"$BACKEND_PATTERN\""
+  BACKEND_CMD="npm run test -- \"$BACKEND_PATTERN\""
 fi
 
 echo -e "${YELLOW}▶  Running: $BACKEND_CMD${RESET}"
 echo ""
 
-# Run from api/ directory; capture exit code without stopping the script
+# Run from v2-backend/ directory; capture exit code without stopping the script
 set +e
-(cd api && eval "$BACKEND_CMD")
+(cd v2-backend && eval "$BACKEND_CMD")
 BACKEND_EXIT=$?
 set -e
 
@@ -73,12 +73,12 @@ echo ""
 # =============================================================================
 header "🎨  FRONTEND TESTS  (root — Vitest)"
 
-FRONTEND_PATTERN="communicationService|MessagingPoller|MessageThread|ComposeBox|ConversationListItem|DashboardSidebar|ListingCard"
+FRONTEND_PATTERN="communicationService|MessagingPoller|MessageThread|ComposeBox|ConversationListItem|DashboardSidebar|ListingCard|TenantInbox"
 
 if [ "$COVERAGE" = "--coverage" ]; then
-  FRONTEND_CMD="npm run test -- --run --reporter=verbose --coverage \"$FRONTEND_PATTERN\""
+  FRONTEND_CMD="npm run test -- --run --coverage \"$FRONTEND_PATTERN\""
 else
-  FRONTEND_CMD="npm run test -- --run --reporter=verbose \"$FRONTEND_PATTERN\""
+  FRONTEND_CMD="npm run test -- --run \"$FRONTEND_PATTERN\""
 fi
 
 echo -e "${YELLOW}▶  Running: $FRONTEND_CMD${RESET}"

@@ -6,16 +6,8 @@ import { CommunicationService } from '../services/communication.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import { randomUUID } from 'crypto';
+import { setSseTicket, getSseTicketInfo, deleteSseTicket } from '../utils/sse-tickets';
 
-// ── In-memory SSE ticket store ────────────────────────────────────────────────
-// Short-lived (60s) opaque tickets that let the client connect to SSE without
-// exposing the Bearer token in the URL / server access logs.
-const sseTickets = new Map<string, { uid: string; email: string; role: string; expiresAt: number }>();
-
-setInterval(() => {
-  const now = Date.now();
-  sseTickets.forEach((v, k) => { if (v.expiresAt < now) sseTickets.delete(k); });
-}, 30_000);
 
 @ApiTags('Communication')
 @ApiBearerAuth('bearer')
@@ -37,7 +29,7 @@ export class CommunicationController {
   @ApiResponse({ status: 200, description: 'One-time SSE ticket valid for 60 seconds' })
   issueSseTicket(@Req() req: any) {
     const ticket = randomUUID();
-    sseTickets.set(ticket, {
+    setSseTicket(ticket, {
       uid:       req.user.uid,
       email:     req.user.email || '',
       role:      req.user.role  || '',
@@ -57,11 +49,11 @@ export class CommunicationController {
     let role: string;
 
     if (ticket) {
-      const info = sseTickets.get(ticket);
+      const info = getSseTicketInfo(ticket);
       if (!info || info.expiresAt < Date.now()) {
         throw new UnauthorizedException('SSE ticket is invalid or has expired');
       }
-      sseTickets.delete(ticket); // one-time use
+      deleteSseTicket(ticket); // one-time use
       uid   = info.uid;
       email = info.email;
       role  = info.role;
@@ -147,7 +139,7 @@ export class CommunicationController {
       data: {
         conversationId,
         senderId: userId,
-        message: result,
+        message: result.data,
       },
     });
 

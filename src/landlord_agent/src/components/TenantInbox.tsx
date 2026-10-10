@@ -115,6 +115,8 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   const [composeTenantName,  setComposeTenantName]  = useState('');
   const [composeCreating,    setComposeCreating]    = useState(false);
   const [composeError,       setComposeError]       = useState<string | null>(null);
+  const [tenantSearch,       setTenantSearch]       = useState('');
+  const [showTenantDropdown, setShowTenantDropdown] = useState(false);
 
   // Load tenants for the compose picker
   const { tenants: allTenants } = useTenants({
@@ -125,6 +127,8 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   const optimisticBottomRef = useRef<HTMLDivElement>(null);
   // Track last seen lastMessageAt per conversation to detect when real messages arrive
   const lastSeenAt = useRef<Record<string, string | null>>({});
+  // Track pending optimistic message IDs so we can clear them once MessageThread confirms load
+  const pendingOptimisticIds = useRef<Record<string, Set<string>>>({});
 
   const scrollToBottom = useCallback(() => {
     optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -132,14 +136,24 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
 
   // When the active conversation receives a new real message (lastMessageAt advances),
   // clear the optimistic messages for that conversation to prevent double-rendering.
+  // IMPORTANT: only clear if we have previously seen a lastMessageAt for this conversation
+  // (i.e. prev !== undefined), and the value has actually advanced. This prevents the
+  // poller's 15-second tick from wiping optimistics before MessageThread has re-fetched.
   useEffect(() => {
     if (!activeConversationId) return;
     const conv = conversations.find((c) => c.id === activeConversationId);
     if (!conv) return;
     const prev = lastSeenAt.current[activeConversationId];
     const now = conv.lastMessageAt;
-    if (now && prev !== null && now !== prev) {
-      setOptimisticMessages((m) => ({ ...m, [activeConversationId]: [] }));
+    // prev === undefined → first time we see this conversation, just record and skip clear
+    // prev === null or a timestamp → if now has advanced, schedule a delayed clear so
+    // MessageThread has time to fetch the real messages first.
+    if (prev !== undefined && now && now !== prev) {
+      // Delay clearing optimistics to give MessageThread's useEffect time to fire and
+      // load the real messages (avoids a flash of empty thread between send and fetch).
+      setTimeout(() => {
+        setOptimisticMessages((m) => ({ ...m, [activeConversationId]: [] }));
+      }, 1500);
     }
     lastSeenAt.current[activeConversationId] = now;
   }, [activeConversationId, conversations]);
@@ -158,8 +172,13 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   const handleSelect = useCallback(
     (id: string) => {
       setActiveConversationId(id);
-      setOptimisticMessages((prev) => ({ ...prev, [id]: [] }));
+      // Do NOT clear optimistic messages here — they may belong to this conversation
+      // if the user just sent a message and immediately clicked away and back.
+      // Initialise lastSeenAt sentinel so the poller won't wipe optimistics on first tick.
       const conv = conversations.find((c) => c.id === id);
+      if (!(id in lastSeenAt.current)) {
+        lastSeenAt.current[id] = conv?.lastMessageAt ?? null;
+      }
       const prevCursor = readCursors[id] ?? null;
       if (conv && isUnread(conv, prevCursor)) decrementUnreadCount(1);
       setReadCursors((prev) => ({ ...prev, [id]: new Date().toISOString() }));
@@ -202,6 +221,8 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
     setComposePropertyId('');
     setComposePropertyTitle('');
     setComposeTenantName('');
+    setTenantSearch('');
+    setShowTenantDropdown(false);
     setShowCompose(true);
   };
 
@@ -309,14 +330,16 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
               </button>
             ) : null}
             {onAddTenant ? (
-              <button type="button" className="ll-msg-btn-add" onClick={onAddTenant}>
-                <Plus size={16} strokeWidth={2.5} />
+              <button type="button" className="ll-msg-btn-insights" onClick={onAddTenant}
+                title="Add a new tenant">
+                <span className="ll-msg-insights-icon">
+                  <Plus size={13} strokeWidth={2.5} />
+                </span>
                 Add Tenant
               </button>
             ) : null}
-            {/* New Message button — lets landlord initiate a conversation */}
+            {/* New Message — primary orange CTA */}
             <button type="button" className="ll-msg-btn-add" onClick={handleOpenCompose}
-              style={{ background: '#DC5F12' }}
               title="Start a new conversation">
               <Edit size={15} strokeWidth={2.5} />
               New Message
@@ -518,33 +541,94 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
               </button>
             </div>
 
-            {/* Tenant picker */}
+            {/* Tenant picker — searchable custom dropdown */}
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Select Tenant *
               </label>
               <div style={{ position: 'relative' }}>
-                <select
-                  value={composeTenantId}
-                  onChange={e => {
-                    const tid = e.target.value;
-                    setComposeTenantId(tid);
-                    const t = allTenants.find(t => t.id === tid);
-                    if (t) {
-                      setComposeTenantName(t.name);
-                      setComposePropertyId(t.propertyId || '');
-                      setComposePropertyTitle(t.propertyAddress || '');
-                    }
-                  }}
-                  style={{ width: '100%', height: 44, border: '2px solid #e2e8f0', borderRadius: 12, padding: '0 36px 0 14px', fontSize: 14, color: '#1e293b', background: '#fff', appearance: 'none', cursor: 'pointer', outline: 'none' }}
+                {/* Search input that doubles as display */}
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 44, border: `2px solid ${showTenantDropdown ? '#136C9E' : '#e2e8f0'}`, borderRadius: 12, padding: '0 12px', background: '#fff', cursor: 'text', boxSizing: 'border-box' }}
+                  onClick={() => setShowTenantDropdown(true)}
                 >
-                  <option value="">Choose a tenant…</option>
-                  {allTenants.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} {t.propertyAddress ? `— ${t.propertyAddress.split(',')[0]}` : ''}</option>
-                  ))}
-                </select>
-                <ChevronDown size={16} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+                  {composeTenantId && !showTenantDropdown ? (
+                    <span style={{ flex: 1, fontSize: 14, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {composeTenantName}
+                    </span>
+                  ) : (
+                    <input
+                      autoFocus={showTenantDropdown}
+                      value={tenantSearch}
+                      onChange={e => { setTenantSearch(e.target.value); setShowTenantDropdown(true); }}
+                      onFocus={() => setShowTenantDropdown(true)}
+                      placeholder={composeTenantId ? composeTenantName : 'Search tenants…'}
+                      style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, color: '#1e293b', background: 'transparent', minWidth: 0 }}
+                    />
+                  )}
+                  <ChevronDown size={15} style={{ color: '#94a3b8', flexShrink: 0, transform: showTenantDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </div>
+
+                {/* Dropdown list */}
+                {showTenantDropdown && (
+                  <div
+                    style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', marginTop: 4, maxHeight: 220, overflowY: 'auto' }}
+                    onMouseDown={e => e.preventDefault()} // prevent blur
+                  >
+                    {/* Select all */}
+                    <div
+                      style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, color: '#94a3b8', cursor: 'default', borderBottom: '1px solid #f1f5f9', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                    >
+                      <span>{allTenants.filter(t => !tenantSearch || t.name.toLowerCase().includes(tenantSearch.toLowerCase()) || (t.propertyAddress || '').toLowerCase().includes(tenantSearch.toLowerCase())).length} tenant{allTenants.length !== 1 ? 's' : ''}</span>
+                      {composeTenantId && (
+                        <button type="button" onClick={() => { setComposeTenantId(''); setComposeTenantName(''); setComposePropertyId(''); setComposePropertyTitle(''); setTenantSearch(''); }}
+                          style={{ fontSize: 11, color: '#DC5F12', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {allTenants
+                      .filter(t => !tenantSearch || t.name.toLowerCase().includes(tenantSearch.toLowerCase()) || (t.propertyAddress || '').toLowerCase().includes(tenantSearch.toLowerCase()))
+                      .map(t => (
+                        <div
+                          key={t.id}
+                          onClick={() => {
+                            setComposeTenantId(t.id);
+                            setComposeTenantName(t.name);
+                            setComposePropertyId(t.propertyId || '');
+                            setComposePropertyTitle(t.propertyAddress || '');
+                            setTenantSearch('');
+                            setShowTenantDropdown(false);
+                          }}
+                          style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: composeTenantId === t.id ? '#f0f8fd' : 'transparent', borderLeft: composeTenantId === t.id ? '3px solid #136C9E' : '3px solid transparent' }}
+                          onMouseEnter={e => { if (composeTenantId !== t.id) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                          onMouseLeave={e => { if (composeTenantId !== t.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                        >
+                          <span style={{ width: 32, height: 32, borderRadius: '50%', background: composeTenantId === t.id ? '#136C9E' : '#eaf3f8', color: composeTenantId === t.id ? '#fff' : '#136C9E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                            {t.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                          </span>
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</p>
+                            {t.propertyAddress && <p style={{ margin: '1px 0 0', fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.propertyAddress.split(',')[0]}</p>}
+                          </div>
+                          {composeTenantId === t.id && <span style={{ marginLeft: 'auto', color: '#136C9E', fontSize: 16, flexShrink: 0 }}>✓</span>}
+                        </div>
+                      ))
+                    }
+
+                    {allTenants.filter(t => !tenantSearch || t.name.toLowerCase().includes(tenantSearch.toLowerCase()) || (t.propertyAddress || '').toLowerCase().includes(tenantSearch.toLowerCase())).length === 0 && (
+                      <div style={{ padding: '16px 14px', textAlign: 'center', fontSize: 13, color: '#94a3b8' }}>
+                        No tenants found
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+              {/* Click-outside to close */}
+              {showTenantDropdown && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowTenantDropdown(false)} />
+              )}
             </div>
 
             {/* Property override (optional) */}

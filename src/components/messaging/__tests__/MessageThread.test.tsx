@@ -20,6 +20,17 @@ vi.mock('../../../services/communicationService', () => ({
     },
 }));
 
+// ---------------------------------------------------------------------------
+// Mock sseService — prevents real EventSource connections in tests
+// ---------------------------------------------------------------------------
+
+vi.mock('../../../services/sseService', () => ({
+    default: {
+        on: vi.fn(() => () => {}), // returns a no-op unsubscribe function
+        dispatch: vi.fn(),
+    },
+}));
+
 import communicationService from '../../../services/communicationService';
 
 const mockGetMessages = communicationService.getMessages as ReturnType<typeof vi.fn>;
@@ -45,6 +56,11 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
     };
 }
 
+/** Helper: wrap messages in the { messages, hasMore } shape expected by MessageThread */
+function mockMessages(msgs: Message[], hasMore = false) {
+    return { messages: msgs, hasMore };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -61,7 +77,7 @@ describe('MessageThread', () => {
             makeMessage({ id: 'msg-1', sentAt: '2024-01-01T10:00:00Z', body: 'First' }),
             makeMessage({ id: 'msg-2', sentAt: '2024-01-01T11:00:00Z', body: 'Second' }),
         ];
-        mockGetMessages.mockResolvedValueOnce(messages);
+        mockGetMessages.mockResolvedValueOnce(mockMessages(messages));
 
         render(<MessageThread conversationId="conv-1" currentUserId="user-a" />);
 
@@ -80,7 +96,7 @@ describe('MessageThread', () => {
         const messages: Message[] = [
             makeMessage({ id: 'msg-1', senderId: 'current-user', sentAt: '2024-01-01T10:00:00Z' }),
         ];
-        mockGetMessages.mockResolvedValueOnce(messages);
+        mockGetMessages.mockResolvedValueOnce(mockMessages(messages));
 
         render(<MessageThread conversationId="conv-1" currentUserId="current-user" />);
 
@@ -96,7 +112,7 @@ describe('MessageThread', () => {
         const messages: Message[] = [
             makeMessage({ id: 'msg-1', senderId: 'other-user', sentAt: '2024-01-01T10:00:00Z' }),
         ];
-        mockGetMessages.mockResolvedValueOnce(messages);
+        mockGetMessages.mockResolvedValueOnce(mockMessages(messages));
 
         render(<MessageThread conversationId="conv-1" currentUserId="current-user" />);
 
@@ -114,7 +130,7 @@ describe('MessageThread', () => {
             makeMessage({ id: 'msg-2', senderId: 'other-user', readAt: '2024-01-01T10:00:00Z' }),
             makeMessage({ id: 'msg-3', senderId: 'current-user', readAt: null }),
         ];
-        mockGetMessages.mockResolvedValueOnce(messages);
+        mockGetMessages.mockResolvedValueOnce(mockMessages(messages));
 
         render(<MessageThread conversationId="conv-1" currentUserId="current-user" />);
 
@@ -136,7 +152,7 @@ describe('MessageThread', () => {
     });
 
     it('shows empty state when there are no messages', async () => {
-        mockGetMessages.mockResolvedValueOnce([]);
+        mockGetMessages.mockResolvedValueOnce(mockMessages([]));
 
         render(<MessageThread conversationId="conv-1" currentUserId="current-user" />);
 
@@ -146,7 +162,7 @@ describe('MessageThread', () => {
     });
 
     it('re-fetches messages when conversationId changes', async () => {
-        mockGetMessages.mockResolvedValue([]);
+        mockGetMessages.mockResolvedValue(mockMessages([]));
 
         const { rerender } = render(
             <MessageThread conversationId="conv-1" currentUserId="current-user" />
@@ -160,6 +176,59 @@ describe('MessageThread', () => {
 
         await waitFor(() => {
             expect(mockGetMessages).toHaveBeenCalledWith('conv-2');
+        });
+    });
+
+    it('shows the scroll anchor sentinel element', async () => {
+        mockGetMessages.mockResolvedValueOnce(mockMessages([]));
+
+        render(<MessageThread conversationId="conv-1" currentUserId="current-user" />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('scroll-anchor')).toBeInTheDocument();
+        });
+    });
+
+    it('does not call markRead for own messages even if unread', async () => {
+        const messages: Message[] = [
+            makeMessage({ id: 'msg-1', senderId: 'current-user', readAt: null }),
+        ];
+        mockGetMessages.mockResolvedValueOnce(mockMessages(messages));
+
+        render(<MessageThread conversationId="conv-1" currentUserId="current-user" />);
+
+        await waitFor(() => {
+            expect(screen.getAllByTestId('message-item')).toHaveLength(1);
+        });
+
+        expect(mockMarkRead).not.toHaveBeenCalled();
+    });
+
+    it('shows loading state while messages are being fetched', async () => {
+        // Never resolves during this test
+        let resolveMessages: (v: any) => void;
+        mockGetMessages.mockReturnValueOnce(
+            new Promise((res) => { resolveMessages = res; })
+        );
+
+        render(<MessageThread conversationId="conv-1" currentUserId="current-user" />);
+
+        expect(screen.getByTestId('message-thread-loading')).toBeInTheDocument();
+
+        // Resolve to stop leaking
+        resolveMessages!(mockMessages([]));
+    });
+
+    it('displays message body text', async () => {
+        const messages: Message[] = [
+            makeMessage({ id: 'msg-1', body: 'Test message body', senderId: 'other-user' }),
+        ];
+        mockGetMessages.mockResolvedValueOnce(mockMessages(messages));
+
+        render(<MessageThread conversationId="conv-1" currentUserId="current-user" />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Test message body')).toBeInTheDocument();
         });
     });
 });

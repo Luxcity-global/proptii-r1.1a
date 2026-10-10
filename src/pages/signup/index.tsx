@@ -189,7 +189,7 @@ const DedicatedSignupPage: React.FC = () => {
       <main className="flex-1 flex items-center justify-center p-4 relative z-10 my-4">
         <div className="w-full max-w-[480px] bg-white/70 backdrop-blur-2xl rounded-[2.5rem] p-8 sm:p-12 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-white/60 relative overflow-hidden">
           {/* Top accent line */}
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-[#136C9E] via-[#DC5F12] to-[#136C9E]" />
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-primary" />
           {/* VIP Campaign Badge */}
           {(isFromCampaign || campaignLead) && (
             <div className="mb-5 p-3 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center gap-3 text-amber-900 shadow-sm">
@@ -283,7 +283,7 @@ const DedicatedSignupPage: React.FC = () => {
 
             <button
               type="submit"
-              className="group w-full py-4 px-5 bg-gradient-to-r from-[#0F2537] to-[#136C9E] hover:from-[#136C9E] hover:to-[#0F2537] text-white font-bold rounded-2xl text-[15px] transition-all duration-300 shadow-[0_8px_20px_rgba(19,108,158,0.2)] hover:shadow-[0_12px_25px_rgba(19,108,158,0.3)] active:scale-[0.98] flex items-center justify-center gap-2"
+              className="group w-full py-4 px-5 bg-primary hover:bg-stamp-hover text-white font-bold rounded-2xl text-[15px] transition-all duration-300 shadow-[0_8px_20px_rgba(241,90,34,0.2)] hover:shadow-[0_12px_25px_rgba(241,90,34,0.3)] active:scale-[0.98] flex items-center justify-center gap-2"
             >
               Continue with email
               <span className="transition-transform group-hover:translate-x-1">&rarr;</span>

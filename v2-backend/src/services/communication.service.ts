@@ -37,13 +37,19 @@ export class CommunicationService {
 
     try {
       const [tenantSnap, landlordSnap] = await Promise.all([
-        col.where('tenantId', '==', userId).where('isDeleted', '==', false).get(),
-        col.where('landlordId', '==', userId).where('isDeleted', '==', false).get(),
+        col.where('tenantId', '==', userId).get(),
+        col.where('landlordId', '==', userId).get(),
       ]);
 
       const convMap = new Map<string, any>();
-      tenantSnap.docs.forEach(doc => convMap.set(doc.id, { id: doc.id, ...doc.data(), messages: [] }));
-      landlordSnap.docs.forEach(doc => convMap.set(doc.id, { id: doc.id, ...doc.data(), messages: [] }));
+      tenantSnap.docs.forEach(doc => {
+        const d = doc.data();
+        if (d.isDeleted !== true) convMap.set(doc.id, { id: doc.id, ...d, messages: [] });
+      });
+      landlordSnap.docs.forEach(doc => {
+        const d = doc.data();
+        if (d.isDeleted !== true) convMap.set(doc.id, { id: doc.id, ...d, messages: [] });
+      });
 
       const list = Array.from(convMap.values()).sort((a, b) => {
         const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
@@ -65,13 +71,19 @@ export class CommunicationService {
 
     try {
       const [tenantSnap, landlordSnap] = await Promise.all([
-        col.where('tenantId', '==', userId).where('isDeleted', '==', false).get(),
-        col.where('landlordId', '==', userId).where('isDeleted', '==', false).get(),
+        col.where('tenantId', '==', userId).get(),
+        col.where('landlordId', '==', userId).get(),
       ]);
 
       const convMap = new Map<string, any>();
-      tenantSnap.docs.forEach(doc => convMap.set(doc.id, doc.data()));
-      landlordSnap.docs.forEach(doc => convMap.set(doc.id, doc.data()));
+      tenantSnap.docs.forEach(doc => {
+        const d = doc.data();
+        if (d.isDeleted !== true) convMap.set(doc.id, d);
+      });
+      landlordSnap.docs.forEach(doc => {
+        const d = doc.data();
+        if (d.isDeleted !== true) convMap.set(doc.id, d);
+      });
 
       let unreadCount = 0;
       for (const [, conv] of convMap) {
@@ -164,12 +176,15 @@ export class CommunicationService {
     }
 
     try {
-      // Build cursor-paginated query — newest-first then reverse for display
-      let query = col
+      // Build cursor-paginated query — newest-first then reverse for display.
+      // Note: we intentionally do NOT filter by isDeleted here because:
+      // 1. Older messages don't have this field, so isDeleted==false would exclude them
+      // 2. Firestore requires a composite index for (conversationId + isDeleted + sentAt)
+      //    which may not exist in all environments. Filter client-side instead.
+      let query: any = col
         .where('conversationId', '==', conversationId)
-        .where('isDeleted', '==', false)
         .orderBy('sentAt', 'desc')
-        .limit(limit + 1); // Fetch one extra to determine hasMore
+        .limit(limit + 1);
 
       if (before) {
         query = query.startAfter(before);
@@ -179,10 +194,11 @@ export class CommunicationService {
       const hasMore = snapshot.docs.length > limit;
       const docs = hasMore ? snapshot.docs.slice(0, limit) : snapshot.docs;
 
-      // Reverse to chronological order for display
-      const messages = docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .reverse();
+      // Filter out soft-deleted messages in code (avoids composite index requirement)
+      const allMessages = docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      const messages = allMessages
+        .filter((m: any) => m.isDeleted !== true)
+        .reverse(); // back to chronological order
 
       // ── Embed attachment objects to eliminate N+1 client-side fetches ──────
       // Instead of the client calling GET /attachments/:id once per attachment

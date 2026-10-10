@@ -119,7 +119,7 @@ describe('ComposeBox', () => {
     it('renders file input with correct accept attribute', () => {
         render(<ComposeBox conversationId="conv-1" onSend={() => { }} />);
         const fileInput = screen.getByTestId('file-input');
-        expect(fileInput).toHaveAttribute('accept', '.pdf,.doc,.docx,.txt');
+        expect(fileInput).toHaveAttribute('accept', '.pdf,.doc,.docx,.txt,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.webp,.zip');
     });
 
     it('calls sendMessage and onSend on successful submission', async () => {

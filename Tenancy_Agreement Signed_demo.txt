@@ -1,0 +1,10 @@
+This is a placeholder for Tenancy_Agreement Signed.pdf
+
+File details:
+- Name: Tenancy_Agreement Signed.pdf
+- Type: application/pdf
+- Size: 5324.8 bytes
+- Category: Contracts
+- Upload Date: 01/05/2024
+
+Note: This is a demo file. In a real application, this would be the actual file content.

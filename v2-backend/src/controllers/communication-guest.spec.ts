@@ -43,16 +43,16 @@ describe('Section 13 & 14: Communication & Guest Enquiry Endpoints', () => {
     });
 
     it('[GET /communication/conversations/:id/messages] retrieves messages in a conversation', async () => {
-      commsService.getMessages.mockResolvedValue([{ id: 'msg-1', text: 'Hello' }]);
+      commsService.getMessages.mockResolvedValue({ data: [{ id: 'msg-1', text: 'Hello' }], hasMore: false });
       const req = { user: { uid: 'user-1' } };
 
       const res = await controller.getMessages('conv-1', req);
-      expect(commsService.getMessages).toHaveBeenCalledWith('conv-1', req.user);
-      expect(res).toHaveLength(1);
+      expect(commsService.getMessages).toHaveBeenCalledWith('conv-1', req.user, undefined, 50);
+      expect(res.data).toHaveLength(1);
     });
 
     it('[POST /communication/conversations/:id/messages] sends message and broadcasts new message SSE event', async () => {
-      commsService.sendMessage.mockResolvedValue({ id: 'msg-2', text: 'Viewing on Monday' });
+      commsService.sendMessage.mockResolvedValue({ data: { id: 'msg-2', text: 'Viewing on Monday' } });
       const req = { user: { uid: 'user-1' } };
       const dto = { text: 'Viewing on Monday' };
 
@@ -66,7 +66,7 @@ describe('Section 13 & 14: Communication & Guest Enquiry Endpoints', () => {
           message: { id: 'msg-2', text: 'Viewing on Monday' },
         },
       });
-      expect(res.id).toBe('msg-2');
+      expect(res.data.id).toBe('msg-2');
     });
   });
 

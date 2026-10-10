@@ -106,23 +106,24 @@
   height: 42px;
   padding: 0 16px;
   border-radius: 12px;
-  border: 1px solid #c7d2fe;
+  border: 1.5px solid #e2e8f0;
   background: #fff;
-  color: #136c9e;
+  color: #334155;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
 }
 
-.ll-msg-btn-insights:hover { background: rgba(238, 242, 255, 0.5); }
+.ll-msg-btn-insights:hover { background: #f8fafc; border-color: #136c9e; color: #136c9e; }
 
 .ll-msg-insights-icon {
   width: 20px;
   height: 20px;
   border-radius: 6px;
-  background: #eef2ff;
-  color: #4f46e5;
+  background: #eaf3f8;
+  color: #136c9e;
   display: inline-flex;
   align-items: center;
   justify-content: center;

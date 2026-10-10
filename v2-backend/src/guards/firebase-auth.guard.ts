@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { contractFileAccessValid } from '../utils/contract-file-access';
+import { getSseTicketInfo } from '../utils/sse-tickets';
 
 function emailFromToken(decoded: any): string {
   const identities = decoded?.firebase?.identities?.email;
@@ -82,6 +83,30 @@ export class FirebaseAuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
     let token: string | undefined;
 
+    // ── SSE ticket bypass ──────────────────────────────────────────────────────
+    // When the client connects to the SSE endpoint (/communication/events?ticket=...)
+    // there is no Authorization header (EventSource doesn't support custom headers).
+    // Validate the ticket here so the guard can populate req.user and allow the
+    // connection through, instead of throwing 401 before the controller sees it.
+    if (request.query?.ticket && typeof request.query.ticket === 'string') {
+      const ticket = request.query.ticket as string;
+      const info = getSseTicketInfo(ticket);
+      if (info && info.expiresAt > Date.now()) {
+        // Do NOT consume the ticket in the guard — let the controller consume it
+        // (the controller still calls sseTickets.delete for one-time use semantics).
+        request.user = {
+          uid:   info.uid,
+          sub:   info.uid,
+          email: info.email,
+          role:  info.role || 'landlord',
+        };
+        return true;
+      }
+      // Invalid/expired ticket — fall through to reject below
+      throw new UnauthorizedException('SSE ticket is invalid or has expired');
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split('Bearer ')[1]?.trim();
     } else if (request.query?.token) {
@@ -128,7 +153,7 @@ export class FirebaseAuthGuard implements CanActivate {
           } catch {}
         }
 
-        // Default to 'landlord' — users authenticated via Azure B2C / Firebase who have
+        // Default to 'landlord' — users authenticated via Firebase who have
         // not yet had a role written to their Firestore record should be treated as
         // landlords so that property/tenant creation is not blocked by RolesGuard.
         const effectiveRole = role || 'landlord';

@@ -50,7 +50,7 @@ describe('Section 8 & 9: Viewing Requests & Alerts Endpoints', () => {
       const req = { user: { uid: 'tenant-1', role: 'tenant' } };
 
       const res = await controller.getViewings(req);
-      expect(viewingService.getViewingRequests).toHaveBeenCalledWith('tenant-1', 'tenant');
+      expect(viewingService.getViewingRequests).toHaveBeenCalledWith('tenant-1', 'tenant', undefined);
       expect(res).toHaveLength(1);
     });
 
@@ -76,7 +76,7 @@ describe('Section 8 & 9: Viewing Requests & Alerts Endpoints', () => {
         status: 'confirmed',
         notes: 'Meet at reception',
       });
-      expect(viewingService.updateViewingStatus).toHaveBeenCalledWith('vr-101', 'll-1', 'confirmed', 'Meet at reception', req.user);
+      expect(viewingService.updateViewingStatus).toHaveBeenCalledWith('vr-101', 'll-1', 'confirmed', 'Meet at reception', req.user, { agentNotes: undefined, viewingDetails: undefined });
       expect(eventsService.emit).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'viewing_updated',
