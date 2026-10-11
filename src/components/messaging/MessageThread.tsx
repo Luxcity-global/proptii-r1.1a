@@ -324,15 +324,16 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 maxWidth: '70%',
                                 padding: '10px 14px',
                                 borderRadius: '12px',
-                                backgroundColor: isSent ? '#136C9E' : '#f3f4f6',
-                                color: isSent ? '#ffffff' : '#111827',
+                                backgroundColor: message.isDeleted ? 'transparent' : (isSent ? '#136C9E' : '#f3f4f6'),
+                                border: message.isDeleted ? '1px dashed #9ca3af' : 'none',
+                                color: message.isDeleted ? '#6b7280' : (isSent ? '#ffffff' : '#111827'),
                                 textAlign: isSent ? 'right' : 'left',
                                 position: 'relative',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                boxShadow: message.isDeleted ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
                             }}
                         >
                             {message.isDeleted ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9, fontStyle: 'italic', color: isSent ? '#ffffff' : '#4b5563' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontStyle: 'italic', color: '#6b7280' }}>
                                     <Ban size={14} />
                                     <span style={{ fontSize: '0.9rem' }}>This message was deleted</span>
                                 </div>
