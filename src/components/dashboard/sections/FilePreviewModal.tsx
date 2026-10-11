@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, FileText, File, AlertTriangle, Share2, Eye } from 'lucide-react';
+import { Download, FileText, File, AlertTriangle, Eye } from 'lucide-react';
 import { FileItem } from '../../../services/fileService';
 import { fileService } from '../../../services/fileService';
 import { toast } from 'react-hot-toast';
@@ -44,18 +44,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ isOpen, onClose, fi
   const isPdfFile = isPdf(type, url);
   const ready = Boolean(url);
 
-  const handleShare = async () => {
-    if (url && url.startsWith('http')) {
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success('Document link copied to clipboard');
-      } catch {
-        toast.error('Could not copy a share link for this file');
-      }
-      return;
-    }
-    toast.error('This file can be downloaded, but it does not have a shareable link.');
-  };
+
 
   const renderPreview = () => {
     if (canPreview && isImg) {
@@ -139,10 +128,6 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ isOpen, onClose, fi
           <button type="button" className="tn-drawer-secondary" onClick={() => onDownload(file)}>
             <Download className="w-4 h-4" />
             Download File
-          </button>
-          <button type="button" className="tn-drawer-primary" onClick={handleShare}>
-            <Share2 className="w-4 h-4" />
-            Share Document
           </button>
         </div>
       </aside>

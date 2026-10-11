@@ -263,6 +263,7 @@ const YourFiles: React.FC = () => {
         const result = await fileService.deleteFile(fileId, firestoreId);
         if (result.success) {
           setFiles(prev => prev.filter(f => f.id !== fileId));
+          setReferencingFiles(prev => prev.filter(f => f.id !== fileId));
           setDeleteConfirm(null);
 
           if (firestoreId) {
