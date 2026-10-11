@@ -76,18 +76,20 @@ class ApiService {
         (config as any)._t = Date.now();
         const method = config.method?.toUpperCase() ?? 'GET';
         const url = `${config.baseURL ?? ''}${config.url ?? ''}`;
-        console.groupCollapsed(
-          `%c[API] → ${method} ${config.url}`,
-          'color:#1776B6;font-weight:bold'
-        );
-        console.log('URL:', url);
-        if (config.params && Object.keys(config.params).length) {
-          console.log('Params:', config.params);
+        if (import.meta.env?.DEV) {
+          console.groupCollapsed(
+            `%c[API] → ${method} ${config.url}`,
+            'color:#1776B6;font-weight:bold'
+          );
+          console.log('URL:', url);
+          if (config.params && Object.keys(config.params).length) {
+            console.log('Params:', config.params);
+          }
+          if (config.data) {
+            console.log('Body:', config.data);
+          }
+          console.groupEnd();
         }
-        if (config.data) {
-          console.log('Body:', config.data);
-        }
-        console.groupEnd();
         return config;
       },
       (error) => Promise.reject(error)
@@ -98,11 +100,13 @@ class ApiService {
       (response) => {
         const ms = Date.now() - ((response.config as any)._t ?? Date.now());
         const method = response.config.method?.toUpperCase() ?? '?';
-        console.log(
-          `%c[API] ← ${response.status} ${method} ${response.config.url} (${ms}ms)`,
-          'color:#22c55e;font-weight:bold',
-          response.data
-        );
+        if (import.meta.env?.DEV) {
+          console.log(
+            `%c[API] ← ${response.status} ${method} ${response.config.url} (${ms}ms)`,
+            'color:#22c55e;font-weight:bold',
+            response.data
+          );
+        }
         return response;
       },
       async (error: AxiosError) => {
@@ -110,14 +114,16 @@ class ApiService {
         const ms = Date.now() - ((originalRequest as any)?._t ?? Date.now());
         const method = originalRequest?.method?.toUpperCase() ?? '?';
         const status = error.response?.status ?? 'NETWORK';
-        console.groupCollapsed(
-          `%c[API] ✖ ${status} ${method} ${originalRequest?.url} (${ms}ms)`,
-          'color:#ef4444;font-weight:bold'
-        );
-        console.error('Status:', error.response?.status);
-        console.error('Response data:', error.response?.data);
-        console.error('Message:', error.message);
-        console.groupEnd();
+        if (import.meta.env?.DEV) {
+          console.groupCollapsed(
+            `%c[API] ✖ ${status} ${method} ${originalRequest?.url} (${ms}ms)`,
+            'color:#ef4444;font-weight:bold'
+          );
+          console.error('Status:', error.response?.status);
+          console.error('Response data:', error.response?.data);
+          console.error('Message:', error.message);
+          console.groupEnd();
+        }
 
         if (
           error.response?.status === 401 &&
