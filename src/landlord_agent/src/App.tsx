@@ -752,6 +752,7 @@ export function AppContent() {
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get('start')) return; // Deep link takes priority
+      if (params.get('tab') === 'signed') return; // Signed-contract email link
       const savedScreen = sessionStorage.getItem('proptii_current_screen') as Screen | null;
       const savedPreviousScreen = sessionStorage.getItem('proptii_previous_screen') as Screen | null;
       if (savedScreen && savedScreen !== 'main-app' && savedScreen !== 'welcome') {

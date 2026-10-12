@@ -153,8 +153,8 @@ function asBooking(item: any) {
       },
     },
     viewingDetails: {
-      date: details.date || item.requestedDate || '',
-      time: details.time || item.requestedTime || '',
+      date: details.date || item.requestedDate || item.viewing_date || '',
+      time: details.time || item.requestedTime || item.viewing_time || '',
       preference: details.preference || 'In-Person Viewing',
       userDetails: {
         fullName: userDetails.fullName || '',

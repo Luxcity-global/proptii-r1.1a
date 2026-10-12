@@ -24,6 +24,7 @@ const SPA_ROUTE_DIRS = [
   'pricing/confirmed',
   'login',
   'dashboard',
+  'dashboard/tenant-referencing',
   'admin',
   'admin/leads',
   'ProptiiAdmin',

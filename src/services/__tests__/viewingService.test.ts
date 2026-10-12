@@ -21,6 +21,18 @@ describe('viewingService with shared polling coordinator', () => {
     viewingPollingCoordinator.clearCache();
   });
 
+function asListed(bookings: typeof mockBookings) {
+  return bookings.map((booking) => ({
+    ...booking,
+    property: {
+      ...booking.property,
+      town: booking.property.town || '',
+      city: booking.property.city || '',
+      postcode: booking.property.postcode || '',
+    },
+  }));
+}
+
   const mockBookings = [
     {
       id: 'viewing-1',
@@ -79,8 +91,8 @@ describe('viewingService with shared polling coordinator', () => {
 
     // Wait for resolution
     await vi.waitFor(() => {
-      expect(cb1).toHaveBeenCalledWith(mockBookings);
-      expect(cb2).toHaveBeenCalledWith(mockBookings);
+      expect(cb1).toHaveBeenCalledWith(asListed(mockBookings));
+      expect(cb2).toHaveBeenCalledWith(asListed(mockBookings));
       expect(cbStats).toHaveBeenCalledWith({
         upcoming: 1,
         completed: 1,
@@ -112,13 +124,13 @@ describe('viewingService with shared polling coordinator', () => {
 
   it('triggers immediate cache refresh on status update', async () => {
     vi.mocked(apiService.get).mockResolvedValue(mockBookings);
-    vi.mocked(apiService.put).mockResolvedValue({ success: true });
+    vi.mocked(apiService.put).mockResolvedValue({ data: { id: 'viewing-1', status: 'confirmed' } });
 
     const callback = vi.fn();
     const unsub = viewingService.subscribeToUserViewingBookings('user-1', callback);
 
     await vi.waitFor(() => {
-      expect(callback).toHaveBeenCalledWith(mockBookings);
+      expect(callback).toHaveBeenCalledWith(asListed(mockBookings));
     });
 
     expect(apiService.get).toHaveBeenCalledTimes(1);
@@ -133,5 +145,31 @@ describe('viewingService with shared polling coordinator', () => {
     });
 
     unsub();
+  });
+
+  it('does not let an in-flight list overwrite a forced refresh', async () => {
+    let releaseFirst: (value: unknown) => void = () => {};
+    const first = new Promise((resolve) => {
+      releaseFirst = resolve;
+    });
+    const rescheduled = {
+      ...mockBookings[0],
+      status: 'rescheduled',
+      viewingDetails: { ...mockBookings[0].viewingDetails, date: '2026-09-01', time: '16:00' },
+    };
+    vi.mocked(apiService.get)
+      .mockReturnValueOnce(first as any)
+      .mockResolvedValueOnce([rescheduled]);
+
+    const stale = viewingPollingCoordinator.fetchAll();
+    const fresh = viewingPollingCoordinator.fetchAll(true);
+    releaseFirst(mockBookings);
+    const [staleRows, freshRows] = await Promise.all([stale, fresh]);
+
+    expect(staleRows[0].status).toBe('pending');
+    expect(freshRows[0].status).toBe('rescheduled');
+    expect(freshRows[0].viewingDetails.date).toBe('2026-09-01');
+    expect(viewingPollingCoordinator.getCachedData()?.[0].status).toBe('rescheduled');
+    expect(apiService.get).toHaveBeenCalledTimes(2);
   });
 });

@@ -137,15 +137,18 @@ function PortfolioInsightsContent({
   const occupancy = analyticsData?.occupancy;
   const tenants = analyticsData?.tenants;
 
-  const occupiedCount = properties.filter((p) => p.status === 'occupied').length;
-  const vacantCount = properties.filter((p) => p.status === 'vacant').length;
-  const renovatingCount = properties.filter((p) => p.status === 'under-renovation').length;
+  const occupiedCount = properties.filter((p) => p.status === 'occupied' || Boolean(p.tenant) || Boolean(p.tenantId)).length;
+  const vacantCount = properties.filter((p) => p.status === 'vacant' && !p.tenant && !p.tenantId).length;
+  const renovatingCount = properties.filter((p) => p.status === 'under-renovation' && !p.tenant && !p.tenantId).length;
   const propertyRentTotal = properties.reduce((sum, p) => sum + (p.rent || 0), 0);
   const occupiedRentTotal = properties
-    .filter((p) => p.status === 'occupied')
+    .filter((p) => p.status === 'occupied' || Boolean(p.tenant) || Boolean(p.tenantId))
     .reduce((sum, p) => sum + (p.rent || 0), 0);
 
   const monthlyRevenue = revenue?.totalMonthly || occupiedRentTotal || propertyRentTotal;
+  const vacantUnits = properties.length > 0
+    ? Math.max(0, properties.length - occupiedCount)
+    : (occupancy?.vacantUnits ?? vacantCount);
   const occupancyRate =
     properties.length > 0 ? Math.round((occupiedCount / properties.length) * 100) : occupancy?.rate || 0;
   const activeTenants = tenants?.totalActive || occupiedCount;
@@ -460,7 +463,7 @@ function PortfolioInsightsContent({
             </article>
             <article className="ll-an-stat">
               <p className="ll-an-stat-label">Vacant units</p>
-              <p className="ll-an-stat-value">{occupancy?.vacantUnits ?? vacantCount}</p>
+              <p className="ll-an-stat-value">{vacantUnits}</p>
               <p className="ll-an-stat-sub">Currently empty</p>
             </article>
             <article className="ll-an-stat">
@@ -600,7 +603,7 @@ function PortfolioInsightsContent({
                 <div>
                   <div className="ll-an-kpi-label">Active tenants</div>
                   <div className="ll-an-kpi-value">{activeTenants}</div>
-                  <div className="ll-an-kpi-sub">{vacantCount} units currently vacant</div>
+                  <div className="ll-an-kpi-sub">{vacantUnits} units currently vacant</div>
                 </div>
               </article>
             </section>

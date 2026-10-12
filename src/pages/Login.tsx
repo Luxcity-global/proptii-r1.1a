@@ -12,6 +12,14 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { trackEvent } from '../utils/analytics';
 
+function opensTenantPassport(path: string): boolean {
+  const pathname = path.split('?')[0];
+  return pathname === '/view-passport'
+    || pathname.startsWith('/referencing/view')
+    || pathname === '/dashboard/tenant-referencing'
+    || pathname === '/claim-referencing';
+}
+
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,7 +82,7 @@ export const LoginPage: React.FC = () => {
         const isTenant = user.roles.includes('tenant');
         const isHomeowner = user.roles.includes('homeowner');
 
-        if (isLandlord && (from === '/' || from === '/dashboard' || from.startsWith('/dashboard/'))) {
+        if (isLandlord && !opensTenantPassport(from) && (from === '/' || from === '/dashboard' || from.startsWith('/dashboard/'))) {
           targetPath = '/landlord';
         } else if (isTenant && (from === '/' || from === '/landlord' || from.startsWith('/landlord/'))) {
           targetPath = '/dashboard';

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 import { useAuth } from '../contexts/AuthContext';
+import { passportDestination } from '../utils/passportDestination';
 
 const API = getResolvedApiBaseUrl();
 
@@ -110,6 +111,16 @@ const ReferencingView: React.FC = () => {
       .finally(() => setLoading(false));
   }, [viewToken]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !user?.roleResolved) return;
+    const roles = user.roles || [];
+    const manager = roles.includes('landlord') || roles.includes('agent');
+    const tenant = roles.includes('tenant');
+    if (tenant && !manager) {
+      navigate('/dashboard/tenant-referencing', { replace: true });
+    }
+  }, [isAuthenticated, user?.roleResolved, user?.roles, navigate]);
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
@@ -134,13 +145,17 @@ const ReferencingView: React.FC = () => {
         body: JSON.stringify({ claimToken: share.claimToken }),
       });
       const json = await res.json();
-      if (json.success && json.conversationId) {
-        navigate('/landlord/messages', { state: { conversationId: json.conversationId } });
+      const next = passportDestination(user?.roles, json.conversationId);
+      if (json.success && json.conversationId && next.path === '/landlord/messages') {
+        navigate(next.path, { state: next.state });
+      } else if (next.path === '/dashboard/tenant-referencing') {
+        navigate(next.path);
       } else {
         navigate('/landlord/dashboard');
       }
     } catch {
-      navigate('/landlord/dashboard');
+      const next = passportDestination(user?.roles);
+      navigate(next.path === '/dashboard/tenant-referencing' ? next.path : '/landlord/dashboard');
     } finally {
       setClaiming(false);
     }
@@ -186,7 +201,9 @@ const ReferencingView: React.FC = () => {
   const fin  = form?.financial   || {};
   const guar = form?.guarantor   || {};
 
-  const isLandlordLoggedIn = isAuthenticated && (user?.roles?.includes('landlord') || user?.roles?.includes('agent'));
+  const isManager = Boolean(user?.roles?.includes('landlord') || user?.roles?.includes('agent'));
+  const isTenantOnly = Boolean(isAuthenticated && user?.roles?.includes('tenant') && !isManager);
+  const isLandlordLoggedIn = Boolean(isAuthenticated && isManager);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -231,8 +248,8 @@ const ReferencingView: React.FC = () => {
           </div>
         </div>
 
-        {/* CTA banner — shown when not logged in as landlord */}
-        {!isLandlordLoggedIn && (
+        {/* CTA banner — guests can create a landlord account. Tenants stay on the tenant view. */}
+        {!isLandlordLoggedIn && !isTenantOnly && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="font-bold text-gray-900 text-sm">Want to manage this tenant?</p>
@@ -251,6 +268,24 @@ const ReferencingView: React.FC = () => {
         )}
 
         {/* CTA banner — logged in landlord */}
+        {isTenantOnly && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="font-bold text-gray-900 text-sm">This is your referencing passport</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Open it in your tenant dashboard to update details and see who you have shared it with.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/dashboard/tenant-referencing')}
+              className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#136C9E] text-white text-sm font-semibold hover:bg-[#0F5A82] transition-colors shadow-sm"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open tenant view
+            </button>
+          </div>
+        )}
+
         {isLandlordLoggedIn && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
@@ -348,7 +383,7 @@ const ReferencingView: React.FC = () => {
         </SectionCard>
 
         {/* Bottom CTA */}
-        {!isLandlordLoggedIn && (
+        {!isLandlordLoggedIn && !isTenantOnly && (
           <div className="text-center py-6">
             <p className="text-sm text-gray-500 mb-3">
               Manage {share?.tenantName || 'this tenant'}'s application end-to-end with a free Proptii account.

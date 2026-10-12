@@ -21,6 +21,7 @@ import PlanUpgradeWall from '../PlanUpgradeWall';
 import TenantPageHeader from '../ui/TenantPageHeader';
 import BookViewingModal from '../../viewings/BookViewingModal';
 import { toast } from 'react-hot-toast';
+import { downloadReferencingReportPdf } from '../../../utils/referencingReportPdf';
 import '../../../styles/tenantReferencing.css';
 import '../../../styles/tenantModals.css';
 
@@ -99,14 +100,6 @@ function formatShareDate(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Recently';
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function escapeHtml(value?: string | null) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 function documentStatus(doc: any): string {
@@ -414,71 +407,46 @@ const TenantReferencing: React.FC = () => {
       user?.name ||
       [formData?.identity?.firstName, formData?.identity?.lastName].filter(Boolean).join(' ') ||
       'Tenant';
-    const generatedAt = new Date().toLocaleString('en-GB');
-    const pillarRows = [
-      { title: 'Identity Architecture', complete: isSectionCompleted(1), notes: formData?.identity?.email || formData?.identity?.nationality || '' },
-      { title: 'Employment', complete: isSectionCompleted(2), notes: [formData?.employment?.jobPosition, formData?.employment?.companyDetails].filter(Boolean).join(' at ') },
-      { title: 'Residential History', complete: isSectionCompleted(3), notes: formData?.residential?.currentAddress || '' },
-      { title: 'Financial Integrity', complete: isSectionCompleted(4), notes: formData?.financial?.monthlyIncome ? `Monthly income: ${formData.financial.monthlyIncome}` : '' },
-      { title: 'Guarantor', complete: isSectionCompleted(5), notes: [formData?.guarantor?.firstName, formData?.guarantor?.lastName].filter(Boolean).join(' ') },
-    ];
 
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Referencing Report — ${escapeHtml(tenantName)}</title>
-  <style>
-    body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; max-width: 760px; margin: 40px auto; padding: 0 24px; }
-    h1 { font-size: 22px; margin: 0 0 4px; }
-    .muted { color: #64748b; font-size: 13px; }
-    h2 { font-size: 15px; margin: 28px 0 10px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-    th { color: #64748b; font-weight: 600; }
-    .ok { color: #059669; font-weight: 700; }
-    .wait { color: #d97706; font-weight: 700; }
-  </style>
-</head>
-<body>
-  <h1>Referencing Report</h1>
-  <p class="muted">Generated ${escapeHtml(generatedAt)} · Overall progress ${summaryOverallProgress}%</p>
-  <h2>Applicant</h2>
-  <table>
-    <tr><th>Name</th><td>${escapeHtml(tenantName)}</td></tr>
-    <tr><th>Email</th><td>${escapeHtml(formData?.identity?.email || user?.email || 'Not provided')}</td></tr>
-    <tr><th>Phone</th><td>${escapeHtml(formData?.identity?.phoneNumber || 'Not provided')}</td></tr>
-    <tr><th>Date of birth</th><td>${escapeHtml(formData?.identity?.dateOfBirth || 'Not provided')}</td></tr>
-    <tr><th>Nationality</th><td>${escapeHtml(formData?.identity?.nationality || (formData?.identity?.isBritish ? 'British' : 'Not provided'))}</td></tr>
-  </table>
-  <h2>Verification pillars</h2>
-  <table>
-    <tr><th>Pillar</th><th>Status</th><th>Summary</th></tr>
-    ${pillarRows.map((row) => `<tr><td>${escapeHtml(row.title)}</td><td class="${row.complete ? 'ok' : 'wait'}">${row.complete ? 'Verified' : 'Incomplete'}</td><td>${escapeHtml(row.notes || '—')}</td></tr>`).join('')}
-  </table>
-  <h2>Supporting documents</h2>
-  <table>
-    <tr><th>Identity</th><td>${escapeHtml(documentStatus(formData?.identity?.identityProof))}</td></tr>
-    <tr><th>Employment</th><td>${escapeHtml(documentStatus(formData?.employment?.proofDocument))}</td></tr>
-    <tr><th>Residential</th><td>${escapeHtml(documentStatus(formData?.residential?.proofDocument))}</td></tr>
-    <tr><th>Financial</th><td>${escapeHtml(documentStatus(formData?.financial?.proofOfIncomeDocument))}</td></tr>
-    <tr><th>Guarantor</th><td>${escapeHtml(documentStatus(formData?.guarantor?.identityDocument))}</td></tr>
-  </table>
-  <h2>Shared access</h2>
-  ${shares.length === 0 ? '<p class="muted">No passports shared yet.</p>' : `<table><tr><th>Recipient</th><th>Role</th><th>Shared</th><th>Status</th></tr>${shares.map((share) => `<tr><td>${escapeHtml(share.recipientName)}<br/><span class="muted">${escapeHtml(share.recipientEmail)}</span></td><td>${share.recipientRole === 'agent' ? 'Letting Agent' : 'Landlord'}</td><td>${escapeHtml(formatShareDate(share.createdAt))}</td><td>${escapeHtml(share.status || 'Delivered')}</td></tr>`).join('')}</table>`}
-</body>
-</html>`;
-
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `referencing-report-${new Date().toISOString().slice(0, 10)}.html`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    toast.success('Referencing report downloaded');
+    try {
+      downloadReferencingReportPdf({
+        tenantName,
+        generatedAt: new Date().toLocaleString('en-GB'),
+        overallProgress: summaryOverallProgress,
+        applicant: [
+          { label: 'Name', value: tenantName },
+          { label: 'Email', value: formData?.identity?.email || user?.email || 'Not provided' },
+          { label: 'Phone', value: formData?.identity?.phoneNumber || 'Not provided' },
+          { label: 'Date of birth', value: formData?.identity?.dateOfBirth || 'Not provided' },
+          { label: 'Nationality', value: formData?.identity?.nationality || (formData?.identity?.isBritish ? 'British' : 'Not provided') },
+        ],
+        pillars: [
+          { title: 'Identity Architecture', complete: isSectionCompleted(1), notes: formData?.identity?.email || formData?.identity?.nationality || '' },
+          { title: 'Employment', complete: isSectionCompleted(2), notes: [formData?.employment?.jobPosition, formData?.employment?.companyDetails].filter(Boolean).join(' at ') },
+          { title: 'Residential History', complete: isSectionCompleted(3), notes: formData?.residential?.currentAddress || '' },
+          { title: 'Financial Integrity', complete: isSectionCompleted(4), notes: formData?.financial?.monthlyIncome ? `Monthly income: ${formData.financial.monthlyIncome}` : '' },
+          { title: 'Guarantor', complete: isSectionCompleted(5), notes: [formData?.guarantor?.firstName, formData?.guarantor?.lastName].filter(Boolean).join(' ') },
+        ],
+        documents: [
+          { label: 'Identity', value: documentStatus(formData?.identity?.identityProof) },
+          { label: 'Employment', value: documentStatus(formData?.employment?.proofDocument) },
+          { label: 'Residential', value: documentStatus(formData?.residential?.proofDocument) },
+          { label: 'Financial', value: documentStatus(formData?.financial?.proofOfIncomeDocument) },
+          { label: 'Guarantor', value: documentStatus(formData?.guarantor?.identityDocument) },
+        ],
+        shares: shares.map((share) => ({
+          recipientName: share.recipientName,
+          recipientEmail: share.recipientEmail,
+          role: share.recipientRole === 'agent' ? 'Letting Agent' : 'Landlord',
+          shared: formatShareDate(share.createdAt),
+          status: share.status || 'Delivered',
+        })),
+      });
+      toast.success('Referencing report downloaded');
+    } catch (err) {
+      console.error('Failed to download referencing report:', err);
+      toast.error('Could not download the referencing report. Please try again.');
+    }
   };
 
   const started = hasStartedReferencing();

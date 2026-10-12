@@ -30,6 +30,14 @@ export class ViewingRequestService {
     return VIEWING_STATUSES.has(raw) ? raw : fallback;
   }
 
+  private filled(...values: unknown[]): string {
+    for (const value of values) {
+      const text = String(value ?? '').trim();
+      if (text) return text;
+    }
+    return '';
+  }
+
   private normalizedEmail(...values: unknown[]): string {
     for (const value of values) {
       if (typeof value !== 'string') continue;
@@ -101,8 +109,8 @@ export class ViewingRequestService {
       ? writtenContact
       : (storedTenant && storedTenant !== agentMail ? storedTenant : (writtenContact && !agentMail ? writtenContact : ''));
     const viewingDetails: any = {
-      date: details.date || source.requestedDate || '',
-      time: details.time || source.requestedTime || '',
+      date: this.filled(details.date, source.requestedDate, source.viewing_date),
+      time: this.filled(details.time, source.requestedTime, source.viewing_time),
       preference: details.preference || 'In-Person Viewing',
       userDetails: {
         fullName: userDetails.fullName || '',
@@ -533,9 +541,19 @@ export class ViewingRequestService {
       if (notes) payload.notes = notes;
       if (extras?.agentNotes) payload.agentNotes = extras.agentNotes;
       if (extras?.viewingDetails && typeof extras.viewingDetails === 'object') {
-        payload.viewingDetails = extras.viewingDetails;
-        if (extras.viewingDetails.date) payload.requestedDate = extras.viewingDetails.date;
-        if (extras.viewingDetails.time) payload.requestedTime = extras.viewingDetails.time;
+        const previous = data.viewingDetails && typeof data.viewingDetails === 'object' ? data.viewingDetails : {};
+        const nextDetails = { ...previous, ...extras.viewingDetails };
+        payload.viewingDetails = nextDetails;
+        const date = this.filled(nextDetails.date);
+        const time = this.filled(nextDetails.time);
+        if (date) {
+          payload.requestedDate = date;
+          payload.viewing_date = date;
+        }
+        if (time) {
+          payload.requestedTime = time;
+          payload.viewing_time = time;
+        }
       }
       if (nextStatus === 'confirmed') payload.confirmedAt = now;
       if (nextStatus === 'completed') payload.completedAt = now;

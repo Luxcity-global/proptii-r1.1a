@@ -903,12 +903,23 @@ export class ReferencingService {
         updatedAt:    admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
 
-      await db.collection('users').doc(landlordId).set({
-        uid:       landlordId,
-        email:     landlordEmail,
-        role:      'landlord',
+      const userRef = db.collection('users').doc(landlordId);
+      const existingUser = await userRef.get();
+      const existing = existingUser.exists ? (existingUser.data() as any) : {};
+      const existingRole = String(existing.role || '').toLowerCase();
+      const existingRoles = Array.isArray(existing.roles)
+        ? existing.roles.map((role: unknown) => String(role).toLowerCase())
+        : [];
+      const alreadyTenant = existingRole === 'tenant' || existingRoles.includes('tenant');
+      const alreadyManager = existingRole === 'landlord' || existingRole === 'agent'
+        || existingRoles.includes('landlord') || existingRoles.includes('agent');
+      const profile: Record<string, unknown> = {
+        uid: landlordId,
+        email: landlordEmail,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      };
+      if (!alreadyTenant && !alreadyManager) profile.role = 'landlord';
+      await userRef.set(profile, { merge: true });
 
       const tenantId      = shareData.userId;
       const propertyTitle = shareData.propertyAddress || 'Rental Application';
@@ -989,7 +1000,7 @@ export class ReferencingService {
 
   /**
    * Sends an email to a tenant asking them to complete their Proptii
-   * referencing form. The email contains a direct link to /referencing.
+   * referencing form. The email opens the tenant referencing page.
    * Persists a lightweight request record in `referencing_requests` so
    * landlords can see what they've already sent.
    */
@@ -1007,25 +1018,28 @@ export class ReferencingService {
     }
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://proptii.co';
-    const referencingUrl = `${frontendUrl}/referencing`;
+    const referencingUrl = `${frontendUrl}/dashboard/tenant-referencing`;
 
-    // Persist the request record (best-effort — never blocks the email)
+    // Persist the request record so the dashboard can list it after refresh.
     const db = this.db;
-    if (db) {
+    const saveRecord = async () => {
+      if (!db) return;
       const reqId = `req_${landlordId}_${Date.now()}`;
-      db.collection('referencing_requests').doc(reqId).set({
-        id:              reqId,
-        landlordId,
-        landlordName,
-        tenantEmail:     tenantEmail.toLowerCase().trim(),
-        tenantName,
-        propertyAddress,
-        status:          'sent',
-        createdAt:       admin.firestore.FieldValue.serverTimestamp(),
-      }).catch(err => {
+      try {
+        await db.collection('referencing_requests').doc(reqId).set({
+          id:              reqId,
+          landlordId,
+          landlordName,
+          tenantEmail:     tenantEmail.toLowerCase().trim(),
+          tenantName,
+          propertyAddress,
+          status:          'sent',
+          createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (err: any) {
         this.logger.warn(`Failed to save referencing request record: ${err?.message}`);
-      });
-    }
+      }
+    };
 
     // Build and send email via Resend
     const addressLine = propertyAddress
@@ -1064,10 +1078,37 @@ export class ReferencingService {
         html,
       });
       this.logger.log(`Referencing request email sent to ${tenantEmail} [${id}]`);
+      await saveRecord();
       return { success: true, message: 'Referencing request sent successfully' };
     } catch (err: any) {
       this.logger.error(`sendReferencingRequest email failed for ${tenantEmail}: ${err?.message || err}`);
       return { success: false, error: err?.message || 'Failed to send email' };
+    }
+  }
+
+  async getSentReferencingRequests(landlordId: string) {
+    const db = this.db;
+    if (!db || !landlordId) return { success: true, data: [] };
+    try {
+      const snap = await db.collection('referencing_requests').where('landlordId', '==', landlordId).get();
+      const data = snap.docs.map((doc) => {
+        const row = doc.data() as any;
+        return {
+          id: doc.id,
+          tenantEmail: row.tenantEmail || '',
+          tenantName: row.tenantName || '',
+          propertyAddress: row.propertyAddress || '',
+          landlordName: row.landlordName || '',
+          status: row.status || 'sent',
+          createdAt: row.createdAt?.toDate
+            ? row.createdAt.toDate().toISOString()
+            : row.createdAt || new Date().toISOString(),
+        };
+      }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return { success: true, data };
+    } catch (err: any) {
+      this.logger.warn(`getSentReferencingRequests failed for ${landlordId}: ${err?.message || err}`);
+      return { success: true, data: [] };
     }
   }
 

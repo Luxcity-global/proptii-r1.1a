@@ -46,6 +46,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isConverting, setIsConverting] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Use real tenant data passed as prop, with fallback to empty array
   const existingTenants = tenants.length > 0 ? tenants.map(t => ({
@@ -62,32 +63,55 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
     tenant.property.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      if (!allowedTypes.includes(file.type)) {
-        setErrors(prev => ({ ...prev, file: 'Please select a PDF or Word document' }));
-        return;
-      }
-      
-      // Validate file size (max 50MB)
-      const maxSize = 50 * 1024 * 1024; // 50MB
-      if (file.size > maxSize) {
-        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-        setErrors(prev => ({ ...prev, file: `File size must be less than 50MB. Your file is ${fileSizeMB}MB` }));
-        return;
-      }
-      
-      // Warn about large files that might take longer to process
-      if (file.size > 20 * 1024 * 1024) {
-        console.warn('Large file detected:', file.size, 'bytes. This may take longer to process.');
-      }
+  const acceptContractFile = (file: File | undefined) => {
+    if (!file) return;
 
-      setSelectedFile(file);
-      setErrors(prev => ({ ...prev, file: '' }));
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    const allowedByExtension = extension === 'pdf' || extension === 'doc' || extension === 'docx';
+    if (!allowedTypes.includes(file.type) && !allowedByExtension) {
+      setErrors(prev => ({ ...prev, file: 'Please select a PDF or Word document' }));
+      return;
     }
+
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      setErrors(prev => ({ ...prev, file: `File size must be less than 50MB. Your file is ${fileSizeMB}MB` }));
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      console.warn('Large file detected:', file.size, 'bytes. This may take longer to process.');
+    }
+
+    setSelectedFile(file);
+    setErrors(prev => ({ ...prev, file: '' }));
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    acceptContractFile(event.target.files?.[0]);
+    event.target.value = '';
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isUploading) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+    if (isUploading) return;
+    acceptContractFile(event.dataTransfer.files?.[0]);
   };
 
   const handleRemoveFile = () => {
@@ -450,7 +474,13 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
               </CardHeader>
               <CardContent className="space-y-4">
                 {!selectedFile ? (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragOver ? 'border-[#136C9E] bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}
+                    onDragEnter={handleDragOver}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
                     <input
                       type="file"
                       id="file-upload"

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
+import { passportDestination } from '../utils/passportDestination';
 import { getAccessTokenForApiRequest } from '../services/msalAccessToken';
 import { Loader2, AlertTriangle, Check, Home, ShieldCheck } from 'lucide-react';
 
@@ -54,7 +55,13 @@ const ClaimReferencing: React.FC = () => {
 
   // ── Step 2: once authenticated, auto-claim ─────────────────────────────────
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !meta || claiming || claimed) return;
+    if (authLoading || !isAuthenticated || !user?.roleResolved || !meta || claiming || claimed) return;
+
+    const destination = passportDestination(user?.roles);
+    if (destination.path === '/dashboard/tenant-referencing') {
+      navigate(destination.path, { replace: true });
+      return;
+    }
 
     const doClaim = async () => {
       setClaiming(true);
@@ -73,11 +80,9 @@ const ClaimReferencing: React.FC = () => {
 
         if (json.success) {
           setClaimed(true);
-          // Redirect to landlord messages with the new conversation
+          const next = passportDestination(user?.roles, json.conversationId);
           setTimeout(() => {
-            navigate('/landlord/messages', {
-              state: { conversationId: json.conversationId },
-            });
+            navigate(next.path, { state: next.state });
           }, 2500);
         } else {
           setError(json.error || 'Failed to claim. Please try again.');
@@ -90,7 +95,7 @@ const ClaimReferencing: React.FC = () => {
     };
 
     doClaim();
-  }, [isAuthenticated, authLoading, meta, claiming, claimed]);
+  }, [isAuthenticated, authLoading, user?.roleResolved, user?.roles, meta, claiming, claimed]);
 
   const handleLogin = () => {
     const returnUrl = window.location.pathname + window.location.search;
@@ -122,7 +127,7 @@ const ClaimReferencing: React.FC = () => {
               : 'This invitation link is invalid or has expired. Please contact the tenant to request a new one.'}
           </p>
           <button
-            onClick={() => navigate(alreadyClaimed ? '/landlord' : '/')}
+            onClick={() => navigate(alreadyClaimed ? passportDestination(user?.roles).path : '/')}
             className="w-full py-3 rounded-xl bg-[#136C9E] text-white font-semibold text-sm hover:bg-[#0F5A82] transition-colors"
           >
             {alreadyClaimed ? 'Go to Dashboard' : 'Go to Proptii'}
@@ -144,7 +149,7 @@ const ClaimReferencing: React.FC = () => {
             You now have access to <strong>{meta?.tenantName}</strong>'s referencing passport.
             A conversation has been created in your inbox.
           </p>
-          <p className="text-xs text-gray-400">Redirecting to your messages…</p>
+          <p className="text-xs text-gray-400">Redirecting to your dashboard…</p>
         </div>
       </div>
     );

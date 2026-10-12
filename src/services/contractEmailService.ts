@@ -25,7 +25,7 @@ class ContractEmailService {
 
     return renderProptiiEmail({
       title: 'Signed Contract Ready',
-      buttonLabel: 'View All Signed Contracts',
+      buttonLabel: 'View signed contracts',
       buttonHref: `${baseUrl}/landlord/contracts?tab=signed`,
       bodyHtml: `
         <p>Hi ${recipientName},</p>

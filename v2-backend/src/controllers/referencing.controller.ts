@@ -336,6 +336,15 @@ export class ReferencingController {
 
   // ── Request referencing from a tenant ────────────────────────────────────
 
+  @Get('referencing/requests')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'List referencing requests sent by the signed-in landlord or agent' })
+  @ApiResponse({ status: 200, description: 'Array of sent referencing requests' })
+  async getSentReferencingRequests(@Req() req: any) {
+    return await this.referencingService.getSentReferencingRequests(req.user?.uid);
+  }
+
   @Post('referencing/request')
   @HttpCode(200)
   @UseGuards(FirebaseAuthGuard)

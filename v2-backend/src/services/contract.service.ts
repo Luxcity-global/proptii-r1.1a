@@ -8,6 +8,7 @@ import {
 } from '../utils/firebase-storage';
 import { createContractFileAccess } from '../utils/contract-file-access';
 import { renderProptiiEmail } from '../utils/emailLayout';
+import { signedContractReviewUrl } from '../utils/signedContractLink';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return Promise.race([
@@ -863,8 +864,8 @@ export class ContractService {
 
       const safeHtml = renderProptiiEmail({
         title: 'Signed Document Available',
-        buttonLabel: 'Open Proptii',
-        buttonHref: 'https://proptii.co',
+        buttonLabel: 'View signed contracts',
+        buttonHref: signedContractReviewUrl(),
         bodyHtml: `
           <p>Hello ${safeRecipientName},</p>
           <p>Please find attached the signed contract document: <strong>${safeContractName}</strong>.</p>

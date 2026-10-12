@@ -134,8 +134,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           location.pathname.startsWith('/listings/new');
 
         if (actualRole === 'landlord' || actualRole === 'agent') {
+          const stayOnTenantPassport = location.pathname === '/dashboard/tenant-referencing';
           // If a landlord/agent attempts to navigate to the tenant dashboard, send them to their dashboard
-          if (location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/')) {
+          if (!stayOnTenantPassport && (location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/'))) {
             return <Navigate to="/landlord" replace />;
           }
 

@@ -486,6 +486,15 @@ function ReceivedPassports({
   );
 }
 
+interface SentReferencingRequest {
+  id: string;
+  tenantEmail: string;
+  tenantName: string;
+  propertyAddress: string;
+  status: string;
+  createdAt: string;
+}
+
 function RequestReferencing({
   tenants,
   userProfile,
@@ -493,6 +502,9 @@ function RequestReferencing({
   statuses,
   loadingStatuses,
   inviteEmailRef,
+  sentRequests,
+  loadingSent,
+  onRequestSent,
 }: {
   tenants: Tenant[];
   userProfile: UserProfile | null;
@@ -500,6 +512,9 @@ function RequestReferencing({
   statuses: Map<string, 'not-started' | 'in-progress' | 'complete'>;
   loadingStatuses: boolean;
   inviteEmailRef?: React.RefObject<HTMLInputElement | null>;
+  sentRequests: SentReferencingRequest[];
+  loadingSent: boolean;
+  onRequestSent: () => void;
 }) {
   const [search, setSearch] = useState('');
   const [requestStates, setRequestStates] = useState<Record<string, RequestState>>({});
@@ -530,6 +545,7 @@ function RequestReferencing({
         throw new Error(err?.message || `Request failed (${res.status})`);
       }
       setRequestStates((prev) => ({ ...prev, [tenantEmail]: { loading: false, success: true, error: null } }));
+      onRequestSent();
     } catch (err: any) {
       setRequestStates((prev) => ({ ...prev, [tenantEmail]: { loading: false, success: false, error: err.message } }));
     }
@@ -562,6 +578,7 @@ function RequestReferencing({
       setManualEmail('');
       setManualName('');
       setManualProperty('');
+      onRequestSent();
     } catch (err: any) {
       setManualState({ loading: false, success: false, error: err.message });
     }
@@ -708,7 +725,10 @@ function RequestReferencing({
                     || 'not-started';
                   const reqState = requestStates[tenant.email];
                   const isLoading = reqState?.loading;
-                  const isSent = reqState?.success;
+                  const sentAlready = sentRequests.some(
+                    (request) => request.tenantEmail.trim().toLowerCase() === tenant.email.trim().toLowerCase(),
+                  );
+                  const isSent = reqState?.success || sentAlready;
                   const reqError = reqState?.error;
                   return (
                     <tr key={tenant.id}>
@@ -779,6 +799,60 @@ function RequestReferencing({
           </span>
         </div>
       </div>
+
+      <div className="ll-ref-panel" style={{ marginTop: 20 }}>
+        <div className="ll-ref-panel-head">
+          <div className="ll-ref-panel-title">
+            <div className="ll-ref-panel-icon slate">
+              <Send size={18} />
+            </div>
+            <div>
+              <h3>Sent request tracking</h3>
+              <p>Requests you have already emailed. This list stays after you leave the page.</p>
+            </div>
+          </div>
+        </div>
+        <div className="ll-ref-table-wrap">
+          <table className="ll-ref-table">
+            <thead>
+              <tr>
+                <th>Tenant</th>
+                <th>Email</th>
+                <th>Property</th>
+                <th>Sent</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loadingSent ? (
+                <tr className="ll-ref-empty-row">
+                  <td colSpan={5} style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>
+                    Loading sent requests…
+                  </td>
+                </tr>
+              ) : sentRequests.length === 0 ? (
+                <tr className="ll-ref-empty-row">
+                  <td colSpan={5} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>
+                    No referencing requests sent yet.
+                  </td>
+                </tr>
+              ) : (
+                sentRequests.map((request) => (
+                  <tr key={request.id}>
+                    <td>{request.tenantName || 'Tenant'}</td>
+                    <td>{request.tenantEmail}</td>
+                    <td>{request.propertyAddress || '—'}</td>
+                    <td>{request.createdAt ? new Date(request.createdAt).toLocaleDateString('en-GB') : '—'}</td>
+                    <td>
+                      <span className="ll-ref-badge idle">{request.status || 'sent'}</span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
@@ -796,6 +870,8 @@ export function ReferencingPage({
   const [shares, setShares] = useState<ReceivedShare[]>([]);
   const [loadingShares, setLoadingShares] = useState(true);
   const [sharesError, setSharesError] = useState<string | null>(null);
+  const [sentRequests, setSentRequests] = useState<SentReferencingRequest[]>([]);
+  const [loadingSent, setLoadingSent] = useState(true);
   const [statuses, setStatuses] = useState<Map<string, 'not-started' | 'in-progress' | 'complete'>>(new Map());
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const inviteEmailRef = useRef<HTMLInputElement>(null);
@@ -837,8 +913,26 @@ export function ReferencingPage({
     }
   };
 
+  const loadSentRequests = async () => {
+    setLoadingSent(true);
+    try {
+      const token = await getAccessTokenForApiRequest();
+      const res = await fetch(`${API}/referencing/requests`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to load');
+      const json = await res.json();
+      setSentRequests(Array.isArray(json.data) ? json.data : []);
+    } catch {
+      setSentRequests([]);
+    } finally {
+      setLoadingSent(false);
+    }
+  };
+
   useEffect(() => {
     loadShares();
+    loadSentRequests();
   }, [userProfile?.email]);
 
   useEffect(() => {
@@ -863,11 +957,11 @@ export function ReferencingPage({
       if (status === 'complete') completedTenants += 1;
     });
     return {
-      sent: shares.length + pendingTenants + completedTenants,
+      sent: sentRequests.length,
       pending: pendingShares + pendingTenants,
       completed: completedShares + completedTenants,
     };
-  }, [shares, statuses]);
+  }, [shares, statuses, sentRequests]);
 
   const openRequestTab = () => {
     setActiveTab('request');
@@ -982,6 +1076,9 @@ export function ReferencingPage({
             statuses={statuses}
             loadingStatuses={loadingStatuses}
             inviteEmailRef={inviteEmailRef}
+            sentRequests={sentRequests}
+            loadingSent={loadingSent}
+            onRequestSent={loadSentRequests}
           />
         )}
       </div>

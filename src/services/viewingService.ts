@@ -154,8 +154,11 @@ export class ViewingPollingCoordinator {
     }
   }
 
+  private requestSerial = 0;
+
   async fetchAll(force: boolean = false): Promise<any[]> {
-    if (this.inFlightPromise) {
+    // A forced refresh must not join a list request that started before the write.
+    if (!force && this.inFlightPromise) {
       return this.inFlightPromise;
     }
 
@@ -164,12 +167,14 @@ export class ViewingPollingCoordinator {
       return this.cachedData;
     }
 
-    this.inFlightPromise = (async () => {
+    const serial = ++this.requestSerial;
+    const promise = (async () => {
       try {
         const response = await apiService.get('/viewing-requests');
         const payload = Array.isArray(response) ? response : (response?.data || []);
         const rows = Array.isArray(payload) ? payload : (payload?.data || []);
         const items = (Array.isArray(rows) ? rows : []).map(normalizeViewingItem);
+        if (serial !== this.requestSerial) return items;
         this.cachedData = items;
         this.lastFetchTime = Date.now();
         rememberViewings(items);
@@ -179,15 +184,37 @@ export class ViewingPollingCoordinator {
         this.notifyAll(items);
         return items;
       } catch (err: any) {
+        if (serial !== this.requestSerial) throw err;
         const error = err instanceof Error ? err : new Error(err?.message || 'Unknown error');
         this.notifyError(error);
         throw error;
       } finally {
-        this.inFlightPromise = null;
+        if (this.inFlightPromise === promise) this.inFlightPromise = null;
       }
     })();
 
-    return this.inFlightPromise;
+    this.inFlightPromise = promise;
+    return promise;
+  }
+
+  /** Show a reschedule immediately so a later stale list cannot put the old slot back. */
+  applyLocalUpdate(id: string, patch: { status?: string; viewingDetails?: any }) {
+    if (!this.cachedData || !id) return;
+    const next = this.cachedData.map((item) => {
+      if (item?.id !== id) return item;
+      const details = patch.viewingDetails || item.viewingDetails;
+      return normalizeViewingItem({
+        ...item,
+        status: patch.status || item.status,
+        viewingDetails: details,
+        requestedDate: details?.date || item.requestedDate,
+        requestedTime: details?.time || item.requestedTime,
+        viewing_date: details?.date || item.viewing_date,
+        viewing_time: details?.time || item.viewing_time,
+      });
+    });
+    this.cachedData = next;
+    this.notifyAll(next);
   }
 
   subscribe<T>(
@@ -469,7 +496,12 @@ class ViewingService {
       if (savedStatus !== status) {
         return { success: false, error: 'The viewing status did not change.' };
       }
-      publishViewingCopy({ ...updated, id: updated.id || bookingId, status: savedStatus }).catch(() => {});
+      const savedDetails = updated.viewingDetails || updates?.viewingDetails;
+      publishViewingCopy({ ...updated, id: updated.id || bookingId, status: savedStatus, viewingDetails: savedDetails }).catch(() => {});
+      viewingPollingCoordinator.applyLocalUpdate(bookingId, {
+        status: savedStatus,
+        viewingDetails: savedDetails,
+      });
       viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
       return { success: true };
     } catch (error: any) {

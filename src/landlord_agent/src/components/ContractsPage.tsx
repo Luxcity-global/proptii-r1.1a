@@ -70,6 +70,13 @@ interface ContractsPageProps {
 }
 
 type Subsection = 'sent' | 'unsigned' | 'signed' | 'all';
+
+function subsectionFromLocation(): Subsection {
+  if (typeof window === 'undefined') return 'sent';
+  const tab = new URLSearchParams(window.location.search).get('tab');
+  if (tab === 'signed' || tab === 'unsigned' || tab === 'sent' || tab === 'all') return tab;
+  return 'sent';
+}
 type StatusFilter = 'all' | 'sent' | 'pending' | 'signed' | 'expiring';
 
 const TYPE_LABELS: Record<Contract['contractType'], string> = {
@@ -225,7 +232,7 @@ export function ContractsPage({
   const landlordEmail = user?.email ?? userProfile?.email ?? null;
   const userId = user?.id ?? null;
 
-  const [subsection, setSubsection] = useState<Subsection>('sent');
+  const [subsection, setSubsection] = useState<Subsection>(subsectionFromLocation);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [propertyFilter, setPropertyFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
