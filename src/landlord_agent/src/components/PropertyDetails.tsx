@@ -354,7 +354,7 @@ export function PropertyDetails({
     <div className="min-h-screen" style={{ background: '#f8fafc', fontFamily: 'Nunito Sans,sans-serif' }}>
 
       {/* ── Sticky header ─────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 h-[64px] flex items-center justify-between px-5"
+      <header className="static md:sticky top-0 z-30 h-[64px] flex items-center justify-between px-5"
         style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(226,232,240,0.7)' }}>
         <div className="flex items-center gap-3">
           <button type="button" onClick={onBack}

@@ -91,6 +91,18 @@ Result: **PASS** — Zero TypeScript errors, zero Vite build errors. Pre-existin
 
 No desktop CSS rules were removed. All changes were additions or updates within mobile `@media` blocks only.
 
-## Review Finding Addressed
+## Review Findings Addressed (Iteration 2 → Iteration 3)
 
-The duplicate `@media (max-width: 640px)` blocks in `documentsPage.css` noted in the review have been consolidated to a single block.
+### Finding 1: PropertyDetails.tsx sticky header not fixed
+
+`PropertyDetails.tsx` line 357 had `className="sticky top-0 z-30"` with no mobile guard.
+**Fix applied:** Changed to `className="static md:sticky top-0 z-30"` — the Tailwind `md:` prefix applies sticky only at ≥768px, making the header `position: static` on all smaller screens (consistent with the ≤768px breakpoint used by all other page headers).
+Build: ✅ PASS
+
+### Finding 2: contractsPage.css no @media (max-width: 768px) for position: static
+
+Confirmed acceptable: `.ll-ct-header` has no `position: sticky` at any rule level in the CSS file — only `background`, `border-bottom`, `margin`, and `padding` are set. No sticky to override.
+
+### Additional (iteration 1): documentsPage.css duplicate 640px blocks
+
+The duplicate `@media (max-width: 640px)` blocks in `documentsPage.css` were consolidated to a single block in iteration 2.
