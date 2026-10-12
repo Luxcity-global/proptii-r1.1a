@@ -280,7 +280,7 @@ export function MainLayout({
   return (
     <SidebarProvider>
       <div
-        className="flex min-h-screen w-full"
+        className="flex min-h-screen w-full overflow-x-hidden"
         style={
           {
             '--sidebar-width': '250px',
@@ -329,7 +329,7 @@ export function MainLayout({
         />
 
         <main
-          className="flex-1"
+          className="flex-1 min-w-0 overflow-x-hidden"
           style={{
             backgroundColor:
               currentScreen === 'dashboard'

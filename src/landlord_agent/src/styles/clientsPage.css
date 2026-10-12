@@ -16,6 +16,7 @@
   color: var(--ll-text);
   min-height: 100%;
   padding: 0 20px 40px;
+  overflow-x: hidden;
 }
 
 .ll-cl h1,
