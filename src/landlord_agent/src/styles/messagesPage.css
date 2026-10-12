@@ -620,3 +620,14 @@
   white-space: nowrap;
   max-width: 100%;
 }
+
+/* ── Mobile responsiveness: messagesPage supplemental fixes ────────────── */
+
+@media (max-width: 640px) {
+  /* New message button: full-width fill */
+  .ll-msg-btn-add {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+}

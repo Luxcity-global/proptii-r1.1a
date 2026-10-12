@@ -601,3 +601,27 @@
     font-size: 22px;
   }
 }
+
+/* ── Mobile responsiveness: analyticsPage supplemental fixes ───────────── */
+
+@media (max-width: 640px) {
+  /* Tab pills: single scrollable row */
+  .ll-an-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .ll-an-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Toolbar right (date range + export): wrap */
+  .ll-an-toolbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+}

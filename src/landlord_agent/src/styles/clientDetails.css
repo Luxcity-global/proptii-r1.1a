@@ -684,3 +684,26 @@
   .ll-cd-navy-top,
   .ll-cd-report { flex-direction: column; align-items: flex-start; }
 }
+
+/* ── Mobile responsiveness: clientDetails supplemental fixes ───────────── */
+
+@media (max-width: 640px) {
+  /* Tabs: force single scrollable row (already has overflow-x:auto) */
+  .ll-cd-tabs {
+    flex-wrap: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Comms quick-action bar: wrap on very narrow screens */
+  .ll-cd-comms {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Document row inside navy card: wrap */
+  .ll-cd-navy-doc {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

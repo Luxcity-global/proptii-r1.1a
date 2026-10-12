@@ -269,6 +269,7 @@ export function DocumentsPage({
   onDeleteDocuments,
   onArchiveDocuments,
   onExportDocuments,
+  onAddProperty,
   userProfile,
   onRefresh,
   onViewSettings,

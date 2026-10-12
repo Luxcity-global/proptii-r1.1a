@@ -973,3 +973,22 @@
     gap: 10px;
   }
 }
+
+/* ── Mobile responsiveness: contractsPage supplemental fixes ───────────── */
+
+@media (max-width: 640px) {
+  /* Header: adjust negative margins to match reduced page padding */
+  .ll-ct-header {
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* Primary add button: full-width fill */
+  .ll-ct-btn-add {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+}

@@ -1406,3 +1406,25 @@
     display: none;
   }
 }
+
+/* ── Mobile responsiveness: referencingPage supplemental fixes ─────────── */
+
+@media (max-width: 640px) {
+  /* KPI grid: single column on mobile */
+  .ll-ref-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Card action buttons: wrap on narrow screens */
+  .ll-ref-card-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* KPI value: reduce font size on very small phones */
+  .ll-ref-kpi-value {
+    font-size: 22px;
+  }
+}

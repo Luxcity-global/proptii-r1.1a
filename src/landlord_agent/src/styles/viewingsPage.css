@@ -1468,3 +1468,12 @@
     gap: 10px;
   }
 }
+
+/* ── Mobile responsiveness: viewingsPage supplemental fixes ────────────── */
+
+@media (max-width: 640px) {
+  /* Unstick page header so it doesn't overlap the fixed 64px mobile nav bar */
+  .ll-vw-header {
+    position: static;
+  }
+}

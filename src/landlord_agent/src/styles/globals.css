@@ -266,3 +266,10 @@ html {
 .animation-delay-300 {
   animation-delay: 300ms;
 }
+
+/* ── Mobile: prevent horizontal scroll from negative-margin headers ──── */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+}
