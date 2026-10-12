@@ -1776,19 +1776,12 @@
     font-size: 22px;
   }
 
-  /* Actions row: full width, horizontal scroll */
+  /* Actions row: wrap cleanly — no horizontal scroll */
   .ll-docs-header-actions {
     width: 100%;
     justify-content: flex-start;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-
-  .ll-docs-header-actions::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .ll-docs-header-icon {
@@ -1796,7 +1789,8 @@
   }
 
   .ll-docs-btn-attach {
-    flex: 0 0 auto;
+    flex: 1 1 100%;
+    justify-content: center;
     white-space: nowrap;
   }
 

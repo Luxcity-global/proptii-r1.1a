@@ -1382,26 +1382,26 @@
 
   .ll-ref-header-actions {
     width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
     gap: 8px;
-  }
-
-  .ll-ref-header-actions::-webkit-scrollbar {
-    display: none;
-  }
-
-  .ll-ref-btn-add,
-  .ll-ref-btn-insights {
-    flex: 0 0 auto;
-    white-space: nowrap;
   }
 
   .ll-ref-header-icon {
     flex: 0 0 auto;
+  }
+
+  .ll-ref-btn-insights {
+    flex: 1 1 auto;
+    min-width: 130px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .ll-ref-btn-add {
+    flex: 1 1 100%;
+    justify-content: center;
+    white-space: nowrap;
   }
 
   .ll-ref-filters {

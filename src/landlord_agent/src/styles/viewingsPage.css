@@ -1390,26 +1390,26 @@
 
   .ll-vw-header-actions {
     width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
     gap: 8px;
-  }
-
-  .ll-vw-header-actions::-webkit-scrollbar {
-    display: none;
-  }
-
-  .ll-vw-btn-cta,
-  .ll-vw-btn-insights {
-    flex: 0 0 auto;
-    white-space: nowrap;
   }
 
   .ll-vw-header-icon {
     flex: 0 0 auto;
+  }
+
+  .ll-vw-btn-insights {
+    flex: 1 1 auto;
+    min-width: 130px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .ll-vw-btn-cta {
+    flex: 1 1 100%;
+    justify-content: center;
+    white-space: nowrap;
   }
 
   /* Filters: stack */

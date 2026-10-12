@@ -896,26 +896,26 @@
 
   .ll-ct-header-actions {
     width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
     gap: 8px;
-  }
-
-  .ll-ct-header-actions::-webkit-scrollbar {
-    display: none;
-  }
-
-  .ll-ct-btn-send,
-  .ll-ct-btn-insights {
-    flex: 0 0 auto;
-    white-space: nowrap;
   }
 
   .ll-ct-header-icon {
     flex: 0 0 auto;
+  }
+
+  .ll-ct-btn-insights {
+    flex: 1 1 auto;
+    min-width: 130px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .ll-ct-btn-send {
+    flex: 1 1 100%;
+    justify-content: center;
+    white-space: nowrap;
   }
 
   /* KPI grid: single column */

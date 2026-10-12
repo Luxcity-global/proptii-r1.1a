@@ -1579,44 +1579,32 @@
     gap: 10px;
   }
 
-  /* Actions row: two-row layout.
-     Row 1: icon buttons (left-aligned, no wrap).
-     Row 2: text/action buttons scroll horizontally, Add Property pinned at end. */
+  /* Actions row: wrap cleanly — no horizontal scroll */
   .ll-props-header-actions {
     width: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
     gap: 8px;
-    row-gap: 8px;
   }
 
-  /* Icon buttons stay on the first row, same size, never grow */
+  /* Icon buttons: stay their natural size */
   .ll-props-header-icon {
     flex: 0 0 auto;
   }
 
-  /* Text action buttons + Add Property: sit on a scrollable row of their own */
-  .ll-props-btn-insights,
-  .ll-props-btn-add {
-    flex: 0 0 auto;      /* don't stretch — keep natural width */
-    white-space: nowrap;
+  /* Secondary text buttons: share available row space */
+  .ll-props-btn-insights {
+    flex: 1 1 auto;
+    min-width: 130px;
     justify-content: center;
+    white-space: nowrap;
   }
 
-  /* Wrap the text buttons in a horizontal scroll container.
-     We achieve this by making the actions row itself scrollable once it
-     overflows, with nowrap. Icon buttons are pushed before any scroll
-     because they stay flex-shrink:0 small. */
-  .ll-props-header-actions {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-
-  .ll-props-header-actions::-webkit-scrollbar {
-    display: none;
+  /* CTA button: always full-width on its own row */
+  .ll-props-btn-add {
+    flex: 1 1 100%;
+    justify-content: center;
+    white-space: nowrap;
   }
 
   /* Toolbar filters wrap and take full width */
