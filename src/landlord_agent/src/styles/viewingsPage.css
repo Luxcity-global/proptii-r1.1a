@@ -1372,6 +1372,13 @@
 
 /* ── Mobile responsiveness additions ───────────────────────────────────────── */
 
+@media (max-width: 768px) {
+  /* Unstick header at tablet/mobile breakpoint */
+  .ll-vw-header {
+    position: static;
+  }
+}
+
 @media (max-width: 640px) {
   /* Header: stack vertically */
   .ll-vw-header-inner {
@@ -1382,16 +1389,26 @@
 
   .ll-vw-header-actions {
     width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
     gap: 8px;
   }
 
-  .ll-vw-btn-add,
+  .ll-vw-header-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ll-vw-btn-cta,
   .ll-vw-btn-insights {
-    flex: 1;
-    justify-content: center;
-    min-width: 0;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .ll-vw-header-icon {
+    flex: 0 0 auto;
   }
 
   /* Filters: stack */
@@ -1466,14 +1483,5 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-  }
-}
-
-/* ── Mobile responsiveness: viewingsPage supplemental fixes ────────────── */
-
-@media (max-width: 640px) {
-  /* Unstick page header so it doesn't overlap the fixed 64px mobile nav bar */
-  .ll-vw-header {
-    position: static;
   }
 }

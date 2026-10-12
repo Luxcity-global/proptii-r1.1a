@@ -1209,6 +1209,13 @@
 
 /* ── Mobile responsiveness additions ───────────────────────────────────────── */
 
+@media (max-width: 768px) {
+  /* Unstick header at tablet/mobile breakpoint */
+  .ll-cl-header {
+    position: static;
+  }
+}
+
 @media (max-width: 640px) {
   /* Page padding */
   .ll-cl {
@@ -1222,6 +1229,37 @@
     margin-right: -12px;
     padding-left: 12px;
     padding-right: 12px;
+  }
+
+  /* Header: stack copy + actions vertically */
+  .ll-cl-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-cl-header-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    gap: 8px;
+  }
+
+  .ll-cl-header-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ll-cl-btn-add,
+  .ll-cl-btn-insights {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .ll-cl-header-icon {
+    flex: 0 0 auto;
   }
 
   /* Switcher: scrollable pills */
@@ -1260,27 +1298,6 @@
 }
 
 @media (max-width: 480px) {
-  /* Header: stack actions */
-  .ll-cl-header-inner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .ll-cl-header-actions {
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 8px;
-  }
-
-  .ll-cl-btn-add,
-  .ll-cl-btn-insights {
-    flex: 1;
-    justify-content: center;
-    min-width: 0;
-  }
-
   /* KPI: reduce height */
   .ll-cl-kpi {
     min-height: 180px;

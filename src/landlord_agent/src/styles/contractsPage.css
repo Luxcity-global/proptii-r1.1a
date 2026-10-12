@@ -896,16 +896,26 @@
 
   .ll-ct-header-actions {
     width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
     gap: 8px;
   }
 
-  .ll-ct-btn-add,
+  .ll-ct-header-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ll-ct-btn-send,
   .ll-ct-btn-insights {
-    flex: 1;
-    justify-content: center;
-    min-width: 0;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .ll-ct-header-icon {
+    flex: 0 0 auto;
   }
 
   /* KPI grid: single column */
@@ -985,10 +995,9 @@
     padding-right: 12px;
   }
 
-  /* Primary add button: full-width fill */
-  .ll-ct-btn-add {
-    flex: 1;
-    justify-content: center;
-    min-width: 0;
+  /* Primary CTA button: no-shrink */
+  .ll-ct-btn-send {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 }

@@ -737,21 +737,21 @@ export function Dashboard({
   const handleUploadDocument = () => {
     if (onViewDocuments) onViewDocuments();
     else if (firstProperty) onManageDocuments(firstProperty);
-    else onAddProperty();
+    else onAddProperty?.();
   };
   const handleAssignTenant = () => {
     if (onViewClients) onViewClients();
     else if (firstProperty) onViewProperty(firstProperty);
-    else onAddProperty();
+    else onAddProperty?.();
   };
   const handleScheduleViewing = () => {
     if (onViewViewings) onViewViewings();
     else if (onViewAllProperties) onViewAllProperties();
-    else onAddProperty();
+    else onAddProperty?.();
   };
   const handleRecordRent = () => {
     if (onViewAllProperties) onViewAllProperties();
-    else onAddProperty();
+    else onAddProperty?.();
   };
 
   return (

@@ -1740,15 +1740,21 @@
 
 /* ── Mobile responsiveness ──────────────────────────────────────────────────── */
 
+@media (max-width: 768px) {
+  /* Unstick header at tablet/mobile breakpoint */
+  .ll-docs-header {
+    position: static;
+  }
+}
+
 @media (max-width: 640px) {
   /* Page padding */
   .ll-docs {
     padding: 0 14px 32px;
   }
 
-  /* Header: unstick so it doesn't overlap the fixed 64px mobile nav bar */
+  /* Header: adjust margins for reduced page padding */
   .ll-docs-header {
-    position: static;
     margin-left: -14px;
     margin-right: -14px;
     padding-left: 14px;
@@ -1770,10 +1776,28 @@
     font-size: 22px;
   }
 
-  /* Actions row: full width, left-aligned */
+  /* Actions row: full width, horizontal scroll */
   .ll-docs-header-actions {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .ll-docs-header-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ll-docs-header-icon {
+    flex: 0 0 auto;
+  }
+
+  .ll-docs-btn-attach {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   /* Scope/display toggle labels: hide text on small screens */
