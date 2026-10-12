@@ -1572,25 +1572,51 @@
 /* ── Mobile responsiveness additions ───────────────────────────────────────── */
 
 @media (max-width: 640px) {
-  /* Header actions stack vertically */
+  /* Header: stack title + actions vertically */
   .ll-props-header-inner {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
 
+  /* Actions row: two-row layout.
+     Row 1: icon buttons (left-aligned, no wrap).
+     Row 2: text/action buttons scroll horizontally, Add Property pinned at end. */
   .ll-props-header-actions {
     width: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
     gap: 8px;
+    row-gap: 8px;
   }
 
-  .ll-props-btn-add,
-  .ll-props-btn-insights {
-    flex: 1;
+  /* Icon buttons stay on the first row, same size, never grow */
+  .ll-props-header-icon {
+    flex: 0 0 auto;
+  }
+
+  /* Text action buttons + Add Property: sit on a scrollable row of their own */
+  .ll-props-btn-insights,
+  .ll-props-btn-add {
+    flex: 0 0 auto;      /* don't stretch — keep natural width */
+    white-space: nowrap;
     justify-content: center;
-    min-width: 0;
+  }
+
+  /* Wrap the text buttons in a horizontal scroll container.
+     We achieve this by making the actions row itself scrollable once it
+     overflows, with nowrap. Icon buttons are pushed before any scroll
+     because they stay flex-shrink:0 small. */
+  .ll-props-header-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .ll-props-header-actions::-webkit-scrollbar {
+    display: none;
   }
 
   /* Toolbar filters wrap and take full width */
