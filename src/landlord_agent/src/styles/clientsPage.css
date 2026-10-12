@@ -1204,6 +1204,7 @@
 
 @media (max-width: 640px) {
   .ll-cl-header h1 { font-size: 22px; }
+  .ll-cl-kpi { min-height: auto; }
   .ll-cl-kpi-value { font-size: 28px; }
 }
 
@@ -1262,8 +1263,17 @@
     flex: 0 0 auto;
   }
 
-  /* Switcher: scrollable pills */
+  /* Switcher row: stack tabs + filters vertically */
+  .ll-cl-switcher-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  /* Switcher: scrollable pills, full width */
   .ll-cl-switcher {
+    width: 100%;
+    justify-content: flex-start;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     max-width: 100%;
@@ -1300,7 +1310,7 @@
 @media (max-width: 480px) {
   /* KPI: reduce height */
   .ll-cl-kpi {
-    min-height: 180px;
+    min-height: auto;
   }
 
   .ll-cl-kpi-value {

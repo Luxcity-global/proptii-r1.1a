@@ -1190,6 +1190,7 @@
 
 .ll-vw-calendar-scroll {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .ll-vw-calendar-grid {
@@ -1470,6 +1471,24 @@
   /* KPI value */
   .ll-vw-kpi-value {
     font-size: 24px;
+  }
+
+  /* Toolbar right: stack controls vertically, full width */
+  .ll-vw-toolbar-right {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+
+  /* Select + search input: full width */
+  .ll-vw-select,
+  .ll-vw-search input {
+    width: 100%;
+  }
+
+  /* Calendar: reduce padding on mobile */
+  .ll-vw-calendar {
+    padding: 12px;
   }
 }
 

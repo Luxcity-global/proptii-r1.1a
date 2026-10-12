@@ -926,6 +926,7 @@
 
   /* Subsection tabs: horizontal scroll instead of wrapping to 2 rows */
   .ll-ct-subtabs {
+    width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     flex-wrap: nowrap;

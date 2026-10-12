@@ -1636,12 +1636,22 @@
     flex: 1;
     min-width: 120px;
   }
+
+  /* KPI cards: collapse fixed min-height on small screens */
+  .ll-props-kpi {
+    min-height: auto;
+  }
+
+  .ll-props-kpi-value {
+    font-size: 26px;
+  }
 }
 
 @media (max-width: 480px) {
   /* KPI cards: reduce min-height on very small screens */
   .ll-props-kpi {
-    min-height: 160px;
+    min-height: auto;
+    padding: 16px;
   }
 
   .ll-props-kpi-value {

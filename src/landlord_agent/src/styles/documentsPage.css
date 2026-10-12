@@ -1828,9 +1828,25 @@
     width: 100%;
   }
 
-  /* KPI grid: tighter gap */
+  /* KPI grid: single column + tighter gap */
   .ll-docs-kpi-grid {
+    grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  /* Body: reduce top padding on mobile */
+  .ll-docs-body {
+    padding-top: 16px;
+  }
+
+  /* Toolbar filter grid: collapse to single column */
+  .ll-docs-toolbar-filters {
+    grid-template-columns: 1fr;
+  }
+
+  /* All-files grid: collapse to single column */
+  .ll-docs-file-grid {
+    grid-template-columns: 1fr;
   }
 
   /* Category filter pills: horizontal scroll, no wrapping */
