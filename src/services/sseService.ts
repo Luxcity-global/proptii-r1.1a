@@ -110,8 +110,14 @@ class SseService {
       const source = new EventSource(sseUrl);
 
       source.onopen = () => {
+        const prevAttempts = this.reconnectAttempts.get(channel) || 0;
         console.debug(`[SSE:${channel}] Connected`);
         this.reconnectAttempts.set(channel, 0);
+
+        // If this is a reconnect, dispatch a synthetic event so pollers immediately re-sync
+        if (prevAttempts > 0) {
+          this.dispatch({ type: 'conversation_updated', data: { reconnected: true }, timestamp: Date.now() });
+        }
       };
 
       source.onmessage = (event) => {
@@ -144,7 +150,7 @@ class SseService {
     if (this.reconnectTimers.has(channel)) return;
 
     const attempts = this.reconnectAttempts.get(channel) || 0;
-    const delay = Math.min(1000 * Math.pow(2, attempts), 30000); // Exponential backoff capped at 30s
+    const delay = Math.min(1000 * Math.pow(2, attempts), 5000); // Exponential backoff capped at 5s
     this.reconnectAttempts.set(channel, attempts + 1);
 
     const timer = setTimeout(() => {

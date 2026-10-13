@@ -19,11 +19,13 @@ import {
   BedDouble,
   CalendarDays,
   PoundSterling,
+  MessageSquare,
 } from "lucide-react";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import { trackEvent } from "../../../utils/analytics";
 import viewingService from "../../../services/viewingService";
 import { listViewingsForLandlord } from "../../../services/viewingInboxService";
+import { useMessagingContext } from "../../../contexts/MessagingContext";
 import "../styles/dashboardOverview.css";
 
 interface DashboardProps {
@@ -41,6 +43,7 @@ interface DashboardProps {
   onRefresh?: () => void;
   onViewSettings?: () => void;
   onViewNotifications?: () => void;
+  onViewMessages?: () => void;
   onViewAllProperties?: () => void;
   onViewViewings?: () => void;
   onViewClients?: () => void;
@@ -204,6 +207,7 @@ function DashboardOverviewHeader({
   onRefresh,
   onViewSettings,
   onViewNotifications,
+  onViewMessages,
   addLabel = "Add Property",
   showInsights = true,
 }: {
@@ -213,10 +217,12 @@ function DashboardOverviewHeader({
   onRefresh?: () => void;
   onViewSettings?: () => void;
   onViewNotifications?: () => void;
+  onViewMessages?: () => void;
   addLabel?: string;
   showInsights?: boolean;
 }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { unreadCount } = useMessagingContext();
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -249,6 +255,40 @@ function DashboardOverviewHeader({
             onClick={onViewSettings}
           >
             <Settings size={18} />
+          </button>
+          <button
+            type="button"
+            className="ll-header-icon"
+            title="Messages"
+            onClick={onViewMessages || onViewNotifications}
+            style={{ position: 'relative' }}
+          >
+            <MessageSquare size={18} />
+            {unreadCount > 0 && (
+              <span
+                aria-label={`${unreadCount} unread messages`}
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  right: '2px',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  minWidth: '16px',
+                  height: '16px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 3px',
+                  pointerEvents: 'none',
+                }}
+              >
+                {unreadCount > 99 ? '99+' : String(unreadCount)}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -447,6 +487,7 @@ export function Dashboard({
   onRefresh,
   onViewSettings,
   onViewNotifications,
+  onViewMessages,
   onViewAllProperties,
   onViewViewings,
   onViewClients,
@@ -763,6 +804,7 @@ export function Dashboard({
         onRefresh={onRefresh}
         onViewSettings={onViewSettings}
         onViewNotifications={onViewNotifications}
+        onViewMessages={onViewMessages}
       />
       <div className="ll-overview-inner ll-overview-body">
 

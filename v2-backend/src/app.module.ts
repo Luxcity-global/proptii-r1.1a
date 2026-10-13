@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { GovDataModule } from './gov-data/gov-data.module';
 
@@ -31,6 +32,7 @@ import { PaymentsController } from './controllers/payments.controller';
 import { EmailController } from './controllers/email.controller';
 import { TenantInvitationsController } from './controllers/tenant-invitations.controller';
 import { TenantsService } from './services/tenants.service';
+import { NotificationSchedulerService } from './services/notification-scheduler.service';
 
 // ── R1.4 — Search Classifier (Sprint 1.3) ────────────────────────────────────
 import { ClassifierController } from './search/classifier.controller';
@@ -94,6 +96,7 @@ function resolvePublicFolder(folder: string): string {
   imports: [
     GovDataModule,
     LeadsModule,
+    ScheduleModule.forRoot(),
     // Global rate limiter (120 req / 1 min default per client IP; per-endpoint overrides via @Throttle)
     ThrottlerModule.forRoot([{
       name: 'default',
@@ -182,6 +185,8 @@ function resolvePublicFolder(folder: string): string {
     ClassifierService,
     // Document Vault
     DocumentsService,
+    // Notification Scheduler (24h unread reminders)
+    NotificationSchedulerService,
   ],
   exports: [EventsService],
 })

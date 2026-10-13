@@ -23,6 +23,7 @@ import { UserProfile, UserRole } from '../App';
 import LandlordDashboardHeader from './LandlordDashboardHeader';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { useIsMobile } from './ui/use-mobile';
+import { useMessagingContext } from '../../../contexts/MessagingContext';
 import '../styles/sidebarOverview.css';
 
 const proptiiLogoSmall = '/images/Proptii ico.png';
@@ -62,6 +63,8 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   hasNotification?: boolean;
+  /** Numeric badge count — shown as a red pill instead of the plain dot */
+  unreadBadge?: number;
 };
 
 const screenToPath: Record<NavigationScreen, string> = {
@@ -137,6 +140,31 @@ function SidebarNavList({
               <span className="ll-sidebar-nav-icon-wrap">
                 <item.icon className="w-5 h-5" />
                 {item.hasNotification && <span className="ll-sidebar-nav-dot" />}
+                {(item.unreadBadge ?? 0) > 0 && (
+                  <span
+                    aria-label={`${item.unreadBadge} unread`}
+                    style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      right: '-8px',
+                      backgroundColor: '#ef4444',
+                      color: '#ffffff',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      minWidth: '16px',
+                      height: '16px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 3px',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {(item.unreadBadge ?? 0) > 99 ? '99+' : String(item.unreadBadge)}
+                  </span>
+                )}
               </span>
               <span className="ll-sidebar-nav-text">{item.label}</span>
             </button>
@@ -263,6 +291,7 @@ export function MainLayout({
 }: MainLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
+  const { unreadCount } = useMessagingContext();
 
   const navigationItems: NavItem[] = [
     { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard' },
@@ -272,7 +301,7 @@ export function MainLayout({
     { id: 'contracts', icon: FileSignature, label: 'Contracts', hasNotification: true },
     { id: 'clients', icon: Users, label: 'Clients' },
     { id: 'referencing', icon: ShieldCheck, label: 'Referencing' },
-    { id: 'messages', icon: MessageSquare, label: 'Messages' },
+    { id: 'messages', icon: MessageSquare, label: 'Messages', unreadBadge: unreadCount },
     { id: 'insights', icon: BarChart3, label: 'Analytics' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];

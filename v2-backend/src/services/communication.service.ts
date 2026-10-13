@@ -379,10 +379,15 @@ export class CommunicationService {
     const conv = convSnap.data();
     if (!conv) return;
 
+    /**
+     * Two separate dedup fields are used to avoid conflicts:
+     *  - immediateNotifiedAt: set here for per-send (10-min) dedup on immediate notifications.
+     *  - lastNotifiedAt: set exclusively by NotificationSchedulerService for 24h dedup on reminders.
+     */
     // ── Email deduplication: skip if notified within the last 10 minutes ──
     const TEN_MINUTES_MS = 10 * 60 * 1000;
-    if (conv.lastNotifiedAt) {
-      const lastNotified = new Date(conv.lastNotifiedAt).getTime();
+    if (conv.immediateNotifiedAt) {
+      const lastNotified = new Date(conv.immediateNotifiedAt).getTime();
       if (Date.now() - lastNotified < TEN_MINUTES_MS) {
         this.logger.debug(`[notify] Skipping — notified ${Math.round((Date.now() - lastNotified) / 1000)}s ago`);
         return;
@@ -430,23 +435,29 @@ export class CommunicationService {
         (message.body || '').substring(0, 200), // Pass preview to email
       );
 
-      // Record the notification timestamp to prevent duplicates
+      // Record the notification timestamp to prevent duplicates within 10 minutes
       try {
         await this.conversationsCol.doc(conversationId).set(
-          { lastNotifiedAt: new Date().toISOString() },
+          { immediateNotifiedAt: new Date().toISOString() },
           { merge: true }
         );
       } catch { /* non-fatal */ }
     }
   }
 
-  async markRead(messageId: string, userId?: string) {
+  async markRead(messageId: string, userId?: string): Promise<{ data: { success: boolean; conversationId: string; senderId: string } }> {
     const col = this.messagesCol;
+    let conversationId = '';
+    let senderId = '';
+
     if (col) {
       try {
         const msgDoc = await col.doc(messageId).get();
         if (msgDoc.exists) {
           const msg = msgDoc.data()!;
+          conversationId = msg.conversationId || '';
+          senderId = msg.senderId || '';
+
           // Only mark read if not already read (avoid double decrement)
           if (!msg.readAt) {
             await col.doc(messageId).set({ readAt: new Date().toISOString() }, { merge: true });
@@ -474,7 +485,26 @@ export class CommunicationService {
         }
       } catch {}
     }
-    return { data: { success: true } };
+    return { data: { success: true, conversationId, senderId } };
+  }
+
+  /**
+   * Returns the tenant and landlord IDs for a given conversation.
+   * Throws NotFoundException if the conversation document does not exist.
+   */
+  async getParticipants(conversationId: string): Promise<{ tenantId: string; landlordId: string }> {
+    const col = this.conversationsCol;
+    if (!col) return { tenantId: '', landlordId: '' };
+
+    const snap = await col.doc(conversationId).get();
+    if (!snap.exists) {
+      throw new NotFoundException(`Conversation ${conversationId} not found`);
+    }
+    const data = snap.data()!;
+    return {
+      tenantId: data.tenantId || '',
+      landlordId: data.landlordId || '',
+    };
   }
 
   // ── Attachments ───────────────────────────────────────────────────────────

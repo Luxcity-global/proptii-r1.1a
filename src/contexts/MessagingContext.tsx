@@ -100,20 +100,33 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, []);
 
     const markConversationAsRead = useCallback((id: string) => {
-        setConversations(prev => prev.map(c => {
-            const isLandlord = c.landlordId === user?.id;
-            const unread = isLandlord ? (c.unreadForLandlord ?? 0) : (c.unreadForTenant ?? 0);
-            
-            if (c.id === id && unread > 0) {
-                setUnreadCount(count => Math.max(0, count - unread));
-                return { 
-                    ...c, 
-                    unreadForLandlord: isLandlord ? 0 : c.unreadForLandlord,
-                    unreadForTenant: !isLandlord ? 0 : c.unreadForTenant
-                };
-            }
-            return c;
-        }));
+        // Optimistically zero out the unread counter for the target conversation
+        // and decrement the global badge. Both state updates are separate, clean calls
+        // that do not nest one setter inside another's functional updater.
+        let delta = 0;
+
+        setConversations(prev => {
+            const updated = prev.map(c => {
+                const isLandlord = c.landlordId === user?.id;
+                const unread = isLandlord ? (c.unreadForLandlord ?? 0) : (c.unreadForTenant ?? 0);
+
+                if (c.id === id && unread > 0) {
+                    delta = unread;
+                    return {
+                        ...c,
+                        unreadForLandlord: isLandlord ? 0 : c.unreadForLandlord,
+                        unreadForTenant: !isLandlord ? 0 : c.unreadForTenant,
+                    };
+                }
+                return c;
+            });
+            return updated;
+        });
+
+        // Note: delta is captured synchronously inside the updater above because
+        // the updater runs synchronously during the setState call in React 18 with
+        // automatic batching. We schedule the unread count update in the same batch.
+        setUnreadCount(prev => Math.max(0, prev - delta));
     }, [user?.id]);
 
     return (

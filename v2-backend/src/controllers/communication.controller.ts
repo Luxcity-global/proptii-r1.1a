@@ -142,15 +142,19 @@ export class CommunicationController {
     const userId = req.user.uid;
     const result = await this.communicationService.sendMessage(conversationId, dto, userId, req.user);
 
-    // Broadcast new message event to conversation participants
-    this.eventsService.emit({
-      type: 'message_new',
-      data: {
-        conversationId,
-        senderId: userId,
-        message: result.data,
-      },
-    });
+    // Emit targeted SSE events to both participants instead of a global broadcast.
+    // Both sender and recipient need the event so their pollers re-fetch the thread.
+    try {
+      const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
+      const eventData = { conversationId, senderId: userId, message: result.data };
+
+      this.eventsService.emit({ type: 'message_new', userId: tenantId, data: eventData });
+      this.eventsService.emit({ type: 'message_new', userId: landlordId, data: eventData });
+      this.eventsService.emit({ type: 'conversation_updated', userId: tenantId, data: { conversationId } });
+      this.eventsService.emit({ type: 'conversation_updated', userId: landlordId, data: { conversationId } });
+    } catch (err: any) {
+      this.logger.warn(`[sendMessage] Failed to emit SSE events: ${err?.message || err}`);
+    }
 
     return result;
   }
@@ -163,12 +167,26 @@ export class CommunicationController {
   async markRead(@Param('id') messageId: string, @Req() req: any) {
     const userId = req?.user?.uid;
     const result = await this.communicationService.markRead(messageId, userId);
+    const { conversationId } = result.data;
 
-    this.eventsService.emit({
-      type: 'message_read',
-      userId,
-      data: { messageId },
-    });
+    // Emit targeted read events to both participants.
+    // Reader's own event clears the badge in their other tabs; the other
+    // participant's event updates their preview (e.g. "read" tick).
+    try {
+      const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
+
+      this.eventsService.emit({ type: 'message_read', userId, data: { messageId, conversationId } });
+      const otherParticipantId = userId === tenantId ? landlordId : tenantId;
+      if (otherParticipantId && otherParticipantId !== userId) {
+        this.eventsService.emit({ type: 'message_read', userId: otherParticipantId, data: { messageId, conversationId } });
+      }
+
+      // Also trigger a conversation list re-fetch on both sides
+      this.eventsService.emit({ type: 'conversation_updated', userId: tenantId, data: { conversationId } });
+      this.eventsService.emit({ type: 'conversation_updated', userId: landlordId, data: { conversationId } });
+    } catch (err: any) {
+      this.logger.warn(`[markRead] Failed to emit SSE events: ${err?.message || err}`);
+    }
 
     return result;
   }

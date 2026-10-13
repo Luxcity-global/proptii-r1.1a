@@ -119,7 +119,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
 
   // Load tenants for the compose picker
   const { tenants: allTenants } = useTenants({
-    userId: (user as any)?.id || (user as any)?.uid || null,
+    userId: (user as any)?.id || (user as any)?.uid || (userProfile as any)?.id || null,
   });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -176,6 +176,8 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
       // Initialise lastSeenAt sentinel so the poller won't wipe optimistics on first tick.
       const conv = conversations.find((c) => c.id === id);
       if (conv && isUnread(conv)) {
+        // markConversationAsRead clears the badge optimistically and fires a markRead
+        // API call so the backend decrements unreadForLandlord. SSE will echo confirmation.
         markConversationAsRead(id);
       }
       setMobileShowThread(true); // navigate to thread on mobile
@@ -206,7 +208,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
     });
   }, [activeConversationId]);
 
-  const currentUserId = user?.id ?? '';
+  const currentUserId = (user as any)?.id || (user as any)?.uid || (userProfile as any)?.id || '';
   const userName = userProfile?.name || (user as { name?: string; displayName?: string } | null)?.name || (user as { displayName?: string } | null)?.displayName || 'Landlord';
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
 

@@ -71,7 +71,7 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
         void fetchData();
 
         // Register SSE real-time listener for instant push updates
-        const unsubscribeSse = sseService.on(['message_new', 'message_read', 'conversation_new'], () => {
+        const unsubscribeSse = sseService.on(['message_new', 'message_read', 'conversation_new', 'conversation_updated'], () => {
             console.debug('[useMessagingPoller] SSE message event received, updating inbox immediately');
             void fetchData();
         });

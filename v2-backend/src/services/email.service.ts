@@ -68,6 +68,50 @@ export class EmailService {
     }
   }
 
+  // ─── Unread Message Reminder ─────────────────────────────────────────────
+  // Sent by the scheduler when a conversation has had unread messages for >24h.
+  // Uses the same renderProptiiEmail wrapper as other notification emails.
+
+  async sendUnreadReminderNotification(opts: {
+    recipientEmail: string;
+    recipientName: string;
+    propertyTitle: string;
+    unreadCount: number;
+  }): Promise<void> {
+    const { recipientEmail, recipientName, propertyTitle, unreadCount } = opts;
+    if (!recipientEmail) return;
+
+    const safeRecipientName = this.truncate(recipientName || '', 50);
+    const safePropertyTitle = this.truncate(propertyTitle || 'a property', 60);
+    const greeting = safeRecipientName ? `Hello ${safeRecipientName},` : 'Hello,';
+    const actionUrl = `${this.frontendUrl}/dashboard/messages`;
+    const messageWord = unreadCount === 1 ? 'message' : 'messages';
+
+    const html = renderProptiiEmail({
+      title: 'You have unread messages on Proptii',
+      buttonLabel: 'View Messages →',
+      buttonHref: actionUrl,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">${greeting}</p>
+        <p style="margin:0 0 8px;">
+          You have <strong>${unreadCount} unread ${messageWord}</strong> regarding
+          <strong>${safePropertyTitle}</strong> that have been waiting for more than 24 hours.
+        </p>
+        <p style="margin:8px 0 16px;">Don't leave the conversation hanging — log in to read and reply.</p>
+        <p style="font-size:0.8em;color:#94a3b8;margin-top:16px;">
+          If the button doesn't work: <a href="${actionUrl}" style="color:#136C9E;">${actionUrl}</a>
+        </p>
+      `,
+    });
+
+    try {
+      const id = await sendEmail({ to: recipientEmail, subject: 'You have unread messages on Proptii', html });
+      this.logger.log(`Unread reminder sent to ${recipientEmail} [${id}]`);
+    } catch (err: any) {
+      this.logger.error(`Failed to send unread reminder: ${err?.message || err}`);
+    }
+  }
+
   // ─── Guest Claim Account ──────────────────────────────────────────────────
   // Sent to a guest user so they can claim a full Proptii account after
   // receiving messages without being registered.

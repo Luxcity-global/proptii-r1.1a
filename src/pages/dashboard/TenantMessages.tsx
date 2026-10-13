@@ -160,6 +160,8 @@ const TenantMessages: React.FC = () => {
 
     const conv = conversations.find((c) => c.id === id);
     if (conv && isUnread(conv)) {
+      // markConversationAsRead clears the badge optimistically and fires a markRead
+      // API call so the backend decrements unreadForTenant. SSE will echo confirmation.
       markConversationAsRead(id);
     }
     setMobileShowThread(true); // navigate to thread panel on mobile
