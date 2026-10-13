@@ -74,7 +74,7 @@ export class NotificationSchedulerService {
 
           // Notify tenant if they have unread messages
           if ((conv.unreadForTenant ?? 0) > 0 && conv.tenantId) {
-            const profile = await this.userProfileService.getProfile(conv.tenantId) as any;
+            const profile = await this.userProfileService.getProfile(conv.tenantId);
             const recipientEmail: string = profile?.email || '';
             const recipientName: string = profile?.name || profile?.displayName || conv.tenantName || 'Tenant';
 
@@ -91,7 +91,7 @@ export class NotificationSchedulerService {
 
           // Notify landlord if they have unread messages
           if ((conv.unreadForLandlord ?? 0) > 0 && conv.landlordId) {
-            const profile = await this.userProfileService.getProfile(conv.landlordId) as any;
+            const profile = await this.userProfileService.getProfile(conv.landlordId);
             const recipientEmail: string = profile?.email || '';
             const recipientName: string = profile?.name || profile?.displayName || 'Landlord';
 

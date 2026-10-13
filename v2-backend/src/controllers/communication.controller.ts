@@ -94,10 +94,14 @@ export class CommunicationController {
     const result = await this.communicationService.getOrCreateConversation(dto, userId);
     
     if (result.isNew) {
-      this.eventsService.emit({
-        type: 'conversation_new',
-        data: result.data,
-      });
+      // Emit targeted events to both participants only — no global broadcast.
+      const { tenantId, landlordId } = result.data as { tenantId: string; landlordId: string };
+      if (tenantId) {
+        this.eventsService.emit({ type: 'conversation_new', userId: tenantId, data: result.data });
+      }
+      if (landlordId && landlordId !== tenantId) {
+        this.eventsService.emit({ type: 'conversation_new', userId: landlordId, data: result.data });
+      }
     }
     
     return { data: result.data };
@@ -200,14 +204,19 @@ export class CommunicationController {
     const userId = req.user.uid;
     const result = await this.communicationService.editMessage(messageId, dto.body, userId);
 
-    this.eventsService.emit({
-      type: 'message_edit',
-      data: {
-        messageId,
-        body: dto.body,
-        editedAt: new Date().toISOString(),
-      },
-    });
+    // Emit targeted events to both participants instead of a global broadcast.
+    const editedAt = new Date().toISOString();
+    const conversationId: string = (result.data as any)?.conversationId || '';
+    if (conversationId) {
+      try {
+        const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
+        const eventData = { messageId, conversationId, body: dto.body, editedAt };
+        if (tenantId) this.eventsService.emit({ type: 'message_edit', userId: tenantId, data: eventData });
+        if (landlordId) this.eventsService.emit({ type: 'message_edit', userId: landlordId, data: eventData });
+      } catch (err: any) {
+        this.logger.warn(`[editMessage] Failed to emit targeted SSE events: ${err?.message || err}`);
+      }
+    }
 
     return result;
   }
@@ -221,13 +230,19 @@ export class CommunicationController {
     const userId = req.user.uid;
     const result = await this.communicationService.deleteMessage(messageId, userId);
 
-    this.eventsService.emit({
-      type: 'message_delete',
-      data: {
-        messageId,
-        deletedAt: new Date().toISOString(),
-      },
-    });
+    // Emit targeted events to both participants instead of a global broadcast.
+    const deletedAt = new Date().toISOString();
+    const conversationId: string = (result.data as any)?.conversationId || '';
+    if (conversationId) {
+      try {
+        const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
+        const eventData = { messageId, conversationId, deletedAt };
+        if (tenantId) this.eventsService.emit({ type: 'message_delete', userId: tenantId, data: eventData });
+        if (landlordId) this.eventsService.emit({ type: 'message_delete', userId: landlordId, data: eventData });
+      } catch (err: any) {
+        this.logger.warn(`[deleteMessage] Failed to emit targeted SSE events: ${err?.message || err}`);
+      }
+    }
 
     return result;
   }

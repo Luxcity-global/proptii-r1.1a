@@ -418,7 +418,7 @@ export class CommunicationService {
       recipientEmail = conv.guestEmail;
       recipientName = conv.tenantName || 'Guest';
     } else if (recipientId) {
-      const profile = await this.userProfileService.getProfile(recipientId) as any;
+      const profile = await this.userProfileService.getProfile(recipientId);
       recipientEmail = profile?.email || '';
       recipientName = profile?.name || profile?.displayName || (recipientId === conv.landlordId ? 'Landlord' : (conv.tenantName || 'Tenant'));
     }
