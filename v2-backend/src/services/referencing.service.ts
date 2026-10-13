@@ -905,10 +905,10 @@ export class ReferencingService {
 
       const userRef = db.collection('users').doc(landlordId);
       const existingUser = await userRef.get();
-      const existing = existingUser.exists ? (existingUser.data() as any) : {};
-      const existingRole = String(existing.role || '').toLowerCase();
-      const existingRoles = Array.isArray(existing.roles)
-        ? existing.roles.map((role: unknown) => String(role).toLowerCase())
+      const profileData = existingUser.exists ? (existingUser.data() as any) : {};
+      const existingRole = String(profileData.role || '').toLowerCase();
+      const existingRoles = Array.isArray(profileData.roles)
+        ? profileData.roles.map((role: unknown) => String(role).toLowerCase())
         : [];
       const alreadyTenant = existingRole === 'tenant' || existingRoles.includes('tenant');
       const alreadyManager = existingRole === 'landlord' || existingRole === 'agent'
