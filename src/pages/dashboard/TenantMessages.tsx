@@ -429,7 +429,7 @@ const TenantMessages: React.FC = () => {
                 )}
 
                 <div ref={scrollContainerRef} className="tn-msg-feed">
-                  <MessageThread ref={threadRef} conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} />
+                  <MessageThread ref={threadRef} conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} scrollContainerRef={scrollContainerRef} />
                   {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
                     <div key={msg.id} data-testid="optimistic-message" className="tn-msg-optimistic">
                       <div className="tn-msg-optimistic-bubble">

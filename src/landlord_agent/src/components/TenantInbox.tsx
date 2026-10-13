@@ -153,7 +153,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
       // load the real messages (avoids a flash of empty thread between send and fetch).
       setTimeout(() => {
         setOptimisticMessages((m) => ({ ...m, [activeConversationId]: [] }));
-      }, 1500);
+      }, 3000);
     }
     lastSeenAt.current[activeConversationId] = now;
   }, [activeConversationId, conversations]);
@@ -529,6 +529,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                     conversationId={activeConversationId}
                     currentUserId={currentUserId}
                     onScrollRequest={scrollToBottom}
+                    scrollContainerRef={scrollContainerRef}
                   />
                   {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
                     <div key={msg.id} data-testid="optimistic-message" className="ll-msg-optimistic">

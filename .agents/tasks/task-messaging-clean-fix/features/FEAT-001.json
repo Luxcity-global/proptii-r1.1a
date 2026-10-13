@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Fix real-time messaging: (1) remove message_new/message_read/conversation_updated from useMessagingPoller SSE subscription to eliminate the three-way update race that causes duplicate/disappearing messages; (2) pass scrollContainerRef to MessageThread in both TenantMessages and TenantInbox so load-earlier scroll restoration works; (3) increase optimistic-clear timeout in TenantInbox from 1500ms to 3000ms.",
+  "status": "completed",
+  "steps": [
+    "Step 1 — Edit src/hooks/useMessagingPoller.ts. Find the sseService.on call on the line that reads `sseService.on(['message_new', 'message_read', 'conversation_new', 'conversation_updated'], () => {`. Replace the array argument with `['conversation_new']`. Keep the separate unsubscribePresence handler for 'presence_update' exactly as-is. Remove the console.debug log line inside the handler or update its text. The fetchData() call inside must remain. The unsubscribeSse variable must still be called in the cleanup return.",
+
+    "Step 2 — Edit src/pages/dashboard/TenantMessages.tsx. Find the <MessageThread> JSX element (currently: `<MessageThread ref={threadRef} conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} />`). Add the prop `scrollContainerRef={scrollContainerRef}` to it. The scrollContainerRef is already created via `const scrollContainerRef = useRef<HTMLDivElement>(null)` and already attached to the feed div as `<div ref={scrollContainerRef} className='tn-msg-feed'>`. No other changes to this file.",
+
+    "Step 3 — Edit src/landlord_agent/src/components/TenantInbox.tsx. (A) Find the <MessageThread> JSX element (currently: `<MessageThread ref={threadRef} conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} />`). Add the prop `scrollContainerRef={scrollContainerRef}` to it. The scrollContainerRef is already created via `const scrollContainerRef = useRef<HTMLDivElement>(null)` and already attached to the feed div as `<div ref={scrollContainerRef} className='ll-msg-feed'>`. (B) In the lastSeenAt useEffect (the one that watches `activeConversationId` and `conversations`, and has `if (prev !== undefined && now && now !== prev)` inside), find `setTimeout(() => { setOptimisticMessages(...) }, 1500)` and change the delay from 1500 to 3000.",
+
+    "Step 4 — Run `cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build` and confirm it exits 0. Do not modify backend files unless there are pre-existing TypeScript errors — fix only if the build is broken.",
+
+    "Step 5 — Run `cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npx vite build` and confirm it exits 0. Fix any TypeScript type errors introduced by the changes (unlikely since we are only adding a prop that is already declared in MessageThreadProps).",
+
+    "Step 6 — Record findings and set status to completed. Commit with message: 'fix(messaging): remove competing SSE update paths, pass scrollContainerRef, increase optimistic timeout'."
+  ],
+  "acceptance_criteria": [
+    "`cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build` exits 0",
+    "`cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npx vite build` exits 0",
+    "`grep -n 'message_new\\|message_read\\|conversation_updated' src/hooks/useMessagingPoller.ts` returns no lines inside an sseService.on() call (only conversation_new and presence_update remain as SSE triggers)",
+    "`grep -n 'scrollContainerRef' src/pages/dashboard/TenantMessages.tsx` shows the prop being passed to <MessageThread>",
+    "`grep -n 'scrollContainerRef' src/landlord_agent/src/components/TenantInbox.tsx` shows the prop being passed to <MessageThread>",
+    "`grep -c 'sseService.on' src/components/messaging/MessageThread.tsx` returns 4 (MessageThread unchanged)",
+    "`grep -rn 'sseService.on' src/pages/dashboard/TenantMessages.tsx src/landlord_agent/src/components/TenantInbox.tsx` returns 0 matches",
+    "`grep -n '3000' src/landlord_agent/src/components/TenantInbox.tsx` shows the updated timeout in the lastSeenAt useEffect"
+  ],
+  "verification": [
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npx vite build"
+  ],
+  "blocked_reason": null,
+  "findings": "All three changes applied cleanly. useMessagingPoller SSE listener now subscribes only to conversation_new, eliminating the race with MessageThread's own message_new/message_read/conversation_updated handlers. scrollContainerRef passed to MessageThread in both TenantMessages.tsx and TenantInbox.tsx. Optimistic clear timeout in TenantInbox increased from 1500ms to 3000ms. Both backend and frontend builds exit 0."
+}

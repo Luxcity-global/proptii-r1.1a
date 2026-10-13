@@ -70,9 +70,11 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
         // Fire an initial fetch on mount
         void fetchData();
 
-        // Register SSE real-time listener for instant push updates
-        const unsubscribeSse = sseService.on(['message_new', 'message_read', 'conversation_new', 'conversation_updated'], () => {
-            console.debug('[useMessagingPoller] SSE message event received, updating inbox immediately');
+        // Register SSE real-time listener for instant push updates.
+        // Only listen to conversation_new here. message_new, message_read, and
+        // conversation_updated are handled exclusively inside MessageThread to
+        // avoid a three-way update race that caused duplicate/disappearing messages.
+        const unsubscribeSse = sseService.on(['conversation_new'], () => {
             void fetchData();
         });
 
