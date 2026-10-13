@@ -401,43 +401,7 @@ export function PropertyDetails({
         </div>
       </header>
 
-      {/* ── Hero photo strip ───────────────────────────────────────────────── */}
-      {validPhotos.length > 0 ? (
-        <div className="relative bg-[#1e293b] w-full overflow-hidden flex items-center justify-center" style={{ height: 360 }}>
-          {(() => {
-            const coverPhoto = validPhotos.find(p => p.isCover) || validPhotos[0];
-            return (
-              <>
-                <img src={coverPhoto.url} alt="" className="absolute inset-0 w-full h-full object-cover blur-[40px] opacity-40 scale-110" />
-                <img src={coverPhoto.url} alt="Property Cover" className="relative z-10 w-full h-full object-contain" />
-              </>
-            );
-          })()}
-          
-          {/* Add photos shortcut on hero */}
-          <button type="button"
-            onClick={() => { document.getElementById('photos-section')?.scrollIntoView({ behavior: 'smooth' }); fileInputRef.current?.click(); }}
-            className="absolute z-20 top-4 right-4 flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-[10px] text-white transition-all hover:bg-white/25"
-            style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', fontFamily: 'Archivo,sans-serif' }}>
-            <Camera size={13} /> Add Photos
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-center"
-          style={{ height: 220, background: 'linear-gradient(135deg,#1e3a4f 0%,#0f1e2e 100%)' }}>
-          <button type="button"
-            onClick={() => { setActiveTab('photos'); fileInputRef.current?.click(); }}
-            className="flex flex-col items-center gap-3 text-white/70 hover:text-white transition-colors">
-            <div className="w-14 h-14 rounded-[18px] flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.1)' }}>
-              <Camera size={24} />
-            </div>
-            <span className="text-[13px] font-semibold" style={{ fontFamily: 'Archivo,sans-serif' }}>
-              Add Photos
-            </span>
-          </button>
-        </div>
-      )}
+
 
       {/* Hidden global file input — triggered from multiple places */}
       <input
