@@ -123,7 +123,16 @@ class SseService {
       source.onmessage = (event) => {
         try {
           const parsed: SseMessagePayload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          this.dispatch(parsed);
+          // NestJS @Sse wraps our AppServerEvent as { data: AppServerEvent, type, id }.
+          // After JSON.parse the shape is { type, userId, data: { conversationId, ... } } — correct.
+          // But if the backend map() sets `data: event` (the full AppServerEvent), we get
+          // { type, data: { type, userId, data: { conversationId } } } — one extra nesting.
+          // Detect and unwrap that here so the rest of the app always sees a flat payload.
+          const unwrapped: SseMessagePayload =
+            parsed.data && typeof parsed.data === 'object' && 'data' in parsed.data && parsed.data.type === parsed.type
+              ? { ...parsed, data: parsed.data.data }
+              : parsed;
+          this.dispatch(unwrapped);
         } catch (err) {
           console.debug(`[SSE:${channel}] Error parsing event:`, err);
         }
