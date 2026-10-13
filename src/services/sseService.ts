@@ -108,10 +108,11 @@ class SseService {
       }
 
       const source = new EventSource(sseUrl);
+      console.log('[SSE] Connecting to', sseUrl);
 
       source.onopen = () => {
         const prevAttempts = this.reconnectAttempts.get(channel) || 0;
-        console.debug(`[SSE:${channel}] Connected`);
+        console.log(`[SSE:${channel}] Connected (readyState=${source.readyState})`);
         this.reconnectAttempts.set(channel, 0);
 
         // If this is a reconnect, dispatch a synthetic event so pollers immediately re-sync
@@ -120,28 +121,60 @@ class SseService {
         }
       };
 
+      // NestJS @Sse emits named events (event: <type>\ndata: ...) when MessageEvent.type is set.
+      // EventSource.onmessage only fires for unnamed events — named events are silently dropped.
+      // We must use addEventListener for every event type we care about, PLUS keep onmessage
+      // as a fallback for any unnamed events the backend may emit.
+      const handleRawEvent = (eventType: string) => (msgEvent: MessageEvent) => {
+        try {
+          console.log(`[SSE named:${eventType}]`, msgEvent.data);
+          const raw = typeof msgEvent.data === 'string' ? JSON.parse(msgEvent.data) : msgEvent.data;
+          // The data field is the full AppServerEvent; extract the inner data payload
+          const innerData = raw?.data ?? raw;
+          const payload: SseMessagePayload = {
+            type: eventType,
+            userId: raw?.userId,
+            targetEmail: raw?.targetEmail,
+            targetRole: raw?.targetRole,
+            data: innerData,
+            timestamp: raw?.timestamp,
+          };
+          console.log('[SSE dispatching]', JSON.stringify(payload));
+          this.dispatch(payload);
+        } catch (err) {
+          console.log(`[SSE:${channel}] Error parsing named event ${eventType}:`, err);
+        }
+      };
+
+      // Register listeners for every named event type the backend emits
+      const namedEventTypes = [
+        'message_new', 'message_read', 'message_edit', 'message_delete',
+        'conversation_new', 'conversation_updated',
+        'typing_start',
+        'presence_update',
+      ];
+      namedEventTypes.forEach(type => {
+        source.addEventListener(type, handleRawEvent(type));
+      });
+
+      // Fallback: unnamed events (type = 'message') — kept for safety
       source.onmessage = (event) => {
         try {
+          console.log('[SSE RAW onmessage]', event.data);
           const parsed: SseMessagePayload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          // DIAGNOSTIC — remove after confirming shape
-          console.log('[SSE RAW]', JSON.stringify(parsed));
-          // NestJS @Sse wraps our AppServerEvent as { data: AppServerEvent, type, id }.
-          // After JSON.parse the shape is { type, userId, data: { conversationId, ... } } — correct.
-          // But if the backend map() sets `data: event` (the full AppServerEvent), we get
-          // { type, data: { type, userId, data: { conversationId } } } — one extra nesting.
-          // Detect and unwrap that here so the rest of the app always sees a flat payload.
+          // Flatten double-nest if present
           const unwrapped: SseMessagePayload =
             parsed.data && typeof parsed.data === 'object' && 'data' in parsed.data && parsed.data.type === parsed.type
               ? { ...parsed, data: parsed.data.data }
               : parsed;
           this.dispatch(unwrapped);
         } catch (err) {
-          console.debug(`[SSE:${channel}] Error parsing event:`, err);
+          console.log(`[SSE:${channel}] Error parsing unnamed event:`, err);
         }
       };
 
-      source.onerror = () => {
-        console.debug(`[SSE:${channel}] Disconnected, scheduling reconnect...`);
+      source.onerror = (err) => {
+        console.log(`[SSE:${channel}] Error/disconnect (readyState=${source.readyState})`, err);
         this.disconnectChannel(channel);
         this.scheduleReconnect(channel);
       };
