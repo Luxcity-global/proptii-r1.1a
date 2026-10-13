@@ -100,34 +100,33 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, []);
 
     const markConversationAsRead = useCallback((id: string) => {
-        // Optimistically zero out the unread counter for the target conversation
-        // and decrement the global badge. Both state updates are separate, clean calls
-        // that do not nest one setter inside another's functional updater.
-        let delta = 0;
+        // Compute delta from the current conversations snapshot BEFORE calling setConversations.
+        // This avoids the fragile pattern of writing a variable inside a functional updater
+        // and then reading it in a subsequent setState — under React 18 concurrent scheduling
+        // the two calls may not execute atomically.
+        const conv = conversations.find(c => c.id === id);
+        const isLandlord = conv?.landlordId === user?.id;
+        const delta = conv
+            ? (isLandlord ? (conv.unreadForLandlord ?? 0) : (conv.unreadForTenant ?? 0))
+            : 0;
 
-        setConversations(prev => {
-            const updated = prev.map(c => {
-                const isLandlord = c.landlordId === user?.id;
-                const unread = isLandlord ? (c.unreadForLandlord ?? 0) : (c.unreadForTenant ?? 0);
-
-                if (c.id === id && unread > 0) {
-                    delta = unread;
+        if (delta > 0) {
+            // Zero out the unread counter for the target conversation
+            setConversations(prev =>
+                prev.map(c => {
+                    if (c.id !== id) return c;
                     return {
                         ...c,
                         unreadForLandlord: isLandlord ? 0 : c.unreadForLandlord,
                         unreadForTenant: !isLandlord ? 0 : c.unreadForTenant,
                     };
-                }
-                return c;
-            });
-            return updated;
-        });
+                }),
+            );
 
-        // Note: delta is captured synchronously inside the updater above because
-        // the updater runs synchronously during the setState call in React 18 with
-        // automatic batching. We schedule the unread count update in the same batch.
-        setUnreadCount(prev => Math.max(0, prev - delta));
-    }, [user?.id]);
+            // Decrement the global badge independently — delta is already known
+            setUnreadCount(prev => Math.max(0, prev - delta));
+        }
+    }, [conversations, user?.id]);
 
     return (
         <MessagingContext.Provider

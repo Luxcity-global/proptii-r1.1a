@@ -114,11 +114,22 @@ export class CommunicationController {
   @ApiParam({ name: 'id', description: 'Conversation ID' })
   async sendTyping(@Param('id') conversationId: string, @Req() req: any) {
     const userId = req.user.uid;
-    this.eventsService.emit({
-      type: 'typing_start',
-      userId,
-      data: { conversationId, senderId: userId },
-    });
+    // Emit the typing indicator to the OTHER participant — not the sender's own stream.
+    // getParticipants() resolves which party is the recipient.
+    try {
+      const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
+      const recipientId = userId === tenantId ? landlordId : tenantId;
+      if (recipientId) {
+        this.eventsService.emit({
+          type: 'typing_start',
+          userId: recipientId,
+          data: { conversationId, senderId: userId },
+        });
+      }
+    } catch (err: any) {
+      // Non-fatal — typing indicators are best-effort
+      this.logger.debug(`[sendTyping] Could not resolve participants: ${err?.message || err}`);
+    }
     return { data: { ok: true } };
   }
 
