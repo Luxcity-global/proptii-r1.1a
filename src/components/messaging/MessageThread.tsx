@@ -220,9 +220,12 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
     const didInitialScroll = useRef(false);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
-        bottomRef.current?.scrollIntoView({ behavior });
-        onScrollRequest?.();
-    }, [onScrollRequest]);
+        if (bottomRef.current) {
+            bottomRef.current.scrollIntoView({ behavior });
+        } else if (scrollContainerRef?.current) {
+            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        }
+    }, [scrollContainerRef]);
 
     // Handle scroll events on container to toggle floating "Scroll to bottom" button
     useEffect(() => {
@@ -245,8 +248,8 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         try {
             // Call getMessages(conversationId) directly to match unit test expectations
             const raw = await communicationService.getMessages(conversationId);
-            const fetched: Message[] = Array.isArray(raw) ? raw : (raw?.messages ?? []);
-            const more: boolean = Array.isArray(raw) ? false : !!raw?.hasMore;
+            const fetched: Message[] = (raw as any)?.messages ?? (Array.isArray(raw) ? raw : (raw as any)?.data ?? []);
+            const more: boolean = (raw as any)?.hasMore ?? false;
             const sorted: ThreadMessage[] = [...fetched].sort(
                 (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
             );
@@ -352,8 +355,8 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         try {
             const oldest = messages[0]?.sentAt;
             const raw = await communicationService.getMessages(conversationId, oldest, 30);
-            const older: Message[] = Array.isArray(raw) ? raw : (raw?.messages ?? []);
-            const more: boolean = Array.isArray(raw) ? false : !!raw?.hasMore;
+            const older: Message[] = (raw as any)?.messages ?? (Array.isArray(raw) ? raw : (raw as any)?.data ?? []);
+            const more: boolean = (raw as any)?.hasMore ?? false;
             const sorted: ThreadMessage[] = [...older].sort(
                 (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
             );

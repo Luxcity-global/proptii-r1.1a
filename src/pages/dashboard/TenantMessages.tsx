@@ -432,7 +432,7 @@ const TenantMessages: React.FC = () => {
                 )}
 
                 <div ref={scrollContainerRef} className="tn-msg-feed">
-                  <MessageThread ref={threadRef} conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} scrollContainerRef={scrollContainerRef} />
+                  <MessageThread ref={threadRef} conversationId={activeConversationId} currentUserId={currentUserId} scrollContainerRef={scrollContainerRef} />
                 </div>
 
                 <ComposeBox

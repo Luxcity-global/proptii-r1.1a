@@ -495,7 +495,6 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                     ref={threadRef}
                     conversationId={activeConversationId}
                     currentUserId={currentUserId}
-                    onScrollRequest={scrollToBottom}
                     scrollContainerRef={scrollContainerRef}
                   />
                 </div>
