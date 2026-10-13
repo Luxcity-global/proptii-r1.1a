@@ -1,0 +1,7 @@
+{
+  "task_id": "task-messaging-clean-fix",
+  "task_description": "Fix the real-time messaging system: eliminate duplicate/disappearing messages caused by three competing update paths, fix scroll-position restoration in load-earlier, and ensure SSE-driven appends work without manual refresh.",
+  "status": "completed",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}
