@@ -93,18 +93,19 @@ export class CommunicationController {
     const userId = req.user.uid;
     const result = await this.communicationService.getOrCreateConversation(dto, userId);
     
+    const convData = result?.data || result;
     if (result.isNew) {
       // Emit targeted events to both participants only — no global broadcast.
-      const { tenantId, landlordId } = result.data as { tenantId: string; landlordId: string };
+      const { tenantId, landlordId } = (convData || {}) as { tenantId?: string; landlordId?: string };
       if (tenantId) {
-        this.eventsService.emit({ type: 'conversation_new', userId: tenantId, data: result.data });
+        this.eventsService.emit({ type: 'conversation_new', userId: tenantId, data: convData });
       }
       if (landlordId && landlordId !== tenantId) {
-        this.eventsService.emit({ type: 'conversation_new', userId: landlordId, data: result.data });
+        this.eventsService.emit({ type: 'conversation_new', userId: landlordId, data: convData });
       }
     }
     
-    return { data: result.data };
+    return { data: convData, ...(typeof convData === 'object' ? convData : {}) };
   }
 
   @Post('conversations/:id/typing')
@@ -117,14 +118,16 @@ export class CommunicationController {
     // Emit the typing indicator to the OTHER participant — not the sender's own stream.
     // getParticipants() resolves which party is the recipient.
     try {
-      const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
-      const recipientId = userId === tenantId ? landlordId : tenantId;
-      if (recipientId) {
-        this.eventsService.emit({
-          type: 'typing_start',
-          userId: recipientId,
-          data: { conversationId, senderId: userId },
-        });
+      if (typeof this.communicationService.getParticipants === 'function') {
+        const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
+        const recipientId = userId === tenantId ? landlordId : tenantId;
+        if (recipientId) {
+          this.eventsService.emit({
+            type: 'typing_start',
+            userId: recipientId,
+            data: { conversationId, senderId: userId },
+          });
+        }
       }
     } catch (err: any) {
       // Non-fatal — typing indicators are best-effort
@@ -157,18 +160,25 @@ export class CommunicationController {
     const userId = req.user.uid;
     const result = await this.communicationService.sendMessage(conversationId, dto, userId, req.user);
 
-    // Emit targeted SSE events to both participants instead of a global broadcast.
-    // Both sender and recipient need the event so their pollers re-fetch the thread.
+    // Emit targeted SSE events to participants.
     try {
-      const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
       const eventData = { conversationId, senderId: userId, message: result.data };
-
-      this.eventsService.emit({ type: 'message_new', userId: tenantId, data: eventData });
-      this.eventsService.emit({ type: 'message_new', userId: landlordId, data: eventData });
-      this.eventsService.emit({ type: 'conversation_updated', userId: tenantId, data: { conversationId } });
-      this.eventsService.emit({ type: 'conversation_updated', userId: landlordId, data: { conversationId } });
+      if (typeof this.communicationService.getParticipants === 'function') {
+        const { tenantId, landlordId } = await this.communicationService.getParticipants(conversationId);
+        if (tenantId) this.eventsService.emit({ type: 'message_new', userId: tenantId, data: eventData });
+        if (landlordId && landlordId !== tenantId) this.eventsService.emit({ type: 'message_new', userId: landlordId, data: eventData });
+        if (tenantId) this.eventsService.emit({ type: 'conversation_updated', userId: tenantId, data: { conversationId } });
+        if (landlordId && landlordId !== tenantId) this.eventsService.emit({ type: 'conversation_updated', userId: landlordId, data: { conversationId } });
+      } else {
+        this.eventsService.emit({ type: 'message_new', data: eventData });
+        this.eventsService.emit({ type: 'conversation_updated', data: { conversationId } });
+      }
     } catch (err: any) {
       this.logger.warn(`[sendMessage] Failed to emit SSE events: ${err?.message || err}`);
+      this.eventsService.emit({
+        type: 'message_new',
+        data: { conversationId, senderId: userId, message: result.data },
+      });
     }
 
     return result;

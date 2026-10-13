@@ -25,67 +25,66 @@ function getBase(): string {
     return `${getResolvedApiBaseUrl()}/communication`;
 }
 
-/** Axios 1.x may use AxiosHeaders — set Authorization in a way that always applies. */
-function setBearerAuth(config: InternalAxiosRequestConfig, accessToken: string): void {
-    const value = `Bearer ${accessToken}`;
-    const headers = config.headers;
-    if (!headers) return;
-    if (typeof (headers as { set?: (k: string, v: string) => void }).set === 'function') {
-        (headers as { set: (k: string, v: string) => void }).set('Authorization', value);
-    } else {
-        (headers as Record<string, string>)['Authorization'] = value;
-    }
+interface ApiResponse<T = any> {
+    data: T;
 }
 
-// Dedicated Axios instance for communication module
-const commApi = axios.create({
-    baseURL: getBase(),
-    timeout: 10000, // Reduced from 30s — fail fast on connection errors
-});
-
-// Request interceptor: re-resolve baseURL each request (handles env changes) + attach Bearer token
-commApi.interceptors.request.use(
-    async (config: InternalAxiosRequestConfig) => {
-        // Re-resolve on every request so URL reflects current env without page reload
-        config.baseURL = getBase();
-        const token = await getAccessTokenForApiRequest();
-        if (token) {
-            setBearerAuth(config, token);
+// Dedicated API client for communication module
+const commApi = {
+    async request<T = any>(method: string, endpoint: string, body?: any, params?: Record<string, string>): Promise<ApiResponse<T>> {
+        let url = `${getBase()}${endpoint}`;
+        if (params && Object.keys(params).length > 0) {
+            const sp = new URLSearchParams(params);
+            url += (url.includes('?') ? '&' : '?') + sp.toString();
         }
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+        let token = await getAccessTokenForApiRequest().catch(() => null);
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
 
-// Response interceptor: on 401, clear the stale cached token and retry once
-// with a freshly acquired MSAL token before giving up.
-commApi.interceptors.response.use(
-    (response) => response,
-    async (error: AxiosError) => {
-        const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
-        if (
-            error.response?.status === 401 &&
-            originalRequest &&
-            !originalRequest._retried
-        ) {
-            originalRequest._retried = true;
+        const init: RequestInit = {
+            method,
+            headers,
+        };
+        if (body !== undefined && method !== 'GET' && method !== 'HEAD') {
+            init.body = typeof body === 'string' ? body : JSON.stringify(body);
+        }
+
+        let res = await fetch(url, init);
+        if (res.status === 401) {
             localStorage.removeItem('auth_token');
-            try {
-                const freshToken = await getAccessTokenForApiRequest();
-                if (freshToken) {
-                    setBearerAuth(originalRequest, freshToken);
-                    return commApi.request(originalRequest);
-                }
-            } catch (_e) {
-                // Fresh token acquisition failed — fall through to error handling
+            const freshToken = await getAccessTokenForApiRequest().catch(() => null);
+            if (freshToken) {
+                headers['Authorization'] = `Bearer ${freshToken}`;
+                res = await fetch(url, init);
             }
         }
-        return Promise.reject(error);
-    }
-);
+        if (!res.ok) {
+            const errText = await res.text().catch(() => '');
+            throw new Error(`API error ${res.status}: ${errText}`);
+        }
+        const json = await res.json().catch(() => null);
+        return { data: json };
+    },
+    get<T = any>(endpoint: string, config?: { params?: any }): Promise<ApiResponse<T>> {
+        return this.request<T>('GET', endpoint, undefined, config?.params);
+    },
+    post<T = any>(endpoint: string, body?: any): Promise<ApiResponse<T>> {
+        return this.request<T>('POST', endpoint, body);
+    },
+    patch<T = any>(endpoint: string, body?: any, config?: { params?: any }): Promise<ApiResponse<T>> {
+        return this.request<T>('PATCH', endpoint, body, config?.params);
+    },
+    delete<T = any>(endpoint: string): Promise<ApiResponse<T>> {
+        return this.request<T>('DELETE', endpoint);
+    },
+};
 
 /**
- * Unwrap the Azure Functions response envelope `{ data: T }` → T.
+ * Unwrap the Azure Functions / NestJS response envelope `{ data: T }` → T.
  * Falls back to the raw body if the envelope is absent (future-proofing).
  */
 function unwrap<T>(body: any): T {
@@ -126,29 +125,34 @@ const communicationService = {
      * GET /api/communication/conversations/{id}/messages?before={sentAt}&limit={n}
      * Requirements: 6.3
      */
-    async getMessages(conversationId: string, before?: string, limit = 50): Promise<{ messages: Message[]; hasMore: boolean }> {
+    async getMessages(conversationId: string, before?: string, limit = 50): Promise<{ messages: Message[]; hasMore: boolean } & Message[]> {
         try {
             const params = new URLSearchParams({ limit: String(limit) });
             if (before) params.set('before', before);
             const { data } = await commApi.get(`/conversations/${conversationId}/messages?${params}`);
             
-            // Bypass unwrap here because unwrap naively strips out hasMore if the data object looks like an envelope
+            let list: Message[] = [];
+            let hasMore = false;
             if (data && 'data' in data && Array.isArray(data.data)) {
-                return { messages: data.data, hasMore: !!data.hasMore };
+                list = data.data;
+                hasMore = !!data.hasMore;
+            } else if (Array.isArray(data)) {
+                list = data;
+                hasMore = false;
+            } else {
+                const body = unwrap<{ data: Message[]; hasMore: boolean } | Message[]>(data);
+                if (Array.isArray(body)) {
+                    list = body;
+                    hasMore = false;
+                } else {
+                    list = (body as any)?.data ?? [];
+                    hasMore = (body as any)?.hasMore ?? false;
+                }
             }
-            if (Array.isArray(data)) {
-                return { messages: data, hasMore: false };
-            }
-            
-            // Fallback (should not be reached if backend behaves correctly)
-            const body = unwrap<{ data: Message[]; hasMore: boolean } | Message[]>(data);
-            if (Array.isArray(body)) {
-                return { messages: body, hasMore: false };
-            }
-            return { messages: (body as any).data ?? [], hasMore: (body as any).hasMore ?? false };
+            return Object.assign([...list], { messages: list, hasMore });
         } catch (err) {
             console.warn('⚠️ Communication service getMessages failed:', err);
-            return { messages: [], hasMore: false };
+            return Object.assign([] as Message[], { messages: [] as Message[], hasMore: false });
         }
     },
 
@@ -206,11 +210,18 @@ const communicationService = {
         try {
             const { data } = await commApi.get('/conversations/unread-count');
             const result = unwrap<{ unreadCount: number } | number>(data);
-            // Backend returns { unreadCount: N } — unwrap the inner field if needed
-            if (result !== null && typeof result === 'object' && 'unreadCount' in result) {
-                return (result as { unreadCount: number }).unreadCount;
+            if (typeof result === 'number') {
+                return result;
             }
-            return (result as number) || 0;
+            if (result !== null && typeof result === 'object') {
+                if (typeof (result as any).unreadCount === 'number') {
+                    return (result as { unreadCount: number }).unreadCount;
+                }
+                if (typeof (result as any).count === 'number') {
+                    return (result as { count: number }).count;
+                }
+            }
+            return 0;
         } catch (err) {
             console.warn('⚠️ Communication service getUnreadCount failed, falling back to 0:', err);
             return 0;

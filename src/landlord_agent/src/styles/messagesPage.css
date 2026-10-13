@@ -450,22 +450,7 @@
 .ll-msg-empty p { margin: 6px 0 0; font-size: 13px; max-width: 240px; }
 
 .ll-msg [data-testid="message-item"] {
-  padding: 4px 24px;
-}
-
-.ll-msg [data-testid="message-item"][data-alignment="right"] > div {
-  background: #e1f3fe !important;
-  color: #1e293b !important;
-  border-radius: 16px 16px 0 16px !important;
-  border: 1px solid rgba(188, 217, 234, 0.6) !important;
-  text-align: left !important;
-}
-
-.ll-msg [data-testid="message-item"][data-alignment="left"] > div {
-  background: #fff !important;
-  color: #1e293b !important;
-  border-radius: 16px 16px 16px 0 !important;
-  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  padding: 4px 20px;
 }
 
 .ll-msg [data-testid="compose-box"] {

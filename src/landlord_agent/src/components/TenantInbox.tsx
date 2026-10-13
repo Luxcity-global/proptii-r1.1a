@@ -102,9 +102,6 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
 
   const [activeTab, setActiveTab] = useState<TabId>('inbox');
   const [search, setSearch] = useState('');
-  const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>(
-    {}
-  );
 
   // ── New Message compose modal state ────────────────────────────────────────
   const [showCompose,        setShowCompose]        = useState(false);
@@ -124,39 +121,10 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<MessageThreadHandle>(null);
-  const optimisticBottomRef = useRef<HTMLDivElement>(null);
-  // Track last seen lastMessageAt per conversation to detect when real messages arrive
-  const lastSeenAt = useRef<Record<string, string | null>>({});
-  // Track pending optimistic message IDs so we can clear them once MessageThread confirms load
-  const pendingOptimisticIds = useRef<Record<string, Set<string>>>({});
 
   const scrollToBottom = useCallback(() => {
-    optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    threadRef.current?.scrollToBottom('smooth');
   }, []);
-
-  // When the active conversation receives a new real message (lastMessageAt advances),
-  // clear the optimistic messages for that conversation to prevent double-rendering.
-  // IMPORTANT: only clear if we have previously seen a lastMessageAt for this conversation
-  // (i.e. prev !== undefined), and the value has actually advanced. This prevents the
-  // poller's 15-second tick from wiping optimistics before MessageThread has re-fetched.
-  useEffect(() => {
-    if (!activeConversationId) return;
-    const conv = conversations.find((c) => c.id === activeConversationId);
-    if (!conv) return;
-    const prev = lastSeenAt.current[activeConversationId];
-    const now = conv.lastMessageAt;
-    // prev === undefined → first time we see this conversation, just record and skip clear
-    // prev === null or a timestamp → if now has advanced, schedule a delayed clear so
-    // MessageThread has time to fetch the real messages first.
-    if (prev !== undefined && now && now !== prev) {
-      // Delay clearing optimistics to give MessageThread's useEffect time to fire and
-      // load the real messages (avoids a flash of empty thread between send and fetch).
-      setTimeout(() => {
-        setOptimisticMessages((m) => ({ ...m, [activeConversationId]: [] }));
-      }, 3000);
-    }
-    lastSeenAt.current[activeConversationId] = now;
-  }, [activeConversationId, conversations]);
 
   useEffect(() => {
     if (conversations.length === 0) {
@@ -172,13 +140,8 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   const handleSelect = useCallback(
     (id: string) => {
       setActiveConversationId(id);
-      // Do NOT clear optimistic messages here — they may belong to this conversation
-      // if the user just sent a message and immediately clicked away and back.
-      // Initialise lastSeenAt sentinel so the poller won't wipe optimistics on first tick.
       const conv = conversations.find((c) => c.id === id);
       if (conv && isUnread(conv)) {
-        // markConversationAsRead clears the badge optimistically and fires a markRead
-        // API call so the backend decrements unreadForLandlord. SSE will echo confirmation.
         markConversationAsRead(id);
       }
       setMobileShowThread(true); // navigate to thread on mobile
@@ -188,30 +151,34 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
 
   const [mobileShowThread, setMobileShowThread] = useState(false);
 
-  const handleSend = useCallback(
-    (message: Message, file?: File) => {
-      if (!activeConversationId) return;
-      setOptimisticMessages((prev) => ({
-        ...prev,
-        [activeConversationId]: [...(prev[activeConversationId] ?? []), { message, file }],
-      }));
-      setTimeout(scrollToBottom, 0);
-    },
-    [activeConversationId, scrollToBottom],
-  );
-
-  const handleSendError = useCallback(() => {
-    if (!activeConversationId) return;
-    // Remove the last optimistic message for this conversation (the one that failed)
-    setOptimisticMessages((prev) => {
-      const current = prev[activeConversationId] ?? [];
-      return { ...prev, [activeConversationId]: current.slice(0, -1) };
-    });
-  }, [activeConversationId]);
-
   const currentUserId = (user as any)?.id || (user as any)?.uid || (userProfile as any)?.id || '';
   const userName = userProfile?.name || (user as { name?: string; displayName?: string } | null)?.name || (user as { displayName?: string } | null)?.displayName || 'Landlord';
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
+
+  const handleOptimisticSend = useCallback(
+    (tempMessage: Message, file?: File) => {
+      threadRef.current?.addOptimisticMessage(
+        { ...tempMessage, senderId: currentUserId },
+        file,
+      );
+    },
+    [currentUserId],
+  );
+
+  const handleSend = useCallback(
+    (message: Message, _file?: File, tempId?: string) => {
+      if (tempId) {
+        threadRef.current?.reconcileMessage(tempId, message);
+      } else {
+        threadRef.current?.reconcileMessage(message.id, message);
+      }
+    },
+    [],
+  );
+
+  const handleSendError = useCallback((tempId?: string) => {
+    threadRef.current?.markSendError(tempId);
+  }, []);
 
   // ── Open a new conversation from the compose picker ────────────────────────
   const handleOpenCompose = async () => {
@@ -531,21 +498,11 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                     onScrollRequest={scrollToBottom}
                     scrollContainerRef={scrollContainerRef}
                   />
-                  {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
-                    <div key={msg.id} data-testid="optimistic-message" className="ll-msg-optimistic">
-                      <div className="ll-msg-optimistic-bubble">
-                        {msg.body ? <p style={{ margin: 0, wordBreak: 'break-word' }}>{msg.body}</p> : null}
-                        {file ? (
-                          <AttachmentPill url={URL.createObjectURL(file)} fileName={file.name} sizeBytes={file.size} isSent />
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                  <div ref={optimisticBottomRef} />
                 </div>
 
                 <ComposeBox
                   conversationId={activeConversationId}
+                  onOptimisticSend={handleOptimisticSend}
                   onSend={handleSend}
                   onSendError={handleSendError}
                   senderRole="landlord"

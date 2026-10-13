@@ -30,9 +30,11 @@ const MAX_ATTACHMENT_MB = 10; // Increased from 5MB — images and xlsx can be l
 
 export interface ComposeBoxProps {
     conversationId: string;
-    onSend: (message: Message, attachedFile?: File) => void;
+    onSend: (message: Message, attachedFile?: File, tempId?: string) => void;
+    /** Called immediately before API request to render bubble with 0ms latency */
+    onOptimisticSend?: (tempMessage: Message, attachedFile?: File) => void;
     /** Called when send fails after optimistic render — lets the parent clean up */
-    onSendError?: () => void;
+    onSendError?: (tempId?: string) => void;
     senderRole?: 'tenant' | 'landlord';
     recipientId?: string;
     agentEmail?: string;
@@ -86,6 +88,7 @@ const SpinnerIcon = () => (
 const ComposeBox: React.FC<ComposeBoxProps> = ({
     conversationId,
     onSend,
+    onOptimisticSend,
     onSendError,
     senderRole = 'tenant',
     recipientId,
@@ -97,14 +100,23 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [sending, setSending] = useState(false);
     const [focused, setFocused] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const adjustHeight = () => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(Math.max(el.scrollHeight, 40), 120)}px`;
+    };
 
     useEffect(() => {
         setBody(initialBody ?? '');
         setSelectedFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
-    }, [conversationId]);
+        setTimeout(adjustHeight, 0);
+    }, [conversationId, initialBody]);
 
     const charCount = body.length;
     const isOverLimit = charCount > MAX_CHARS;
@@ -113,12 +125,23 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
 
     const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setBody(e.target.value);
+        adjustHeight();
         // Debounced typing indicator — fires at most once per 1.5s while user types
         if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
         typingTimerRef.current = setTimeout(() => {
-            communicationService.sendTyping(conversationId);
+            communicationService.sendTyping?.(conversationId);
         }, 500);
     };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (!isSubmitDisabled) {
+                handleSubmit(e as any);
+            }
+        }
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] ?? null;
         if (file && file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
@@ -132,24 +155,45 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isSubmitDisabled) return;
+
+        const trimmed = body.trim();
+        const fileToUpload = selectedFile;
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+        // Optimistically notify parent immediately for 0ms perceived latency
+        const optimisticMsg: Message = {
+            id: tempId,
+            conversationId,
+            senderId: '', // Populated by consumer
+            senderRole,
+            body: trimmed,
+            attachmentIds: [],
+            sentAt: new Date().toISOString(),
+            readAt: null,
+            isDeleted: false,
+            deletedAt: null,
+        };
+        onOptimisticSend?.(optimisticMsg, fileToUpload || undefined);
+
         setSending(true);
 
         try {
             let attachmentIds: string[] = [];
 
-            if (selectedFile) {
+            if (fileToUpload) {
                 try {
-                    const attachment = await communicationService.uploadAttachment(selectedFile, conversationId);
+                    const attachment = await communicationService.uploadAttachment(fileToUpload, conversationId);
                     attachmentIds = [attachment.id];
                 } catch (_e) {
                     toast.error('File upload failed. Please try again.');
                     setSending(false);
+                    onSendError?.(tempId);
                     return;
                 }
             }
 
             const message = await communicationService.sendMessage(conversationId, {
-                body: body.trim(),
+                body: trimmed,
                 attachmentIds,
                 senderRole,
                 recipientId,
@@ -157,18 +201,19 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
                 propertyTitle,
             });
 
-            if (selectedFile) {
-                onSend(message, selectedFile);
+            if (fileToUpload) {
+                onSend(message, fileToUpload);
             } else {
                 onSend(message);
             }
             setBody('');
             setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
+            setTimeout(adjustHeight, 0);
         } catch (_e) {
             toast.error('Failed to send message. Please try again.');
-            // Notify the parent so it can remove any optimistic render
-            onSendError?.();
+            // Notify the parent so it can mark or remove optimistic entry
+            onSendError?.(tempId);
         } finally {
             setSending(false);
         }
@@ -311,13 +356,15 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
                 {/* Textarea */}
                 <div style={{ padding: '10px 16px 0', position: 'relative' }}>
                     <textarea
+                        ref={textareaRef}
                         data-testid="compose-textarea"
                         value={body}
                         onChange={handleBodyChange}
+                        onKeyDown={handleKeyDown}
                         onFocus={() => setFocused(true)}
                         onBlur={() => setFocused(false)}
-                        placeholder="Type a message…"
-                        rows={3}
+                        placeholder="Type a message… (Press Enter to send, Shift+Enter for new line)"
+                        rows={1}
                         aria-label="Message body"
                         aria-describedby="char-counter"
                         aria-invalid={isOverLimit}

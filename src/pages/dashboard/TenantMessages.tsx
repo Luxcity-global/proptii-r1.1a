@@ -77,7 +77,6 @@ const TenantMessages: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('inbox');
   const [search, setSearch] = useState('');
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
-  const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>({});
   const [mobileShowThread, setMobileShowThread] = useState(false);
   const [prefilledDrafts, setPrefilledDrafts] = useState<Record<string, string>>({});
   const pendingConversationRef = useRef<{ id: string; conversation?: Conversation; prefilledMessage?: string } | null>(null);
@@ -114,10 +113,9 @@ const TenantMessages: React.FC = () => {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<MessageThreadHandle>(null);
-  const optimisticBottomRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
-    optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    threadRef.current?.scrollToBottom('smooth');
   }, []);
 
   useEffect(() => {
@@ -150,7 +148,6 @@ const TenantMessages: React.FC = () => {
 
   const handleSelect = useCallback((id: string) => {
     setActiveConversationId(id);
-    setOptimisticMessages((prev) => ({ ...prev, [id]: [] }));
 
     if (activeConversationId) {
       setPrefilledDrafts((prev) => {
@@ -162,36 +159,42 @@ const TenantMessages: React.FC = () => {
 
     const conv = conversations.find((c) => c.id === id);
     if (conv && isUnread(conv)) {
-      // markConversationAsRead clears the badge optimistically and fires a markRead
-      // API call so the backend decrements unreadForTenant. SSE will echo confirmation.
       markConversationAsRead(id);
     }
     setMobileShowThread(true); // navigate to thread panel on mobile
   }, [activeConversationId, setActiveConversationId, conversations, markConversationAsRead]);
 
-  const handleSend = useCallback((message: Message, file?: File) => {
-    if (!activeConversationId) return;
-    setOptimisticMessages((prev) => ({
-      ...prev,
-      [activeConversationId]: [...(prev[activeConversationId] ?? []), { message, file }],
-    }));
-    setPrefilledDrafts((prev) => {
-      const next = { ...prev };
-      delete next[activeConversationId];
-      return next;
-    });
-    setTimeout(scrollToBottom, 0);
-  }, [activeConversationId, scrollToBottom]);
+  const currentUserId = user?.id ?? '';
 
-  const handleSendError = useCallback(() => {
-    if (!activeConversationId) return;
-    setOptimisticMessages((prev) => {
-      const current = prev[activeConversationId] ?? [];
-      return { ...prev, [activeConversationId]: current.slice(0, -1) };
-    });
+  const handleOptimisticSend = useCallback(
+    (tempMessage: Message, file?: File) => {
+      threadRef.current?.addOptimisticMessage(
+        { ...tempMessage, senderId: currentUserId },
+        file,
+      );
+    },
+    [currentUserId],
+  );
+
+  const handleSend = useCallback((message: Message, _file?: File, tempId?: string) => {
+    if (tempId) {
+      threadRef.current?.reconcileMessage(tempId, message);
+    } else {
+      threadRef.current?.reconcileMessage(message.id, message);
+    }
+    if (activeConversationId) {
+      setPrefilledDrafts((prev) => {
+        const next = { ...prev };
+        delete next[activeConversationId];
+        return next;
+      });
+    }
   }, [activeConversationId]);
 
-  const currentUserId = user?.id ?? '';
+  const handleSendError = useCallback((tempId?: string) => {
+    threadRef.current?.markSendError(tempId);
+  }, []);
+
   const userName = (user as { name?: string; displayName?: string } | null)?.name
     ?? (user as { displayName?: string } | null)?.displayName
     ?? 'Tenant';
@@ -430,19 +433,11 @@ const TenantMessages: React.FC = () => {
 
                 <div ref={scrollContainerRef} className="tn-msg-feed">
                   <MessageThread ref={threadRef} conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} scrollContainerRef={scrollContainerRef} />
-                  {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
-                    <div key={msg.id} data-testid="optimistic-message" className="tn-msg-optimistic">
-                      <div className="tn-msg-optimistic-bubble">
-                        {msg.body ? <p style={{ margin: 0, wordBreak: 'break-word' }}>{msg.body}</p> : null}
-                        {file && <AttachmentPill url={URL.createObjectURL(file)} fileName={file.name} sizeBytes={file.size} isSent />}
-                      </div>
-                    </div>
-                  ))}
-                  <div ref={optimisticBottomRef} />
                 </div>
 
                 <ComposeBox
                   conversationId={activeConversationId}
+                  onOptimisticSend={handleOptimisticSend}
                   onSend={handleSend}
                   onSendError={handleSendError}
                   senderRole="tenant"

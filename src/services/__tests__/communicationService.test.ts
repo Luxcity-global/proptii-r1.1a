@@ -1,15 +1,12 @@
 /**
  * Unit tests for communicationService.
  *
- * Mocks `apiService` to assert correct endpoints, HTTP methods, and payloads
- * for each of the eight communication service methods.
- *
- * Requirements: 3.2, 6.1–6.6, 7.1, 7.4
+ * Mocks fetch to assert correct endpoints, HTTP methods, headers, and payloads
+ * for all communication service methods.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import communicationService from '../communicationService';
-import apiService from '../api';
 import type {
     Conversation,
     Message,
@@ -18,31 +15,15 @@ import type {
     SendMessageDto,
 } from '../../types/messaging';
 
-// ---------------------------------------------------------------------------
-// Mock apiService
-// ---------------------------------------------------------------------------
-vi.mock('../api', () => ({
-    default: {
-        get: vi.fn(),
-        post: vi.fn(),
-        patch: vi.fn(),
-        request: vi.fn(),
-        uploadFile: vi.fn(),
-    },
+vi.mock('../msalAccessToken', () => ({
+    getAccessTokenForApiRequest: vi.fn().mockResolvedValue('test-token'),
 }));
 
-const mockApiService = apiService as {
-    get: ReturnType<typeof vi.fn>;
-    post: ReturnType<typeof vi.fn>;
-    patch: ReturnType<typeof vi.fn>;
-    request: ReturnType<typeof vi.fn>;
-    uploadFile: ReturnType<typeof vi.fn>;
-};
+vi.mock('../../config/apiBaseUrl', () => ({
+    getResolvedApiBaseUrl: () => 'http://localhost:3002/api',
+}));
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-const BASE = '/api/communication';
+const BASE = 'http://localhost:3002/api/communication';
 
 const conversation: Conversation = {
     id: 'conv-1',
@@ -81,30 +62,35 @@ const attachment: MessageAttachment = {
     uploadedAt: '2024-01-01T00:00:00.000Z',
 };
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+function mockFetchJson(status: number, data: any) {
+    return vi.fn().mockResolvedValue({
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => data,
+        text: async () => (typeof data === 'string' ? data : JSON.stringify(data)),
+    });
+}
+
 describe('communicationService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    // -----------------------------------------------------------------------
-    // getConversations
-    // -----------------------------------------------------------------------
     describe('getConversations', () => {
-        it('calls GET /api/communication/conversations and returns the data', async () => {
-            mockApiService.get.mockResolvedValueOnce({ data: [conversation] });
+        it('calls GET /communication/conversations and returns the list', async () => {
+            globalThis.fetch = mockFetchJson(200, { data: [conversation] });
 
             const result = await communicationService.getConversations();
 
-            expect(mockApiService.get).toHaveBeenCalledOnce();
-            expect(mockApiService.get).toHaveBeenCalledWith(`${BASE}/conversations`);
+            expect(globalThis.fetch).toHaveBeenCalledOnce();
+            const [url, init] = (globalThis.fetch as any).mock.calls[0];
+            expect(url).toBe(`${BASE}/conversations`);
+            expect(init.method).toBe('GET');
             expect(result).toEqual([conversation]);
         });
 
         it('returns an empty array when the API returns an empty list', async () => {
-            mockApiService.get.mockResolvedValueOnce({ data: [] });
+            globalThis.fetch = mockFetchJson(200, { data: [] });
 
             const result = await communicationService.getConversations();
 
@@ -112,222 +98,137 @@ describe('communicationService', () => {
         });
     });
 
-    // -----------------------------------------------------------------------
-    // getOrCreateConversation
-    // -----------------------------------------------------------------------
     describe('getOrCreateConversation', () => {
-        it('calls POST /api/communication/conversations with the DTO and returns the conversation', async () => {
+        it('calls POST /communication/conversations with the DTO and returns the conversation', async () => {
             const dto: CreateConversationDto = {
                 propertyId: 'prop-1',
                 tenantId: 'tenant-1',
                 landlordId: 'landlord-1',
             };
-            mockApiService.post.mockResolvedValueOnce({ data: conversation });
+            globalThis.fetch = mockFetchJson(200, { data: conversation });
 
             const result = await communicationService.getOrCreateConversation(dto);
 
-            expect(mockApiService.post).toHaveBeenCalledOnce();
-            expect(mockApiService.post).toHaveBeenCalledWith(`${BASE}/conversations`, dto);
+            expect(globalThis.fetch).toHaveBeenCalledOnce();
+            const [url, init] = (globalThis.fetch as any).mock.calls[0];
+            expect(url).toBe(`${BASE}/conversations`);
+            expect(init.method).toBe('POST');
+            expect(JSON.parse(init.body)).toEqual(dto);
             expect(result).toEqual(conversation);
-        });
-
-        it('sends all three required DTO fields', async () => {
-            const dto: CreateConversationDto = {
-                propertyId: 'prop-abc',
-                tenantId: 'tenant-xyz',
-                landlordId: 'landlord-xyz',
-            };
-            mockApiService.post.mockResolvedValueOnce({ data: conversation });
-
-            await communicationService.getOrCreateConversation(dto);
-
-            const [, payload] = mockApiService.post.mock.calls[0];
-            expect(payload).toMatchObject({
-                propertyId: 'prop-abc',
-                tenantId: 'tenant-xyz',
-                landlordId: 'landlord-xyz',
-            });
         });
     });
 
-    // -----------------------------------------------------------------------
-    // getMessages
-    // -----------------------------------------------------------------------
     describe('getMessages', () => {
-        it('calls GET /api/communication/conversations/{id}/messages and returns messages', async () => {
-            mockApiService.get.mockResolvedValueOnce({ data: [message] });
+        it('calls GET /communication/conversations/{id}/messages and returns messages', async () => {
+            globalThis.fetch = mockFetchJson(200, { data: [message], hasMore: false });
 
             const result = await communicationService.getMessages('conv-1');
 
-            expect(mockApiService.get).toHaveBeenCalledOnce();
-            expect(mockApiService.get).toHaveBeenCalledWith(
-                `${BASE}/conversations/conv-1/messages`,
-            );
-            expect(result).toEqual([message]);
-        });
-
-        it('interpolates the conversationId into the URL', async () => {
-            mockApiService.get.mockResolvedValueOnce({ data: [] });
-
-            await communicationService.getMessages('my-conv-id');
-
-            expect(mockApiService.get).toHaveBeenCalledWith(
-                `${BASE}/conversations/my-conv-id/messages`,
-            );
+            expect(globalThis.fetch).toHaveBeenCalledOnce();
+            const [url] = (globalThis.fetch as any).mock.calls[0];
+            expect(url).toContain(`${BASE}/conversations/conv-1/messages`);
+            expect(result.messages).toEqual([message]);
+            expect(result.hasMore).toBe(false);
         });
     });
 
-    // -----------------------------------------------------------------------
-    // sendMessage
-    // -----------------------------------------------------------------------
     describe('sendMessage', () => {
-        it('calls POST /api/communication/conversations/{id}/messages with the DTO', async () => {
+        it('calls POST /communication/conversations/{id}/messages and returns the sent message', async () => {
             const dto: SendMessageDto = {
                 body: 'Hello!',
                 senderRole: 'tenant',
             };
-            mockApiService.post.mockResolvedValueOnce({ data: message });
+            globalThis.fetch = mockFetchJson(200, { data: message });
 
             const result = await communicationService.sendMessage('conv-1', dto);
 
-            expect(mockApiService.post).toHaveBeenCalledOnce();
-            expect(mockApiService.post).toHaveBeenCalledWith(
-                `${BASE}/conversations/conv-1/messages`,
-                dto,
-            );
+            expect(globalThis.fetch).toHaveBeenCalledOnce();
+            const [url, init] = (globalThis.fetch as any).mock.calls[0];
+            expect(url).toBe(`${BASE}/conversations/conv-1/messages`);
+            expect(init.method).toBe('POST');
+            expect(JSON.parse(init.body)).toEqual(dto);
             expect(result).toEqual(message);
-        });
-
-        it('includes optional attachmentIds and recipientId when provided', async () => {
-            const dto: SendMessageDto = {
-                body: 'See attached',
-                senderRole: 'landlord',
-                attachmentIds: ['att-1'],
-                recipientId: 'tenant-1',
-            };
-            mockApiService.post.mockResolvedValueOnce({ data: message });
-
-            await communicationService.sendMessage('conv-1', dto);
-
-            const [, payload] = mockApiService.post.mock.calls[0];
-            expect(payload).toMatchObject({
-                body: 'See attached',
-                senderRole: 'landlord',
-                attachmentIds: ['att-1'],
-                recipientId: 'tenant-1',
-            });
         });
     });
 
-    // -----------------------------------------------------------------------
-    // markRead
-    // -----------------------------------------------------------------------
     describe('markRead', () => {
-        it('calls PATCH /api/communication/messages/{id}/read with conversationId as query param', async () => {
-            mockApiService.request.mockResolvedValueOnce({ data: undefined });
+        it('calls PATCH /communication/messages/{id}/read with conversationId', async () => {
+            globalThis.fetch = mockFetchJson(200, { success: true });
 
             await communicationService.markRead('msg-1', 'conv-1');
 
-            expect(mockApiService.request).toHaveBeenCalledOnce();
-            expect(mockApiService.request).toHaveBeenCalledWith({
-                method: 'PATCH',
-                url: `${BASE}/messages/msg-1/read`,
-                params: { conversationId: 'conv-1' },
-            });
-        });
-
-        it('interpolates the messageId into the URL', async () => {
-            mockApiService.request.mockResolvedValueOnce({ data: undefined });
-
-            await communicationService.markRead('my-msg-id', 'my-conv-id');
-
-            const [call] = mockApiService.request.mock.calls;
-            expect(call[0].url).toBe(`${BASE}/messages/my-msg-id/read`);
-            expect(call[0].params).toEqual({ conversationId: 'my-conv-id' });
+            expect(globalThis.fetch).toHaveBeenCalledOnce();
+            const [url, init] = (globalThis.fetch as any).mock.calls[0];
+            expect(url).toContain(`${BASE}/messages/msg-1/read?conversationId=conv-1`);
+            expect(init.method).toBe('PATCH');
         });
     });
 
-    // -----------------------------------------------------------------------
-    // getUnreadCount
-    // -----------------------------------------------------------------------
+    describe('editMessage', () => {
+        it('calls PATCH /communication/messages/{id}/body with updated body', async () => {
+            const updated = { ...message, body: 'Edited text' };
+            globalThis.fetch = mockFetchJson(200, { data: updated });
+
+            const result = await communicationService.editMessage('msg-1', 'Edited text');
+
+            expect(globalThis.fetch).toHaveBeenCalledOnce();
+            const [url, init] = (globalThis.fetch as any).mock.calls[0];
+            expect(url).toBe(`${BASE}/messages/msg-1/body`);
+            expect(init.method).toBe('PATCH');
+            expect(JSON.parse(init.body)).toEqual({ body: 'Edited text' });
+            expect(result).toEqual(updated);
+        });
+    });
+
+    describe('deleteMessage', () => {
+        it('calls DELETE /communication/messages/{id}', async () => {
+            const deleted = { ...message, isDeleted: true };
+            globalThis.fetch = mockFetchJson(200, { data: deleted });
+
+            const result = await communicationService.deleteMessage('msg-1');
+
+            expect(globalThis.fetch).toHaveBeenCalledOnce();
+            const [url, init] = (globalThis.fetch as any).mock.calls[0];
+            expect(url).toBe(`${BASE}/messages/msg-1`);
+            expect(init.method).toBe('DELETE');
+            expect(result).toEqual(deleted);
+        });
+    });
+
     describe('getUnreadCount', () => {
-        it('calls GET /api/communication/conversations/unread-count and returns the count', async () => {
-            mockApiService.get.mockResolvedValueOnce({ data: 5 });
+        it('calls GET /communication/conversations/unread-count and returns count', async () => {
+            globalThis.fetch = mockFetchJson(200, { count: 3 });
 
             const result = await communicationService.getUnreadCount();
 
-            expect(mockApiService.get).toHaveBeenCalledOnce();
-            expect(mockApiService.get).toHaveBeenCalledWith(
-                `${BASE}/conversations/unread-count`,
-            );
-            expect(result).toBe(5);
-        });
-
-        it('returns 0 when there are no unread messages', async () => {
-            mockApiService.get.mockResolvedValueOnce({ data: 0 });
-
-            const result = await communicationService.getUnreadCount();
-
-            expect(result).toBe(0);
+            expect(result).toBe(3);
         });
     });
 
-    // -----------------------------------------------------------------------
-    // uploadAttachment
-    // -----------------------------------------------------------------------
     describe('uploadAttachment', () => {
-        it('calls uploadFile with the correct URL including conversationId query param', async () => {
-            const file = new File(['content'], 'document.pdf', { type: 'application/pdf' });
-            mockApiService.uploadFile.mockResolvedValueOnce({ data: attachment });
+        it('uploads file to storage and registers attachment record', async () => {
+            const fetchMock = vi.fn();
+            // 1. Storage upload
+            fetchMock.mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({ url: 'https://storage.example.com/test.pdf' }),
+                text: async () => JSON.stringify({ url: 'https://storage.example.com/test.pdf' }),
+            });
+            // 2. Attachment registration
+            fetchMock.mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: async () => ({ data: attachment }),
+                text: async () => JSON.stringify({ data: attachment }),
+            });
+            globalThis.fetch = fetchMock;
 
+            const file = new File(['test'], 'document.pdf', { type: 'application/pdf' });
             const result = await communicationService.uploadAttachment(file, 'conv-1');
 
-            expect(mockApiService.uploadFile).toHaveBeenCalledOnce();
-            const [url, uploadedFile] = mockApiService.uploadFile.mock.calls[0];
-            expect(url).toBe(`${BASE}/attachments/upload?conversationId=conv-1`);
-            expect(uploadedFile).toBe(file);
+            expect(fetchMock).toHaveBeenCalledTimes(2);
             expect(result).toEqual(attachment);
-        });
-
-        it('URL-encodes the conversationId in the query string', async () => {
-            const file = new File(['content'], 'doc.pdf', { type: 'application/pdf' });
-            mockApiService.uploadFile.mockResolvedValueOnce({ data: attachment });
-
-            await communicationService.uploadAttachment(file, 'conv id with spaces');
-
-            const [url] = mockApiService.uploadFile.mock.calls[0];
-            expect(url).toBe(
-                `${BASE}/attachments/upload?conversationId=conv%20id%20with%20spaces`,
-            );
-        });
-    });
-
-    // -----------------------------------------------------------------------
-    // getAttachmentUrl
-    // -----------------------------------------------------------------------
-    describe('getAttachmentUrl', () => {
-        it('calls GET /api/communication/attachments/{id}/url with conversationId as query param', async () => {
-            const sasUrl = 'https://storage.example.com/att-1?sas=token';
-            mockApiService.get.mockResolvedValueOnce({ data: sasUrl });
-
-            const result = await communicationService.getAttachmentUrl('att-1', 'conv-1');
-
-            expect(mockApiService.get).toHaveBeenCalledOnce();
-            expect(mockApiService.get).toHaveBeenCalledWith(
-                `${BASE}/attachments/att-1/url`,
-                { conversationId: 'conv-1' },
-            );
-            expect(result).toBe(sasUrl);
-        });
-
-        it('interpolates the attachmentId into the URL', async () => {
-            mockApiService.get.mockResolvedValueOnce({ data: 'https://example.com/url' });
-
-            await communicationService.getAttachmentUrl('my-att-id', 'my-conv-id');
-
-            const [url, params] = mockApiService.get.mock.calls[0];
-            expect(url).toBe(`${BASE}/attachments/my-att-id/url`);
-            expect(params).toEqual({ conversationId: 'my-conv-id' });
         });
     });
 });

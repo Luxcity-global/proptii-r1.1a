@@ -9,10 +9,10 @@
  *    Shows a mailto: fallback clearly labelled as "Send via email" and an
  *    "Invite to Proptii" button that sends a claim link.
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Send, Mail, ExternalLink, Loader2, MessageSquare } from 'lucide-react';
-import MessageThread from '../../../components/messaging/MessageThread';
+import MessageThread, { type MessageThreadHandle } from '../../../components/messaging/MessageThread';
 import ComposeBox from '../../../components/messaging/ComposeBox';
 import communicationService from '../../../services/communicationService';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -60,7 +60,7 @@ export function CommsModal({
   const [conversation,      setConversation]      = useState<Conversation | null>(null);
   const [convLoading,       setConvLoading]        = useState(false);
   const [convError,         setConvError]          = useState<string | null>(null);
-  const [optimisticMessages, setOptimisticMessages] = useState<Array<{ message: Message; file?: File }>>([]);
+  const threadRef = useRef<MessageThreadHandle>(null);
 
   // ── Unclaimed invite state ────────────────────────────────────────────────
   const [inviteSent,   setInviteSent]   = useState(false);
@@ -103,12 +103,26 @@ export function CommsModal({
     return () => { cancelled = true; };
   }, [isConnected, isDummy, share.claimedBy, effectiveLandlordId, share.propertyId]);
 
-  const handleSend = useCallback((message: Message, file?: File) => {
-    setOptimisticMessages(prev => [...prev, { message, file }]);
+  const handleOptimisticSend = useCallback(
+    (tempMessage: Message, file?: File) => {
+      threadRef.current?.addOptimisticMessage(
+        { ...tempMessage, senderId: effectiveLandlordId },
+        file,
+      );
+    },
+    [effectiveLandlordId],
+  );
+
+  const handleSend = useCallback((message: Message, _file?: File, tempId?: string) => {
+    if (tempId) {
+      threadRef.current?.reconcileMessage(tempId, message);
+    } else {
+      threadRef.current?.reconcileMessage(message.id, message);
+    }
   }, []);
 
-  const handleSendError = useCallback(() => {
-    setOptimisticMessages(prev => prev.slice(0, -1));
+  const handleSendError = useCallback((tempId?: string) => {
+    threadRef.current?.markSendError(tempId);
   }, []);
 
   const handleSendInvite = async () => {
@@ -193,28 +207,18 @@ export function CommsModal({
               )}
               {conversation && !convLoading && (
                 <MessageThread
+                  ref={threadRef}
                   conversationId={conversation.id}
                   currentUserId={effectiveLandlordId}
                 />
               )}
-              {/* Optimistic messages */}
-              {optimisticMessages.map(({ message: msg }) => (
-                <div key={msg.id} style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 16px' }}>
-                  <div style={{
-                    maxWidth: '70%', padding: '10px 14px', borderRadius: 12,
-                    background: '#3b82f6', color: '#fff', fontSize: 14,
-                    opacity: 0.7,
-                  }}>
-                    {msg.body}
-                  </div>
-                </div>
-              ))}
             </div>
 
             {conversation && (
               <div style={{ borderTop: '1px solid #f1f5f9', flexShrink: 0 }}>
                 <ComposeBox
                   conversationId={conversation.id}
+                  onOptimisticSend={handleOptimisticSend}
                   onSend={handleSend}
                   onSendError={handleSendError}
                   senderRole="landlord"

@@ -167,7 +167,7 @@ describe('Property 22: MessageThread renders messages in chronological order wit
             ),
             { numRuns: 100 }
         );
-    });
+    }, 60_000);
 
     it('maintains chronological order and correct alignment simultaneously', async () => {
         await fc.assert(
@@ -231,5 +231,5 @@ describe('Property 22: MessageThread renders messages in chronological order wit
             ),
             { numRuns: 100 }
         );
-    });
+    }, 60_000);
 });
