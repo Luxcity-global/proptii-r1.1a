@@ -167,7 +167,8 @@ export class CommunicationService {
           conv?.landlordId === user.uid ||
           (user.email && (
             conv?.guestEmail?.toLowerCase() === user.email.toLowerCase() ||
-            conv?.landlordEmail?.toLowerCase() === user.email.toLowerCase()
+            conv?.landlordEmail?.toLowerCase() === user.email.toLowerCase() ||
+            conv?.tenantEmail?.toLowerCase() === user.email.toLowerCase()
           ));
         if (!isParticipant) {
           throw new ForbiddenException('You are not authorized to view messages in this conversation');
@@ -176,32 +177,59 @@ export class CommunicationService {
     }
 
     try {
-      // Fetch newest-first with cursor pagination.
-      // We only need (conversationId) single-field index which always exists.
-      // orderBy sentAt desc lets us paginate backwards cheaply.
-      let query: any = col
-        .where('conversationId', '==', conversationId)
-        .orderBy('sentAt', 'desc')
-        .limit(limit + 1); // fetch one extra to know if there are more
+      let messages: any[] = [];
+      let hasMore = false;
 
-      // Cursor: if `before` is provided, only fetch messages sent before that timestamp
-      if (before) {
-        query = query.startAfter(before);
+      try {
+        // Attempt indexed query with cursor pagination first
+        let query: any = col
+          .where('conversationId', '==', conversationId)
+          .orderBy('sentAt', 'desc')
+          .limit(limit + 1); // fetch one extra to know if there are more
+
+        // Cursor: if `before` is provided, only fetch messages sent before that timestamp
+        if (before) {
+          query = query.startAfter(before);
+        }
+
+        const snapshot = await query.get();
+        const docs = snapshot.docs;
+
+        // The extra doc tells us whether there are older messages
+        hasMore = docs.length > limit;
+        const pageDocs = hasMore ? docs.slice(0, limit) : docs;
+
+        // Map to message objects (desc order → reverse to chronological for display)
+        const allMessages = pageDocs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        // Filter soft-deleted in memory (avoids composite index on isDeleted)
+        messages = allMessages
+          .filter((m: any) => m.isDeleted !== true)
+          .reverse(); // chronological order for rendering
+      } catch (queryErr: any) {
+        // Fallback: If composite index is missing or building in Firestore (e.g. FAILED_PRECONDITION / code 9),
+        // query with single-field index (conversationId) and sort in-memory.
+        this.logger.warn(`Index query failed for messages in conversation ${conversationId}, falling back to unindexed fetch + memory sort: ${queryErr?.message || queryErr}`);
+        const snap = await col.where('conversationId', '==', conversationId).get();
+        let docs = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        // Filter soft-deleted
+        docs = docs.filter((m: any) => m.isDeleted !== true);
+        // Sort descending (newest first)
+        docs.sort((a: any, b: any) => {
+          const tA = a.sentAt ? new Date(a.sentAt).getTime() : 0;
+          const tB = b.sentAt ? new Date(b.sentAt).getTime() : 0;
+          return tB - tA;
+        });
+        if (before) {
+          const beforeTime = new Date(before).getTime();
+          docs = docs.filter((m: any) => {
+            const t = m.sentAt ? new Date(m.sentAt).getTime() : 0;
+            return t < beforeTime;
+          });
+        }
+        hasMore = docs.length > limit;
+        const pageDocs = hasMore ? docs.slice(0, limit) : docs;
+        messages = pageDocs.reverse(); // chronological order for rendering
       }
-
-      const snapshot = await query.get();
-      const docs = snapshot.docs;
-
-      // The extra doc tells us whether there are older messages
-      const hasMore = docs.length > limit;
-      const pageDocs = hasMore ? docs.slice(0, limit) : docs;
-
-      // Map to message objects (desc order → reverse to chronological for display)
-      const allMessages = pageDocs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-      // Filter soft-deleted in memory (avoids composite index on isDeleted)
-      const messages = allMessages
-        .filter((m: any) => m.isDeleted !== true)
-        .reverse(); // chronological order for rendering
 
       // ── Embed attachment objects to eliminate N+1 client-side fetches ──────
       // Instead of the client calling GET /attachments/:id once per attachment
@@ -268,7 +296,8 @@ export class CommunicationService {
           conv?.landlordId === userId ||
           (user.email && (
             conv?.guestEmail?.toLowerCase() === user.email.toLowerCase() ||
-            conv?.landlordEmail?.toLowerCase() === user.email.toLowerCase()
+            conv?.landlordEmail?.toLowerCase() === user.email.toLowerCase() ||
+            conv?.tenantEmail?.toLowerCase() === user.email.toLowerCase()
           ));
         if (!isParticipant) {
           throw new ForbiddenException('You are not authorized to send messages in this conversation');

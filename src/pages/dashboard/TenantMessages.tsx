@@ -164,7 +164,7 @@ const TenantMessages: React.FC = () => {
     setMobileShowThread(true); // navigate to thread panel on mobile
   }, [activeConversationId, setActiveConversationId, conversations, markConversationAsRead]);
 
-  const currentUserId = user?.id ?? '';
+  const currentUserId = user?.id || (user as any)?.uid || '';
 
   const handleOptimisticSend = useCallback(
     (tempMessage: Message, file?: File) => {
