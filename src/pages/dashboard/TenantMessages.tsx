@@ -8,10 +8,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Download, MessageSquare, Search } from 'lucide-react';
 import { useMessagingContext } from '../../contexts/MessagingContext';
 import { useAuth } from '../../contexts/AuthContext';
-import MessageThread from '../../components/messaging/MessageThread';
+import MessageThread, { type MessageThreadHandle } from '../../components/messaging/MessageThread';
 import ComposeBox from '../../components/messaging/ComposeBox';
 import AttachmentPill from '../../components/messaging/AttachmentPill';
 import TenantPageHeader from '../../components/dashboard/ui/TenantPageHeader';
+import sseService from '../../services/sseService';
 import type { Conversation, Message } from '../../types/messaging';
 import '../../styles/tenantMessages.css';
 import '../../styles/tenantModals.css';
@@ -112,11 +113,29 @@ const TenantMessages: React.FC = () => {
   }, [location.state, location.pathname, navigate, setActiveConversationId, _setConversations]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<MessageThreadHandle>(null);
   const optimisticBottomRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
     optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
+
+  // Refresh the open message thread in real time when an SSE event arrives for it
+  useEffect(() => {
+    const activeConvId = activeConversationId;
+    if (!activeConvId) return;
+
+    const refreshThread = (event: { data: unknown }) => {
+      const data = event.data as { conversationId?: string } | null;
+      if (data?.conversationId === activeConvId) {
+        threadRef.current?.refresh();
+      }
+    };
+
+    const unsub1 = sseService.on('message_new', refreshThread);
+    const unsub2 = sseService.on('conversation_updated', refreshThread);
+    return () => { unsub1(); unsub2(); };
+  }, [activeConversationId]);
 
   useEffect(() => {
     refreshConversations().then(() => {
@@ -407,7 +426,7 @@ const TenantMessages: React.FC = () => {
                 )}
 
                 <div ref={scrollContainerRef} className="tn-msg-feed">
-                  <MessageThread conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} />
+                  <MessageThread ref={threadRef} conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} />
                   {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
                     <div key={msg.id} data-testid="optimistic-message" className="tn-msg-optimistic">
                       <div className="tn-msg-optimistic-bubble">

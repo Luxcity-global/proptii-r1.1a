@@ -9,9 +9,10 @@ import { Bell, Download, MessageSquare, Plus, Search, Settings, Sparkles, Edit, 
 import { useMessagingContext } from '../../../contexts/MessagingContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import communicationService from '../../../services/communicationService';
-import MessageThread from '../../../components/messaging/MessageThread';
+import MessageThread, { type MessageThreadHandle } from '../../../components/messaging/MessageThread';
 import ComposeBox from '../../../components/messaging/ComposeBox';
 import AttachmentPill from '../../../components/messaging/AttachmentPill';
+import sseService from '../../../services/sseService';
 import type { Conversation, Message } from '../../../types/messaging';
 import type { UserProfile } from '../App';
 import { useTenants } from '../hooks/useTenants';
@@ -123,6 +124,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<MessageThreadHandle>(null);
   const optimisticBottomRef = useRef<HTMLDivElement>(null);
   // Track last seen lastMessageAt per conversation to detect when real messages arrive
   const lastSeenAt = useRef<Record<string, string | null>>({});
@@ -132,6 +134,23 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   const scrollToBottom = useCallback(() => {
     optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
+
+  // Refresh the open message thread in real time when an SSE event arrives for it
+  useEffect(() => {
+    const activeConvId = activeConversationId;
+    if (!activeConvId) return;
+
+    const refreshThread = (event: { data: unknown }) => {
+      const data = event.data as { conversationId?: string } | null;
+      if (data?.conversationId === activeConvId) {
+        threadRef.current?.refresh();
+      }
+    };
+
+    const unsub1 = sseService.on('message_new', refreshThread);
+    const unsub2 = sseService.on('conversation_updated', refreshThread);
+    return () => { unsub1(); unsub2(); };
+  }, [activeConversationId]);
 
   // When the active conversation receives a new real message (lastMessageAt advances),
   // clear the optimistic messages for that conversation to prevent double-rendering.
@@ -504,6 +523,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
 
                 <div ref={scrollContainerRef} className="ll-msg-feed">
                   <MessageThread
+                    ref={threadRef}
                     conversationId={activeConversationId}
                     currentUserId={currentUserId}
                     onScrollRequest={scrollToBottom}

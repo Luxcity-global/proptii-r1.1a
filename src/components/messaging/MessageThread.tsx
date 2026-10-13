@@ -12,7 +12,7 @@
  * Requirements: 10.3, 10.5, 11.3, 11.5, 12.1, 7.4
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import type { Message } from '../../types/messaging';
 import communicationService from '../../services/communicationService';
 import sseService from '../../services/sseService';
@@ -86,10 +86,24 @@ export interface MessageThreadProps {
 }
 
 // ---------------------------------------------------------------------------
+// Public handle — exposed via ref so parent pages can trigger a silent refresh
+// ---------------------------------------------------------------------------
+
+export interface MessageThreadHandle {
+    /** Re-fetches messages silently (no loading spinner) and marks unread as read */
+    refresh: () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUserId, onScrollRequest }) => {
+const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
+    ({ conversationId, currentUserId, onScrollRequest }, ref) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -173,6 +187,25 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
             setLoading(false);
         }
     }, [conversationId, currentUserId]);
+
+    // Expose refresh() so parent pages can force a silent re-fetch on SSE events
+    useImperativeHandle(ref, () => ({
+        refresh: () => {
+            if (!conversationId) return;
+            // Silent refresh — don't set loading=true so there's no spinner flash
+            communicationService.getMessages(conversationId).then(({ messages: fetched, hasMore: more }) => {
+                const sorted = [...fetched].sort(
+                    (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
+                );
+                setMessages(sorted);
+                setHasMore(more);
+                const unread = sorted.filter(
+                    (m) => m.readAt === null && m.senderId !== currentUserId,
+                );
+                Promise.all(unread.map((m) => communicationService.markRead(m.id, conversationId))).catch(() => {});
+            }).catch(() => {});
+        },
+    }), [conversationId, currentUserId]);
 
     const loadEarlier = useCallback(async () => {
         if (!conversationId || !messages.length || loadingMore) return;
@@ -532,6 +565,8 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
             )}
         </div>
     );
-};
+});
+
+MessageThread.displayName = 'MessageThread';
 
 export default MessageThread;
