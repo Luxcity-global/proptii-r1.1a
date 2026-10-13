@@ -192,20 +192,21 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
     useImperativeHandle(ref, () => ({
         refresh: () => {
             if (!conversationId) return;
-            // Silent refresh — don't set loading=true so there's no spinner flash
+            // Silent refresh — no loading spinner, just swap in the fresh list
             communicationService.getMessages(conversationId).then(({ messages: fetched, hasMore: more }) => {
                 const sorted = [...fetched].sort(
                     (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
                 );
                 setMessages(sorted);
                 setHasMore(more);
+                scrollToBottom();
                 const unread = sorted.filter(
                     (m) => m.readAt === null && m.senderId !== currentUserId,
                 );
                 Promise.all(unread.map((m) => communicationService.markRead(m.id, conversationId))).catch(() => {});
             }).catch(() => {});
         },
-    }), [conversationId, currentUserId]);
+    }), [conversationId, currentUserId, scrollToBottom]);
 
     const loadEarlier = useCallback(async () => {
         if (!conversationId || !messages.length || loadingMore) return;
@@ -227,25 +228,56 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         fetchAndMarkRead();
     }, [fetchAndMarkRead]);
 
-    // Listen for new messages via SSE
+    // Listen for new messages via SSE — directly append to avoid any round-trip delay
     useEffect(() => {
         if (!conversationId) return;
+
+        // Shared silent refetch — used as fallback when direct append isn't possible
+        const silentRefetch = () => {
+            communicationService.getMessages(conversationId).then(({ messages: fetched, hasMore: more }) => {
+                const sorted = [...fetched].sort(
+                    (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
+                );
+                setMessages(sorted);
+                setHasMore(more);
+                const unread = sorted.filter(m => m.readAt === null && m.senderId !== currentUserId);
+                Promise.all(unread.map(m => communicationService.markRead(m.id, conversationId))).catch(() => {});
+            }).catch(() => {});
+        };
+
         const unsubscribe = sseService.on('message_new', (event) => {
             const data = event.data as any;
-            if (data?.conversationId === conversationId && data?.message) {
+            // Try direct append first (instant, like WhatsApp)
+            const convId = data?.conversationId ?? data?.data?.conversationId;
+            const msg = data?.message ?? data?.data?.message;
+            if (convId === conversationId && msg) {
                 setMessages((prev) => {
-                    if (prev.some(m => m.id === data.message.id)) return prev;
-                    return [...prev, data.message];
+                    if (prev.some(m => m.id === msg.id)) return prev;
+                    return [...prev, msg];
                 });
-                if (data.message.senderId !== currentUserId) {
-                    communicationService.markRead(data.message.id, conversationId).catch(console.error);
+                if (msg.senderId !== currentUserId) {
+                    communicationService.markRead(msg.id, conversationId).catch(console.error);
                 }
+            } else if (!convId || convId === conversationId) {
+                // Payload shape unclear or matches — do a background fetch as fallback
+                silentRefetch();
+            }
+        });
+
+        const unsubscribeUpdated = sseService.on('conversation_updated', (event) => {
+            const data = event.data as any;
+            const convId = data?.conversationId ?? data?.data?.conversationId;
+            // Only re-fetch if this event is for our conversation (or reconnect broadcast)
+            if (!convId || convId === conversationId) {
+                silentRefetch();
             }
         });
 
         const unsubscribeTyping = sseService.on('typing_start', (event) => {
             const data = event.data as any;
-            if (data?.conversationId === conversationId && data?.senderId !== currentUserId) {
+            const convId = data?.conversationId ?? data?.data?.conversationId;
+            const senderId = data?.senderId ?? data?.data?.senderId;
+            if (convId === conversationId && senderId !== currentUserId) {
                 setIsTyping(true);
                 if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
                 typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
@@ -254,27 +286,28 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
 
         const unsubscribeEdit = sseService.on('message_edit', (event) => {
             const data = event.data as any;
-            if (data?.messageId) {
+            const msgId = data?.messageId ?? data?.data?.messageId;
+            const body = data?.body ?? data?.data?.body;
+            const editedAt = data?.editedAt ?? data?.data?.editedAt;
+            if (msgId) {
                 setMessages((prev) => prev.map((m) =>
-                    m.id === data.messageId
-                        ? { ...m, body: data.body, editedAt: data.editedAt }
-                        : m
+                    m.id === msgId ? { ...m, body, editedAt } : m
                 ));
             }
         });
 
         const unsubscribeDelete = sseService.on('message_delete', (event) => {
             const data = event.data as any;
-            if (data?.messageId) {
+            const msgId = data?.messageId ?? data?.data?.messageId;
+            const deletedAt = data?.deletedAt ?? data?.data?.deletedAt;
+            if (msgId) {
                 setMessages((prev) => prev.map((m) =>
-                    m.id === data.messageId
-                        ? { ...m, isDeleted: true, deletedAt: data.deletedAt }
-                        : m
+                    m.id === msgId ? { ...m, isDeleted: true, deletedAt } : m
                 ));
             }
         });
 
-        return () => { unsubscribe(); unsubscribeTyping(); unsubscribeEdit(); unsubscribeDelete(); };
+        return () => { unsubscribe(); unsubscribeUpdated(); unsubscribeTyping(); unsubscribeEdit(); unsubscribeDelete(); };
     }, [conversationId, currentUserId]);
 
     // Scroll to bottom whenever the message list changes (new fetch or new messages)

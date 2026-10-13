@@ -122,14 +122,10 @@ const TenantMessages: React.FC = () => {
 
   // Refresh the open message thread in real time when an SSE event arrives for it
   useEffect(() => {
-    const activeConvId = activeConversationId;
-    if (!activeConvId) return;
+    if (!activeConversationId) return;
 
-    const refreshThread = (event: { data: unknown }) => {
-      const data = event.data as { conversationId?: string } | null;
-      if (data?.conversationId === activeConvId) {
-        threadRef.current?.refresh();
-      }
+    const refreshThread = () => {
+      threadRef.current?.refresh();
     };
 
     const unsub1 = sseService.on('message_new', refreshThread);
@@ -345,7 +341,7 @@ const TenantMessages: React.FC = () => {
                       type="button"
                       data-testid="conversation-list-item"
                       data-conversation-id={conv.id}
-                      className={`tn-msg-conv${conv.id === activeConversationId ? ' is-on' : ''}`}
+                      className={`tn-msg-conv${conv.id === activeConversationId ? ' is-on' : ''}${isUnread(conv) && conv.id !== activeConversationId ? ' is-unread' : ''}`}
                       onClick={() => handleSelect(conv.id)}
                       aria-pressed={conv.id === activeConversationId}
                       aria-label={`Conversation with ${name} about ${property || 'a property'}`}
@@ -361,14 +357,34 @@ const TenantMessages: React.FC = () => {
                       </div>
                       <div className="tn-msg-conv-main">
                         <div className="tn-msg-conv-top">
-                          <h4>{name}</h4>
-                          {time.label ? (
-                            <span className={`tn-msg-conv-time${time.fresh ? ' is-now' : ''}`}>{time.label}</span>
-                          ) : null}
+                          <h4 style={{ fontWeight: isUnread(conv) && conv.id !== activeConversationId ? 700 : undefined }}>{name}</h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {time.label ? (
+                              <span className={`tn-msg-conv-time${time.fresh ? ' is-now' : ''}`}
+                                style={{ color: isUnread(conv) && conv.id !== activeConversationId ? '#136c9e' : undefined,
+                                         fontWeight: isUnread(conv) && conv.id !== activeConversationId ? 600 : undefined }}>
+                                {time.label}
+                              </span>
+                            ) : null}
+                            {isUnread(conv) && conv.id !== activeConversationId && (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                minWidth: 18, height: 18, borderRadius: 9,
+                                background: '#136c9e', color: '#fff',
+                                fontSize: '0.68rem', fontWeight: 700, padding: '0 5px',
+                              }}>
+                                {(conv.unreadForTenant ?? 0) > 99 ? '99+' : (conv.unreadForTenant ?? 0) > 0 ? conv.unreadForTenant : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {property ? <div className="tn-msg-conv-sub">{property}</div> : null}
                         {(conv as any).lastMessagePreview ? (
-                          <div className="tn-msg-conv-preview">{(conv as any).lastMessagePreview}</div>
+                          <div className="tn-msg-conv-preview"
+                            style={{ color: isUnread(conv) && conv.id !== activeConversationId ? '#1e293b' : undefined,
+                                     fontWeight: isUnread(conv) && conv.id !== activeConversationId ? 500 : undefined }}>
+                            {(conv as any).lastMessagePreview}
+                          </div>
                         ) : null}
                       </div>
                     </button>
