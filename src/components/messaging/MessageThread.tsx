@@ -247,6 +247,7 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
 
         const unsubscribe = sseService.on('message_new', (event) => {
             const data = event.data as any;
+            console.log('[MessageThread] message_new fired', JSON.stringify(data));
             // Try direct append first (instant, like WhatsApp)
             const convId = data?.conversationId ?? data?.data?.conversationId;
             const msg = data?.message ?? data?.data?.message;

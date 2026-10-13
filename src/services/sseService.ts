@@ -123,6 +123,8 @@ class SseService {
       source.onmessage = (event) => {
         try {
           const parsed: SseMessagePayload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          // DIAGNOSTIC — remove after confirming shape
+          console.log('[SSE RAW]', JSON.stringify(parsed));
           // NestJS @Sse wraps our AppServerEvent as { data: AppServerEvent, type, id }.
           // After JSON.parse the shape is { type, userId, data: { conversationId, ... } } — correct.
           // But if the backend map() sets `data: event` (the full AppServerEvent), we get
