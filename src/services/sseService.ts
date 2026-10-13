@@ -108,73 +108,55 @@ class SseService {
       }
 
       const source = new EventSource(sseUrl);
-      console.log('[SSE] Connecting to', sseUrl);
 
       source.onopen = () => {
         const prevAttempts = this.reconnectAttempts.get(channel) || 0;
-        console.log(`[SSE:${channel}] Connected (readyState=${source.readyState})`);
         this.reconnectAttempts.set(channel, 0);
-
-        // If this is a reconnect, dispatch a synthetic event so pollers immediately re-sync
         if (prevAttempts > 0) {
           this.dispatch({ type: 'conversation_updated', data: { reconnected: true }, timestamp: Date.now() });
         }
       };
 
-      // NestJS @Sse emits named events (event: <type>\ndata: ...) when MessageEvent.type is set.
-      // EventSource.onmessage only fires for unnamed events — named events are silently dropped.
-      // We must use addEventListener for every event type we care about, PLUS keep onmessage
-      // as a fallback for any unnamed events the backend may emit.
+      // NestJS @Sse sets MessageEvent.type, producing named SSE events (event: message_new\ndata: ...).
+      // EventSource.onmessage ONLY fires for unnamed events — named events are silently dropped.
+      // Register addEventListener for every named event type the backend emits.
       const handleRawEvent = (eventType: string) => (msgEvent: MessageEvent) => {
         try {
-          console.log(`[SSE named:${eventType}]`, msgEvent.data);
           const raw = typeof msgEvent.data === 'string' ? JSON.parse(msgEvent.data) : msgEvent.data;
-          // The data field is the full AppServerEvent; extract the inner data payload
-          const innerData = raw?.data ?? raw;
+          // raw is the full AppServerEvent: { type, userId, data: <inner payload>, timestamp }
+          // Normalise to SseMessagePayload with the inner payload as .data
           const payload: SseMessagePayload = {
             type: eventType,
             userId: raw?.userId,
             targetEmail: raw?.targetEmail,
             targetRole: raw?.targetRole,
-            data: innerData,
+            data: raw?.data ?? raw,
             timestamp: raw?.timestamp,
           };
-          console.log('[SSE dispatching]', JSON.stringify(payload));
           this.dispatch(payload);
         } catch (err) {
-          console.log(`[SSE:${channel}] Error parsing named event ${eventType}:`, err);
+          console.error(`[SSE:${channel}] Error parsing ${eventType} event:`, err);
         }
       };
 
-      // Register listeners for every named event type the backend emits
       const namedEventTypes = [
         'message_new', 'message_read', 'message_edit', 'message_delete',
         'conversation_new', 'conversation_updated',
-        'typing_start',
-        'presence_update',
+        'typing_start', 'presence_update',
       ];
-      namedEventTypes.forEach(type => {
-        source.addEventListener(type, handleRawEvent(type));
-      });
+      namedEventTypes.forEach(type => source.addEventListener(type, handleRawEvent(type)));
 
-      // Fallback: unnamed events (type = 'message') — kept for safety
+      // Fallback for any unnamed events
       source.onmessage = (event) => {
         try {
-          console.log('[SSE RAW onmessage]', event.data);
           const parsed: SseMessagePayload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          // Flatten double-nest if present
-          const unwrapped: SseMessagePayload =
-            parsed.data && typeof parsed.data === 'object' && 'data' in parsed.data && parsed.data.type === parsed.type
-              ? { ...parsed, data: parsed.data.data }
-              : parsed;
-          this.dispatch(unwrapped);
+          this.dispatch(parsed);
         } catch (err) {
-          console.log(`[SSE:${channel}] Error parsing unnamed event:`, err);
+          console.error(`[SSE:${channel}] Error parsing unnamed event:`, err);
         }
       };
 
-      source.onerror = (err) => {
-        console.log(`[SSE:${channel}] Error/disconnect (readyState=${source.readyState})`, err);
+      source.onerror = () => {
         this.disconnectChannel(channel);
         this.scheduleReconnect(channel);
       };

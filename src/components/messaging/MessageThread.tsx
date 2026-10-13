@@ -228,87 +228,55 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         fetchAndMarkRead();
     }, [fetchAndMarkRead]);
 
-    // Listen for new messages via SSE — directly append to avoid any round-trip delay
+    // Listen for new messages via SSE — direct append, one path, no refetch
     useEffect(() => {
         if (!conversationId) return;
 
-        // Shared silent refetch — used as fallback when direct append isn't possible
-        const silentRefetch = () => {
-            communicationService.getMessages(conversationId).then(({ messages: fetched, hasMore: more }) => {
-                const sorted = [...fetched].sort(
-                    (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
-                );
-                setMessages(sorted);
-                setHasMore(more);
-                const unread = sorted.filter(m => m.readAt === null && m.senderId !== currentUserId);
-                Promise.all(unread.map(m => communicationService.markRead(m.id, conversationId))).catch(() => {});
-            }).catch(() => {});
-        };
-
-        const unsubscribe = sseService.on('message_new', (event) => {
-            const data = event.data as any;
-            console.log('[MessageThread] message_new fired', JSON.stringify(data));
-            // Try direct append first (instant, like WhatsApp)
-            const convId = data?.conversationId ?? data?.data?.conversationId;
-            const msg = data?.message ?? data?.data?.message;
-            if (convId === conversationId && msg) {
-                setMessages((prev) => {
-                    if (prev.some(m => m.id === msg.id)) return prev;
-                    return [...prev, msg];
-                });
-                if (msg.senderId !== currentUserId) {
-                    communicationService.markRead(msg.id, conversationId).catch(console.error);
-                }
-            } else if (!convId || convId === conversationId) {
-                // Payload shape unclear or matches — do a background fetch as fallback
-                silentRefetch();
-            }
-        });
-
-        const unsubscribeUpdated = sseService.on('conversation_updated', (event) => {
-            const data = event.data as any;
-            const convId = data?.conversationId ?? data?.data?.conversationId;
-            // Only re-fetch if this event is for our conversation (or reconnect broadcast)
-            if (!convId || convId === conversationId) {
-                silentRefetch();
+        const unsubscribeNew = sseService.on('message_new', (event) => {
+            const d = event.data as any;
+            const convId = d?.conversationId;
+            const msg = d?.message;
+            if (convId !== conversationId || !msg) return;
+            setMessages((prev) => {
+                if (prev.some(m => m.id === msg.id)) return prev; // dedup
+                return [...prev, msg];
+            });
+            // Mark as read if received (not sent by us)
+            if (msg.senderId !== currentUserId) {
+                communicationService.markRead(msg.id, conversationId).catch(() => {});
             }
         });
 
         const unsubscribeTyping = sseService.on('typing_start', (event) => {
-            const data = event.data as any;
-            const convId = data?.conversationId ?? data?.data?.conversationId;
-            const senderId = data?.senderId ?? data?.data?.senderId;
-            if (convId === conversationId && senderId !== currentUserId) {
-                setIsTyping(true);
-                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
-            }
+            const d = event.data as any;
+            if (d?.conversationId !== conversationId || d?.senderId === currentUserId) return;
+            setIsTyping(true);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
         });
 
         const unsubscribeEdit = sseService.on('message_edit', (event) => {
-            const data = event.data as any;
-            const msgId = data?.messageId ?? data?.data?.messageId;
-            const body = data?.body ?? data?.data?.body;
-            const editedAt = data?.editedAt ?? data?.data?.editedAt;
-            if (msgId) {
-                setMessages((prev) => prev.map((m) =>
-                    m.id === msgId ? { ...m, body, editedAt } : m
-                ));
-            }
+            const d = event.data as any;
+            if (!d?.messageId) return;
+            setMessages((prev) => prev.map((m) =>
+                m.id === d.messageId ? { ...m, body: d.body, editedAt: d.editedAt } : m
+            ));
         });
 
         const unsubscribeDelete = sseService.on('message_delete', (event) => {
-            const data = event.data as any;
-            const msgId = data?.messageId ?? data?.data?.messageId;
-            const deletedAt = data?.deletedAt ?? data?.data?.deletedAt;
-            if (msgId) {
-                setMessages((prev) => prev.map((m) =>
-                    m.id === msgId ? { ...m, isDeleted: true, deletedAt } : m
-                ));
-            }
+            const d = event.data as any;
+            if (!d?.messageId) return;
+            setMessages((prev) => prev.map((m) =>
+                m.id === d.messageId ? { ...m, isDeleted: true, deletedAt: d.deletedAt } : m
+            ));
         });
 
-        return () => { unsubscribe(); unsubscribeUpdated(); unsubscribeTyping(); unsubscribeEdit(); unsubscribeDelete(); };
+        return () => {
+            unsubscribeNew();
+            unsubscribeTyping();
+            unsubscribeEdit();
+            unsubscribeDelete();
+        };
     }, [conversationId, currentUserId]);
 
     // Scroll to bottom whenever the message list changes (new fetch or new messages)

@@ -12,7 +12,6 @@ import MessageThread, { type MessageThreadHandle } from '../../components/messag
 import ComposeBox from '../../components/messaging/ComposeBox';
 import AttachmentPill from '../../components/messaging/AttachmentPill';
 import TenantPageHeader from '../../components/dashboard/ui/TenantPageHeader';
-import sseService from '../../services/sseService';
 import type { Conversation, Message } from '../../types/messaging';
 import '../../styles/tenantMessages.css';
 import '../../styles/tenantModals.css';
@@ -112,6 +111,7 @@ const TenantMessages: React.FC = () => {
     }
   }, [location.state, location.pathname, navigate, setActiveConversationId, _setConversations]);
 
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<MessageThreadHandle>(null);
   const optimisticBottomRef = useRef<HTMLDivElement>(null);
@@ -119,19 +119,6 @@ const TenantMessages: React.FC = () => {
   const scrollToBottom = useCallback(() => {
     optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
-
-  // Refresh the open message thread in real time when an SSE event arrives for it
-  useEffect(() => {
-    if (!activeConversationId) return;
-
-    const refreshThread = () => {
-      threadRef.current?.refresh();
-    };
-
-    const unsub1 = sseService.on('message_new', refreshThread);
-    const unsub2 = sseService.on('conversation_updated', refreshThread);
-    return () => { unsub1(); unsub2(); };
-  }, [activeConversationId]);
 
   useEffect(() => {
     refreshConversations().then(() => {

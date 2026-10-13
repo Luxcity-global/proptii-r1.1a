@@ -12,7 +12,6 @@ import communicationService from '../../../services/communicationService';
 import MessageThread, { type MessageThreadHandle } from '../../../components/messaging/MessageThread';
 import ComposeBox from '../../../components/messaging/ComposeBox';
 import AttachmentPill from '../../../components/messaging/AttachmentPill';
-import sseService from '../../../services/sseService';
 import type { Conversation, Message } from '../../../types/messaging';
 import type { UserProfile } from '../App';
 import { useTenants } from '../hooks/useTenants';
@@ -134,19 +133,6 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   const scrollToBottom = useCallback(() => {
     optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
-
-  // Refresh the open message thread in real time when an SSE event arrives for it
-  useEffect(() => {
-    if (!activeConversationId) return;
-
-    const refreshThread = () => {
-      threadRef.current?.refresh();
-    };
-
-    const unsub1 = sseService.on('message_new', refreshThread);
-    const unsub2 = sseService.on('conversation_updated', refreshThread);
-    return () => { unsub1(); unsub2(); };
-  }, [activeConversationId]);
 
   // When the active conversation receives a new real message (lastMessageAt advances),
   // clear the optimistic messages for that conversation to prevent double-rendering.
