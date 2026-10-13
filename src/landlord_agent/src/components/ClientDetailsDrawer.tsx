@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { Mail, Phone, X } from 'lucide-react';
+import { Mail, Phone, MessageSquare, X } from 'lucide-react';
 import '../styles/clientDetails.css';
 
 export type ClientDrawerTab = { id: string; label: string };
@@ -27,6 +26,7 @@ interface ClientDetailsDrawerProps {
   activeTab: string;
   onTabChange: (id: string) => void;
   onClose: () => void;
+  onMessage?: () => void;
   loading?: boolean;
   actions?: React.ReactNode;
   children: React.ReactNode;
@@ -50,6 +50,7 @@ export function ClientDetailsDrawer({
   activeTab,
   onTabChange,
   onClose,
+  onMessage,
   loading,
   actions,
   children,
@@ -117,6 +118,17 @@ export function ClientDetailsDrawer({
                 <Mail size={14} className="ll-cd-comm-icon is-mail" />
                 <span>Email Client</span>
               </span>
+            )}
+            {onMessage && (
+              <button
+                type="button"
+                className="ll-cd-comm"
+                onClick={onMessage}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}
+              >
+                <MessageSquare size={14} className="ll-cd-comm-icon is-mail" />
+                <span>Message</span>
+              </button>
             )}
             {actions}
           </div>

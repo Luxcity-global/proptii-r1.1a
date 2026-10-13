@@ -5,7 +5,12 @@
   --tn-orange-hover: #ba4e0b;
   --tn-blue: #136c9e;
   --tn-border: #e2e8f0;
-  font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    "Nunito Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   background: #f8fafc;
   color: #1e293b;
   min-height: 100%;
@@ -16,7 +21,12 @@
 .tn-msg h2,
 .tn-msg h3,
 .tn-msg h4 {
-  font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    "Archivo",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 .tn-msg-body {
@@ -27,7 +37,9 @@
 }
 
 @media (min-width: 1024px) {
-  .tn-msg-body { padding: 32px 40px 0; }
+  .tn-msg-body {
+    padding: 32px 40px 0;
+  }
 }
 
 .tn-msg-toolbar {
@@ -39,7 +51,11 @@
   flex-wrap: wrap;
 }
 
-.tn-msg-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tn-msg-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 
 .tn-msg-tab {
   padding: 6px 16px;
@@ -53,7 +69,10 @@
   font-family: inherit;
 }
 
-.tn-msg-tab:hover { background: #f1f5f9; color: #0f172a; }
+.tn-msg-tab:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
 
 .tn-msg-tab.is-on {
   border-color: var(--tn-orange);
@@ -98,8 +117,13 @@
   font-family: inherit;
 }
 
-.tn-msg-export:hover { background: #f8fafc; }
-.tn-msg-export:disabled { opacity: 0.45; cursor: not-allowed; }
+.tn-msg-export:hover {
+  background: #f8fafc;
+}
+.tn-msg-export:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .tn-msg-split {
   display: grid;
@@ -109,7 +133,9 @@
 }
 
 @media (min-width: 1024px) {
-  .tn-msg-split { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); }
+  .tn-msg-split {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  }
 }
 
 .tn-msg-list,
@@ -123,7 +149,9 @@
   flex-direction: column;
 }
 
-.tn-msg-list { padding: 16px; }
+.tn-msg-list {
+  padding: 16px;
+}
 
 .tn-msg-search {
   position: relative;
@@ -177,7 +205,9 @@
   font-family: inherit;
 }
 
-.tn-msg-conv:hover { background: #f8fafc; }
+.tn-msg-conv:hover {
+  background: #f8fafc;
+}
 
 .tn-msg-conv.is-on {
   background: #f0f7fb;
@@ -197,13 +227,26 @@
   flex-shrink: 0;
 }
 
-.tn-msg-avatar.sky { background: #136c9e; }
-.tn-msg-avatar.orange { background: #dc5f12; }
-.tn-msg-avatar.green { background: #059669; }
-.tn-msg-avatar.rose { background: #e11d48; }
-.tn-msg-avatar.violet { background: #7c3aed; }
+.tn-msg-avatar.sky {
+  background: #136c9e;
+}
+.tn-msg-avatar.orange {
+  background: #dc5f12;
+}
+.tn-msg-avatar.green {
+  background: #059669;
+}
+.tn-msg-avatar.rose {
+  background: #e11d48;
+}
+.tn-msg-avatar.violet {
+  background: #7c3aed;
+}
 
-.tn-msg-conv-main { flex: 1; min-width: 0; }
+.tn-msg-conv-main {
+  flex: 1;
+  min-width: 0;
+}
 
 .tn-msg-conv-top {
   display: flex;
@@ -229,7 +272,10 @@
   white-space: nowrap;
 }
 
-.tn-msg-conv-time.is-now { color: #136c9e; text-transform: uppercase; }
+.tn-msg-conv-time.is-now {
+  color: #136c9e;
+  text-transform: uppercase;
+}
 
 .tn-msg-conv-sub,
 .tn-msg-conv-preview {
@@ -241,7 +287,9 @@
   white-space: nowrap;
 }
 
-.tn-msg-conv-preview { color: #94a3b8; }
+.tn-msg-conv-preview {
+  color: #94a3b8;
+}
 
 .tn-msg-back {
   margin-top: 16px;
@@ -266,9 +314,13 @@
   gap: 8px;
 }
 
-.tn-msg-back button:hover { background: #f8fafc; }
+.tn-msg-back button:hover {
+  background: #f8fafc;
+}
 
-.tn-msg-thread { overflow: hidden; }
+.tn-msg-thread {
+  overflow: hidden;
+}
 
 .tn-msg-thread-head {
   padding: 16px 20px;
@@ -333,8 +385,16 @@
   margin-bottom: 12px;
 }
 
-.tn-msg-empty h3 { margin: 0; color: #0f172a; font-size: 15px; }
-.tn-msg-empty p { margin: 6px 0 0; font-size: 13px; max-width: 240px; }
+.tn-msg-empty h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+}
+.tn-msg-empty p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  max-width: 240px;
+}
 
 .tn-msg [data-testid="message-item"] {
   padding: 4px 24px;
@@ -391,7 +451,9 @@
 
 @media (max-width: 640px) {
   .tn-msg-list,
-  .tn-msg-thread { min-height: 420px; }
+  .tn-msg-thread {
+    min-height: 420px;
+  }
 }
 
 /* ── Mobile messaging — split-pane navigation ──────────────────────────────── */
@@ -450,7 +512,9 @@
     flex-wrap: nowrap;
     scrollbar-width: none;
   }
-  .tn-msg-tabs::-webkit-scrollbar { display: none; }
+  .tn-msg-tabs::-webkit-scrollbar {
+    display: none;
+  }
 
   .tn-msg-toolbar {
     flex-direction: column;

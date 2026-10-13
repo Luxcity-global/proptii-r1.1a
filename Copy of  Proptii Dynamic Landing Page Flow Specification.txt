@@ -1,0 +1,34 @@
+﻿Landing Page Content Personalization Matrix
+3.1 Hero & Positioning Layer (Driven by segment)
+
+
+Segment Key
+	Hero Headline
+	Hero Subheadline / Value Proposition
+	Primary CTA Label
+ 
+	Estate Agent
+	Reclaim your pipeline: Automate tenant progression from enquiry to contract.
+	Prevent deal drop-off and streamline compliance by allowing tenants to securely submit details and documents directly.
+	Start 1-Month Agent Trial
+	Independent Landlord
+	Self-manage without the stress, paperwork, or compliance panic.
+	Simplify tenancy admin with digital referencing while tracking rent and storing digital documents in one place.
+	Start 1-Month Free Trial
+	Property Manager
+	Consolidate secure tenant referencing uploads, details collection, and communications into one central cockpit.
+	Stop context-switching between fragmented inbox threads, spreadsheets, and contractor WhatsApp groups.
+	Start 1-Month Operations Trial
+	Property Investor
+	Protect asset yields and compliance with hands-off operations.
+	Gain portfolio-level visibility, streamline tenancies, and keep asset operating overhead lean.
+	Start 1-Month Investor Trial
+	Default / Other
+	Put your property management and tenancy admin on autopilot.
+	Digital referencing, tenant communication, and compliance from a single workspace.
+	Start 1-Month Free Trial
+	
+Fallback & Edge Case Handling
+* Direct / Unparameterized Traffic: If a user navigates to /welcome directly with no query string, the system cleanly defaults to the general property management layout and copy.
+* URL Encoding & Special Characters: All query parameters undergo standard URI decoding to gracefully handle slashes (e.g., Estate agent / letting agent) and dashes (e.g., 21–50).
+* CTA Continuation: Hidden fields and segment selections are preserved and forwarded from the landing page directly into the registration onboarding flow so the user never has to re-enter their role.

@@ -81,6 +81,8 @@ const AttachmentLoader: React.FC<AttachmentLoaderProps> = ({ attachmentId, conve
 export interface MessageThreadProps {
     conversationId: string;
     currentUserId: string;
+    /** The scrollable feed container — used to preserve scroll position when prepending older messages */
+    scrollContainerRef?: React.RefObject<HTMLDivElement>;
     /** Called after messages are fetched so the parent can scroll its container */
     onScrollRequest?: () => void;
 }
@@ -103,7 +105,7 @@ export interface MessageThreadHandle {
 // ---------------------------------------------------------------------------
 
 const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
-    ({ conversationId, currentUserId, onScrollRequest }, ref) => {
+    ({ conversationId, currentUserId, scrollContainerRef, onScrollRequest }, ref) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -151,36 +153,29 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         setMessageToDelete(null);
     };
 
-    // Sentinel element at the bottom of the list — scrolled into view after every render
+    // Scroll container ref — the parent feed div, passed via scrollContainerRef on the thread's wrapper
+    // We use the bottomRef sentinel to scroll to bottom, and the parent's ref for scroll position restoration
     const bottomRef = useRef<HTMLDivElement>(null);
 
-    const scrollToBottom = useCallback(() => {
-        if (typeof bottomRef.current?.scrollIntoView === 'function') {
-            bottomRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+        bottomRef.current?.scrollIntoView({ behavior });
         onScrollRequest?.();
     }, [onScrollRequest]);
 
     const fetchAndMarkRead = useCallback(async () => {
         if (!conversationId) return;
-
         setLoading(true);
         setError(null);
-
         try {
-            const { messages: fetched, hasMore: more } = await communicationService.getMessages(conversationId);
+            const { messages: fetched, hasMore: more } = await communicationService.getMessages(conversationId, undefined, 30);
             const sorted = [...fetched].sort(
                 (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
             );
             setMessages(sorted);
             setHasMore(more);
-
-            const unread = sorted.filter(
-                (m) => m.readAt === null && m.senderId !== currentUserId,
-            );
-            await Promise.all(
-                unread.map((m) => communicationService.markRead(m.id, conversationId)),
-            );
+            // Mark unread
+            const unread = sorted.filter(m => m.readAt === null && m.senderId !== currentUserId);
+            await Promise.all(unread.map(m => communicationService.markRead(m.id, conversationId)));
         } catch (_e) {
             setError('Failed to load messages. Please try again.');
         } finally {
@@ -188,41 +183,54 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         }
     }, [conversationId, currentUserId]);
 
-    // Expose refresh() so parent pages can force a silent re-fetch on SSE events
+    // Scroll to bottom instantly once messages first load
+    const didInitialScroll = useRef(false);
+    useEffect(() => {
+        if (messages.length > 0 && !didInitialScroll.current) {
+            didInitialScroll.current = true;
+            scrollToBottom('auto');
+        }
+    }, [messages, scrollToBottom]);
+
+    // Reset scroll flag when conversation changes
+    useEffect(() => {
+        didInitialScroll.current = false;
+    }, [conversationId]);
+
+    // Expose refresh() for when a conversation is opened
     useImperativeHandle(ref, () => ({
-        refresh: () => {
-            if (!conversationId) return;
-            // Silent refresh — no loading spinner, just swap in the fresh list
-            communicationService.getMessages(conversationId).then(({ messages: fetched, hasMore: more }) => {
-                const sorted = [...fetched].sort(
-                    (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
-                );
-                setMessages(sorted);
-                setHasMore(more);
-                scrollToBottom();
-                const unread = sorted.filter(
-                    (m) => m.readAt === null && m.senderId !== currentUserId,
-                );
-                Promise.all(unread.map((m) => communicationService.markRead(m.id, conversationId))).catch(() => {});
-            }).catch(() => {});
-        },
-    }), [conversationId, currentUserId, scrollToBottom]);
+        refresh: () => { fetchAndMarkRead(); },
+    }), [fetchAndMarkRead]);
 
     const loadEarlier = useCallback(async () => {
         if (!conversationId || !messages.length || loadingMore) return;
         setLoadingMore(true);
+
+        // Capture scroll height before prepend to restore position after
+        const container = scrollContainerRef?.current;
+        const scrollHeightBefore = container?.scrollHeight ?? 0;
+        const scrollTopBefore = container?.scrollTop ?? 0;
+
         try {
             const oldest = messages[0]?.sentAt;
-            const { messages: older, hasMore: more } = await communicationService.getMessages(conversationId, oldest);
+            const { messages: older, hasMore: more } = await communicationService.getMessages(conversationId, oldest, 30);
             const sorted = [...older].sort(
                 (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
             );
             setMessages(prev => [...sorted.filter(m => !prev.some(p => p.id === m.id)), ...prev]);
             setHasMore(more);
+
+            // After React re-renders, restore scroll so user stays in the same position
+            requestAnimationFrame(() => {
+                if (container) {
+                    const added = container.scrollHeight - scrollHeightBefore;
+                    container.scrollTop = scrollTopBefore + added;
+                }
+            });
         } catch (_e) { /* silent */ } finally {
             setLoadingMore(false);
         }
-    }, [conversationId, messages, loadingMore]);
+    }, [conversationId, messages, loadingMore, scrollContainerRef]);
 
     useEffect(() => {
         fetchAndMarkRead();
@@ -241,6 +249,8 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
                 if (prev.some(m => m.id === msg.id)) return prev; // dedup
                 return [...prev, msg];
             });
+            // Scroll to bottom for new messages
+            requestAnimationFrame(() => scrollToBottom('smooth'));
             // Mark as read if received (not sent by us)
             if (msg.senderId !== currentUserId) {
                 communicationService.markRead(msg.id, conversationId).catch(() => {});
@@ -277,21 +287,14 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
             unsubscribeEdit();
             unsubscribeDelete();
         };
-    }, [conversationId, currentUserId]);
-
-    // Scroll to bottom whenever the message list changes (new fetch or new messages)
-    useEffect(() => {
-        if (messages.length > 0) {
-            scrollToBottom();
-        }
-    }, [messages, scrollToBottom]);
+    }, [conversationId, currentUserId, scrollToBottom]);
 
     return (
         <div
             data-testid="message-thread"
             style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}
         >
-            {/* Load earlier messages button */}
+            {/* Load earlier messages */}
             {hasMore && (
                 <div style={{ textAlign: 'center', paddingBottom: 4 }}>
                     <button

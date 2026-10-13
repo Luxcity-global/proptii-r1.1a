@@ -299,8 +299,6 @@ export function PropertyPreview({
         </div>
       </div>
 
-      </div>
-
       {/* ── Hero photo strip ───────────────────────────────────────────────── */}
       {property.photos.length > 0 ? (
         <div className="relative bg-[#1e293b] w-full overflow-hidden flex items-center justify-center" style={{ height: 360 }}>

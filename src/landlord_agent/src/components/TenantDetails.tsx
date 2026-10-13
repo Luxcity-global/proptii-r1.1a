@@ -66,11 +66,12 @@ interface TenantDetailsProps {
   tenant: Tenant | null;
   onBack: () => void;
   onEdit?: (tenant: Tenant) => void;
+  onMessage?: (tenant: Tenant) => void;
   onTenantUpdate?: (tenant: Tenant) => void;
   initialTab?: string;
 }
 
-export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate, initialTab = 'overview' }: TenantDetailsProps) {
+export function TenantDetails({ tenant, onBack, onEdit, onMessage, onTenantUpdate, initialTab = 'overview' }: TenantDetailsProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [referencingStatus, setReferencingStatus] = useState<'not-started' | 'in-progress' | 'complete'>('not-started');
@@ -709,6 +710,7 @@ const asDate = (value: unknown): Date | null => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onClose={onBack}
+        onMessage={onMessage && displayTenant ? () => onMessage(displayTenant) : undefined}
         loading={isLoadingTenant}
         actions={
           onEdit ? (

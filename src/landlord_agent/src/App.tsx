@@ -52,8 +52,14 @@ import { getResolvedApiBaseUrl } from '../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../services/msalAccessToken';
 import AuthContext, { useAuth } from '../../contexts/AuthContext';
 import { MessagingProvider } from '../../contexts/MessagingContext';
+import { useMessagingPoller } from '../../hooks/useMessagingPoller';
 import { trackEvent } from '../../utils/analytics';
 import { useTenants } from './hooks/useTenants';
+
+function LandlordMessagingPoller() {
+  useMessagingPoller();
+  return null;
+}
 import {
   AGENT_TEST_COMPANY,
   AGENT_TEST_COMPANY_PROFILE,
@@ -68,12 +74,12 @@ import {
 const VacancyPrevention = lazy(() => import('./components/VacancyPrevention').then(m => ({ default: m.VacancyPrevention })));
 const ArrearsManagement = lazy(() => import('./components/ArrearsManagement').then(m => ({ default: m.ArrearsManagement })));
 const PortfolioInsights = lazy(() => import('./components/PortfolioInsights').then(m => ({ default: m.PortfolioInsights })));
-const PropertyInsights  = lazy(() => import('./components/PropertyInsights').then(m => ({ default: m.PropertyInsights })));
-const ReferencingPage   = lazy(() => import('./components/ReferencingPage').then(m => ({ default: m.ReferencingPage })));
-const ContractsPage     = lazy(() => import('./components/ContractsPage').then(m => ({ default: m.ContractsPage })));
-const ViewingsPage      = lazy(() => import('./components/ViewingsPage').then(m => ({ default: m.default })));
+const PropertyInsights = lazy(() => import('./components/PropertyInsights').then(m => ({ default: m.PropertyInsights })));
+const ReferencingPage = lazy(() => import('./components/ReferencingPage').then(m => ({ default: m.ReferencingPage })));
+const ContractsPage = lazy(() => import('./components/ContractsPage').then(m => ({ default: m.ContractsPage })));
+const ViewingsPage = lazy(() => import('./components/ViewingsPage').then(m => ({ default: m.default })));
 const LandlordAgentSettingsPage = lazy(() => import('./components/LandlordAgentSettingsPage').then(m => ({ default: m.default })));
-const AddLandlord       = lazy(() => import('./components/AddLandlord').then(m => ({ default: m.AddLandlord })));
+const AddLandlord = lazy(() => import('./components/AddLandlord').then(m => ({ default: m.AddLandlord })));
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center min-h-[200px]">
@@ -361,6 +367,7 @@ const PATH_TO_NAV_SCREEN: Record<string, NavigationScreen> = {
   '/insights': 'insights',
   '/settings': 'settings',
   '/messages': 'messages',
+  '/inbox': 'messages',
   '/referencing': 'referencing',
 };
 
@@ -488,8 +495,8 @@ export function AppContent() {
   const [openDocsDocumentId, setOpenDocsDocumentId] = React.useState<string | undefined>(undefined);
 
   // Fetch unassigned vault documents once the user opens the Documents tab
-  const loadUnassignedDocuments = React.useCallback(async () => {
-    if (unassignedLoadedRef.current) return;
+  const loadUnassignedDocuments = React.useCallback(async (force = false) => {
+    if (unassignedLoadedRef.current && !force) return;
     try {
       const docs = await documentService.getUnassignedDocuments();
       setUnassignedDocuments(docs);
@@ -577,7 +584,7 @@ export function AppContent() {
     if (hostIsAuthenticated && !hostIsLoading) {
       import('../../services/authReady').then(({ notifyAuthReady }) => {
         notifyAuthReady();
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     // While host auth is still resolving, do not wipe portfolio state or force
@@ -664,7 +671,7 @@ export function AppContent() {
         setIsAuthLoading(false);
         return;
       }
-      
+
       // Handle NAVIGATE messages
       if (data && data.type === 'NAVIGATE' && data.payload) {
         const { path } = data.payload;
@@ -1192,13 +1199,18 @@ export function AppContent() {
     }
   }, [navigationScreen, loadUnassignedDocuments]);
 
+  React.useEffect(() => {
+    if (portfolioRefreshKey > 0) {
+      loadUnassignedDocuments(true);
+    }
+  }, [portfolioRefreshKey, loadUnassignedDocuments]);
+
   // Helper function to get current user ID — delegates to resolveManagerId
   const getCurrentUserId = (): string | null => resolveManagerId();
 
   // Function to process alerts and update state
   const processAlerts = (activeAlerts: Alert[]) => {
     setAlerts(activeAlerts);
-
     // Convert alerts to Dashboard format
     const vacancyAlertsList: VacancyRiskAlert[] = [];
     const arrearsAlertsList: ArrearsAlert[] = [];
@@ -1824,6 +1836,7 @@ export function AppContent() {
             onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
             onViewSettings={() => handleNavigation('settings')}
             onViewNotifications={() => handleNavigation('messages')}
+            onViewMessages={() => handleNavigation('messages')}
             onViewAllProperties={() => handleNavigation('properties')}
             onViewViewings={() => handleNavigation('viewings')}
             onViewClients={() => handleNavigation('clients')}
@@ -2585,18 +2598,18 @@ export function AppContent() {
             isEditing={isEditing}
             isPublishing={isPublishing}
             initialData={{
-              propertyType:      propertySetupData.propertyType || undefined,
-              address:           propertySetupData.propertyDetails.address,
-              monthlyRent:       propertySetupData.propertyDetails.monthlyRent,
-              bedrooms:          propertySetupData.propertyDetails.bedrooms,
-              bathrooms:         propertySetupData.propertyDetails.bathrooms,
-              squareFootage:     propertySetupData.propertyDetails.squareFootage,
+              propertyType: propertySetupData.propertyType || undefined,
+              address: propertySetupData.propertyDetails.address,
+              monthlyRent: propertySetupData.propertyDetails.monthlyRent,
+              bedrooms: propertySetupData.propertyDetails.bedrooms,
+              bathrooms: propertySetupData.propertyDetails.bathrooms,
+              squareFootage: propertySetupData.propertyDetails.squareFootage,
               uploadedDocuments: propertySetupData.propertyDetails.uploadedDocuments,
-              amenities:         propertySetupData.amenities,
-              images:            propertySetupData.images,
-              imageFiles:        propertySetupData.imageFiles,
-              additionalNotes:   propertySetupData.additionalNotes,
-              status:            propertySetupData.status,
+              amenities: propertySetupData.amenities,
+              images: propertySetupData.images,
+              imageFiles: propertySetupData.imageFiles,
+              additionalNotes: propertySetupData.additionalNotes,
+              status: propertySetupData.status,
             }}
             onBulkImport={!isEditing ? () => navigateToScreen('bulk-import-property') : undefined}
             onBack={() => {
@@ -2630,18 +2643,18 @@ export function AppContent() {
                   ...propertySetupData,
                   propertyType: wizardData.propertyType,
                   propertyDetails: {
-                    address:           wizardData.address,
-                    monthlyRent:       wizardData.monthlyRent,
-                    bedrooms:          wizardData.bedrooms,
-                    bathrooms:         wizardData.bathrooms,
-                    squareFootage:     wizardData.squareFootage,
+                    address: wizardData.address,
+                    monthlyRent: wizardData.monthlyRent,
+                    bedrooms: wizardData.bedrooms,
+                    bathrooms: wizardData.bathrooms,
+                    squareFootage: wizardData.squareFootage,
                     uploadedDocuments: wizardData.uploadedDocuments,
                   },
-                  amenities:       wizardData.amenities,
-                  images:          wizardData.images,
-                  imageFiles:      wizardData.imageFiles,
+                  amenities: wizardData.amenities,
+                  images: wizardData.images,
+                  imageFiles: wizardData.imageFiles,
                   additionalNotes: wizardData.additionalNotes,
-                  status:          wizardData.status,
+                  status: wizardData.status,
                 };
 
                 // 1. Upload images
@@ -2663,10 +2676,10 @@ export function AppContent() {
                 }
 
                 // 3. Build property object from wizard data
-                const bedrooms     = parseInt(syncedSetupData.propertyDetails.bedrooms) || 1;
-                const bathrooms    = parseInt(syncedSetupData.propertyDetails.bathrooms);
-                const squareFootage= parseInt(syncedSetupData.propertyDetails.squareFootage);
-                const rent         = parseInt(syncedSetupData.propertyDetails.monthlyRent) || 0;
+                const bedrooms = parseInt(syncedSetupData.propertyDetails.bedrooms) || 1;
+                const bathrooms = parseInt(syncedSetupData.propertyDetails.bathrooms);
+                const squareFootage = parseInt(syncedSetupData.propertyDetails.squareFootage);
+                const rent = parseInt(syncedSetupData.propertyDetails.monthlyRent) || 0;
 
                 const preservedStatus = syncedSetupData.status
                   || (isEditing && selectedProperty ? selectedProperty.status : undefined)
@@ -2674,17 +2687,17 @@ export function AppContent() {
 
                 const newProperty: Property = {
                   id: 'setup-property',
-                  address:    syncedSetupData.propertyDetails.address,
-                  type:       syncedSetupData.propertyType || 'Property',
+                  address: syncedSetupData.propertyDetails.address,
+                  type: syncedSetupData.propertyType || 'Property',
                   bedrooms,
                   rent,
-                  status:     preservedStatus,
-                  amenities:  syncedSetupData.amenities,
-                  notes:      syncedSetupData.additionalNotes,
-                  photos:     [],
-                  documents:  [],
-                  createdAt:  new Date(),
-                  ...(isNaN(bathrooms)     ? {} : { bathrooms }),
+                  status: preservedStatus,
+                  amenities: syncedSetupData.amenities,
+                  notes: syncedSetupData.additionalNotes,
+                  photos: [],
+                  documents: [],
+                  createdAt: new Date(),
+                  ...(isNaN(bathrooms) ? {} : { bathrooms }),
                   ...(isNaN(squareFootage) ? {} : { squareFootage }),
                 } as any;
 
@@ -2697,17 +2710,17 @@ export function AppContent() {
                   if (!imgUrl.startsWith('blob:')) {
                     const existing = (selectedProperty?.photos || []).find(p => p.url === imgUrl);
                     finalPhotos.push({
-                      id:       existing?.id || `photo-${Date.now()}-${i}`,
-                      url:      imgUrl,
+                      id: existing?.id || `photo-${Date.now()}-${i}`,
+                      url: imgUrl,
                       filename: existing?.filename || `property-photo-${i + 1}.jpg`,
-                      isCover:  finalPhotos.length === 0,
-                      room:     existing?.room ?? (finalPhotos.length === 0 ? 'Exterior' : undefined),
+                      isCover: finalPhotos.length === 0,
+                      room: existing?.room ?? (finalPhotos.length === 0 ? 'Exterior' : undefined),
                     });
                   } else if (uploadIdx < uploadedPhotos.length) {
                     finalPhotos.push({
                       ...uploadedPhotos[uploadIdx],
                       isCover: finalPhotos.length === 0,
-                      room:    finalPhotos.length === 0 ? 'Exterior' : uploadedPhotos[uploadIdx].room,
+                      room: finalPhotos.length === 0 ? 'Exterior' : uploadedPhotos[uploadIdx].room,
                     });
                     uploadIdx++;
                   }
@@ -2733,17 +2746,17 @@ export function AppContent() {
                   const originalProperty = await propertyService.getProperty(editingPropertyId);
                   const cleanUpdates = Object.fromEntries(
                     Object.entries({
-                      address:     newProperty.address,
-                      type:        newProperty.type,
-                      bedrooms:    newProperty.bedrooms,
-                      bathrooms:   (newProperty as any).bathrooms,
+                      address: newProperty.address,
+                      type: newProperty.type,
+                      bedrooms: newProperty.bedrooms,
+                      bathrooms: (newProperty as any).bathrooms,
                       squareFootage: (newProperty as any).squareFootage,
-                      rent:        newProperty.rent,
-                      amenities:   newProperty.amenities,
-                      notes:       newProperty.notes,
-                      status:      originalProperty?.status || preservedStatus,
-                      photos:      newProperty.photos,
-                      documents:   newProperty.documents,
+                      rent: newProperty.rent,
+                      amenities: newProperty.amenities,
+                      notes: newProperty.notes,
+                      status: originalProperty?.status || preservedStatus,
+                      photos: newProperty.photos,
+                      documents: newProperty.documents,
                     }).filter(([, v]) => v !== undefined)
                   ) as any;
 
@@ -2756,7 +2769,7 @@ export function AppContent() {
                     setSelectedProperty(enriched);
                     setProperties(prev => prev.map(p => p.id === editingPropertyId ? enriched : p));
                     const currentUserId = getCurrentUserId();
-                    if (currentUserId) alertService.generateAlerts(currentUserId).catch(() => {});
+                    if (currentUserId) alertService.generateAlerts(currentUserId).catch(() => { });
                   }
                   setIsEditing(false);
                   setEditingPropertyId(null);
@@ -2845,6 +2858,9 @@ export function AppContent() {
                 onBack={() => {
                   setClientDetailsTab('overview');
                   navigateToMainApp('clients');
+                }}
+                onMessage={() => {
+                  handleNavigation('messages');
                 }}
                 onEdit={(tenant) => {
                   setSelectedTenant(tenant);
@@ -3114,7 +3130,7 @@ export function AppContent() {
               // Also delete from landlord_documents if it exists there
               try {
                 await documentService.deleteDocument(documentId);
-              } catch {}
+              } catch { }
 
               await propertyService.updateProperty(propertyId, {
                 documents: updatedDocs.map(d => ({
@@ -3528,44 +3544,54 @@ export function AppContent() {
     );
   }
 
+  const effectiveUserId = resolveManagerId() || (userProfile as any)?.id || (hostUser as any)?.id || '';
   const authContextValue = {
-    user: userProfile,
+    user: userProfile
+      ? {
+          ...userProfile,
+          id: effectiveUserId,
+          uid: effectiveUserId,
+        }
+      : (hostUser ? { ...hostUser, id: hostUser.id || effectiveUserId } : null),
     isAuthenticated,
     isLoading: isAuthLoading,
-    login: () => {},
-    logout: () => {},
+    login: () => { },
+    logout: () => { },
   };
 
   return (
     <AuthContext.Provider value={authContextValue as any}>
-      <div className="min-h-screen bg-background">
-        <div
+      <MessagingProvider>
+        <LandlordMessagingPoller />
+        <div className="min-h-screen bg-background">
+          <div
             className={`transition-all duration-[4ms] ease-out ${isTransitioning
               ? 'opacity-0 transform scale-75'
               : 'opacity-100'
-            }`}
-        >
-          <Suspense fallback={<LazyFallback />}>
-            {renderScreen()}
-          </Suspense>
+              }`}
+          >
+            <Suspense fallback={<LazyFallback />}>
+              {renderScreen()}
+            </Suspense>
+          </div>
+          {showTenantPopup && (
+            <TenantSelectionPopup
+              existingTenants={tenants}
+              onClose={() => setShowTenantPopup(false)}
+              onSelectExisting={(tenantId) => {
+                setShowTenantPopup(false);
+                setPreviousScreen(currentScreen);
+                navigateToScreen('select-existing-tenant');
+              }}
+              onAddNew={() => {
+                setShowTenantPopup(false);
+                setPreviousScreen(currentScreen);
+                navigateToScreen('tenant-selection');
+              }}
+            />
+          )}
         </div>
-        {showTenantPopup && (
-          <TenantSelectionPopup
-            existingTenants={tenants}
-            onClose={() => setShowTenantPopup(false)}
-            onSelectExisting={(tenantId) => {
-              setShowTenantPopup(false);
-              setPreviousScreen(currentScreen);
-              navigateToScreen('select-existing-tenant');
-            }}
-            onAddNew={() => {
-              setShowTenantPopup(false);
-              setPreviousScreen(currentScreen);
-              navigateToScreen('tenant-selection');
-            }}
-          />
-        )}
-      </div>
+      </MessagingProvider>
     </AuthContext.Provider>
   );
 }

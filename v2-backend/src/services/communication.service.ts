@@ -176,31 +176,32 @@ export class CommunicationService {
     }
 
     try {
-      // Build cursor-paginated query — newest-first then reverse for display.
-      // Note: we intentionally do NOT filter by isDeleted here because:
-      // 1. Older messages don't have this field, so isDeleted==false would exclude them
-      // 2. Firestore requires a composite index for (conversationId + isDeleted + sentAt)
-      //    which may not exist in all environments. Filter client-side instead.
+      // Fetch newest-first with cursor pagination.
+      // We only need (conversationId) single-field index which always exists.
+      // orderBy sentAt desc lets us paginate backwards cheaply.
       let query: any = col
         .where('conversationId', '==', conversationId)
-        .limit(200); // Temporary fallback to avoid missing composite index error
+        .orderBy('sentAt', 'desc')
+        .limit(limit + 1); // fetch one extra to know if there are more
+
+      // Cursor: if `before` is provided, only fetch messages sent before that timestamp
+      if (before) {
+        query = query.startAfter(before);
+      }
 
       const snapshot = await query.get();
-      const hasMore = false; // Disable pagination while using fallback
       const docs = snapshot.docs;
-      
-      // Sort in memory instead
-      docs.sort((a: any, b: any) => {
-        const tA = new Date(a.data().sentAt).getTime();
-        const tB = new Date(b.data().sentAt).getTime();
-        return tB - tA; // desc
-      });
 
-      // Filter out soft-deleted messages in code (avoids composite index requirement)
-      const allMessages = docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      // The extra doc tells us whether there are older messages
+      const hasMore = docs.length > limit;
+      const pageDocs = hasMore ? docs.slice(0, limit) : docs;
+
+      // Map to message objects (desc order → reverse to chronological for display)
+      const allMessages = pageDocs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      // Filter soft-deleted in memory (avoids composite index on isDeleted)
       const messages = allMessages
         .filter((m: any) => m.isDeleted !== true)
-        .reverse(); // back to chronological order
+        .reverse(); // chronological order for rendering
 
       // ── Embed attachment objects to eliminate N+1 client-side fetches ──────
       // Instead of the client calling GET /attachments/:id once per attachment

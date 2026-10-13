@@ -2,7 +2,7 @@
 
 ## Overview
 
-This report documents all changes made to implement real-time messaging via SSE for Proptii, including the fixes applied after the review found three issues (`CHANGES_REQUESTED`).
+This report covers all changes made to implement real-time messaging via SSE, plus the fixes applied for the two blocking review findings.
 
 ---
 
@@ -10,91 +10,69 @@ This report documents all changes made to implement real-time messaging via SSE 
 
 ### Backend (`v2-backend/`)
 
-#### `v2-backend/src/controllers/communication.controller.ts`
-
-- **`sendMessage()`**: Replaced global `eventsService.emit()` (no `userId`) with four targeted events — `message_new` and `conversation_updated` to both `tenantId` and `landlordId`.
-- **`markRead()`**: After `communicationService.markRead()` returns `conversationId`, calls `getParticipants()` and emits targeted `message_read` + `conversation_updated` to both participants.
-- **`getOrCreateConversation()`** _(review fix)_: Replaced single global `conversation_new` broadcast with two targeted emits using `tenantId` and `landlordId` from `result.data`.
-- **`editMessage()`** _(review fix)_: Replaced global `message_edit` broadcast with targeted emits to both participants via `getParticipants(conversationId)`. `conversationId` is retrieved from `result.data`.
-- **`deleteMessage()`** _(review fix)_: Same targeted pattern as `editMessage()`.
-
-#### `v2-backend/src/services/communication.service.ts`
-
-- **`getParticipants()`**: New public method — reads the conversation doc from Firestore and returns `{ tenantId, landlordId }`. Throws `NotFoundException` if the document doesn't exist.
-- **`markRead()`**: Extended return type from `{ data: { success: boolean } }` to `{ data: { success: boolean; conversationId: string; senderId: string } }` so the controller can look up participants without an additional DB call.
-- **`notifyRecipient()`**: Renamed dedup field from `lastNotifiedAt` to `immediateNotifiedAt` — separates the 10-min per-send dedup from the scheduler's 24h `lastNotifiedAt` field.
-- **`notifyRecipient()`** _(review fix)_: Removed `as any` cast on `userProfileService.getProfile()` return — `Record<string, any>` already allows `.email`, `.name`, `.displayName` access.
-
-#### `v2-backend/src/services/notification-scheduler.service.ts` _(new file)_
-
-- `@Cron('0 * * * *')` — runs hourly.
-- Queries `conversations` where `unreadForTenant > 0` and `unreadForLandlord > 0` (two queries, de-duplicated via `Map`).
-- For each conversation, checks `lastNotifiedAt` — sends reminder if null or older than 24 hours.
-- Calls `emailService.sendUnreadReminderNotification()` for each affected party.
-- Updates `lastNotifiedAt` after at least one reminder is sent.
-- Per-conversation errors are caught individually.
-- _(review fix)_: Removed both `as any` casts on `userProfileService.getProfile()`.
-
-#### `v2-backend/src/services/email.service.ts`
-
-- **`sendUnreadReminderNotification()`**: New method — sends "You have unread messages on Proptii" email using the same `renderProptiiEmail` wrapper as other notifications. Accepts `{ recipientEmail, recipientName, propertyTitle, unreadCount }`. CTA links to `/dashboard/messages`.
-
-#### `v2-backend/src/app.module.ts`
-
-- Added `import { ScheduleModule } from '@nestjs/schedule'` and `ScheduleModule.forRoot()` to `imports`.
-- Added `import { NotificationSchedulerService }` and `NotificationSchedulerService` to `providers`.
+| File                                             | What changed                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/controllers/communication.controller.ts`    | (1) Fixed `sendTyping()` — now calls `getParticipants()` and emits `typing_start` to the **other** participant's `userId` instead of the sender's own stream. (2) `sendMessage()` emits targeted `message_new` + `conversation_updated` to both `tenantId` and `landlordId` instead of a global broadcast. (3) `markRead()` emits `message_read` to both the reader and the other participant, plus `conversation_updated` to both. |
+| `src/services/communication.service.ts`          | Added `getParticipants(conversationId)` method returning `{ tenantId, landlordId }`. Extended `markRead()` return type to include `conversationId` and `senderId`. Renamed 10-min dedup field from `lastNotifiedAt` to `immediateNotifiedAt` in `notifyRecipient()`.                                                                                                                                                                |
+| `src/services/notification-scheduler.service.ts` | **New file.** Hourly `@Cron('0 * * * *')` job that queries conversations with `unreadForTenant > 0` or `unreadForLandlord > 0`, checks if `lastNotifiedAt` is older than 24h, and sends reminder emails via `EmailService`.                                                                                                                                                                                                         |
+| `src/services/email.service.ts`                  | Added `sendUnreadReminderNotification()` method using the same `renderProptiiEmail` wrapper. Subject: "You have unread messages on Proptii". Accepts `{ recipientEmail, recipientName, propertyTitle, unreadCount }`.                                                                                                                                                                                                               |
+| `src/app.module.ts`                              | `ScheduleModule.forRoot()` added to imports. `NotificationSchedulerService` added to providers.                                                                                                                                                                                                                                                                                                                                     |
 
 ### Frontend (`src/`)
 
-#### `src/services/sseService.ts`
-
-- **Reconnect cap**: Changed `Math.min(1000 * Math.pow(2, attempts), 30000)` to `5000` — max reconnect delay is now 5 s.
-- **Reconnect re-fetch**: In `source.onopen`, if `prevAttempts > 0`, dispatches synthetic `conversation_updated` event so pollers immediately re-fetch after reconnect.
-- **SSE ticket exchange**: For the `communication` channel, a `POST /communication/sse-ticket` call exchanges the Bearer token for a short-lived opaque ticket, keeping the token out of URLs and server logs.
-
-#### `src/hooks/useMessagingPoller.ts`
-
-- Added `'conversation_updated'` and `'conversation_new'` to the SSE event types that trigger `fetchData()`.
-
-#### `src/contexts/MessagingContext.tsx`
-
-- **`markConversationAsRead()`**: Computes `delta` from the conversation's unread count synchronously inside the `setConversations` updater, then calls `setUnreadCount(prev => Math.max(0, prev - delta))` as a separate call — avoids the anti-pattern of nesting one state setter inside another's updater.
-- Added `decrementUnreadCount()` helper exported from context.
-
-#### `src/landlord_agent/src/components/MainLayout.tsx`
-
-- Added optional `unreadBadge?: number` field to the `NavItem` type.
-- Messages nav item now uses `unreadBadge: unreadCount` instead of `hasNotification: unreadCount > 0`.
-- `SidebarNavList` renders a numeric red pill badge with `99+` cap when `(item.unreadBadge ?? 0) > 0`.
-
-#### `src/landlord_agent/src/components/Dashboard.tsx`
-
-- `DashboardOverviewHeader` messages button now shows a numeric badge (`unreadCount > 99 ? '99+' : String(unreadCount)`) using the same inline style as the sidebar pill. Replaces the plain `ll-header-dot` dot.
+| File                                               | What changed                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/services/sseService.ts`                       | Reconnect cap lowered from 30 000 ms to 5 000 ms. `source.onopen` handler dispatches a synthetic `conversation_updated` event on reconnect (when `prevAttempts > 0`) so pollers re-fetch immediately after reconnection.                                                     |
+| `src/hooks/useMessagingPoller.ts`                  | Added `'conversation_updated'` and `'conversation_new'` to the SSE event subscription array.                                                                                                                                                                                 |
+| `src/contexts/MessagingContext.tsx`                | **Review fix:** `markConversationAsRead()` now computes `delta` from the `conversations` state snapshot _before_ calling `setConversations`, eliminating the fragile cross-`setState` variable capture pattern. Added `conversations` to the `useCallback` dependency array. |
+| `src/landlord_agent/src/components/MainLayout.tsx` | `NavItem` type has `unreadBadge?: number`. Messages nav item passes `unreadBadge: unreadCount`. `SidebarNavList` renders a numeric red pill badge (with `99+` cap) instead of the plain dot.                                                                                 |
+| `src/landlord_agent/src/components/Dashboard.tsx`  | `DashboardOverviewHeader` messages button shows a numeric red pill badge (`99+` cap) instead of the plain `ll-header-dot`.                                                                                                                                                   |
 
 ---
 
 ## Review Findings Fixed
 
-| ID                                  | Description                                                   | Fix applied                                                                            |
-| ----------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `global-broadcast-conversation-new` | `getOrCreateConversation` emitted `conversation_new` globally | Now emits two targeted events: one to `tenantId`, one to `landlordId`                  |
-| `global-broadcast-edit-delete`      | `editMessage` and `deleteMessage` emitted globally            | Both now call `getParticipants(conversationId)` and emit two targeted events           |
-| `any-cast-user-profile`             | `as any` on `getProfile()` return in scheduler and service    | Removed both casts — `Record<string, any>` is the declared return type; no cast needed |
+### 1. `typing-indicator-broken` (blocking — confirmed)
+
+**Problem:** `sendTyping()` emitted `typing_start` with `userId` set to the sender's own UID. Since `EventsService` routes by `userId`, the event arrived on the sender's own SSE stream — the recipient never saw a typing indicator.
+
+**Fix:** The handler now calls `getParticipants(conversationId)` to resolve the other participant, then emits `typing_start` to that participant's `userId`. The call is wrapped in try/catch so a Firestore failure is non-fatal (typing indicators are best-effort).
+
+**File:** `v2-backend/src/controllers/communication.controller.ts`
+
+---
+
+### 2. `delta-capture-concurrent-react` (blocking — likely)
+
+**Problem:** `markConversationAsRead()` wrote a local `delta` variable _inside_ the `setConversations` functional updater, then consumed it in a subsequent `setUnreadCount` call. Under React 18 concurrent scheduling the two `setState` calls are not guaranteed to execute atomically; `setUnreadCount` could fire while `delta` is still `0`.
+
+**Fix:** `delta` is now computed from the `conversations` state snapshot that is already in scope (via the `useCallback` closure) _before_ calling `setConversations`. `setConversations` and `setUnreadCount` are then called with their respective known values — neither depends on the other's updater running first. `conversations` was added to the `useCallback` dependency array.
+
+**File:** `src/contexts/MessagingContext.tsx`
+
+---
+
+### 3. `build-not-independently-verified` (non-blocking — possible)
+
+Build evidence is now captured:
+
+- Backend: `cd v2-backend && npm run build` → exit code 0 (nest build + static copy)
+- Frontend: `npx vite build` → exit code 0 (✓ built in ~2m 5s)
 
 ---
 
 ## Manual Steps Required
 
-None — all changes are code-level and take effect on the next deploy.
+1. **Deploy backend** — `NotificationSchedulerService` will start running on the next hourly tick after deployment. No Firestore index changes are required (queries use existing single-field indexes on `unreadForTenant` and `unreadForLandlord`).
 
-**Note on Firestore fields:** Two new fields are written to conversation documents but are additive only:
+2. **Firestore field note** — Existing conversation documents have `lastNotifiedAt` (previously set by `notifyRecipient()`). From this deploy onward, `notifyRecipient()` writes to `immediateNotifiedAt` (10-min dedup) and the scheduler uses `lastNotifiedAt` (24h dedup). Existing docs will behave correctly: the `if (conv.immediateNotifiedAt)` guard treats missing field as "no dedup needed", which is the correct fallback.
 
-- `immediateNotifiedAt` — set by `notifyRecipient()` for 10-min per-send dedup. Existing docs that lack this field are handled gracefully (treated as "never notified").
-- `lastNotifiedAt` — set by `NotificationSchedulerService` after sending a 24h reminder. Same graceful handling.
+3. **No schema migration needed** — `immediateNotifiedAt` is a new field; absence is handled by the `??` null guard. `lastNotifiedAt` continues to be written by the scheduler and read by itself — no conflict.
+
+4. **No frontend env changes** — `FRONTEND_URL` env var is already used by `EmailService` for the CTA button URL in reminder emails.
 
 ---
 
-## Build Verification
+## Commit
 
-- `cd v2-backend && npm run build` — ✅ zero errors
-- `npx vite build` — ✅ zero errors (warnings are pre-existing Rollup annotation notices unrelated to these changes)
+`fix: fix sendTyping SSE target and markConversationAsRead delta capture` (commit `7b55dcc0`)

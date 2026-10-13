@@ -416,9 +416,11 @@
 
 .ll-msg-feed {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: #fafbfc;
-  padding: 16px 0;
 }
 
 .ll-msg-empty {

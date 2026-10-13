@@ -1,0 +1,5 @@
+{
+  "verdict": "APPROVED",
+  "findings": [],
+  "reviewDoc": "Reviewed the messaging clean fix against all 8 acceptance criteria from FEAT-001. (1) useMessagingPoller.ts SSE subscription confirmed as only ['conversation_new'] on line 77 and separate 'presence_update' on line 81 — message_new, message_read, and conversation_updated appear only in comments, not in any sseService.on() call. (2) TenantMessages.tsx passes scrollContainerRef={scrollContainerRef} to <MessageThread> on line 432. (3) TenantInbox.tsx passes scrollContainerRef={scrollContainerRef} to <MessageThread> on line 532. (4) The optimistic-clear timeout in TenantInbox is 3000ms (line 156). (5) MessageThread.tsx has exactly 4 sseService.on calls (message_new, typing_start, message_edit, message_delete) — unchanged. (6) No sseService.on calls in TenantMessages.tsx or TenantInbox.tsx (grep returned exit code 1 / no matches). (7) Both backend and frontend builds reported as passing in FEAT-001 findings. All acceptance criteria satisfied; no blocking concerns."
+}

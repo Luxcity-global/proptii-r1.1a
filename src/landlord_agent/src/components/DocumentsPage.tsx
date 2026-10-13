@@ -41,7 +41,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useIsMobile } from './ui/use-mobile';
 import { Property, PropertyDocument, UserProfile } from '../App';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
@@ -143,7 +142,7 @@ function computeDocumentStatus(expiry?: string | null): PropertyDocument['status
   return 'valid';
 }
 
-const CATEGORY_TYPES: Record<Exclude<CategoryFilter, 'all'>, PropertyDocument['type'][]> = {
+const CATEGORY_TYPES: Record<Exclude<CategoryFilter, 'all' | 'unassigned'>, PropertyDocument['type'][]> = {
   compliance: ['epc', 'gas-cert'],
   contracts: ['tenancy-agreement'],
   insurance: ['insurance'],
@@ -280,7 +279,9 @@ export function DocumentsPage({
   const [typeFilter, setTypeFilter] = useState<CategoryFilter>('all');
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
   const [tenantFilter, setTenantFilter] = useState<string>('all');
-  const [viewScope, setViewScope] = useState<ViewScope>('property');
+  const [viewScope, setViewScope] = useState<ViewScope>(
+    (properties && properties.length > 0) ? 'property' : 'all'
+  );
   const [displayStyle, setDisplayStyle] = useState<DisplayStyle>('grid');
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
@@ -710,30 +711,6 @@ export function DocumentsPage({
     return <LandlordPageEmptyShell page="documents" variant="guest" />;
   }
 
-  // If brand-new user with no properties AND no unassigned docs, show the
-  // "Add your first property" shell — but still allow vault upload via the button.
-  if (isNewPortfolioUser(properties) && unassignedDocuments.length === 0) {
-    return (
-      <LandlordPageEmptyShell
-        page="documents"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      >
-        {onUploadToVault && (
-          <button
-            type="button"
-            className="ll-docs-btn-attach"
-            style={{ marginTop: 12 }}
-            onClick={() => openAttachFlow()}
-          >
-            <Upload size={15} />
-            Upload document without a property
-          </button>
-        )}
-      </LandlordPageEmptyShell>
-    );
-  }
 
   const effectiveDisplay: DisplayStyle = isMobile && viewScope === 'all' ? 'grid' : displayStyle;
   const vaultEmpty = allDocuments.length === 0 && !hasActiveFilters;
@@ -1812,8 +1789,7 @@ export function DocumentsPage({
             </div>
             <h3>No Documents in Vault Yet</h3>
             <p>
-              Start attaching compliance certificates (Gas Safety, EPC, EICR) to properties to build
-              your audit-ready repository.
+              Upload compliance certificates, tenancy agreements, and documents to your vault anytime. You can link them to properties now or later.
             </p>
             <div className="ll-docs-empty-actions">
               <button
@@ -1861,14 +1837,18 @@ export function DocumentsPage({
                   </>
                 ) : (
                   <>
-                    <div className="ll-docs-section-head">
-                      <h2>Properties & Attached Document Packs</h2>
-                      <span>
-                        Showing {filteredProperties.length} propert
-                        {filteredProperties.length === 1 ? 'y' : 'ies'}
-                      </span>
-                    </div>
-                    {effectiveDisplay === 'grid' ? renderPropertyCards() : renderPropertyTable()}
+                    {filteredProperties.length > 0 && (
+                      <>
+                        <div className="ll-docs-section-head">
+                          <h2>Properties & Attached Document Packs</h2>
+                          <span>
+                            Showing {filteredProperties.length} propert
+                            {filteredProperties.length === 1 ? 'y' : 'ies'}
+                          </span>
+                        </div>
+                        {effectiveDisplay === 'grid' ? renderPropertyCards() : renderPropertyTable()}
+                      </>
+                    )}
 
                     {hasMatchingUnassigned && (
                       <div style={{ marginTop: 32 }}>
@@ -2035,13 +2015,18 @@ export function DocumentsPage({
                       }));
                     }}
                   >
-                    <option value="">Don't assign to a property yet</option>
+                    <option value="">Don't assign to a property yet (Save to Vault)</option>
                     {(properties || []).map((property) => (
                       <option key={property.id} value={property.id}>
                         {property.address}
                       </option>
                     ))}
                   </select>
+                  {(!properties || properties.length === 0) && (
+                    <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>
+                      No properties added yet. This document will be saved to your vault so you can assign it later.
+                    </p>
+                  )}
                 </label>
 
                 {attachForm.propertyId && (
@@ -2571,20 +2556,39 @@ export function DocumentsPage({
                 >
                   Select Target Property
                 </label>
-                <select
-                  className="ll-docs-select"
-                  style={{ width: '100%', height: 40 }}
-                  value={assignTargetPropertyId}
-                  onChange={(e) => setAssignTargetPropertyId(e.target.value)}
-                  required
-                >
-                  <option value="" disabled>Choose property...</option>
-                  {properties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.address}
-                    </option>
-                  ))}
-                </select>
+                {(properties && properties.length > 0) ? (
+                  <select
+                    className="ll-docs-select"
+                    style={{ width: '100%', height: 40 }}
+                    value={assignTargetPropertyId}
+                    onChange={(e) => setAssignTargetPropertyId(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>Choose property...</option>
+                    {properties.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.address}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ padding: '12px 14px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: 13, color: '#64748b' }}>
+                    <p style={{ margin: '0 0 8px' }}>You haven&apos;t added any properties yet. Add a property to assign this document to it.</p>
+                    {onAddProperty && (
+                      <button
+                        type="button"
+                        className="ll-docs-btn-attach"
+                        style={{ fontSize: 12, padding: '4px 10px', height: 'auto' }}
+                        onClick={() => {
+                          closeAssignModal();
+                          onAddProperty();
+                        }}
+                      >
+                        + Add Property
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div
@@ -2606,7 +2610,7 @@ export function DocumentsPage({
                 <button
                   type="submit"
                   className="ll-docs-btn-attach"
-                  disabled={isAssigning || !assignTargetPropertyId}
+                  disabled={isAssigning || !assignTargetPropertyId || (properties || []).length === 0}
                 >
                   {isAssigning ? 'Assigning...' : 'Confirm Assignment'}
                 </button>

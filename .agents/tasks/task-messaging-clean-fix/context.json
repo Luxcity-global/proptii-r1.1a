@@ -1,0 +1,23 @@
+{
+  "project_type": "React/Vite SPA (frontend) + NestJS backend (v2-backend), TypeScript throughout",
+  "language": "TypeScript / TSX",
+  "build_system": "Vite for frontend (vite.config.ts at root), NestJS CLI for backend (v2-backend/). Frontend full build: `npm run build` (runs build:landlord, then vite build, then copy-spa-fallbacks, then validate-build). For just the SPA: `npx vite build`.",
+  "test_framework": "vitest (backend: `nest build && vitest run`). No frontend unit test suite found.",
+  "build_command": "cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npx vite build",
+  "test_command": "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build",
+  "verification_instructions": "1. Run `cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build` — must exit 0. 2. Run `cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npx vite build` — must exit 0. Both must pass before committing.",
+  "snapshot_or_generated_files": null,
+  "environment_constraints": "Do NOT restart any dev servers. Do not touch sseService.ts (wire format confirmed correct). Backend files (events.service.ts, communication.controller.ts, communication.service.ts) are NOT to be modified.",
+  "contribution_requirements": "All changes must build cleanly. Commit on the current branch; never push.",
+  "key_patterns": "SSE events flow: backend EventsService.emit() → sseService.ts addEventListener() → sseService.dispatch() → registered listeners. MessagingContext holds conversation list + unread count + online users. useMessagingPoller runs every 15s + on SSE triggers. MessageThread owns its own message list state, appends via SSE directly. Optimistic messages are rendered in a sibling div OUTSIDE MessageThread in both TenantMessages and TenantInbox.",
+  "relevant_files": [
+    "src/hooks/useMessagingPoller.ts",
+    "src/pages/dashboard/TenantMessages.tsx",
+    "src/landlord_agent/src/components/TenantInbox.tsx",
+    "src/components/messaging/MessageThread.tsx",
+    "src/contexts/MessagingContext.tsx",
+    "src/services/communicationService.ts",
+    "src/services/sseService.ts"
+  ],
+  "directory_structure": "src/ — tenant-facing React app. src/landlord_agent/src/ — landlord-facing React app (shared components via relative imports going up to src/). v2-backend/src/ — NestJS backend. .agents/tasks/ — planning and review artifacts."
+}
