@@ -200,6 +200,8 @@ export interface MessageThreadHandle {
 // Component
 // ---------------------------------------------------------------------------
 
+const PAGE_SIZE = 30;
+
 const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
     ({ conversationId, currentUserId, scrollContainerRef, onScrollRequest, onRetryMessage }, ref) => {
     const [messages, setMessages] = useState<ThreadMessage[]>([]);
@@ -214,10 +216,15 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
     const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
     const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
+    const [newIncomingCount, setNewIncomingCount] = useState(0);
 
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
     const didInitialScroll = useRef(false);
+    // Tracks the sentAt of the oldest loaded message — used as a cursor for earlier-page fetches
+    const oldestCursorRef = useRef<string | null>(null);
+    // Tracks if viewport is currently near bottom to decide whether to auto-scroll on new incoming message
+    const isNearBottomRef = useRef(true);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
         if (bottomRef.current) {
@@ -234,7 +241,12 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
 
         const handleScroll = () => {
             const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-            setShowScrollBottom(distanceFromBottom > 160);
+            const isNear = distanceFromBottom <= 140;
+            isNearBottomRef.current = isNear;
+            setShowScrollBottom(!isNear);
+            if (isNear) {
+                setNewIncomingCount(0);
+            }
         };
 
         container.addEventListener('scroll', handleScroll, { passive: true });
@@ -246,7 +258,7 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         setLoading(true);
         setError(null);
         try {
-            // Call getMessages(conversationId) directly to match unit test expectations
+            // Call getMessages(conversationId) directly to match unit test expectations & get initial page
             const raw = await communicationService.getMessages(conversationId);
             const fetched: Message[] = (raw as any)?.messages ?? (Array.isArray(raw) ? raw : (raw as any)?.data ?? []);
             const more: boolean = (raw as any)?.hasMore ?? false;
@@ -262,6 +274,8 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
                 return [...sorted, ...filteredPending];
             });
 
+            // Store cursor pointing at the oldest message in this page
+            oldestCursorRef.current = sorted.length > 0 ? sorted[0].sentAt : null;
             setHasMore(more);
 
             // Mark unread from other senders
@@ -345,7 +359,10 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
     }), [fetchAndMarkRead, scrollToBottom]);
 
     const loadEarlier = useCallback(async () => {
-        if (!conversationId || !messages.length || loadingMore) return;
+        if (!conversationId || loadingMore) return;
+        // Use the stored cursor; fall back to the oldest rendered message
+        const cursor = oldestCursorRef.current ?? messages[0]?.sentAt;
+        if (!cursor) return;
         setLoadingMore(true);
 
         const container = scrollContainerRef?.current;
@@ -353,14 +370,20 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         const scrollTopBefore = container?.scrollTop ?? 0;
 
         try {
-            const oldest = messages[0]?.sentAt;
-            const raw = await communicationService.getMessages(conversationId, oldest, 30);
+            const raw = await communicationService.getMessages(conversationId, cursor, PAGE_SIZE);
             const older: Message[] = (raw as any)?.messages ?? (Array.isArray(raw) ? raw : (raw as any)?.data ?? []);
             const more: boolean = (raw as any)?.hasMore ?? false;
             const sorted: ThreadMessage[] = [...older].sort(
                 (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
             );
-            setMessages(prev => [...sorted.filter(m => !prev.some(p => p.id === m.id)), ...prev]);
+            setMessages(prev => {
+                const merged = [...sorted.filter(m => !prev.some(p => p.id === m.id)), ...prev];
+                // Update cursor to the oldest message now in view
+                if (sorted.length > 0) {
+                    oldestCursorRef.current = sorted[0].sentAt;
+                }
+                return merged;
+            });
             setHasMore(more);
 
             requestAnimationFrame(() => {
@@ -377,6 +400,32 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
     useEffect(() => {
         void fetchAndMarkRead();
     }, [fetchAndMarkRead]);
+
+    const syncLatestSilent = useCallback(async () => {
+        if (!conversationId) return;
+        try {
+            const raw = await communicationService.getMessages(conversationId);
+            const fetched: Message[] = (raw as any)?.messages ?? (Array.isArray(raw) ? raw : (raw as any)?.data ?? []);
+            if (!fetched.length) return;
+
+            setMessages((prev) => {
+                const map = new Map(prev.map(m => [m.id, m]));
+                for (const msg of fetched) {
+                    const existing = map.get(msg.id);
+                    if (!existing || existing.isPending) {
+                        map.set(msg.id, { ...msg, isPending: false });
+                    } else {
+                        map.set(msg.id, { ...existing, ...msg, isPending: false });
+                    }
+                }
+                return Array.from(map.values()).sort(
+                    (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
+                );
+            });
+        } catch (_err) {
+            // silent catchup
+        }
+    }, [conversationId]);
 
     // ── Real-Time SSE Listeners ──────────────────────────────────────────────
     useEffect(() => {
@@ -400,19 +449,28 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
                     m.senderId === msg.senderId &&
                     m.body === msg.body
                 );
+                let next: ThreadMessage[];
                 if (pendingIdx !== -1) {
-                    const next = [...prev];
+                    next = [...prev];
                     next[pendingIdx] = { ...msg, isPending: false };
-                    return next;
+                } else {
+                    next = [...prev, msg];
                 }
-                return [...prev, msg];
+                return next.sort(
+                    (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
+                );
             });
 
-            requestAnimationFrame(() => scrollToBottom('smooth'));
-
-            // Auto-mark as read if message is received from other participant
-            if (msg.senderId !== currentUserId) {
-                communicationService.markRead(msg.id, conversationId).catch(() => {});
+            const isOwn = msg.senderId === currentUserId;
+            if (isOwn || isNearBottomRef.current) {
+                requestAnimationFrame(() => scrollToBottom('smooth'));
+                // Auto-mark as read if message is received from other participant
+                if (!isOwn) {
+                    communicationService.markRead(msg.id, conversationId).catch(() => {});
+                }
+            } else {
+                // User is scrolled up reading earlier messages — do not forcefully yank scroll
+                setNewIncomingCount((c) => c + 1);
             }
         });
 
@@ -463,15 +521,33 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
             ));
         });
 
+        // 6. Reconnection catchup
+        const unsubscribeReconnect = sseService.on('conversation_updated', (event) => {
+            const d = event.data as any;
+            if (d?.reconnected) {
+                void syncLatestSilent();
+            }
+        });
+
+        // 7. Tab visibility catchup
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                void syncLatestSilent();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         return () => {
             unsubscribeNew();
             unsubscribeRead();
             unsubscribeTyping();
             unsubscribeEdit();
             unsubscribeDelete();
+            unsubscribeReconnect();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         };
-    }, [conversationId, currentUserId, scrollToBottom]);
+    }, [conversationId, currentUserId, scrollToBottom, syncLatestSilent]);
 
     // ── Message Actions ──────────────────────────────────────────────────────
     const startEditing = (messageId: string, currentBody: string) => {
@@ -529,27 +605,48 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
                 boxSizing: 'border-box',
             }}
         >
-            {/* Load earlier messages */}
+            {/* Load earlier messages — paginated */}
             {hasMore && (
-                <div style={{ textAlign: 'center', paddingBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 12px' }}>
                     <button
                         type="button"
                         onClick={loadEarlier}
                         disabled={loadingMore}
                         style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
                             fontSize: '0.75rem',
                             fontWeight: 600,
                             color: '#136c9e',
-                            background: '#eaf3f8',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: 20,
-                            padding: '6px 16px',
+                            background: 'rgba(19,108,158,0.08)',
+                            border: '1px solid rgba(19,108,158,0.22)',
+                            borderRadius: '999px',
+                            padding: '6px 18px',
                             cursor: loadingMore ? 'default' : 'pointer',
-                            opacity: loadingMore ? 0.6 : 1,
-                            transition: 'all 0.15s ease',
+                            opacity: loadingMore ? 0.65 : 1,
+                            transition: 'background 0.15s ease, opacity 0.15s ease',
+                            letterSpacing: '0.01em',
                         }}
+                        onMouseEnter={e => { if (!loadingMore) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(19,108,158,0.14)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(19,108,158,0.08)'; }}
                     >
-                        {loadingMore ? 'Loading earlier…' : '↑ Load earlier messages'}
+                        {loadingMore ? (
+                            <>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#136c9e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 0.75s linear infinite' }}>
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                                </svg>
+                                Loading earlier…
+                            </>
+                        ) : (
+                            <>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#136c9e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="18 15 12 9 6 15" />
+                                </svg>
+                                View earlier messages
+                            </>
+                        )}
                     </button>
                 </div>
             )}
@@ -1000,28 +1097,42 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
             {showScrollBottom && (
                 <button
                     type="button"
-                    onClick={() => scrollToBottom('smooth')}
+                    onClick={() => {
+                        scrollToBottom('smooth');
+                        setNewIncomingCount(0);
+                        const unread = messages.filter(m => m.readAt === null && m.senderId !== currentUserId);
+                        if (unread.length > 0) {
+                            unread.forEach(m => communicationService.markRead(m.id, conversationId).catch(() => {}));
+                        }
+                    }}
                     aria-label="Scroll to bottom"
                     style={{
                         position: 'sticky',
                         bottom: '12px',
                         marginLeft: 'auto',
-                        width: '36px',
                         height: '36px',
-                        borderRadius: '50%',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        borderRadius: newIncomingCount > 0 ? '18px' : '50%',
+                        padding: newIncomingCount > 0 ? '0 12px 0 10px' : '0',
+                        width: newIncomingCount > 0 ? 'auto' : '36px',
+                        backgroundColor: newIncomingCount > 0 ? '#136c9e' : '#ffffff',
+                        border: newIncomingCount > 0 ? 'none' : '1px solid #e2e8f0',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        gap: '6px',
                         cursor: 'pointer',
-                        color: '#136c9e',
+                        color: newIncomingCount > 0 ? '#ffffff' : '#136c9e',
                         zIndex: 15,
-                        transition: 'transform 0.15s ease',
+                        transition: 'all 0.2s ease',
                     }}
                 >
                     <ChevronDown size={18} />
+                    {newIncomingCount > 0 && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                            {newIncomingCount} new {newIncomingCount === 1 ? 'message' : 'messages'}
+                        </span>
+                    )}
                 </button>
             )}
 

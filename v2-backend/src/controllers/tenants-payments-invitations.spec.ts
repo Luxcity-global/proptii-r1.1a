@@ -97,21 +97,118 @@ describe('Section 4, 5 & 6: Tenants, Payments & Tenant Invitations Endpoints', (
       controller = new TenantInvitationsController();
     });
 
-    it('[POST /tenant-invitations] creates and records a tenant invitation in Firestore', async () => {
-      const req = { user: { uid: 'landlord-1', email: 'll@proptii.co' } };
-      const body = { tenantEmail: 'invited@tenant.com', propertyId: 'prop-1' };
+    it('[POST /tenant-invitations] creates and records a tenant invitation in Firestore with a token', async () => {
+      const req = { user: { uid: 'landlord-1', email: 'll@proptii.co', name: 'John Landlord' } };
+      const body = { tenantEmail: 'invited@tenant.com', propertyId: 'prop-1', propertyAddress: '10 High St' };
 
       const res = await controller.createInvitation(req, body);
       expect(res.success).toBe(true);
       expect(res.id).toMatch(/^inv_/);
+      expect(res.token).toBeDefined();
+      expect(typeof res.token).toBe('string');
       expect(mockSet).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantEmail: 'invited@tenant.com',
           propertyId: 'prop-1',
+          propertyAddress: '10 High St',
           landlordId: 'landlord-1',
           landlordEmail: 'll@proptii.co',
+          landlordName: 'John Landlord',
           status: 'pending',
+          token: expect.any(String),
         }),
+      );
+    });
+
+    it('[GET /tenant-invitations/validate] validates token successfully', async () => {
+      mockGet.mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          {
+            id: 'inv_123',
+            data: () => ({
+              token: 'valid_tok_123',
+              status: 'pending',
+              propertyId: 'prop-1',
+              propertyAddress: '10 High St',
+              landlordName: 'John',
+              landlordEmail: 'john@test.com',
+              tenantEmail: 'tenant@test.com',
+              expiresAt: new Date(Date.now() + 86400000).toISOString(),
+            }),
+          },
+        ],
+      });
+
+      const res = await controller.validateToken('valid_tok_123');
+      expect(res.valid).toBe(true);
+      expect(res.invitation?.propertyAddress).toBe('10 High St');
+      expect(res.invitation?.landlordName).toBe('John');
+    });
+
+    it('[GET /tenant-invitations/validate] rejects missing or expired token', async () => {
+      const resMissing = await controller.validateToken();
+      expect(resMissing.valid).toBe(false);
+      expect(resMissing.reason).toBe('MISSING_TOKEN');
+
+      mockGet.mockResolvedValueOnce({ empty: true, docs: [] });
+      const resNotFound = await controller.validateToken('non_existent');
+      expect(resNotFound.valid).toBe(false);
+      expect(resNotFound.reason).toBe('NOT_FOUND');
+
+      mockGet.mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          {
+            id: 'inv_123',
+            data: () => ({
+              token: 'expired_tok',
+              status: 'pending',
+              expiresAt: new Date(Date.now() - 10000).toISOString(),
+            }),
+          },
+        ],
+      });
+      const resExpired = await controller.validateToken('expired_tok');
+      expect(resExpired.valid).toBe(false);
+      expect(resExpired.reason).toBe('EXPIRED');
+    });
+
+    it('[POST /tenant-invitations/claim] successfully claims invitation and links account', async () => {
+      mockGet.mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          {
+            id: 'inv_123',
+            data: () => ({
+              token: 'claim_tok',
+              status: 'pending',
+              propertyId: 'prop-1',
+              propertyAddress: '10 High St',
+              landlordId: 'll-1',
+              tenantEmail: 'tenant@test.com',
+              expiresAt: new Date(Date.now() + 86400000).toISOString(),
+            }),
+          },
+        ],
+      });
+
+      // Second get for pending tenant check: empty
+      mockGet.mockResolvedValueOnce({ empty: true, docs: [] });
+      // Third get for conversation check: empty
+      mockGet.mockResolvedValueOnce({ empty: true, docs: [] });
+
+      const req = { user: { uid: 'tenant-uid-1', email: 'tenant@test.com', displayName: 'Jane Tenant' } };
+      const res = await controller.claimInvitation(req, { token: 'claim_tok' });
+
+      expect(res.success).toBe(true);
+      expect(res.propertyId).toBe('prop-1');
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'accepted',
+          acceptedByUid: 'tenant-uid-1',
+        }),
+        { merge: true },
       );
     });
 

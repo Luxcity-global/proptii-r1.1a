@@ -47,6 +47,7 @@ const Pricing             = lazy(() => import('./pages/pricing'));
 const SignupModalPage     = lazy(() => import('./pages/signup'));
 const CreateAccountPage   = lazy(() => import('./pages/signup/create-account'));
 const SignupWelcomePage   = lazy(() => import('./pages/signup/welcome'));
+const TenantInvitePage    = lazy(() => import('./pages/TenantInvitePage'));
 const PlanSelected        = lazy(() => import('./pages/pricing/PlanSelected'));
 const PayNowPage          = lazy(() => import('./pages/billing/pay-now'));
 const BillingConfirmedPage = lazy(() => import('./pages/billing/confirmed'));
@@ -154,6 +155,7 @@ export const App: React.FC = () => {
                 <Route path="/referencing/view/:viewToken" element={<ReferencingView />} />
                 <Route path="/view-passport" element={<ReferencingView />} />
                 <Route path="/claim-referencing" element={<ClaimReferencing />} />
+                <Route path="/invite/tenant" element={<TenantInvitePage />} />
                 <Route path="/guarantor-reference" element={<GuarantorReferencePage />} />
                 <Route path="/guarantor-form" element={<GuarantorReferencePage />} />
                 <Route path="/signup" element={<SignupModalPage />} />

@@ -13,25 +13,87 @@ export interface PendingInvitation {
   status: 'pending' | 'accepted' | 'expired';
 }
 
+export interface ValidatedInvitation {
+  id: string;
+  token: string;
+  propertyId: string;
+  propertyAddress: string;
+  landlordName?: string;
+  landlordEmail?: string;
+  tenantEmail?: string;
+  tenantName?: string;
+  rentAmount?: number | null;
+  leaseStart?: string | null;
+  customMessage?: string | null;
+  expiresAt?: string;
+}
+
+export interface ValidateTokenResponse {
+  valid: boolean;
+  reason?: string;
+  message?: string;
+  invitation?: ValidatedInvitation;
+}
+
+export interface ClaimInvitationResponse {
+  success: boolean;
+  message?: string;
+  propertyId?: string;
+  propertyAddress?: string;
+  tenantId?: string;
+  conversationId?: string;
+}
+
 class InvitationService {
   /**
    * Record a sent tenant invitation so it can be tracked in the dashboard.
-   * Uses PUT /tenants/invitations on the backend which writes to Firestore.
+   * Generates and returns a secure invitation token and document ID.
    */
   async createInvitation(
     data: Omit<PendingInvitation, 'id' | 'sentAt' | 'status'>
-  ): Promise<string> {
+  ): Promise<{ id: string; token: string }> {
     try {
-      const response = await apiService.post('/tenant-invitations', {
+      const response: any = await apiService.post('/tenant-invitations', {
         ...data,
         sentAt: new Date().toISOString(),
         status: 'pending',
       });
-      return response.id as string;
+      const id = response?.id || (response as any)?.data?.id || '';
+      const token = response?.token || (response as any)?.data?.token || id;
+      return { id, token };
     } catch (error) {
-      // Non-fatal — invitation tracking is best-effort
       console.error('[InvitationService] Failed to record invitation:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Public validation of an invitation token.
+   * GET /api/tenant-invitations/validate?token=...
+   */
+  async validateInvitation(token: string): Promise<ValidateTokenResponse> {
+    try {
+      const response: any = await apiService.get(`/tenant-invitations/validate?token=${encodeURIComponent(token)}`);
+      return (response as any)?.data ?? response;
+    } catch (error: any) {
+      return {
+        valid: false,
+        reason: 'ERROR',
+        message: error?.response?.data?.message || error?.message || 'Failed to validate invitation.',
+      };
+    }
+  }
+
+  /**
+   * Authenticated claim of an invitation token by the logged in tenant.
+   * POST /api/tenant-invitations/claim
+   */
+  async claimInvitation(token: string): Promise<ClaimInvitationResponse> {
+    try {
+      const response: any = await apiService.post('/tenant-invitations/claim', { token });
+      return (response as any)?.data ?? response;
+    } catch (error: any) {
+      throw new Error(error?.response?.data?.message || error?.message || 'Failed to claim invitation.');
     }
   }
 
@@ -41,7 +103,7 @@ class InvitationService {
       const list: any[] = response.invitations || [];
       return list.map((item) => ({
         id: item.id,
-        email: item.email,
+        email: item.email || item.tenantEmail,
         propertyId: item.propertyId,
         propertyAddress: item.propertyAddress,
         landlordId: item.landlordId,
@@ -63,3 +125,4 @@ class InvitationService {
 }
 
 export const invitationService = new InvitationService();
+

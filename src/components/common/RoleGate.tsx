@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
  * Exempt paths: /select-role, /claim, /login, /register, /unauthorized
  */
 
-const EXEMPT_PATHS = ['/select-role', '/claim', '/login', '/register', '/unauthorized'];
+const EXEMPT_PATHS = ['/select-role', '/claim', '/login', '/register', '/unauthorized', '/invite/tenant', '/invite'];
 const SETTLE_DELAY_MS = 400;
 
 function isAdminDashboardPath(pathname: string) {

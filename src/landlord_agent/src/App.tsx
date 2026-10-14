@@ -3589,14 +3589,14 @@ export function AppContent() {
             landlordId={getCurrentUserId() || undefined}
             prefillEmail={prefillEmailRef.current}
             onTenantCreated={(tenant) => {
-              // Pending tenant shows in Clients list immediately without a full reload
-              // useTenants in ClientsPage will re-fetch when the tab is next visited
+              invalidateTenants();
             }}
             onBack={() => {
               prefillEmailRef.current = undefined;
               navigateToScreen('tenant-selection');
             }}
             onSuccess={() => {
+              invalidateTenants();
               prefillEmailRef.current = undefined;
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);

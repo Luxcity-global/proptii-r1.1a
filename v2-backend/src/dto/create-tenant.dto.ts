@@ -10,11 +10,11 @@ export class EmergencyContactDto {
 export class CreateTenantDto {
   @ApiProperty() @IsString() @IsNotEmpty() name: string;
   @ApiProperty() @IsEmail() email: string;
-  @ApiProperty() @IsString() @IsNotEmpty() phone: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
   @ApiProperty() @IsString() @IsNotEmpty() propertyId: string;
-  @ApiProperty() @IsNumber() @Min(0) rentAmount: number;
-  @ApiProperty() @IsString() @IsNotEmpty() leaseStart: string;
-  @ApiProperty() @IsString() @IsNotEmpty() leaseEnd: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) rentAmount?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() leaseStart?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() leaseEnd?: string;
 
   // Optional fields — present for manual add, absent for invite flow
   @ApiPropertyOptional() @IsOptional() @IsString() propertyAddress?: string;

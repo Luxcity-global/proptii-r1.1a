@@ -79,6 +79,7 @@ function buildEmailHtml(
 }
 
 function buildInviteLink(
+  token: string,
   propertyId: string,
   landlordEmail?: string,
   landlordId?: string
@@ -87,8 +88,8 @@ function buildInviteLink(
     typeof window !== 'undefined' && window.location.origin
       ? window.location.origin
       : (import.meta as any)?.env?.VITE_APP_URL || 'https://proptii.co';
-  const url = new URL('/tenant-onboarding', base);
-  url.searchParams.set('invite', 'true');
+  const url = new URL('/invite/tenant', base);
+  if (token) url.searchParams.set('token', token);
   if (propertyId) url.searchParams.set('propertyId', propertyId);
   if (landlordEmail) url.searchParams.set('landlordEmail', landlordEmail);
   if (landlordId) url.searchParams.set('landlordId', landlordId);
@@ -138,7 +139,25 @@ export function InviteTenant({
     try {
       if (!selectedProperty) throw new Error('Selected property not found');
 
-      const inviteLink = buildInviteLink(propertyId, landlordEmail, landlordId);
+      // 1. Record in Firestore first to generate a secure invitation token
+      let inviteToken = '';
+      try {
+        const invResult = await invitationService.createInvitation({
+          email: email.trim().toLowerCase(),
+          propertyId,
+          propertyAddress: selectedProperty.address,
+          landlordId: landlordId ?? '',
+          landlordEmail: landlordEmail ?? '',
+          inviteType: 'new-tenant',
+          customMessage: customMessage.trim() || undefined,
+        });
+        inviteToken = invResult.token;
+      } catch (err) {
+        console.warn('Could not record invitation record prior to email send:', err);
+      }
+
+      // 2. Build tokenized invitation link and email content
+      const inviteLink = buildInviteLink(inviteToken, propertyId, landlordEmail, landlordId);
       const html = buildEmailHtml(
         selectedProperty.address,
         inviteLink,
@@ -146,7 +165,7 @@ export function InviteTenant({
       );
       const subject = `You've been invited to join as a tenant — ${selectedProperty.address}`;
 
-      // 1. Send the email (with one retry on network errors)
+      // 3. Send the email (with one retry on network errors)
       const API_BASE = PRIMARY_API_BASE_URL.replace(/\/api$/, '');
       let lastErr: any = null;
       for (let attempt = 1; attempt <= 2; attempt++) {
@@ -156,8 +175,6 @@ export function InviteTenant({
             { to: email.trim().toLowerCase(), subject, html },
             { timeout: 45_000, validateStatus: (s) => s < 500 }
           );
-          // Check both HTTP status AND the response body — the endpoint always
-          // returns HTTP 200 but sets success:false when Resend rejects the email
           if (res.status >= 400) {
             throw new Error(res.data?.message || res.data?.error || `HTTP ${res.status}`);
           }
@@ -177,21 +194,6 @@ export function InviteTenant({
 
       trackEvent('landlord_invite_tenant_sent', { property_address: selectedProperty.address });
 
-      // 2. Record in Firestore (non-fatal if it fails — email was already sent)
-      try {
-        await invitationService.createInvitation({
-          email: email.trim().toLowerCase(),
-          propertyId,
-          propertyAddress: selectedProperty.address,
-          landlordId: landlordId ?? '',
-          landlordEmail: landlordEmail ?? '',
-          inviteType: 'new-tenant',
-          customMessage: customMessage.trim() || undefined,
-        });
-      } catch {
-        // Non-fatal — invitation email was already sent
-      }
-
       // 3. Create a pending tenant record so the invitee appears in the Clients
       //    list immediately under status "pending" rather than being invisible
       //    until they complete onboarding.
@@ -206,9 +208,9 @@ export function InviteTenant({
           propertyAddress: selectedProperty.address,
           rentAmount: 0,
           paymentFrequency: 'monthly',
-          firstPaymentDate: now,
-          leaseStart: now,
-          leaseEnd: nextYear,
+          firstPaymentDate: now.toISOString(),
+          leaseStart: now.toISOString(),
+          leaseEnd: nextYear.toISOString(),
           status: 'pending',
           referencingStatus: 'not-started',
           paymentStatus: 'current',
@@ -220,7 +222,8 @@ export function InviteTenant({
           const saved = await tenantService.getTenant(pendingTenantId);
           if (saved) onTenantCreated(saved);
         }
-      } catch {
+      } catch (tErr) {
+        console.warn('[InviteTenant] Could not create pending tenant record:', tErr);
         // Non-fatal — the invite was sent and recorded; tenant record is best-effort
       }
 

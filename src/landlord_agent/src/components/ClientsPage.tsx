@@ -274,9 +274,9 @@ export function ClientsPage({
     fetchReferencingStatuses();
   }, [tenants, userProfile]);
 
-  // Load pending invitations whenever the tab is opened or userId changes
+  // Load pending invitations whenever userId changes or invitations tab is opened
   useEffect(() => {
-    if (!userId || activeTab !== 'invitations') return;
+    if (!userId) return;
     let cancelled = false;
     const load = async () => {
       setIsLoadingInvitations(true);
