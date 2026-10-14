@@ -2418,6 +2418,8 @@ export function AppContent() {
               trackEvent('landlord_add_tenant_clicked', { source: 'clients_page' });
               editingTenantRef.current = null;
               setSelectedTenant(null);
+              // Clear any stale wizard sentinel so it doesn't misroute this fresh flow
+              setPreviousScreen(null);
               navigateToScreen('tenant-selection');
             }}
             onAddLandlord={() => navigateToScreen('add-landlord')}
@@ -2528,6 +2530,8 @@ export function AppContent() {
             onAddTenant={() => {
               editingTenantRef.current = null;
               setSelectedTenant(null);
+              // Clear any stale wizard sentinel so it doesn't misroute this fresh flow
+              setPreviousScreen(null);
               navigateToScreen('tenant-selection');
             }}
           />
@@ -2550,6 +2554,8 @@ export function AppContent() {
             onAddTenant={() => {
               editingTenantRef.current = null;
               setSelectedTenant(null);
+              // Clear any stale wizard sentinel so it doesn't misroute this fresh flow
+              setPreviousScreen(null);
               navigateToScreen('tenant-selection');
             }}
             onViewClients={() => handleNavigation('clients')}
@@ -3082,6 +3088,8 @@ export function AppContent() {
               trackEvent('landlord_add_tenant_clicked', { source: 'property_details' });
               editingTenantRef.current = null;
               setSelectedTenant(null);
+              // Clear any stale wizard sentinel so it doesn't misroute this fresh flow
+              setPreviousScreen(null);
               navigateToScreen('tenant-selection');
             }}
             onSelectExistingTenant={async (tenantId) => {
@@ -3462,7 +3470,12 @@ export function AppContent() {
               }
               if (previousScreen === 'add-tenant-from-wizard') {
                 // Property is already saved; associate tenant with the real propertyId
-                await addTenant({ ...tenant, propertyId: selectedProperty!.id });
+                if (!selectedProperty) {
+                  throw new Error(
+                    'Cannot link tenant: the property was not found. Please go back and try again.'
+                  );
+                }
+                await addTenant({ ...tenant, propertyId: selectedProperty.id });
               } else {
                 // addTenant POSTs to backend — useTenants in ClientsPage re-fetches on navigate
                 await addTenant(tenant);
