@@ -65,7 +65,7 @@ export interface WizardPropertyData {
   images: string[];       // blob: URLs for preview
   imageFiles: File[];     // actual File objects for upload
   additionalNotes: string;
-  status?: 'vacant' | 'occupied' | 'under-renovation';
+  status?: 'vacant' | 'occupied' | 'under-renovation' | 'draft';
 }
 
 interface AddPropertyWizardProps {
@@ -74,10 +74,12 @@ interface AddPropertyWizardProps {
   isEditing?: boolean;
   isPublishing?: boolean;
   isSavingForTenant?: boolean;  // loading state on "Add a Tenant Now" button
+  isSavingDraft?: boolean;      // loading state on "Save as Draft" button
   onPublish: (data: WizardPropertyData) => Promise<void>;
   onBulkImport?: () => void;
   onBack: () => void;           // cancel → previous screen
   onAddTenant?: (data: WizardPropertyData) => void;  // from review step
+  onSaveDraft?: (data: WizardPropertyData) => Promise<void>;
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -234,6 +236,7 @@ function blank(init?: Partial<WizardPropertyData>): WizardPropertyData {
 export function AddPropertyWizard({
   initialData, isEditing = false, isPublishing = false,
   onPublish, onBulkImport, onBack, onAddTenant, isSavingForTenant = false,
+  onSaveDraft, isSavingDraft = false,
 }: AddPropertyWizardProps) {
   const [form, setForm]         = useState<WizardPropertyData>(() => blank(initialData));
   const [step, setStep]         = useState<Step>(1);
@@ -241,6 +244,7 @@ export function AddPropertyWizard({
   const [errors, setErrors]     = useState<FieldErrors>({});
   const [globalError, setGE]    = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [showModeModal, setShowModeModal] = useState(!isEditing && !!onBulkImport);
   const [modeChoice, setModeChoice]       = useState<'single'|'bulk'>('single');
 
@@ -312,6 +316,19 @@ export function AddPropertyWizard({
       setGE(err?.message || 'Failed to save property. Please try again.');
     } finally {
       setPublishing(false);
+    }
+  }
+
+  // ─── Save as Draft ────────────────────────────────────────────────────────────
+
+  async function handleSaveDraft() {
+    setSavingDraft(true);
+    try {
+      await onSaveDraft?.({ ...form, status: 'draft' });
+    } catch (err: any) {
+      setGE(err?.message || 'Failed to save draft. Please try again.');
+    } finally {
+      setSavingDraft(false);
     }
   }
 
@@ -475,6 +492,17 @@ export function AddPropertyWizard({
           <span className="text-[12px] text-[#64748b] font-medium" style={{ fontFamily: 'Archivo,sans-serif' }}>
             Step {step} of 5
           </span>
+          {!isEditing && onSaveDraft && (
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={savingDraft || isSavingDraft}
+              className="hidden sm:flex text-[12.5px] font-semibold text-[#136C9E] hover:underline disabled:opacity-50 transition-all"
+              style={{ fontFamily: 'Archivo,sans-serif' }}
+            >
+              {(savingDraft || isSavingDraft) ? 'Saving…' : 'Save as Draft'}
+            </button>
+          )}
           <button type="button" onClick={onBack}
             className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
             title="Cancel">
@@ -885,6 +913,22 @@ export function AddPropertyWizard({
                     {isSavingForTenant
                       ? <><Loader2 size={15} className="animate-spin" /> Saving property…</>
                       : <><Plus size={15} strokeWidth={2.5} /> Add a Tenant Now</>
+                    }
+                  </button>
+                )}
+
+                {/* Save as Draft shortcut */}
+                {!isEditing && onSaveDraft && (
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={savingDraft || isSavingDraft}
+                    className="w-full h-[44px] rounded-[14px] border font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-all hover:bg-[#f8fafc] disabled:opacity-50"
+                    style={{ borderColor: '#cbd5e1', color: '#64748b', fontFamily: 'Archivo,sans-serif' }}
+                  >
+                    {(savingDraft || isSavingDraft)
+                      ? <><Loader2 size={15} className="animate-spin" /> Saving draft…</>
+                      : 'Save as Draft'
                     }
                   </button>
                 )}

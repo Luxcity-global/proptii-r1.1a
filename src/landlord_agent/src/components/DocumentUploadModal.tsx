@@ -32,13 +32,11 @@ export function DocumentUploadModal({ isOpen, onClose, onUpload, isUploading = f
   const [localError, setLocalError] = useState<string | null>(null);
 
   const documentTypes = [
-    { value: 'tenancy-agreement', label: 'Tenancy Agreement' },
-    { value: 'deposit-certificate', label: 'Deposit Protection Certificate' },
-    { value: 'right-to-rent', label: 'Right to Rent Check' },
-    { value: 'id-document', label: 'ID Document' },
-    { value: 'employment-reference', label: 'Employment Reference' },
-    { value: 'bank-statement', label: 'Bank Statement' },
-    { value: 'other', label: 'Other Document' }
+    { value: 'epc',                 label: 'EPC Certificate' },
+    { value: 'gas-cert',            label: 'Gas Safety Certificate' },
+    { value: 'tenancy-agreement',   label: 'Tenancy Agreement' },
+    { value: 'insurance',           label: 'Insurance Document' },
+    { value: 'other',               label: 'Other Document' },
   ];
 
   const MAX_FILE_SIZE_MB = 10;

@@ -59,7 +59,8 @@ import {
   Loader2,
   Download,
 } from "lucide-react";
-import { Property, PropertyPhoto, Tenant } from "../App";
+import { Property, PropertyPhoto, Tenant, PropertyDocument } from "../App";
+import { DocumentUploadModal } from "./DocumentUploadModal";
 import {
   Select,
   SelectContent,
@@ -129,7 +130,7 @@ function initials(name: string): string {
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
-type StatusKey = "occupied" | "vacant" | "under-renovation";
+type StatusKey = "occupied" | "vacant" | "under-renovation" | "draft";
 
 const STATUS_META: Record<
   StatusKey,
@@ -147,6 +148,12 @@ const STATUS_META: Record<
     dot: "#f59e0b",
     bg: "#fef9c3",
     text: "#92400e",
+  },
+  draft: {
+    label: "Draft",
+    dot: "#94a3b8",
+    bg: "#f1f5f9",
+    text: "#475569",
   },
 };
 
@@ -242,6 +249,10 @@ interface PropertyDetailsProps {
   onSelectExistingTenant?: (tenantId: string) => void;
   onRemoveTenant?: (tenantId: string, propertyId: string) => void;
   onChangeTenant?: (propertyId: string, newTenantId: string) => void;
+  onDocumentUpload?: (
+    propertyId: string,
+    doc: { name: string; type: string; file: File; expiryDate?: string }
+  ) => Promise<void>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -258,6 +269,7 @@ export function PropertyDetails({
   onSelectExistingTenant,
   onRemoveTenant,
   onChangeTenant,
+  onDocumentUpload,
 }: PropertyDetailsProps) {
   // ── Tab & hero state ──────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<
@@ -277,6 +289,26 @@ export function PropertyDetails({
   const [previewPhoto, setPreviewPhoto] = useState<PropertyPhoto | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const skipSyncRef = useRef(false);
+
+  // ── Document upload modal state ──────────────────────────────────────────
+  const [isDocUploadOpen, setIsDocUploadOpen]   = useState(false);
+  const [isUploadingDoc,  setIsUploadingDoc]    = useState(false);
+  const [docUploadError,  setDocUploadError]    = useState<string | null>(null);
+  const [selectedDoc, setSelectedDoc]           = useState<PropertyDocument | null>(null);
+
+  async function handleDocUpload(doc: { name: string; type: string; file: File; expiryDate?: string }) {
+    if (!property || !onDocumentUpload) return;
+    setIsUploadingDoc(true);
+    setDocUploadError(null);
+    try {
+      await onDocumentUpload(property.id, doc);
+      setIsDocUploadOpen(false);
+    } catch (err: any) {
+      setDocUploadError(err?.message || 'Upload failed. Please try again.');
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  }
 
   // Sync photos from prop whenever property changes (not during unsaved edits)
   useEffect(() => {
@@ -578,84 +610,81 @@ export function PropertyDetails({
       {/* ── Body ──────────────────────────────────────────────────────────── */}
       <div className="max-w-[1160px] mx-auto px-6 py-6">
 
-        {/* ── Hero photo strip ────────────────────────────────────────────── */}
-        <div className="mb-6">
-          {heroPhotos.length > 0 ? (
-            <div>
-              <div
-                className="relative w-full rounded-[16px] overflow-hidden bg-[#e2e8f0]"
-                style={{ height: "340px" }}
-              >
-                <img
-                  src={heroPhoto!.url}
-                  alt={heroPhoto!.room ?? "Property"}
-                  className="w-full h-full object-cover"
-                />
-                {heroPhotos.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setHeroIdx((i) => Math.max(0, i - 1))}
-                      disabled={heroIdx === 0}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30"
-                    >
-                      <ChevronLeft size={17} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setHeroIdx((i) => Math.min(heroPhotos.length - 1, i + 1))}
-                      disabled={heroIdx === heroPhotos.length - 1}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30"
-                    >
-                      <ChevronRight size={17} />
-                    </button>
-                    <span
-                      className="absolute bottom-3 right-3 text-[11.5px] font-semibold px-2.5 py-1 rounded-full"
-                      style={{ background: "rgba(0,0,0,0.45)", color: "white" }}
-                    >
-                      {heroIdx + 1} / {heroPhotos.length}
-                    </span>
-                  </>
-                )}
-              </div>
-              {heroPhotos.length > 1 && (
-                <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-                  {heroPhotos.map((p, i) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setHeroIdx(i)}
-                      className="shrink-0 rounded-[10px] overflow-hidden transition-all"
-                      style={{
-                        width: 72,
-                        height: 52,
-                        outline: i === heroIdx ? "2.5px solid #136C9E" : "2px solid transparent",
-                        opacity: i === heroIdx ? 1 : 0.65,
-                      }}
-                    >
-                      <img src={p.url} alt={p.room ?? `Photo ${i + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div
-              className="w-full rounded-[16px] flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[#e2e8f0] cursor-pointer hover:border-[#136C9E] hover:bg-[#f0f8fd] transition-all"
-              style={{ height: "220px" }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Camera size={32} className="text-[#94a3b8]" />
-              <p className="text-[13.5px] font-semibold text-[#64748b]">Click to add photos</p>
-            </div>
-          )}
-        </div>
-
         {/* ── Two-column body ─────────────────────────────────────────────── */}
         <div className="flex flex-col lg:flex-row gap-6 items-start">
 
-          {/* ── Left: tab panel ─────────────────────────────────────────── */}
+          {/* ── Left: hero + tabs ───────────────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-4">
+
+            {/* Hero photo strip */}
+            <div>
+              {heroPhotos.length > 0 ? (
+                <div>
+                  <div className="relative w-full rounded-[16px] overflow-hidden bg-[#e2e8f0] aspect-[16/9] max-h-[340px]">
+                    <img
+                      src={heroPhoto!.url}
+                      alt={heroPhoto!.room ?? "Property"}
+                      className="w-full h-full object-cover"
+                    />
+                    {heroPhotos.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setHeroIdx((i) => Math.max(0, i - 1))}
+                          disabled={heroIdx === 0}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30"
+                        >
+                          <ChevronLeft size={17} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHeroIdx((i) => Math.min(heroPhotos.length - 1, i + 1))}
+                          disabled={heroIdx === heroPhotos.length - 1}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30"
+                        >
+                          <ChevronRight size={17} />
+                        </button>
+                        <span
+                          className="absolute bottom-3 right-3 text-[11.5px] font-semibold px-2.5 py-1 rounded-full"
+                          style={{ background: "rgba(0,0,0,0.45)", color: "white" }}
+                        >
+                          {heroIdx + 1} / {heroPhotos.length}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {heroPhotos.length > 1 && (
+                    <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+                      {heroPhotos.map((p, i) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setHeroIdx(i)}
+                          className="shrink-0 rounded-[10px] overflow-hidden transition-all"
+                          style={{
+                            width: 72,
+                            height: 52,
+                            outline: i === heroIdx ? "2.5px solid #136C9E" : "2px solid transparent",
+                            opacity: i === heroIdx ? 1 : 0.65,
+                          }}
+                        >
+                          <img src={p.url} alt={p.room ?? `Photo ${i + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="w-full rounded-[16px] flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[#e2e8f0] cursor-pointer hover:border-[#136C9E] hover:bg-[#f0f8fd] transition-all"
+                  style={{ height: "220px" }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Camera size={32} className="text-[#94a3b8]" />
+                  <p className="text-[13.5px] font-semibold text-[#64748b]">Click to add photos</p>
+                </div>
+              )}
+            </div>
 
             {/* Tab bar */}
             <div className="flex items-center gap-1 p-1 rounded-[12px] bg-[#f1f5f9]" style={{ width: "fit-content" }}>
@@ -769,7 +798,7 @@ export function PropertyDetails({
                   </p>
                   <button
                     type="button"
-                    onClick={onManageDocuments}
+                    onClick={() => setIsDocUploadOpen(true)}
                     className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
                     style={{ color: "#136C9E", fontFamily: "Archivo,sans-serif" }}
                   >
@@ -787,7 +816,7 @@ export function PropertyDetails({
                     </p>
                     <button
                       type="button"
-                      onClick={onManageDocuments}
+                      onClick={() => setIsDocUploadOpen(true)}
                       className="text-[13px] font-semibold px-4 py-2.5 rounded-[12px] transition-all hover:opacity-90"
                       style={{ background: "#136C9E", color: "white", fontFamily: "Archivo,sans-serif" }}
                     >
@@ -797,7 +826,7 @@ export function PropertyDetails({
                 ) : (
                   <ul className="divide-y divide-[#f1f5f9]">
                     {property.documents.map((doc) => (
-                      <li key={doc.id} className="flex items-center gap-3 px-5 py-3.5">
+                      <li key={doc.id} className="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-[#f8fafc] transition-colors" onClick={() => setSelectedDoc(doc)}>
                         <DocStatusIcon status={doc.status} />
                         <div className="flex-1 min-w-0">
                           <p className="text-[13.5px] font-semibold text-[#1e293b] truncate">{doc.name}</p>
@@ -1200,7 +1229,7 @@ export function PropertyDetails({
                   No documents uploaded.{" "}
                   <button
                     type="button"
-                    onClick={onManageDocuments}
+                    onClick={() => setIsDocUploadOpen(true)}
                     className="underline text-[#136C9E] font-semibold"
                   >
                     Upload compliance documents
@@ -1247,6 +1276,102 @@ export function PropertyDetails({
           </div>
         </div>
       </div>
+
+      {/* ── Document Details Drawer ─────────────────────────────────────── */}
+      {selectedDoc && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/25"
+            onClick={() => setSelectedDoc(null)}
+          />
+          {/* Panel */}
+          <aside
+            className="fixed right-0 top-0 h-full z-50 w-[340px] max-w-full flex flex-col"
+            style={{
+              background: "white",
+              borderLeft: "1px solid #e2e8f0",
+              boxShadow: "-8px 0 32px rgba(0,0,0,0.08)",
+            }}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: "1px solid #f1f5f9" }}
+            >
+              <p
+                className="text-[15px] font-bold text-[#1e293b] truncate"
+                style={{ fontFamily: "Archivo,sans-serif" }}
+              >
+                {selectedDoc.name}
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelectedDoc(null)}
+                className="w-8 h-8 rounded-full border border-[#e2e8f0] flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all shrink-0 ml-2"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {/* Type */}
+              <div>
+                <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-1" style={{ fontFamily: "Archivo,sans-serif" }}>
+                  Document Type
+                </p>
+                <p className="text-[13.5px] text-[#334155]">{DOC_TYPE_LABELS[selectedDoc.type] ?? selectedDoc.type}</p>
+              </div>
+              {/* Status */}
+              <div>
+                <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-1.5" style={{ fontFamily: "Archivo,sans-serif" }}>
+                  Status
+                </p>
+                <span className="inline-flex items-center gap-1.5">
+                  <DocStatusIcon status={selectedDoc.status} />
+                  <span className="text-[13px] text-[#334155] capitalize">{selectedDoc.status.replace("-", " ")}</span>
+                </span>
+              </div>
+              {/* Issued date */}
+              <div>
+                <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-1" style={{ fontFamily: "Archivo,sans-serif" }}>
+                  Issued
+                </p>
+                <p className="text-[13.5px] text-[#334155]">{dates.docs[selectedDoc.id]?.issue ?? "—"}</p>
+              </div>
+              {/* Expiry date (if present) */}
+              {selectedDoc.expiryDate && (
+                <div>
+                  <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-1" style={{ fontFamily: "Archivo,sans-serif" }}>
+                    Expires
+                  </p>
+                  <p className="text-[13.5px] text-[#334155]">{dates.docs[selectedDoc.id]?.expiry ?? "—"}</p>
+                </div>
+              )}
+            </div>
+            {/* Footer — download */}
+            <div className="px-5 py-4" style={{ borderTop: "1px solid #f1f5f9" }}>
+              <button
+                type="button"
+                onClick={() => window.open(selectedDoc.url, "_blank", "noopener")}
+                className="w-full h-[44px] rounded-[12px] font-semibold text-[14px] flex items-center justify-center gap-2 transition-all hover:opacity-90"
+                style={{ background: "#136C9E", color: "white", fontFamily: "Archivo,sans-serif" }}
+              >
+                <Download size={16} /> Download Document
+              </button>
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* ── Document Upload Modal ────────────────────────────────────────── */}
+      <DocumentUploadModal
+        isOpen={isDocUploadOpen}
+        isUploading={isUploadingDoc}
+        uploadError={docUploadError}
+        onClose={() => { setIsDocUploadOpen(false); setDocUploadError(null); }}
+        onUpload={handleDocUpload}
+      />
 
       {/* ── Change Tenant Dialog ─────────────────────────────────────────── */}
       <Dialog open={showChangeTenantDialog} onOpenChange={setShowChangeTenantDialog}>

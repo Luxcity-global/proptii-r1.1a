@@ -122,7 +122,7 @@ export interface Property {
   bathrooms?: number;
   squareFootage?: number;
   rent: number;
-  status: 'vacant' | 'occupied' | 'under-renovation';
+  status: 'vacant' | 'occupied' | 'under-renovation' | 'draft';
   amenities: string[];
   notes: string;
   photos: PropertyPhoto[];
@@ -2949,6 +2949,15 @@ export function AppContent() {
               }
               setIsPublishing(false);
             }}
+            onSaveDraft={async (wizardData: WizardPropertyData) => {
+              setIsPublishing(true);
+              try {
+                await savePropertyFromWizard({ ...wizardData, status: 'draft' });
+              } finally {
+                setIsPublishing(false);
+              }
+              navigateToMainApp('properties');
+            }}
           />
         );
 
@@ -3076,6 +3085,28 @@ export function AppContent() {
             }}
             onManageDocuments={() => navigateToScreen('document-management')}
             updateProperty={updateProperty}
+            onDocumentUpload={async (propertyId, doc) => {
+              if (!userProfile) return;
+              const apiBase = getResolvedApiBaseUrl();
+              const token = await getAccessTokenForApiRequest().catch(() => null);
+              const fd = new FormData();
+              fd.append('file', doc.file, doc.file.name);
+              fd.append('folder', 'properties/documents');
+              const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+              const res = await fetch(`${apiBase}/storage/upload`, { method: 'POST', headers, body: fd });
+              if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
+              const { url } = await res.json() as { url: string };
+              const newDoc: Omit<PropertyDocument, 'id'> = {
+                name: doc.name,
+                type: doc.type as PropertyDocument['type'],
+                url,
+                issueDate: new Date(),
+                expiryDate: doc.expiryDate ? new Date(doc.expiryDate) : undefined,
+                status: 'valid',
+              };
+              addDocumentToProperty(propertyId, newDoc);
+              await propertyService.addDocumentToProperty(propertyId, newDoc);
+            }}
             onViewTenant={(tenantId) => {
               const tenant = tenants.find(t => t.id === tenantId);
               if (tenant) {
