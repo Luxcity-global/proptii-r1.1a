@@ -9,9 +9,13 @@
   font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--ll-bg);
   color: #1e293b;
-  min-height: 100%;
-  padding: 0 20px 40px;
-  overflow-x: hidden;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 16px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .ll-msg h1,
@@ -28,12 +32,11 @@
 }
 
 .ll-msg-header {
+  flex-shrink: 0;
   background: #fff;
   border-bottom: 1px solid rgba(226, 232, 240, 0.8);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  position: static;
   margin-left: -20px;
   margin-right: -20px;
   padding-left: 20px;
@@ -46,7 +49,7 @@
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  padding: 24px 0;
+  padding: 16px 0;
 }
 
 .ll-msg-header h1 {
@@ -149,14 +152,22 @@
 
 .ll-msg-btn-add:hover { background: var(--ll-orange-hover); }
 
-.ll-msg-body { padding: 32px 0 0; }
+.ll-msg-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0 0;
+  overflow: hidden;
+}
 
 .ll-msg-toolbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 
 .ll-msg-export {
@@ -208,7 +219,7 @@
   height: 18px;
   margin-left: 6px;
   padding: 0 5px;
-  border-radius: 9px;
+  border-radius: 999px;
   background: #e2e8f0;
   color: #64748b;
   font-size: 10px;
@@ -223,10 +234,14 @@
 }
 
 .ll-msg-split {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
-  align-items: start;
+  gap: 20px;
+  align-items: stretch;
+  height: 100%;
+  overflow: hidden;
 }
 
 @media (min-width: 1024px) {
@@ -239,9 +254,12 @@
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 16px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-  min-height: 640px;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .ll-msg-list { padding: 16px; }
@@ -278,7 +296,9 @@
 
 .ll-msg-convs {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -416,10 +436,11 @@
 
 .ll-msg-feed {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  min-height: 0;
   background: #fafbfc;
 }
 
@@ -560,12 +581,19 @@
 
   /* Split: default show list, hide thread */
   .ll-msg-split {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
     gap: 0;
   }
 
   .ll-msg-list {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: 100%;
     border-radius: 16px;
     min-height: 0;
   }
@@ -573,6 +601,8 @@
   .ll-msg-thread {
     display: none;
     border-radius: 16px;
+    height: 100%;
+    max-height: 100%;
     min-height: 0;
   }
 
@@ -586,7 +616,9 @@
   .ll-msg-thread--active-mobile {
     display: flex !important;
     flex-direction: column;
-    min-height: 70vh;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
   }
 
   /* Show back button inside thread on mobile */

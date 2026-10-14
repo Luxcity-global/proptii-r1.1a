@@ -375,6 +375,9 @@ export function MainLayout({
                   : currentScreen === 'contracts'
                     ? '#fbfbfe'
                     : '#F7F7F7',
+            ...(currentScreen === 'messages' || currentScreen === 'inbox'
+              ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+              : {}),
           }}
         >
           <div className="md:hidden h-16" />

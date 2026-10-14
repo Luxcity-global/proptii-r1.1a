@@ -61,6 +61,7 @@ export function CommsModal({
   const [convLoading,       setConvLoading]        = useState(false);
   const [convError,         setConvError]          = useState<string | null>(null);
   const threadRef = useRef<MessageThreadHandle>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // ── Unclaimed invite state ────────────────────────────────────────────────
   const [inviteSent,   setInviteSent]   = useState(false);
@@ -194,7 +195,7 @@ export function CommsModal({
         {/* ── CONNECTED: real MessageThread ── */}
         {isConnected && !isDummy ? (
           <>
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
               {convLoading && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10, color: '#64748b' }}>
                   <Loader2 size={18} className="animate-spin" /> Loading conversation…
@@ -210,6 +211,7 @@ export function CommsModal({
                   ref={threadRef}
                   conversationId={conversation.id}
                   currentUserId={effectiveLandlordId}
+                  scrollContainerRef={scrollContainerRef}
                 />
               )}
             </div>

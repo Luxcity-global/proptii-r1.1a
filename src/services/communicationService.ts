@@ -125,7 +125,7 @@ const communicationService = {
      * GET /api/communication/conversations/{id}/messages?before={sentAt}&limit={n}
      * Requirements: 6.3
      */
-    async getMessages(conversationId: string, before?: string, limit = 50): Promise<{ messages: Message[]; hasMore: boolean } & Message[]> {
+    async getMessages(conversationId: string, before?: string, limit = 25): Promise<{ messages: Message[]; hasMore: boolean } & Message[]> {
         try {
             const params = new URLSearchParams({ limit: String(limit) });
             if (before) params.set('before', before);

@@ -461,7 +461,12 @@ const DashboardInner: React.FC = () => {
       {/* Main content — sidebar spacer already offsets layout; no extra marginLeft */}
       <main
         className="flex-1 min-w-0"
-        style={{ backgroundColor: '#F7F7F7' }}
+        style={{
+          backgroundColor: '#F7F7F7',
+          ...(location.pathname.startsWith('/dashboard/messages')
+            ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+            : {}),
+        }}
       >
         {isMobile && <div className="h-16" />} {/* Spacer for mobile header */}
         {hideLegacyHeader ? (
@@ -487,7 +492,9 @@ const DashboardInner: React.FC = () => {
         <div
           className={
             hideLegacyHeader
-              ? 'w-full'
+              ? location.pathname.startsWith('/dashboard/messages')
+                ? 'w-full h-full overflow-hidden'
+                : 'w-full'
               : `${isMobile ? 'px-4 pb-4' : 'px-5 lg:px-6 pb-8'} w-full max-w-6xl mx-auto`
           }
         >

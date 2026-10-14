@@ -13,8 +13,13 @@
     sans-serif;
   background: #f8fafc;
   color: #1e293b;
-  min-height: 100%;
-  padding: 0 0 40px;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 16px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .tn-msg h1,
@@ -30,24 +35,31 @@
 }
 
 .tn-msg-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   max-width: 1152px;
   margin: 0 auto;
   width: 100%;
-  padding: 24px 20px 0;
+  padding: 16px 20px 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 @media (min-width: 1024px) {
   .tn-msg-body {
-    padding: 32px 40px 0;
+    padding: 20px 40px 0;
   }
 }
 
 .tn-msg-toolbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 
@@ -87,7 +99,7 @@
   height: 18px;
   margin-left: 6px;
   padding: 0 5px;
-  border-radius: 9px;
+  border-radius: 999px;
   background: #e2e8f0;
   color: #64748b;
   font-size: 10px;
@@ -126,15 +138,36 @@
 }
 
 .tn-msg-split {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
-  align-items: start;
+  gap: 20px;
+  align-items: stretch;
+  height: 100%;
+  overflow: hidden;
 }
 
 @media (min-width: 1024px) {
   .tn-msg-split {
     grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  }
+}
+
+@media (max-width: 1023px) {
+  .tn-msg {
+    height: calc(100vh - 64px);
+    max-height: calc(100vh - 64px);
+    padding: 0 0 12px;
+  }
+
+  .tn-msg-split {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    gap: 0;
   }
 }
 
@@ -144,9 +177,12 @@
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 16px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-  min-height: 640px;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .tn-msg-list {
@@ -185,7 +221,9 @@
 
 .tn-msg-convs {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -357,9 +395,12 @@
 
 .tn-msg-feed {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
   background: #fafbfc;
-  padding: 16px 0;
 }
 
 .tn-msg-empty {

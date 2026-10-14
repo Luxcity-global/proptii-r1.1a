@@ -200,7 +200,7 @@ export interface MessageThreadHandle {
 // Component
 // ---------------------------------------------------------------------------
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 25;
 
 const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
     ({ conversationId, currentUserId, scrollContainerRef, onScrollRequest, onRetryMessage }, ref) => {
@@ -226,17 +226,66 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
     // Tracks if viewport is currently near bottom to decide whether to auto-scroll on new incoming message
     const isNearBottomRef = useRef(true);
 
-    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
-        if (bottomRef.current) {
-            bottomRef.current.scrollIntoView({ behavior });
-        } else if (scrollContainerRef?.current) {
-            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
-        }
+    const rootRef = useRef<HTMLDivElement>(null);
+    const getContainer = useCallback(() => {
+        return scrollContainerRef?.current || (rootRef.current?.parentElement as HTMLDivElement | null);
     }, [scrollContainerRef]);
 
-    // Handle scroll events on container to toggle floating "Scroll to bottom" button
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+        const container = getContainer();
+        if (container) {
+            if (behavior === 'smooth') {
+                container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+            } else {
+                container.scrollTop = container.scrollHeight;
+            }
+        } else if (bottomRef.current) {
+            bottomRef.current.scrollIntoView({ behavior, block: 'nearest' });
+        }
+    }, [getContainer]);
+
+    const loadEarlier = useCallback(async () => {
+        if (!conversationId || loadingMore) return;
+        // Use the stored cursor; fall back to the oldest rendered message
+        const cursor = oldestCursorRef.current ?? messages[0]?.sentAt;
+        if (!cursor) return;
+        setLoadingMore(true);
+
+        const container = getContainer();
+        const scrollHeightBefore = container?.scrollHeight ?? 0;
+        const scrollTopBefore = container?.scrollTop ?? 0;
+
+        try {
+            const raw = await communicationService.getMessages(conversationId, cursor, PAGE_SIZE);
+            const older: Message[] = (raw as any)?.messages ?? (Array.isArray(raw) ? raw : (raw as any)?.data ?? []);
+            const more: boolean = (raw as any)?.hasMore ?? false;
+            const sorted: ThreadMessage[] = [...older].sort(
+                (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
+            );
+            setMessages(prev => {
+                const merged = [...sorted.filter(m => !prev.some(p => p.id === m.id)), ...prev];
+                // Update cursor to the oldest message now in view
+                if (sorted.length > 0) {
+                    oldestCursorRef.current = sorted[0].sentAt;
+                }
+                return merged;
+            });
+            setHasMore(more);
+
+            requestAnimationFrame(() => {
+                if (container) {
+                    const added = container.scrollHeight - scrollHeightBefore;
+                    container.scrollTop = scrollTopBefore + added;
+                }
+            });
+        } catch (_e) { /* silent */ } finally {
+            setLoadingMore(false);
+        }
+    }, [conversationId, messages, loadingMore, getContainer]);
+
+    // Handle scroll events on container to toggle floating "Scroll to bottom" button & auto-fetch earlier messages
     useEffect(() => {
-        const container = scrollContainerRef?.current;
+        const container = getContainer();
         if (!container) return;
 
         const handleScroll = () => {
@@ -247,11 +296,16 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
             if (isNear) {
                 setNewIncomingCount(0);
             }
+
+            // Auto-load earlier messages when user scrolls near the top of the feed
+            if (container.scrollTop <= 80 && hasMore && !loadingMore) {
+                void loadEarlier();
+            }
         };
 
         container.addEventListener('scroll', handleScroll, { passive: true });
         return () => container.removeEventListener('scroll', handleScroll);
-    }, [scrollContainerRef]);
+    }, [getContainer, hasMore, loadingMore, loadEarlier]);
 
     const fetchAndMarkRead = useCallback(async () => {
         if (!conversationId) return;
@@ -358,44 +412,6 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
         },
     }), [fetchAndMarkRead, scrollToBottom]);
 
-    const loadEarlier = useCallback(async () => {
-        if (!conversationId || loadingMore) return;
-        // Use the stored cursor; fall back to the oldest rendered message
-        const cursor = oldestCursorRef.current ?? messages[0]?.sentAt;
-        if (!cursor) return;
-        setLoadingMore(true);
-
-        const container = scrollContainerRef?.current;
-        const scrollHeightBefore = container?.scrollHeight ?? 0;
-        const scrollTopBefore = container?.scrollTop ?? 0;
-
-        try {
-            const raw = await communicationService.getMessages(conversationId, cursor, PAGE_SIZE);
-            const older: Message[] = (raw as any)?.messages ?? (Array.isArray(raw) ? raw : (raw as any)?.data ?? []);
-            const more: boolean = (raw as any)?.hasMore ?? false;
-            const sorted: ThreadMessage[] = [...older].sort(
-                (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
-            );
-            setMessages(prev => {
-                const merged = [...sorted.filter(m => !prev.some(p => p.id === m.id)), ...prev];
-                // Update cursor to the oldest message now in view
-                if (sorted.length > 0) {
-                    oldestCursorRef.current = sorted[0].sentAt;
-                }
-                return merged;
-            });
-            setHasMore(more);
-
-            requestAnimationFrame(() => {
-                if (container) {
-                    const added = container.scrollHeight - scrollHeightBefore;
-                    container.scrollTop = scrollTopBefore + added;
-                }
-            });
-        } catch (_e) { /* silent */ } finally {
-            setLoadingMore(false);
-        }
-    }, [conversationId, messages, loadingMore, scrollContainerRef]);
 
     useEffect(() => {
         void fetchAndMarkRead();
@@ -594,6 +610,7 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
 
     return (
         <div
+            ref={rootRef}
             data-testid="message-thread"
             style={{
                 display: 'flex',
@@ -603,6 +620,7 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
                 position: 'relative',
                 minHeight: '100%',
                 boxSizing: 'border-box',
+                overscrollBehavior: 'contain',
             }}
         >
             {/* Load earlier messages — paginated */}
