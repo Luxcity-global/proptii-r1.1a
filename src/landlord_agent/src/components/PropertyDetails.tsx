@@ -472,12 +472,11 @@ export function PropertyDetails({
     (d) => d.status === "expiring-soon" || d.status === "expired",
   ).length;
 
-  const TAB_CLASS = (t: typeof activeTab) =>
-    `px-4 py-2.5 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer border-0 outline-none ${
-      activeTab === t
-        ? "bg-white text-[#136C9E] shadow-sm"
-        : "text-[#64748b] hover:text-[#1e293b]"
-    }`;
+
+
+  // ── Hero photo helpers ────────────────────────────────────────────────────
+  const heroPhotos = validPhotos.length > 0 ? validPhotos : [];
+  const heroPhoto = heroPhotos[heroIdx] ?? null;
 
   return (
     <div
@@ -486,566 +485,311 @@ export function PropertyDetails({
     >
       {/* ── Sticky header ─────────────────────────────────────────────────── */}
       <header
-        className="static md:sticky top-0 z-30 h-[64px] flex items-center justify-between px-5"
+        className="static md:sticky top-0 z-30 h-[60px] flex items-center justify-between px-6"
         style={{
-          background: "rgba(255,255,255,0.88)",
+          background: "rgba(255,255,255,0.95)",
           backdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(226,232,240,0.7)",
+          borderBottom: "1px solid rgba(226,232,240,0.8)",
         }}
       >
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
+            className="w-8 h-8 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
           >
-            <ArrowLeft size={16} strokeWidth={2.5} />
+            <ArrowLeft size={15} strokeWidth={2.5} />
           </button>
-          <div className="hidden sm:block">
+          <div>
             <p
-              className="text-[15px] font-bold text-[#1e293b] leading-tight"
+              className="text-[14px] font-bold text-[#1e293b] leading-tight"
               style={{ fontFamily: "Archivo,sans-serif" }}
             >
-              {(property.address.split(",")[0] ?? property.address).trim()}
-            </p>
-            <p className="text-[12px] text-[#64748b] leading-tight mt-0.5">
               {property.address}
             </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <StatusPill status={property.status} />
+              <span className="text-[12px] text-[#64748b]">
+                {fmtType(property.type)}
+                {property.bedrooms ? ` · ${property.bedrooms} beds` : ""}
+                {typeof (property as any).bathrooms === "number"
+                  ? ` · ${(property as any).bathrooms} baths`
+                  : ""}
+                {typeof (property as any).squareFootage === "number"
+                  ? ` · ${(property as any).squareFootage} sq ft`
+                  : ""}
+              </span>
+            </div>
           </div>
         </div>
+
         <div className="flex items-center gap-2">
-          <StatusPill status={property.status} />
           <button
             type="button"
             onClick={() => onEdit(property)}
-            className="flex items-center gap-1.5 h-9 px-4 rounded-[10px] text-[13px] font-semibold transition-all hover:opacity-90"
-            style={{
-              background: "#136C9E",
-              color: "white",
-              fontFamily: "Archivo,sans-serif",
-              boxShadow: "0 2px 8px rgba(19,108,158,0.25)",
-            }}
+            className="flex items-center gap-1.5 h-8 px-3.5 rounded-[9px] text-[12.5px] font-semibold transition-all border border-[#e2e8f0] bg-white text-[#334155] hover:bg-[#f1f5f9]"
+            style={{ fontFamily: "Archivo,sans-serif" }}
           >
-            <Edit3 size={14} /> Edit
+            <Edit3 size={13} /> Edit
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="w-9 h-9 rounded-[10px] border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
+                className="w-8 h-8 rounded-[9px] border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
               >
-                <MoreHorizontal size={16} />
+                <MoreHorizontal size={15} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="rounded-[14px] border-[#e2e8f0] p-1.5 min-w-[180px]"
-            >
+            <DropdownMenuContent align="end" className="rounded-[14px] border-[#e2e8f0] p-1.5 min-w-[180px]">
               <DropdownMenuItem
                 className="rounded-[10px] cursor-pointer text-[13px]"
-                onSelect={() => {
-                  setActiveTab("photos");
-                }}
+                onSelect={() => setActiveTab("photos")}
               >
-                <Camera size={14} className="mr-2 text-[#64748b]" /> Manage
-                Photos
+                <Camera size={14} className="mr-2 text-[#64748b]" /> Manage Photos
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="rounded-[10px] cursor-pointer text-[13px]"
                 onSelect={() => onManageDocuments()}
               >
-                <FileText size={14} className="mr-2 text-[#64748b]" /> Manage
-                Documents
+                <FileText size={14} className="mr-2 text-[#64748b]" /> Manage Documents
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="rounded-[10px] cursor-pointer text-[13px]"
-                onSelect={() =>
-                  updateProperty(property.id, { status: "under-renovation" })
-                }
+                onSelect={() => updateProperty(property.id, { status: "under-renovation" })}
               >
-                <Archive size={14} className="mr-2 text-[#64748b]" /> Mark as
-                Renovation
+                <Archive size={14} className="mr-2 text-[#64748b]" /> Mark as Renovation
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
-      {/* Hidden global file input — triggered from multiple places */}
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
         multiple
         accept="image/*"
         className="hidden"
-        onChange={(e) => {
-          uploadFiles(e.target.files);
-          e.target.value = "";
-        }}
+        onChange={(e) => { uploadFiles(e.target.files); e.target.value = ""; }}
       />
 
       {/* ── Body ──────────────────────────────────────────────────────────── */}
-      <div className="max-w-[1120px] mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* ── Left: tabs ─────────────────────────────────────────────── */}
-          <div className="flex-1 min-w-0 space-y-4">
-            {/* Tab bar (Scroll Links) */}
-            <div
-              className="flex items-center gap-1 p-1 rounded-[14px] bg-[#f1f5f9]"
-              style={{ width: "fit-content" }}
-            >
-              <button
-                className="px-4 py-2.5 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer border-0 outline-none text-[#64748b] hover:text-[#1e293b] hover:bg-white"
-                onClick={() =>
-                  document
-                    .getElementById("overview-section")
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
+      <div className="max-w-[1160px] mx-auto px-6 py-6">
+
+        {/* ── Hero photo strip ────────────────────────────────────────────── */}
+        <div className="mb-6">
+          {heroPhotos.length > 0 ? (
+            <div>
+              <div
+                className="relative w-full rounded-[16px] overflow-hidden bg-[#e2e8f0]"
+                style={{ height: "340px" }}
               >
-                Overview
-              </button>
-              <button
-                className="px-4 py-2.5 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer border-0 outline-none text-[#64748b] hover:text-[#1e293b] hover:bg-white"
-                onClick={() =>
-                  document
-                    .getElementById("documents-section")
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-              >
-                Documents
-                {expiredDocCount > 0 && (
-                  <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                    {expiredDocCount}
-                  </span>
-                )}
-              </button>
-              <button
-                className="px-4 py-2.5 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer border-0 outline-none text-[#64748b] hover:text-[#1e293b] hover:bg-white"
-                onClick={() =>
-                  document
-                    .getElementById("photos-section")
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-              >
-                Photos ({validPhotos.length})
-              </button>
-            </div>
-
-            {/* ── Overview Section ─────────────────────────────────────────── */}
-            <div
-              id="overview-section"
-              className="scroll-mt-[140px] space-y-4 pt-2"
-            >
-              <SCard>
-                <div className="px-5 pt-5 pb-1">
-                  <p
-                    className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-4"
-                    style={{ fontFamily: "Archivo,sans-serif" }}
-                  >
-                    Property Specifications
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#f1f5f9]">
-                  {[
-                    {
-                      icon: BedDouble,
-                      label: "Bedrooms",
-                      value: String(property.bedrooms),
-                    },
-                    {
-                      icon: Bath,
-                      label: "Bathrooms",
-                      value:
-                        typeof (property as any).bathrooms === "number"
-                          ? String((property as any).bathrooms)
-                          : "—",
-                    },
-                    {
-                      icon: Maximize2,
-                      label: "Size",
-                      value:
-                        typeof (property as any).squareFootage === "number"
-                          ? `${(property as any).squareFootage} sq ft`
-                          : "—",
-                    },
-                    {
-                      icon: PoundSterling,
-                      label: "Monthly Rent",
-                      value: `£${(property.rent ?? 0).toLocaleString()}`,
-                    },
-                  ].map(({ icon: Icon, label, value }) => (
-                    <div
-                      key={label}
-                      className="bg-white px-5 py-4 flex items-center gap-3"
-                    >
-                      <span
-                        className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
-                        style={{ background: "#eaf3f8" }}
-                      >
-                        <Icon size={17} style={{ color: "#136C9E" }} />
-                      </span>
-                      <div>
-                        <p className="text-[11px] text-[#94a3b8] font-semibold uppercase tracking-wide">
-                          {label}
-                        </p>
-                        <p
-                          className="text-[14px] font-bold text-[#1e293b] mt-0.5"
-                          style={{ fontFamily: "Archivo,sans-serif" }}
-                        >
-                          {value}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="px-5 py-4 flex items-center gap-2 text-[13px] text-[#64748b] border-t border-[#f1f5f9]">
-                  <MapPin size={14} className="text-[#94a3b8] shrink-0" />
-                  {property.address}
-                  <span className="ml-auto text-[12px]">
-                    Added {dates.createdAt}
-                  </span>
-                </div>
-              </SCard>
-
-              {(property.amenities ?? []).length > 0 && (
-                <SCard className="px-5 py-5">
-                  <p
-                    className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3"
-                    style={{ fontFamily: "Archivo,sans-serif" }}
-                  >
-                    Amenities
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {property.amenities.map((a) => (
-                      <span
-                        key={a}
-                        className="text-[12px] font-semibold px-3 py-1 rounded-full capitalize"
-                        style={{
-                          background: "#eaf3f8",
-                          color: "#136C9E",
-                          border: "1px solid rgba(19,108,158,0.15)",
-                        }}
-                      >
-                        {a.replace(/-/g, " ")}
-                      </span>
-                    ))}
-                  </div>
-                </SCard>
-              )}
-
-              {property.notes && (
-                <SCard className="px-5 py-5">
-                  <p
-                    className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-2"
-                    style={{ fontFamily: "Archivo,sans-serif" }}
-                  >
-                    Notes
-                  </p>
-                  <p className="text-[13.5px] text-[#475569] leading-relaxed">
-                    {property.notes}
-                  </p>
-                </SCard>
-              )}
-            </div>
-
-            {/* ── Photos Section ─────────────────────────────────────────── */}
-            <div
-              id="photos-section"
-              className="scroll-mt-[140px] space-y-4 pt-6"
-            >
-              {/* Error banner */}
-              {photoSaveError && (
-                <div className="flex items-center gap-2 p-3 rounded-[12px] border border-red-200 bg-red-50 text-[13px] text-red-700">
-                  <AlertTriangle size={15} className="shrink-0" />
-                  {photoSaveError}
-                </div>
-              )}
-
-              {/* Upload zone */}
-              <SCard>
-                <div
-                  className="m-5 border-2 border-dashed rounded-[16px] p-8 text-center cursor-pointer transition-all hover:border-[#136C9E] hover:bg-[#f0f8fd]"
-                  style={{ borderColor: "#e2e8f0" }}
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    uploadFiles(e.dataTransfer.files);
-                  }}
-                >
-                  {uploadingCount > 0 ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2
-                        size={28}
-                        className="text-[#136C9E] animate-spin"
-                      />
-                      <p className="text-[13px] font-semibold text-[#136C9E]">
-                        Uploading {uploadingCount} photo
-                        {uploadingCount > 1 ? "s" : ""}…
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload
-                        size={28}
-                        className="mx-auto mb-3 text-[#94a3b8]"
-                      />
-                      <p
-                        className="text-[14px] font-semibold text-[#334155]"
-                        style={{ fontFamily: "Archivo,sans-serif" }}
-                      >
-                        Drag & drop or click to upload
-                      </p>
-                      <p className="text-[12px] text-[#64748b] mt-1">
-                        JPG, PNG, HEIC — max 10 MB each
-                      </p>
-                    </>
-                  )}
-                </div>
-              </SCard>
-
-              {/* Photo grid */}
-              {validPhotos.length === 0 && uploadingCount === 0 ? (
-                <SCard className="flex flex-col items-center py-12 text-center px-5">
-                  <div
-                    className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
-                    style={{ background: "#f1f5f9" }}
-                  >
-                    <ImageIcon size={24} className="text-[#94a3b8]" />
-                  </div>
-                  <p className="text-[14px] font-semibold text-[#1e293b] mb-1">
-                    No photos yet
-                  </p>
-                  <p className="text-[13px] text-[#64748b]">
-                    Properties with photos attract significantly more enquiries.
-                  </p>
-                </SCard>
-              ) : (
-                <SCard className="p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <p
-                      className="text-[13px] font-bold text-[#1e293b]"
-                      style={{ fontFamily: "Archivo,sans-serif" }}
-                    >
-                      {validPhotos.length} photo
-                      {validPhotos.length !== 1 ? "s" : ""}
-                      {hasChanges && (
-                        <span className="ml-2 text-[11px] text-amber-500 font-semibold">
-                          • unsaved changes
-                        </span>
-                      )}
-                    </p>
+                <img
+                  src={heroPhoto!.url}
+                  alt={heroPhoto!.room ?? "Property"}
+                  className="w-full h-full object-cover"
+                />
+                {heroPhotos.length > 1 && (
+                  <>
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
+                      onClick={() => setHeroIdx((i) => Math.max(0, i - 1))}
+                      disabled={heroIdx === 0}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30"
+                    >
+                      <ChevronLeft size={17} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHeroIdx((i) => Math.min(heroPhotos.length - 1, i + 1))}
+                      disabled={heroIdx === heroPhotos.length - 1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30"
+                    >
+                      <ChevronRight size={17} />
+                    </button>
+                    <span
+                      className="absolute bottom-3 right-3 text-[11.5px] font-semibold px-2.5 py-1 rounded-full"
+                      style={{ background: "rgba(0,0,0,0.45)", color: "white" }}
+                    >
+                      {heroIdx + 1} / {heroPhotos.length}
+                    </span>
+                  </>
+                )}
+              </div>
+              {heroPhotos.length > 1 && (
+                <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                  {heroPhotos.map((p, i) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setHeroIdx(i)}
+                      className="shrink-0 rounded-[10px] overflow-hidden transition-all"
                       style={{
-                        color: "#136C9E",
-                        fontFamily: "Archivo,sans-serif",
+                        width: 72,
+                        height: 52,
+                        outline: i === heroIdx ? "2.5px solid #136C9E" : "2px solid transparent",
+                        opacity: i === heroIdx ? 1 : 0.65,
                       }}
                     >
-                      <Plus size={14} /> Add More
+                      <img src={p.url} alt={p.room ?? `Photo ${i + 1}`} className="w-full h-full object-cover" />
                     </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {validPhotos.map((photo, i) => (
-                      <div
-                        key={photo.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, i)}
-                        onDragEnter={(e) => handleDragEnter(e, i)}
-                        onDragEnd={() => setDraggedIdx(null)}
-                        className="group relative rounded-[12px] overflow-hidden bg-[#f1f5f9] cursor-grab active:cursor-grabbing"
-                        style={{ opacity: draggedIdx === i ? 0.5 : 1 }}
-                      >
-                        <div className="relative aspect-video overflow-hidden">
-                          <img
-                            src={photo.url}
-                            alt={photo.room ?? "Property"}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-
-                          {/* Drag handle */}
-                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <GripVertical
-                              size={14}
-                              className="text-white drop-shadow"
-                            />
-                          </div>
-
-                          {/* Cover badge */}
-                          {photo.isCover && (
-                            <span
-                              className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
-                              style={{
-                                background: "#136C9E",
-                                fontFamily: "Archivo,sans-serif",
-                              }}
-                            >
-                              <Star size={9} fill="currentColor" /> Cover
-                            </span>
-                          )}
-
-                          {/* Hover overlay actions */}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <button
-                              type="button"
-                              title="Preview"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPreviewPhoto(photo);
-                              }}
-                              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all"
-                            >
-                              <Eye size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              title="Download"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(photo.url, "_blank", "noopener");
-                              }}
-                              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all"
-                            >
-                              <Download size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              title="Remove"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removePhoto(photo.id);
-                              }}
-                              className="w-8 h-8 rounded-full bg-red-500/70 hover:bg-red-500 flex items-center justify-center text-white transition-all"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Room tag + set cover — below image */}
-                        <div className="p-2 space-y-1.5 bg-white border-t border-[#f1f5f9]">
-                          <Select
-                            value={photo.room || "none"}
-                            onValueChange={(v) => setRoom(photo.id, v)}
-                          >
-                            <SelectTrigger className="h-7 text-[11px] rounded-[8px] border-[#e2e8f0] px-2">
-                              <SelectValue placeholder="Tag room" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">No tag</SelectItem>
-                              {ROOM_TYPES.map((r) => (
-                                <SelectItem key={r} value={r}>
-                                  {r}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {!photo.isCover && (
-                            <button
-                              type="button"
-                              onClick={() => setCover(photo.id)}
-                              className="w-full h-6 text-[10.5px] font-semibold rounded-[8px] border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9] flex items-center justify-center gap-1 transition-all"
-                            >
-                              <Star size={9} /> Set as cover
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </SCard>
-              )}
-
-              {/* Unsaved changes save bar */}
-              {hasChanges && (
-                <div
-                  className="flex items-center justify-between p-4 rounded-[16px] border"
-                  style={{ background: "#fffbeb", borderColor: "#fde68a" }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
-                    <p className="text-[13px] font-semibold text-amber-800">
-                      You have unsaved photo changes
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={savePhotos}
-                    disabled={isSavingPhotos}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white transition-all disabled:opacity-50 hover:opacity-90"
-                    style={{
-                      background: "#DC5F12",
-                      fontFamily: "Archivo,sans-serif",
-                    }}
-                  >
-                    {isSavingPhotos ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Saving…
-                      </>
-                    ) : (
-                      <>
-                        <Save size={14} />
-                        Save Photos
-                      </>
-                    )}
-                  </button>
+                  ))}
                 </div>
               )}
             </div>
+          ) : (
+            <div
+              className="w-full rounded-[16px] flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[#e2e8f0] cursor-pointer hover:border-[#136C9E] hover:bg-[#f0f8fd] transition-all"
+              style={{ height: "220px" }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Camera size={32} className="text-[#94a3b8]" />
+              <p className="text-[13.5px] font-semibold text-[#64748b]">Click to add photos</p>
+            </div>
+          )}
+        </div>
 
-            {/* ── Documents Section ─────────────────────────────────────────── */}
-            <div id="documents-section" className="scroll-mt-[140px] pt-6">
-              <SCard>
-                <div
-                  className="flex items-center justify-between px-5 pt-5 pb-4"
-                  style={{ borderBottom: "1px solid #f1f5f9" }}
+        {/* ── Two-column body ─────────────────────────────────────────────── */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+
+          {/* ── Left: tab panel ─────────────────────────────────────────── */}
+          <div className="flex-1 min-w-0 space-y-4">
+
+            {/* Tab bar */}
+            <div className="flex items-center gap-1 p-1 rounded-[12px] bg-[#f1f5f9]" style={{ width: "fit-content" }}>
+              {(
+                [
+                  { key: "overview" as const, label: "Details" },
+                  { key: "documents" as const, label: "Documents", badge: expiredDocCount > 0 ? expiredDocCount : null },
+                  { key: "photos" as const, label: `Photos (${validPhotos.length})` },
+                ]
+              ).map(({ key, label, badge }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveTab(key)}
+                  className={`px-3.5 py-2 rounded-[9px] text-[13px] font-semibold transition-all border-0 outline-none ${
+                    activeTab === key
+                      ? "bg-white text-[#136C9E] shadow-sm"
+                      : "text-[#64748b] hover:text-[#1e293b] hover:bg-white/60"
+                  }`}
                 >
-                  <p
-                    className="text-[14px] font-bold text-[#1e293b]"
-                    style={{ fontFamily: "Archivo,sans-serif" }}
-                  >
+                  {label}
+                  {badge != null && (
+                    <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Details tab ─────────────────────────────────────────────── */}
+            {activeTab === "overview" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Basic Information */}
+                  <SCard className="px-5 py-5">
+                    <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-4" style={{ fontFamily: "Archivo,sans-serif" }}>
+                      Basic Information
+                    </p>
+                    <ul className="space-y-3">
+                      <li className="flex items-center gap-2.5 text-[13px] text-[#475569]">
+                        <MapPin size={14} className="text-[#94a3b8] shrink-0" />
+                        <span className="truncate">{property.address}</span>
+                      </li>
+                      <li className="flex items-center gap-2.5 text-[13px] text-[#475569]">
+                        <BedDouble size={14} className="text-[#94a3b8] shrink-0" />
+                        {property.bedrooms} bedroom{property.bedrooms !== 1 ? "s" : ""}
+                      </li>
+                      <li className="flex items-center gap-2.5 text-[13px] text-[#475569]">
+                        <Bath size={14} className="text-[#94a3b8] shrink-0" />
+                        {typeof (property as any).bathrooms === "number"
+                          ? `${(property as any).bathrooms} bathroom${(property as any).bathrooms !== 1 ? "s" : ""}`
+                          : "—"}
+                      </li>
+                      <li className="flex items-center gap-2.5 text-[13px] text-[#475569]">
+                        <Maximize2 size={14} className="text-[#94a3b8] shrink-0" />
+                        {typeof (property as any).squareFootage === "number"
+                          ? `${(property as any).squareFootage} sq ft`
+                          : "—"}
+                      </li>
+                      <li className="flex items-center gap-2.5 text-[13px] text-[#475569]">
+                        <PoundSterling size={14} className="text-[#94a3b8] shrink-0" />
+                        £{(property.rent ?? 0).toLocaleString()} per month
+                      </li>
+                      <li className="flex items-center gap-2.5 text-[13px] text-[#475569]">
+                        <Calendar size={14} className="text-[#94a3b8] shrink-0" />
+                        Added {dates.createdAt}
+                      </li>
+                    </ul>
+                  </SCard>
+
+                  {/* Amenities + Notes */}
+                  <div className="space-y-4">
+                    {(property.amenities ?? []).length > 0 && (
+                      <SCard className="px-5 py-5">
+                        <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3" style={{ fontFamily: "Archivo,sans-serif" }}>
+                          Amenities
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {property.amenities.map((a) => (
+                            <span
+                              key={a}
+                              className="text-[12px] font-semibold px-3 py-1 rounded-full capitalize"
+                              style={{ background: "#eaf3f8", color: "#136C9E", border: "1px solid rgba(19,108,158,0.15)" }}
+                            >
+                              {a.replace(/-/g, " ")}
+                            </span>
+                          ))}
+                        </div>
+                      </SCard>
+                    )}
+                    {property.notes && (
+                      <SCard className="px-5 py-5">
+                        <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-2" style={{ fontFamily: "Archivo,sans-serif" }}>
+                          Notes
+                        </p>
+                        <p className="text-[13.5px] text-[#475569] leading-relaxed">{property.notes}</p>
+                      </SCard>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Documents tab ────────────────────────────────────────────── */}
+            {activeTab === "documents" && (
+              <SCard>
+                <div className="flex items-center justify-between px-5 pt-5 pb-4" style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <p className="text-[14px] font-bold text-[#1e293b]" style={{ fontFamily: "Archivo,sans-serif" }}>
                     Property Documents
                   </p>
                   <button
                     type="button"
                     onClick={onManageDocuments}
                     className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
-                    style={{
-                      color: "#136C9E",
-                      fontFamily: "Archivo,sans-serif",
-                    }}
+                    style={{ color: "#136C9E", fontFamily: "Archivo,sans-serif" }}
                   >
                     <Plus size={14} /> Upload Document
                   </button>
                 </div>
                 {(property.documents ?? []).length === 0 ? (
                   <div className="flex flex-col items-center py-12 text-center px-5">
-                    <div
-                      className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4"
-                      style={{ background: "#f1f5f9" }}
-                    >
+                    <div className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4" style={{ background: "#f1f5f9" }}>
                       <FileText size={24} className="text-[#94a3b8]" />
                     </div>
-                    <p className="text-[14px] font-semibold text-[#1e293b] mb-1">
-                      No documents yet
-                    </p>
+                    <p className="text-[14px] font-semibold text-[#1e293b] mb-1">No documents yet</p>
                     <p className="text-[13px] text-[#64748b] mb-4">
-                      Upload EPC certificates, gas safety checks and tenancy
-                      agreements.
+                      Upload EPC certificates, gas safety checks and tenancy agreements.
                     </p>
                     <button
                       type="button"
                       onClick={onManageDocuments}
                       className="text-[13px] font-semibold px-4 py-2.5 rounded-[12px] transition-all hover:opacity-90"
-                      style={{
-                        background: "#136C9E",
-                        color: "white",
-                        fontFamily: "Archivo,sans-serif",
-                      }}
+                      style={{ background: "#136C9E", color: "white", fontFamily: "Archivo,sans-serif" }}
                     >
                       Upload Documents
                     </button>
@@ -1053,63 +797,213 @@ export function PropertyDetails({
                 ) : (
                   <ul className="divide-y divide-[#f1f5f9]">
                     {property.documents.map((doc) => (
-                      <li
-                        key={doc.id}
-                        className="flex items-center gap-3 px-5 py-3.5"
-                      >
+                      <li key={doc.id} className="flex items-center gap-3 px-5 py-3.5">
                         <DocStatusIcon status={doc.status} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13.5px] font-semibold text-[#1e293b] truncate">
-                            {doc.name}
-                          </p>
-                          <p className="text-[11.5px] text-[#64748b]">
-                            {DOC_TYPE_LABELS[doc.type] ?? doc.type}
-                          </p>
+                          <p className="text-[13.5px] font-semibold text-[#1e293b] truncate">{doc.name}</p>
+                          <p className="text-[11.5px] text-[#64748b]">{DOC_TYPE_LABELS[doc.type] ?? doc.type}</p>
                         </div>
                         <div className="text-right text-[11.5px] text-[#94a3b8] shrink-0">
                           <p>Issued {dates.docs[doc.id]?.issue ?? "—"}</p>
-                          {doc.expiryDate && (
-                            <p>Expires {dates.docs[doc.id]?.expiry ?? "—"}</p>
-                          )}
+                          {doc.expiryDate && <p>Expires {dates.docs[doc.id]?.expiry ?? "—"}</p>}
                         </div>
                       </li>
                     ))}
                   </ul>
                 )}
               </SCard>
-            </div>
+            )}
+
+            {/* ── Photos tab ──────────────────────────────────────────────── */}
+            {activeTab === "photos" && (
+              <div className="space-y-4">
+                {photoSaveError && (
+                  <div className="flex items-center gap-2 p-3 rounded-[12px] border border-red-200 bg-red-50 text-[13px] text-red-700">
+                    <AlertTriangle size={15} className="shrink-0" />
+                    {photoSaveError}
+                  </div>
+                )}
+
+                {/* Upload zone */}
+                <SCard>
+                  <div
+                    className="m-5 border-2 border-dashed rounded-[16px] p-8 text-center cursor-pointer transition-all hover:border-[#136C9E] hover:bg-[#f0f8fd]"
+                    style={{ borderColor: "#e2e8f0" }}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); uploadFiles(e.dataTransfer.files); }}
+                  >
+                    {uploadingCount > 0 ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 size={28} className="text-[#136C9E] animate-spin" />
+                        <p className="text-[13px] font-semibold text-[#136C9E]">
+                          Uploading {uploadingCount} photo{uploadingCount > 1 ? "s" : ""}…
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload size={28} className="mx-auto mb-3 text-[#94a3b8]" />
+                        <p className="text-[14px] font-semibold text-[#334155]" style={{ fontFamily: "Archivo,sans-serif" }}>
+                          Drag & drop or click to upload
+                        </p>
+                        <p className="text-[12px] text-[#64748b] mt-1">JPG, PNG, HEIC — max 10 MB each</p>
+                      </>
+                    )}
+                  </div>
+                </SCard>
+
+                {/* Photo grid */}
+                {validPhotos.length === 0 && uploadingCount === 0 ? (
+                  <SCard className="flex flex-col items-center py-12 text-center px-5">
+                    <div className="w-14 h-14 rounded-[16px] flex items-center justify-center mb-4" style={{ background: "#f1f5f9" }}>
+                      <ImageIcon size={24} className="text-[#94a3b8]" />
+                    </div>
+                    <p className="text-[14px] font-semibold text-[#1e293b] mb-1">No photos yet</p>
+                    <p className="text-[13px] text-[#64748b]">Properties with photos attract significantly more enquiries.</p>
+                  </SCard>
+                ) : (
+                  <SCard className="p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[13px] font-bold text-[#1e293b]" style={{ fontFamily: "Archivo,sans-serif" }}>
+                        {validPhotos.length} photo{validPhotos.length !== 1 ? "s" : ""}
+                        {hasChanges && (
+                          <span className="ml-2 text-[11px] text-amber-500 font-semibold">• unsaved changes</span>
+                        )}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-[10px] transition-all hover:bg-[#eaf3f8]"
+                        style={{ color: "#136C9E", fontFamily: "Archivo,sans-serif" }}
+                      >
+                        <Plus size={14} /> Add More
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {validPhotos.map((photo, i) => (
+                        <div
+                          key={photo.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, i)}
+                          onDragEnter={(e) => handleDragEnter(e, i)}
+                          onDragEnd={() => setDraggedIdx(null)}
+                          className="group relative rounded-[12px] overflow-hidden bg-[#f1f5f9] cursor-grab active:cursor-grabbing"
+                          style={{ opacity: draggedIdx === i ? 0.5 : 1 }}
+                        >
+                          <div className="relative aspect-video overflow-hidden">
+                            <img
+                              src={photo.url}
+                              alt={photo.room ?? "Property"}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <GripVertical size={14} className="text-white drop-shadow" />
+                            </div>
+                            {photo.isCover && (
+                              <span
+                                className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                                style={{ background: "#136C9E", fontFamily: "Archivo,sans-serif" }}
+                              >
+                                <Star size={9} fill="currentColor" /> Cover
+                              </span>
+                            )}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                title="Preview"
+                                onClick={(e) => { e.stopPropagation(); setPreviewPhoto(photo); }}
+                                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Download"
+                                onClick={(e) => { e.stopPropagation(); window.open(photo.url, "_blank", "noopener"); }}
+                                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-all"
+                              >
+                                <Download size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Remove"
+                                onClick={(e) => { e.stopPropagation(); removePhoto(photo.id); }}
+                                className="w-8 h-8 rounded-full bg-red-500/70 hover:bg-red-500 flex items-center justify-center text-white transition-all"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="p-2 space-y-1.5 bg-white border-t border-[#f1f5f9]">
+                            <Select value={photo.room || "none"} onValueChange={(v: string) => setRoom(photo.id, v)}>
+                              <SelectTrigger className="h-7 text-[11px] rounded-[8px] border-[#e2e8f0] px-2">
+                                <SelectValue placeholder="Tag room" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No tag</SelectItem>
+                                {ROOM_TYPES.map((r) => (
+                                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {!photo.isCover && (
+                              <button
+                                type="button"
+                                onClick={() => setCover(photo.id)}
+                                className="w-full h-6 text-[10.5px] font-semibold rounded-[8px] border border-[#e2e8f0] text-[#64748b] hover:bg-[#f1f5f9] flex items-center justify-center gap-1 transition-all"
+                              >
+                                <Star size={9} /> Set as cover
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </SCard>
+                )}
+
+                {/* Unsaved changes save bar */}
+                {hasChanges && (
+                  <div
+                    className="flex items-center justify-between p-4 rounded-[16px] border"
+                    style={{ background: "#fffbeb", borderColor: "#fde68a" }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      <p className="text-[13px] font-semibold text-amber-800">You have unsaved photo changes</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={savePhotos}
+                      disabled={isSavingPhotos}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white transition-all disabled:opacity-50 hover:opacity-90"
+                      style={{ background: "#DC5F12", fontFamily: "Archivo,sans-serif" }}
+                    >
+                      {isSavingPhotos ? (
+                        <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                      ) : (
+                        <><Save size={14} /> Save Photos</>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* ── Right: sidebar ─────────────────────────────────────────── */}
-          <div className="w-full lg:w-[300px] shrink-0 space-y-4 lg:sticky lg:top-[80px]">
-            {/* Quick actions */}
+          {/* ── Right: sidebar ──────────────────────────────────────────── */}
+          <div className="w-full lg:w-[300px] shrink-0 space-y-4 lg:sticky lg:top-[68px]">
+
+            {/* Quick Actions */}
             <SCard className="p-4">
-              <p
-                className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-1"
-                style={{ fontFamily: "Archivo,sans-serif" }}
-              >
+              <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-1" style={{ fontFamily: "Archivo,sans-serif" }}>
                 Quick Actions
               </p>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {[
-                  {
-                    label: "Edit Property",
-                    icon: Edit3,
-                    action: () => onEdit(property),
-                  },
-                  {
-                    label: "Add Photos",
-                    icon: Camera,
-                    action: () => {
-                      setActiveTab("photos");
-                      fileInputRef.current?.click();
-                    },
-                  },
-                  {
-                    label: "Manage Documents",
-                    icon: FileText,
-                    action: onManageDocuments,
-                  },
+                  { label: "Edit Property", icon: Edit3, action: () => onEdit(property) },
+                  { label: "Manage Photos", icon: Camera, action: () => setActiveTab("photos") },
+                  { label: "Manage Documents", icon: FileText, action: onManageDocuments },
                 ].map(({ label, icon: Icon, action }) => (
                   <button
                     key={label}
@@ -1125,212 +1019,153 @@ export function PropertyDetails({
               </div>
             </SCard>
 
-            {/* Tenant card — occupied */}
-            {(property.status === "occupied" || property.tenant) &&
-              property.tenant && (
-                <SCard className="overflow-hidden">
-                  <div
-                    className="px-4 py-3.5"
-                    style={{
-                      background:
-                        "linear-gradient(135deg,#136C9E 0%,#0e5a87 100%)",
-                    }}
-                  >
-                    <p
-                      className="text-[11px] uppercase font-bold tracking-wider text-white/70 mb-2"
-                      style={{ fontFamily: "Archivo,sans-serif" }}
+            {/* Current Tenant */}
+            {(property.status === "occupied" || property.tenant) && property.tenant && (
+              <SCard className="overflow-hidden">
+                <div className="px-4 py-3.5" style={{ background: "linear-gradient(135deg,#136C9E 0%,#0e5a87 100%)" }}>
+                  <p className="text-[11px] uppercase font-bold tracking-wider text-white/70 mb-2" style={{ fontFamily: "Archivo,sans-serif" }}>
+                    Current Tenant
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-[14px] font-bold text-white"
+                      style={{ background: "rgba(255,255,255,0.2)" }}
                     >
-                      Current Tenant
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-[14px] font-bold text-white"
-                        style={{ background: "rgba(255,255,255,0.2)" }}
-                      >
-                        {initials(property.tenant.name ?? "")}
-                      </div>
-                      <div className="min-w-0">
-                        <p
-                          className="text-[14px] font-bold text-white truncate"
-                          style={{ fontFamily: "Archivo,sans-serif" }}
-                        >
-                          {property.tenant.name}
-                        </p>
-                        <span
-                          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                            property.tenant.paymentStatus === "current"
-                              ? "bg-green-400/30 text-green-100"
-                              : property.tenant.paymentStatus === "overdue"
-                                ? "bg-red-400/30 text-red-100"
-                                : "bg-amber-400/30 text-amber-100"
-                          }`}
-                        >
-                          {property.tenant.paymentStatus === "current"
-                            ? "✓ Up to date"
+                      {initials(property.tenant.name ?? "")}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-bold text-white truncate" style={{ fontFamily: "Archivo,sans-serif" }}>
+                        {property.tenant.name}
+                      </p>
+                      <span
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          property.tenant.paymentStatus === "current"
+                            ? "bg-green-400/30 text-green-100"
                             : property.tenant.paymentStatus === "overdue"
-                              ? "⚠ Overdue"
-                              : "Payment plan"}
-                        </span>
-                      </div>
+                              ? "bg-red-400/30 text-red-100"
+                              : "bg-amber-400/30 text-amber-100"
+                        }`}
+                      >
+                        {property.tenant.paymentStatus === "current"
+                          ? "✓ Up to date"
+                          : property.tenant.paymentStatus === "overdue"
+                            ? "⚠ Overdue"
+                            : "Payment plan"}
+                      </span>
                     </div>
                   </div>
-                  <div className="px-4 py-3 space-y-2.5">
-                    {property.tenant.email && (
-                      <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
-                        <Mail size={13} className="text-[#94a3b8] shrink-0" />
-                        <span className="truncate">
-                          {property.tenant.email}
-                        </span>
+                </div>
+                <div className="px-4 py-3 space-y-2.5">
+                  {property.tenant.email && (
+                    <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
+                      <Mail size={13} className="text-[#94a3b8] shrink-0" />
+                      <span className="truncate">{property.tenant.email}</span>
+                    </div>
+                  )}
+                  {property.tenant.phone && (
+                    <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
+                      <Phone size={13} className="text-[#94a3b8] shrink-0" />
+                      {property.tenant.phone}
+                    </div>
+                  )}
+                  {property.tenant.rentAmount && (
+                    <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
+                      <PoundSterling size={13} className="text-[#94a3b8] shrink-0" />
+                      £{(property.tenant.rentAmount ?? 0).toLocaleString()} / month
+                    </div>
+                  )}
+                  {dates.leaseEnd !== "—" && (
+                    <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
+                      <Calendar size={13} className="text-[#94a3b8] shrink-0" />
+                      Lease until {dates.leaseEnd}
+                    </div>
+                  )}
+                  {property.tenant.paymentStatus === "overdue" && (property.tenant as any).overdueAmount && (
+                    <div className="flex items-start gap-2 p-2.5 rounded-[10px] bg-red-50 border border-red-200">
+                      <AlertTriangle size={13} className="text-red-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-[12px] font-bold text-red-700">
+                          £{(property.tenant as any).overdueAmount.toLocaleString()} overdue
+                        </p>
+                        {dates.lastPaid !== "—" && (
+                          <p className="text-[11px] text-red-500">Last paid {dates.lastPaid}</p>
+                        )}
                       </div>
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-2 pt-1">
+                    {onViewTenant && property.tenant.id && (
+                      <button
+                        type="button"
+                        onClick={() => onViewTenant(property.tenant!.id)}
+                        className="w-full h-9 rounded-[10px] border border-[#e2e8f0] flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-[#334155] hover:bg-[#f1f5f9] transition-all"
+                        style={{ fontFamily: "Archivo,sans-serif" }}
+                      >
+                        <Eye size={13} /> View Tenant Details
+                      </button>
                     )}
-                    {property.tenant.phone && (
-                      <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
-                        <Phone size={13} className="text-[#94a3b8] shrink-0" />
-                        {property.tenant.phone}
-                      </div>
-                    )}
-                    {property.tenant.rentAmount && (
-                      <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
-                        <PoundSterling
-                          size={13}
-                          className="text-[#94a3b8] shrink-0"
-                        />
-                        £{(property.tenant.rentAmount ?? 0).toLocaleString()} /
-                        month
-                      </div>
-                    )}
-                    {dates.leaseEnd !== "—" && (
-                      <div className="flex items-center gap-2 text-[12.5px] text-[#475569]">
-                        <Calendar
-                          size={13}
-                          className="text-[#94a3b8] shrink-0"
-                        />
-                        Rent ends {dates.leaseEnd}
-                      </div>
-                    )}
-                    {property.tenant.paymentStatus === "overdue" &&
-                      (property.tenant as any).overdueAmount && (
-                        <div className="flex items-start gap-2 p-2.5 rounded-[10px] bg-red-50 border border-red-200">
-                          <AlertTriangle
-                            size={13}
-                            className="text-red-500 mt-0.5 shrink-0"
-                          />
-                          <div>
-                            <p className="text-[12px] font-bold text-red-700">
-                              £
-                              {(
-                                property.tenant as any
-                              ).overdueAmount.toLocaleString()}{" "}
-                              overdue
-                            </p>
-                            {dates.lastPaid !== "—" && (
-                              <p className="text-[11px] text-red-500">
-                                Last paid {dates.lastPaid}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    <div className="flex flex-col gap-2 pt-1">
-                      {onViewTenant && property.tenant.id && (
+                    <div className="flex gap-2">
+                      {onChangeTenant && property.tenant.id && (
                         <button
                           type="button"
-                          onClick={() => onViewTenant(property.tenant!.id)}
-                          className="w-full h-9 rounded-[10px] border border-[#e2e8f0] flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-[#334155] hover:bg-[#f1f5f9] transition-all"
+                          onClick={() => setShowChangeTenantDialog(true)}
+                          className="flex-1 h-9 rounded-[10px] border border-[#e2e8f0] flex items-center justify-center gap-1 text-[12px] font-semibold text-[#334155] hover:bg-[#f1f5f9] transition-all"
                           style={{ fontFamily: "Archivo,sans-serif" }}
                         >
-                          <Eye size={13} /> View Tenant Details
+                          <UserCheck size={13} /> Change
                         </button>
                       )}
-                      <div className="flex gap-2">
-                        {onChangeTenant && property.tenant.id && (
-                          <button
-                            type="button"
-                            onClick={() => setShowChangeTenantDialog(true)}
-                            className="flex-1 h-9 rounded-[10px] border border-[#e2e8f0] flex items-center justify-center gap-1 text-[12px] font-semibold text-[#334155] hover:bg-[#f1f5f9] transition-all"
-                            style={{ fontFamily: "Archivo,sans-serif" }}
-                          >
-                            <UserCheck size={13} /> Change
-                          </button>
-                        )}
-                        {onRemoveTenant && property.tenant.id && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  `Remove ${property.tenant?.name} from this property?`,
-                                )
-                              ) {
-                                onRemoveTenant(
-                                  property.tenant!.id,
-                                  property.id,
-                                );
-                              }
-                            }}
-                            className="flex-1 h-9 rounded-[10px] border flex items-center justify-center gap-1 text-[12px] font-semibold transition-all hover:bg-red-50"
-                            style={{
-                              borderColor: "#fca5a5",
-                              color: "#dc2626",
-                              fontFamily: "Archivo,sans-serif",
-                            }}
-                          >
-                            <UserX size={13} /> Remove
-                          </button>
-                        )}
-                      </div>
+                      {onRemoveTenant && property.tenant.id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`Remove ${property.tenant?.name} from this property?`)) {
+                              onRemoveTenant(property.tenant!.id, property.id);
+                            }
+                          }}
+                          className="flex-1 h-9 rounded-[10px] border flex items-center justify-center gap-1 text-[12px] font-semibold transition-all hover:bg-red-50"
+                          style={{ borderColor: "#fca5a5", color: "#dc2626", fontFamily: "Archivo,sans-serif" }}
+                        >
+                          <UserX size={13} /> Remove
+                        </button>
+                      )}
                     </div>
                   </div>
-                </SCard>
-              )}
+                </div>
+              </SCard>
+            )}
 
             {/* Vacant card */}
             {property.status === "vacant" && !property.tenant && (
               <SCard className="p-4">
                 <div className="text-center py-4">
-                  <div
-                    className="w-12 h-12 rounded-[14px] flex items-center justify-center mx-auto mb-3"
-                    style={{ background: "#f1f5f9" }}
-                  >
+                  <div className="w-12 h-12 rounded-[14px] flex items-center justify-center mx-auto mb-3" style={{ background: "#f1f5f9" }}>
                     <User size={22} className="text-[#94a3b8]" />
                   </div>
-                  <p
-                    className="text-[14px] font-bold text-[#1e293b] mb-1"
-                    style={{ fontFamily: "Archivo,sans-serif" }}
-                  >
+                  <p className="text-[14px] font-bold text-[#1e293b] mb-1" style={{ fontFamily: "Archivo,sans-serif" }}>
                     Property is Vacant
                   </p>
-                  <p className="text-[12.5px] text-[#64748b] mb-4">
-                    Ready to welcome a new tenant.
-                  </p>
+                  <p className="text-[12.5px] text-[#64748b] mb-4">Ready to welcome a new tenant.</p>
                   {onAddTenant && (
                     <button
                       type="button"
                       onClick={onAddTenant}
                       className="w-full h-[42px] rounded-[12px] flex items-center justify-center gap-2 text-[13px] font-semibold text-white transition-all hover:opacity-90 mb-2"
-                      style={{
-                        background: "#DC5F12",
-                        fontFamily: "Archivo,sans-serif",
-                        boxShadow: "0 3px 10px rgba(220,95,18,0.25)",
-                      }}
+                      style={{ background: "#DC5F12", fontFamily: "Archivo,sans-serif", boxShadow: "0 3px 10px rgba(220,95,18,0.25)" }}
                     >
                       <UserPlus size={15} /> Add New Tenant
                     </button>
                   )}
                   {availableTenants.length > 0 && onSelectExistingTenant && (
                     <div className="mt-3">
-                      <p className="text-[11px] text-[#94a3b8] font-semibold mb-2">
-                        Or assign existing tenant
-                      </p>
+                      <p className="text-[11px] text-[#94a3b8] font-semibold mb-2">Or assign existing tenant</p>
                       <Select onValueChange={onSelectExistingTenant}>
                         <SelectTrigger className="w-full rounded-[10px] border-[#e2e8f0] text-[13px]">
                           <SelectValue placeholder="Select tenant…" />
                         </SelectTrigger>
                         <SelectContent>
                           {availableTenants.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.name}
-                            </SelectItem>
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -1344,90 +1179,67 @@ export function PropertyDetails({
             {property.status === "under-renovation" && (
               <SCard className="p-4">
                 <div className="text-center py-4">
-                  <div
-                    className="w-12 h-12 rounded-[14px] flex items-center justify-center mx-auto mb-3"
-                    style={{ background: "#fef9c3" }}
-                  >
+                  <div className="w-12 h-12 rounded-[14px] flex items-center justify-center mx-auto mb-3" style={{ background: "#fef9c3" }}>
                     <Clock size={22} className="text-amber-500" />
                   </div>
-                  <p
-                    className="text-[14px] font-bold text-[#1e293b] mb-1"
-                    style={{ fontFamily: "Archivo,sans-serif" }}
-                  >
+                  <p className="text-[14px] font-bold text-[#1e293b] mb-1" style={{ fontFamily: "Archivo,sans-serif" }}>
                     Under Renovation
                   </p>
-                  <p className="text-[12.5px] text-[#64748b]">
-                    Not available for tenants until works complete.
-                  </p>
+                  <p className="text-[12.5px] text-[#64748b]">Not available for tenants until works complete.</p>
                 </div>
               </SCard>
             )}
 
-            {/* Compliance */}
-            {(property.documents ?? []).length > 0 && (
-              <SCard className="p-4">
-                <p
-                  className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-1"
-                  style={{ fontFamily: "Archivo,sans-serif" }}
-                >
-                  Compliance
+            {/* Compliance Status */}
+            <SCard className="p-4">
+              <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-1" style={{ fontFamily: "Archivo,sans-serif" }}>
+                Compliance Status
+              </p>
+              {(property.documents ?? []).length === 0 ? (
+                <p className="text-[12.5px] text-[#64748b] leading-relaxed">
+                  No documents uploaded.{" "}
+                  <button
+                    type="button"
+                    onClick={onManageDocuments}
+                    className="underline text-[#136C9E] font-semibold"
+                  >
+                    Upload compliance documents
+                  </button>{" "}
+                  to track their status.
                 </p>
+              ) : (
                 <ul className="space-y-2.5">
                   {property.documents.map((doc) => (
-                    <li
-                      key={doc.id}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-[12.5px] text-[#334155] truncate">
-                        {DOC_TYPE_LABELS[doc.type] ?? doc.type}
-                      </span>
+                    <li key={doc.id} className="flex items-center justify-between">
+                      <span className="text-[12.5px] text-[#334155] truncate">{DOC_TYPE_LABELS[doc.type] ?? doc.type}</span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <DocStatusIcon status={doc.status} />
-                        <span className="text-[11.5px] text-[#64748b] capitalize">
-                          {doc.status.replace("-", " ")}
-                        </span>
+                        <span className="text-[11.5px] text-[#64748b] capitalize">{doc.status.replace("-", " ")}</span>
                       </div>
                     </li>
                   ))}
                 </ul>
-              </SCard>
-            )}
+              )}
+            </SCard>
 
-            {/* Summary */}
+            {/* Property Summary */}
             <SCard className="p-4">
-              <p
-                className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-1"
-                style={{ fontFamily: "Archivo,sans-serif" }}
-              >
-                Summary
+              <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-1" style={{ fontFamily: "Archivo,sans-serif" }}>
+                Property Summary
               </p>
               <ul className="space-y-2.5">
                 {[
                   ["Type", fmtType(property.type)],
                   ["Bedrooms", String(property.bedrooms)],
-                  [
-                    "Bathrooms",
-                    typeof (property as any).bathrooms === "number"
-                      ? String((property as any).bathrooms)
-                      : "—",
-                  ],
-                  [
-                    "Sq Ft",
-                    typeof (property as any).squareFootage === "number"
-                      ? `${(property as any).squareFootage}`
-                      : "—",
-                  ],
-                  ["Monthly Rent", `£${(property.rent ?? 0).toLocaleString()}`],
+                  ["Bathrooms", typeof (property as any).bathrooms === "number" ? String((property as any).bathrooms) : "—"],
+                  ["Square footage", typeof (property as any).squareFootage === "number" ? `${(property as any).squareFootage} sq ft` : "—"],
+                  ["Monthly rent", `£${(property.rent ?? 0).toLocaleString()}`],
                   ["Photos", String(validPhotos.length)],
                   ["Documents", String((property.documents ?? []).length)],
                 ].map(([label, value]) => (
                   <li key={label} className="flex items-center justify-between">
-                    <span className="text-[12.5px] text-[#64748b]">
-                      {label}
-                    </span>
-                    <span className="text-[12.5px] font-semibold text-[#1e293b]">
-                      {value}
-                    </span>
+                    <span className="text-[12.5px] text-[#64748b]">{label}</span>
+                    <span className="text-[12.5px] font-semibold text-[#1e293b]">{value}</span>
                   </li>
                 ))}
               </ul>
@@ -1437,18 +1249,12 @@ export function PropertyDetails({
       </div>
 
       {/* ── Change Tenant Dialog ─────────────────────────────────────────── */}
-      <Dialog
-        open={showChangeTenantDialog}
-        onOpenChange={setShowChangeTenantDialog}
-      >
+      <Dialog open={showChangeTenantDialog} onOpenChange={setShowChangeTenantDialog}>
         <DialogContent className="rounded-[20px]">
           <DialogHeader>
-            <DialogTitle style={{ fontFamily: "Archivo,sans-serif" }}>
-              Change Tenant
-            </DialogTitle>
+            <DialogTitle style={{ fontFamily: "Archivo,sans-serif" }}>Change Tenant</DialogTitle>
             <DialogDescription>
-              Select a tenant to assign to this property. The current tenant's
-              assignment will be updated.
+              Select a tenant to assign to this property. The current tenant's assignment will be updated.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
@@ -1458,14 +1264,11 @@ export function PropertyDetails({
               </SelectTrigger>
               <SelectContent>
                 {swappableTenants.length === 0 ? (
-                  <div className="p-3 text-sm text-center text-[#64748b]">
-                    No available tenants
-                  </div>
+                  <div className="p-3 text-sm text-center text-[#64748b]">No available tenants</div>
                 ) : (
                   swappableTenants.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                      {t.propertyId === property.id ? " (current)" : ""}
+                      {t.name}{t.propertyId === property.id ? " (current)" : ""}
                     </SelectItem>
                   ))
                 )}
@@ -1475,10 +1278,7 @@ export function PropertyDetails({
           <DialogFooter>
             <button
               type="button"
-              onClick={() => {
-                setShowChangeTenantDialog(false);
-                setNewTenantId("");
-              }}
+              onClick={() => { setShowChangeTenantDialog(false); setNewTenantId(""); }}
               className="px-4 py-2 rounded-[10px] border border-[#e2e8f0] text-[13px] font-semibold text-[#64748b] hover:bg-[#f1f5f9] transition-all"
             >
               Cancel
@@ -1494,10 +1294,7 @@ export function PropertyDetails({
                 }
               }}
               className="px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white disabled:opacity-40 transition-all hover:opacity-90"
-              style={{
-                background: "#136C9E",
-                fontFamily: "Archivo,sans-serif",
-              }}
+              style={{ background: "#136C9E", fontFamily: "Archivo,sans-serif" }}
             >
               Confirm Change
             </button>
@@ -1505,7 +1302,7 @@ export function PropertyDetails({
         </DialogContent>
       </Dialog>
 
-      {/* ── Photo preview lightbox ────────────────────────────────────────── */}
+      {/* ── Photo preview lightbox ──────────────────────────────────────── */}
       <Dialog open={!!previewPhoto} onOpenChange={() => setPreviewPhoto(null)}>
         <DialogContent className="max-w-3xl rounded-[20px] p-0 overflow-hidden">
           {previewPhoto && (
@@ -1517,25 +1314,15 @@ export function PropertyDetails({
               />
               <div
                 className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between"
-                style={{
-                  background: "linear-gradient(transparent, rgba(0,0,0,0.6))",
-                }}
+                style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.6))" }}
               >
                 <div className="text-white">
-                  <p className="text-[13px] font-semibold">
-                    {previewPhoto.filename}
-                  </p>
-                  {previewPhoto.room && (
-                    <p className="text-[11px] text-white/70">
-                      {previewPhoto.room}
-                    </p>
-                  )}
+                  <p className="text-[13px] font-semibold">{previewPhoto.filename}</p>
+                  {previewPhoto.room && <p className="text-[11px] text-white/70">{previewPhoto.room}</p>}
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
-                    window.open(previewPhoto.url, "_blank", "noopener")
-                  }
+                  onClick={() => window.open(previewPhoto.url, "_blank", "noopener")}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[12px] font-semibold text-white"
                   style={{ background: "rgba(255,255,255,0.15)" }}
                 >
