@@ -324,6 +324,7 @@ export type Screen =
   | 'tenant-inbox'
   | 'property-preview'
   | 'tenant-selection'
+  | 'add-tenant-from-wizard'
   | 'add-tenant'
   | 'edit-tenant'
   | 'invite-tenant'
@@ -481,6 +482,7 @@ export function AppContent() {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isSavingForTenant, setIsSavingForTenant] = useState(false);
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
   const [showTenantPopup, setShowTenantPopup] = useState(false);
   /** IDs returned from a completed bulk property import — passed to the enrichment queue */
@@ -1443,6 +1445,128 @@ export function AppContent() {
       // Do NOT fall back to fake local state or IDs. Ensure error is propagated.
       throw error;
     }
+  };
+
+  // ─── savePropertyFromWizard ───────────────────────────────────────────────
+  // Saves a property from the wizard WITHOUT navigating away. Returns the
+  // server-canonical Property so the caller can wire it to tenant flow.
+  const savePropertyFromWizard = async (wizardData: WizardPropertyData): Promise<Property> => {
+    if (!userProfile) {
+      window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'publish' } }, '*');
+      throw new Error('Authentication required');
+    }
+
+    const syncedSetupData = {
+      ...propertySetupData,
+      propertyType: wizardData.propertyType,
+      propertyDetails: {
+        address: wizardData.address,
+        monthlyRent: wizardData.monthlyRent,
+        bedrooms: wizardData.bedrooms,
+        bathrooms: wizardData.bathrooms,
+        squareFootage: wizardData.squareFootage,
+        uploadedDocuments: wizardData.uploadedDocuments,
+      },
+      amenities: wizardData.amenities,
+      images: wizardData.images,
+      imageFiles: wizardData.imageFiles,
+      additionalNotes: wizardData.additionalNotes,
+      status: wizardData.status,
+    };
+
+    // 1. Upload images
+    let uploadedPhotos: PropertyPhoto[] = [];
+    if (syncedSetupData.imageFiles.length > 0) {
+      uploadedPhotos = await uploadPropertyImages(syncedSetupData.imageFiles);
+      if (uploadedPhotos.length === 0) {
+        throw new Error(
+          `Image upload failed — none of the ${syncedSetupData.imageFiles.length} photo(s) could be uploaded. ` +
+          `Please check your connection and try again.`
+        );
+      }
+    }
+
+    // 2. Upload documents
+    let uploadedDocuments: PropertyDocument[] = [];
+    if (syncedSetupData.propertyDetails.uploadedDocuments.length > 0) {
+      uploadedDocuments = await uploadPropertyDocuments(syncedSetupData.propertyDetails.uploadedDocuments);
+    }
+
+    // 3. Build property object
+    const bedrooms = parseInt(syncedSetupData.propertyDetails.bedrooms) || 1;
+    const bathrooms = parseInt(syncedSetupData.propertyDetails.bathrooms);
+    const squareFootage = parseInt(syncedSetupData.propertyDetails.squareFootage);
+    const rent = parseInt(syncedSetupData.propertyDetails.monthlyRent) || 0;
+    const preservedStatus = syncedSetupData.status || 'vacant';
+
+    const newProperty: Property = {
+      id: 'setup-property',
+      address: syncedSetupData.propertyDetails.address,
+      type: syncedSetupData.propertyType || 'Property',
+      bedrooms,
+      rent,
+      status: preservedStatus,
+      amenities: syncedSetupData.amenities,
+      notes: syncedSetupData.additionalNotes,
+      photos: [],
+      documents: [],
+      createdAt: new Date(),
+      ...(isNaN(bathrooms) ? {} : { bathrooms }),
+      ...(isNaN(squareFootage) ? {} : { squareFootage }),
+    } as any;
+
+    // 4. Resolve photos (blob: → permanent URL)
+    let finalPhotos: PropertyPhoto[] = [];
+    let uploadIdx = 0;
+    for (let i = 0; i < syncedSetupData.images.length; i++) {
+      const imgUrl = syncedSetupData.images[i];
+      if (!imgUrl) continue;
+      if (!imgUrl.startsWith('blob:')) {
+        finalPhotos.push({
+          id: `photo-${Date.now()}-${i}`,
+          url: imgUrl,
+          filename: `property-photo-${i + 1}.jpg`,
+          isCover: finalPhotos.length === 0,
+          room: finalPhotos.length === 0 ? 'Exterior' : undefined,
+        });
+      } else if (uploadIdx < uploadedPhotos.length) {
+        finalPhotos.push({
+          ...uploadedPhotos[uploadIdx],
+          isCover: finalPhotos.length === 0,
+          room: finalPhotos.length === 0 ? 'Exterior' : uploadedPhotos[uploadIdx].room,
+        });
+        uploadIdx++;
+      }
+    }
+    while (uploadIdx < uploadedPhotos.length) {
+      finalPhotos.push({ ...uploadedPhotos[uploadIdx], isCover: finalPhotos.length === 0 });
+      uploadIdx++;
+    }
+    if (finalPhotos.length === 0 && uploadedPhotos.length > 0) finalPhotos = uploadedPhotos;
+    newProperty.photos = finalPhotos;
+
+    // 5. Resolve documents
+    newProperty.documents = uploadedDocuments;
+
+    // 6. Duplicate check
+    const normAddr = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const dupe = properties.find(p => normAddr(p.address) === normAddr(newProperty.address));
+    if (dupe) throw new Error(`A property at "${newProperty.address}" already exists. Use Edit to update it.`);
+
+    // 7. Persist to backend
+    const propertyId = await addProperty(newProperty);
+
+    // 8. Fetch server-canonical record
+    const created = await propertyService.getProperty(propertyId);
+    if (!created) throw new Error('Property was saved but could not be verified. Please check your properties list.');
+
+    setProperties(prev =>
+      prev.some(p => p.id === created.id)
+        ? prev.map(p => p.id === created.id ? created : p)
+        : [...prev, created]
+    );
+
+    return created;
   };
 
   const updateProperty = async (propertyId: string, updates: Partial<Property>) => {
@@ -2597,6 +2721,7 @@ export function AppContent() {
           <AddPropertyWizard
             isEditing={isEditing}
             isPublishing={isPublishing}
+            isSavingForTenant={isSavingForTenant}
             initialData={{
               propertyType: propertySetupData.propertyType || undefined,
               address: propertySetupData.propertyDetails.address,
@@ -2626,10 +2751,20 @@ export function AppContent() {
                 navigateToMainApp('properties');
               }
             }}
-            onAddTenant={() => {
+            onAddTenant={async (wizardData: WizardPropertyData) => {
               trackEvent('landlord_add_tenant_clicked', { source: 'property_wizard' });
-              setPreviousScreen('property-setup-step1');
-              setShowTenantPopup(true);
+              setIsSavingForTenant(true);
+              try {
+                const createdProperty = await savePropertyFromWizard(wizardData);
+                setSelectedProperty(createdProperty);
+                setPreviousScreen('add-tenant-from-wizard');
+                setShowTenantPopup(true);
+              } catch (err: any) {
+                // Stay on wizard Step 5 — wizard's globalError banner shows the error
+                throw err;
+              } finally {
+                setIsSavingForTenant(false);
+              }
             }}
             onPublish={async (wizardData: WizardPropertyData) => {
               if (!userProfile) {
@@ -3301,6 +3436,9 @@ export function AppContent() {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
                 navigateToScreen('property-setup-step1');
+              } else if (previousScreen === 'add-tenant-from-wizard') {
+                setPreviousScreen(null);
+                navigateToScreen('property-details');
               } else {
                 navigateToMainApp('clients');
               }
@@ -3322,8 +3460,13 @@ export function AppContent() {
                 window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'add-tenant' } }, '*');
                 throw new Error('Authentication required');
               }
-              // addTenant POSTs to backend — useTenants in ClientsPage re-fetches on navigate
-              await addTenant(tenant);
+              if (previousScreen === 'add-tenant-from-wizard') {
+                // Property is already saved; associate tenant with the real propertyId
+                await addTenant({ ...tenant, propertyId: selectedProperty!.id });
+              } else {
+                // addTenant POSTs to backend — useTenants in ClientsPage re-fetches on navigate
+                await addTenant(tenant);
+              }
               prefillEmailRef.current = undefined;
               // Increment refresh key so properties re-fetch from Firestore in the background
               // (tenant list in ClientsPage re-fetches via useTenants on next mount)
@@ -3335,12 +3478,29 @@ export function AppContent() {
                   pendingTenants: [...(prev.pendingTenants || []), tenant]
                 }));
               }
+              // New wizard flow: clear stale wizard state; onBack (below) will
+              // navigate to property-details once the user dismisses the success screen
+              if (previousScreen === 'add-tenant-from-wizard') {
+                setPropertySetupData({
+                  propertyType: null,
+                  propertyDetails: { address: '', monthlyRent: '', bedrooms: '', bathrooms: '', squareFootage: '', uploadedDocuments: [] },
+                  amenities: [],
+                  images: [],
+                  imageFiles: [],
+                  additionalNotes: '',
+                  pendingTenants: [],
+                });
+                // Note: do NOT call setPreviousScreen(null) here — onBack uses it to navigate
+              }
             }}
             onBack={() => {
               prefillEmailRef.current = undefined;
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
                 navigateToScreen('property-setup-step1');
+              } else if (previousScreen === 'add-tenant-from-wizard') {
+                setPreviousScreen(null);
+                navigateToScreen('property-details');
               } else {
                 navigateToMainApp('clients');
               }
@@ -3397,6 +3557,9 @@ export function AppContent() {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
                 navigateToScreen('property-setup-step1');
+              } else if (previousScreen === 'add-tenant-from-wizard') {
+                setPreviousScreen(null);
+                navigateToScreen('property-details');
               } else {
                 navigateToMainApp('clients');
               }
@@ -3415,6 +3578,9 @@ export function AppContent() {
               if (previousScreen === 'property-preview') {
                 setPreviousScreen(null);
                 navigateToScreen('property-setup-step1');
+              } else if (previousScreen === 'add-tenant-from-wizard') {
+                setPreviousScreen(null);
+                navigateToScreen('property-details');
               } else {
                 navigateToMainApp('clients');
               }
@@ -3580,12 +3746,18 @@ export function AppContent() {
               onClose={() => setShowTenantPopup(false)}
               onSelectExisting={(tenantId) => {
                 setShowTenantPopup(false);
-                setPreviousScreen(currentScreen);
+                // Preserve 'add-tenant-from-wizard' if set; otherwise record current screen
+                if (previousScreen !== 'add-tenant-from-wizard') {
+                  setPreviousScreen(currentScreen);
+                }
                 navigateToScreen('select-existing-tenant');
               }}
               onAddNew={() => {
                 setShowTenantPopup(false);
-                setPreviousScreen(currentScreen);
+                // Preserve 'add-tenant-from-wizard' if set; otherwise record current screen
+                if (previousScreen !== 'add-tenant-from-wizard') {
+                  setPreviousScreen(currentScreen);
+                }
                 navigateToScreen('tenant-selection');
               }}
             />

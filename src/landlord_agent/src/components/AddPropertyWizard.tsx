@@ -73,10 +73,11 @@ interface AddPropertyWizardProps {
   initialData?: Partial<WizardPropertyData>;
   isEditing?: boolean;
   isPublishing?: boolean;
+  isSavingForTenant?: boolean;  // loading state on "Add a Tenant Now" button
   onPublish: (data: WizardPropertyData) => Promise<void>;
   onBulkImport?: () => void;
   onBack: () => void;           // cancel → previous screen
-  onAddTenant?: () => void;     // from review step
+  onAddTenant?: (data: WizardPropertyData) => void;  // from review step
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -232,7 +233,7 @@ function blank(init?: Partial<WizardPropertyData>): WizardPropertyData {
 
 export function AddPropertyWizard({
   initialData, isEditing = false, isPublishing = false,
-  onPublish, onBulkImport, onBack, onAddTenant,
+  onPublish, onBulkImport, onBack, onAddTenant, isSavingForTenant = false,
 }: AddPropertyWizardProps) {
   const [form, setForm]         = useState<WizardPropertyData>(() => blank(initialData));
   const [step, setStep]         = useState<Step>(1);
@@ -869,10 +870,22 @@ export function AddPropertyWizard({
 
                 {/* Add tenant shortcut */}
                 {!isEditing && onAddTenant && (
-                  <button type="button" onClick={onAddTenant}
-                    className="w-full h-[44px] rounded-[14px] border border-dashed border-[#136C9E] text-[13.5px] font-semibold text-[#136C9E] flex items-center justify-center gap-2 hover:bg-[#f0f8fd] transition-all"
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await onAddTenant?.(form);
+                      } catch (err: any) {
+                        setGE(err?.message || 'Failed to save property. Please try again.');
+                      }
+                    }}
+                    disabled={isSavingForTenant}
+                    className="w-full h-[44px] rounded-[14px] border border-dashed border-[#136C9E] text-[13.5px] font-semibold text-[#136C9E] flex items-center justify-center gap-2 hover:bg-[#f0f8fd] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ fontFamily: 'Archivo,sans-serif' }}>
-                    <Plus size={15} strokeWidth={2.5} /> Add a Tenant Now
+                    {isSavingForTenant
+                      ? <><Loader2 size={15} className="animate-spin" /> Saving property…</>
+                      : <><Plus size={15} strokeWidth={2.5} /> Add a Tenant Now</>
+                    }
                   </button>
                 )}
               </div>
