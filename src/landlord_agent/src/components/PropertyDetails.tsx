@@ -620,11 +620,11 @@ export function PropertyDetails({
             <div>
               {heroPhotos.length > 0 ? (
                 <div>
-                  <div className="relative w-full rounded-[16px] overflow-hidden bg-[#e2e8f0] aspect-[16/9] max-h-[340px]">
+                  <div className="relative w-full rounded-[16px] overflow-hidden bg-[#0f172a] aspect-[16/9] max-h-[340px]">
                     <img
                       src={heroPhoto!.url}
                       alt={heroPhoto!.room ?? "Property"}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                     {heroPhotos.length > 1 && (
                       <>
@@ -668,7 +668,7 @@ export function PropertyDetails({
                             opacity: i === heroIdx ? 1 : 0.65,
                           }}
                         >
-                          <img src={p.url} alt={p.room ?? `Photo ${i + 1}`} className="w-full h-full object-cover" />
+                          <img src={p.url} alt={p.room ?? `Photo ${i + 1}`} className="w-full h-full object-contain bg-[#0f172a]" />
                         </button>
                       ))}
                     </div>
