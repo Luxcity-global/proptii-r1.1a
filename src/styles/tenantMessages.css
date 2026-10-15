@@ -13,8 +13,10 @@
     sans-serif;
   background: #f8fafc;
   color: #1e293b;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  max-height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 0 0 16px;
@@ -142,15 +144,18 @@
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
   gap: 20px;
   align-items: stretch;
   height: 100%;
+  max-height: 100%;
   overflow: hidden;
 }
 
 @media (min-width: 1024px) {
   .tn-msg-split {
-    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    grid-template-columns: minmax(280px, 4fr) minmax(0, 8fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 
@@ -330,9 +335,10 @@
 }
 
 .tn-msg-back {
-  margin-top: 16px;
+  margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid #f1f5f9;
+  flex-shrink: 0;
 }
 
 .tn-msg-back button {
@@ -394,8 +400,9 @@
 }
 
 .tn-msg-feed {
-  flex: 1;
+  flex: 1 1 0%;
   min-height: 0;
+  height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
   display: flex;
@@ -442,6 +449,7 @@
 }
 
 .tn-msg [data-testid="compose-box"] {
+  flex-shrink: 0 !important;
   border-top: 1px solid #f1f5f9 !important;
   background: #fff !important;
 }

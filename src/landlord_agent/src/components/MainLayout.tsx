@@ -314,6 +314,9 @@ export function MainLayout({
           {
             '--sidebar-width': '250px',
             '--sidebar-width-collapsed': '80px',
+            ...(currentScreen === 'messages' || currentScreen === 'inbox'
+              ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+              : {}),
           } as React.CSSProperties
         }
       >
@@ -376,11 +379,17 @@ export function MainLayout({
                     ? '#fbfbfe'
                     : '#F7F7F7',
             ...(currentScreen === 'messages' || currentScreen === 'inbox'
-              ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+              ? {
+                  height: '100vh',
+                  maxHeight: '100vh',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }
               : {}),
           }}
         >
-          <div className="md:hidden h-16" />
+          <div className={`md:hidden h-16${currentScreen === 'messages' || currentScreen === 'inbox' ? ' flex-shrink-0' : ''}`} />
           {currentScreen !== 'dashboard' &&
             currentScreen !== 'properties' &&
             currentScreen !== 'contracts' &&
@@ -399,7 +408,13 @@ export function MainLayout({
               />
             </div>
           )}
-          {children}
+          {currentScreen === 'messages' || currentScreen === 'inbox' ? (
+            <div className="flex-1 min-h-0 h-full overflow-hidden flex flex-col">
+              {children}
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
     </SidebarProvider>

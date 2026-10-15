@@ -9,8 +9,10 @@
   font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--ll-bg);
   color: #1e293b;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  max-height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 0 20px 16px;
@@ -155,6 +157,7 @@
 .ll-msg-body {
   flex: 1;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   padding: 16px 0 0;
@@ -238,14 +241,19 @@
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
   gap: 20px;
   align-items: stretch;
   height: 100%;
+  max-height: 100%;
   overflow: hidden;
 }
 
 @media (min-width: 1024px) {
-  .ll-msg-split { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); }
+  .ll-msg-split {
+    grid-template-columns: minmax(280px, 4fr) minmax(0, 8fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
 }
 
 .ll-msg-list,
@@ -386,9 +394,10 @@
 .ll-msg-conv-preview { color: #94a3b8; }
 
 .ll-msg-back {
-  margin-top: 16px;
+  margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid #f1f5f9;
+  flex-shrink: 0;
 }
 
 .ll-msg-back button {
@@ -435,8 +444,9 @@
 }
 
 .ll-msg-feed {
-  flex: 1;
+  flex: 1 1 0%;
   min-height: 0;
+  height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
   display: flex;
@@ -475,6 +485,7 @@
 }
 
 .ll-msg [data-testid="compose-box"] {
+  flex-shrink: 0 !important;
   border-top: 1px solid #f1f5f9 !important;
   background: #fff !important;
 }
@@ -548,7 +559,9 @@
 @media (max-width: 767px) {
   /* Page padding */
   .ll-msg {
-    padding: 0 12px 32px;
+    height: 100%;
+    max-height: 100%;
+    padding: 0 12px 12px;
   }
 
   /* Header: unstick + simplify */

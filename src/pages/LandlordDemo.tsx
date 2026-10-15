@@ -93,8 +93,10 @@ const LandlordDemoInner: React.FC = () => {
     );
   }
 
+  const isMessagingRoute = pathname.includes('/messages') || pathname.includes('/inbox');
+
   return (
-    <div className="min-h-screen font-nunito">
+    <div className={`min-h-screen font-nunito${isMessagingRoute ? ' h-screen max-h-screen overflow-hidden flex flex-col' : ''}`}>
       {/* Lazy-loaded Landlord App */}
       <Suspense
         fallback={

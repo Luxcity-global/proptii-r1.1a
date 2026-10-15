@@ -582,7 +582,7 @@ export function PropertyDetails({
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="rounded-[10px] cursor-pointer text-[13px]"
-                onSelect={() => onManageDocuments()}
+                onSelect={() => setActiveTab("documents")}
               >
                 <FileText size={14} className="mr-2 text-[#64748b]" /> Manage Documents
               </DropdownMenuItem>
@@ -620,32 +620,53 @@ export function PropertyDetails({
             <div>
               {heroPhotos.length > 0 ? (
                 <div>
-                  <div className="relative w-full rounded-[16px] overflow-hidden bg-[#0f172a] aspect-[16/9] max-h-[340px]">
+                  <div
+                    className="relative w-full rounded-[16px] overflow-hidden bg-[#e2e8f0] aspect-[16/9] max-h-[340px] group cursor-pointer"
+                    onClick={() => setPreviewPhoto(heroPhoto as any)}
+                  >
                     <img
                       src={heroPhoto!.url}
                       alt={heroPhoto!.room ?? "Property"}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.02]"
                     />
+                    {/* Expand icon on hover */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewPhoto(heroPhoto as any);
+                      }}
+                      title="View full photo"
+                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    >
+                      <Maximize2 size={14} />
+                    </button>
                     {heroPhotos.length > 1 && (
                       <>
                         <button
                           type="button"
-                          onClick={() => setHeroIdx((i) => Math.max(0, i - 1))}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHeroIdx((i) => Math.max(0, i - 1));
+                          }}
                           disabled={heroIdx === 0}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30"
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30 z-10"
                         >
                           <ChevronLeft size={17} />
                         </button>
                         <button
                           type="button"
-                          onClick={() => setHeroIdx((i) => Math.min(heroPhotos.length - 1, i + 1))}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHeroIdx((i) => Math.min(heroPhotos.length - 1, i + 1));
+                          }}
                           disabled={heroIdx === heroPhotos.length - 1}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow transition-all disabled:opacity-30 z-10"
                         >
                           <ChevronRight size={17} />
                         </button>
                         <span
-                          className="absolute bottom-3 right-3 text-[11.5px] font-semibold px-2.5 py-1 rounded-full"
+                          className="absolute bottom-3 right-3 text-[11.5px] font-semibold px-2.5 py-1 rounded-full z-10"
                           style={{ background: "rgba(0,0,0,0.45)", color: "white" }}
                         >
                           {heroIdx + 1} / {heroPhotos.length}
@@ -668,7 +689,7 @@ export function PropertyDetails({
                             opacity: i === heroIdx ? 1 : 0.65,
                           }}
                         >
-                          <img src={p.url} alt={p.room ?? `Photo ${i + 1}`} className="w-full h-full object-contain bg-[#0f172a]" />
+                          <img src={p.url} alt={p.room ?? `Photo ${i + 1}`} className="w-full h-full object-cover object-center bg-[#f1f5f9]" />
                         </button>
                       ))}
                     </div>
@@ -1032,7 +1053,7 @@ export function PropertyDetails({
                 {[
                   { label: "Edit Property", icon: Edit3, action: () => onEdit(property) },
                   { label: "Manage Photos", icon: Camera, action: () => setActiveTab("photos") },
-                  { label: "Manage Documents", icon: FileText, action: onManageDocuments },
+                  { label: "Manage Documents", icon: FileText, action: () => setActiveTab("documents") },
                 ].map(({ label, icon: Icon, action }) => (
                   <button
                     key={label}

@@ -261,6 +261,7 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({
                     gap: '0',
                     background: '#ffffff',
                     borderTop: '1px solid #e5e7eb',
+                    flexShrink: 0,
                 }}
             >
                 {/* Selected file chip */}
