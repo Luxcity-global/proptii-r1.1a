@@ -266,6 +266,7 @@ export class ViewingRequestService {
       const groups = await Promise.all(tasks);
       const byId = new Map<string, any>();
       const addRow = (id: string, data: any) => {
+        if (data?.deleted === true) return;
         if (!byId.has(id)) byId.set(id, this.presentViewing(id, data));
       };
       for (const group of groups) {
@@ -480,6 +481,7 @@ export class ViewingRequestService {
       viewing?.userId === user.uid ||
       viewing?.landlordId === user.uid ||
       viewing?.agentId === user.uid ||
+      viewing?.property?.agent?.id === user.uid ||
       sameEmail(viewing?.tenantEmail) ||
       sameEmail(viewing?.landlordEmail) ||
       sameEmail(viewing?.agentEmail) ||
@@ -495,7 +497,7 @@ export class ViewingRequestService {
     if (!col) throw new NotFoundException('Viewing request not found');
     try {
       const doc = await col.doc(id).get();
-      if (!doc.exists) throw new NotFoundException('Viewing request not found');
+      if (!doc.exists || doc.data()?.deleted === true) throw new NotFoundException('Viewing request not found');
       const data = doc.data();
       this.assertViewingAccess(data, user);
       return this.presentViewing(doc.id, data);
@@ -519,7 +521,7 @@ export class ViewingRequestService {
     try {
       const docRef = col.doc(id);
       const doc = await docRef.get();
-      if (!doc.exists) throw new NotFoundException('Viewing request not found');
+      if (!doc.exists || doc.data()?.deleted === true) throw new NotFoundException('Viewing request not found');
       const data = doc.data() || {};
       await this.assertCanManage(data, user || { uid: userId, email: user?.email }, id);
 
@@ -570,26 +572,79 @@ export class ViewingRequestService {
     }
   }
 
-  async cancelViewing(id: string, userId: string, user?: any) {
-    const col = this.collection;
-    if (!col) return { success: true, message: 'Viewing request cancelled' };
-    try {
-      const docRef = col.doc(id);
-      const doc = await docRef.get();
-      if (!doc.exists) throw new NotFoundException('Viewing request not found');
-      const data = doc.data();
-      await this.assertCanManage(data, user || { uid: userId, email: user?.email }, id);
+  private httpStatus(err: any): number | undefined {
+    if (typeof err?.getStatus === 'function') return err.getStatus();
+    return typeof err?.status === 'number' ? err.status : undefined;
+  }
 
-      await docRef.update({
+  /**
+   * Landlord delete removes a booking from the list. Older rows were saved in
+   * viewingBookings, sometimes under a different document id than the id field.
+   * A deleted flag survives a later list refresh merging the old copy back.
+   */
+  private async copiesOf(id: string): Promise<Array<{ ref: FirebaseFirestore.DocumentReference; data: any }>> {
+    const db = this.db;
+    if (!db || !id) return [];
+    const found = new Map<string, { ref: FirebaseFirestore.DocumentReference; data: any }>();
+    const add = (doc: FirebaseFirestore.DocumentSnapshot) => {
+      if (!doc?.exists) return;
+      if (found.has(doc.ref.path)) return;
+      found.set(doc.ref.path, { ref: doc.ref, data: doc.data() || {} });
+    };
+    for (const name of ['viewings', 'viewingBookings']) {
+      const col = db.collection(name);
+      try {
+        add(await col.doc(id).get());
+      } catch (err: any) {
+        console.warn(`[ViewingRequestService] delete lookup ${name}/${id} failed:`, err?.message || err);
+      }
+      try {
+        const snapshot = await col.where('id', '==', id).limit(10).get();
+        snapshot.docs.forEach((doc) => add(doc));
+      } catch (err: any) {
+        console.warn(`[ViewingRequestService] delete query ${name} failed:`, err?.message || err);
+      }
+    }
+    return Array.from(found.values());
+  }
+
+  async cancelViewing(id: string, userId: string, user?: any) {
+    if (!this.db) return { success: true, message: 'Viewing request removed' };
+    try {
+      const copies = await this.copiesOf(id);
+      if (copies.length === 0) throw new NotFoundException('Viewing request not found');
+      const caller = user || { uid: userId, email: user?.email };
+      const allowed: Array<{ ref: FirebaseFirestore.DocumentReference; data: any }> = [];
+      let denied: any = null;
+      for (const copy of copies) {
+        try {
+          await this.assertCanManage(copy.data, caller, id);
+          allowed.push(copy);
+        } catch (err: any) {
+          if (this.httpStatus(err) === 403) {
+            denied = err;
+            continue;
+          }
+          throw err;
+        }
+      }
+      if (allowed.length !== copies.length) {
+        throw denied || new ForbiddenException('You are not authorized to access or modify this viewing request');
+      }
+      const now = new Date().toISOString();
+      await Promise.all(allowed.map((copy) => copy.ref.update({
+        deleted: true,
+        deletedAt: now,
         status: 'cancelled',
-        cancelledAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      return { success: true, message: 'Viewing request cancelled' };
+        cancelledAt: copy.data?.cancelledAt || now,
+        updatedAt: now,
+      })));
+      return { success: true, message: 'Viewing request removed' };
     } catch (err: any) {
-      if (err?.status === 403 || err?.status === 404) throw err;
+      const code = this.httpStatus(err);
+      if (code === 403 || code === 404) throw err;
       console.warn('[ViewingRequestService] cancelViewing error:', err?.message || err);
-      return { success: true, message: 'Viewing request cancelled' };
+      throw err;
     }
   }
 }

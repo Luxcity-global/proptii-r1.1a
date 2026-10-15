@@ -19,7 +19,8 @@ import {
   Wallet,
   Wrench,
 } from 'lucide-react';
-import { MarketInsight, Property, UserProfile } from '../App';
+import { MarketInsight, Property, Tenant, UserProfile } from '../App';
+import { countPortfolio } from '../utils/portfolioStats';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -41,6 +42,7 @@ import '../styles/analyticsPage.css';
 
 interface PortfolioInsightsProps {
   properties: Property[];
+  tenants?: Tenant[];
   userProfile: UserProfile | null;
   onBack: () => void;
   marketInsights: MarketInsight[];
@@ -69,6 +71,7 @@ function trendLabel(value?: number | null): string | null {
 
 export function PortfolioInsights({
   properties,
+  tenants = [],
   userProfile,
   isAuthenticated = false,
   marketInsights,
@@ -88,6 +91,7 @@ export function PortfolioInsights({
   return (
     <PortfolioInsightsContent
       properties={properties}
+      portfolioTenants={tenants}
       userProfile={userProfile}
       analyticsData={data}
       isLoading={isLoading}
@@ -103,6 +107,7 @@ export function PortfolioInsights({
 
 function PortfolioInsightsContent({
   properties,
+  portfolioTenants = [],
   userProfile,
   analyticsData,
   isLoading,
@@ -114,6 +119,7 @@ function PortfolioInsightsContent({
   onViewProperties,
 }: {
   properties: Property[];
+  portfolioTenants?: Tenant[];
   userProfile: UserProfile | null;
   analyticsData: AnalyticsData | null;
   isLoading: boolean;
@@ -137,21 +143,18 @@ function PortfolioInsightsContent({
   const occupancy = analyticsData?.occupancy;
   const tenants = analyticsData?.tenants;
 
-  const occupiedCount = properties.filter((p) => p.status === 'occupied' || Boolean(p.tenant) || Boolean(p.tenantId)).length;
-  const vacantCount = properties.filter((p) => p.status === 'vacant' && !p.tenant && !p.tenantId).length;
-  const renovatingCount = properties.filter((p) => p.status === 'under-renovation' && !p.tenant && !p.tenantId).length;
+  const portfolio = countPortfolio(properties, portfolioTenants);
+  const occupiedCount = portfolio.occupied;
+  const vacantCount = portfolio.vacant;
+  const renovatingCount = portfolio.renovating;
   const propertyRentTotal = properties.reduce((sum, p) => sum + (p.rent || 0), 0);
-  const occupiedRentTotal = properties
-    .filter((p) => p.status === 'occupied' || Boolean(p.tenant) || Boolean(p.tenantId))
-    .reduce((sum, p) => sum + (p.rent || 0), 0);
 
-  const monthlyRevenue = revenue?.totalMonthly || occupiedRentTotal || propertyRentTotal;
-  const vacantUnits = properties.length > 0
-    ? Math.max(0, properties.length - occupiedCount)
-    : (occupancy?.vacantUnits ?? vacantCount);
-  const occupancyRate =
-    properties.length > 0 ? Math.round((occupiedCount / properties.length) * 100) : occupancy?.rate || 0;
-  const activeTenants = tenants?.totalActive || occupiedCount;
+  const monthlyRevenue = properties.length > 0 ? portfolio.monthlyRent : (revenue?.totalMonthly || 0);
+  const vacantUnits = properties.length > 0 ? vacantCount : (occupancy?.vacantUnits ?? vacantCount);
+  const occupancyRate = properties.length > 0 ? portfolio.occupancyPct : (occupancy?.rate || 0);
+  const activeTenants = portfolioTenants
+    ? portfolioTenants.filter((tenant) => tenant.status === 'active' || tenant.status === 'pending').length
+    : (tenants?.totalActive || occupiedCount);
   const netIncome = monthlyRevenue - Math.round(monthlyRevenue * 0.2);
   const outstandingRent = revenue?.outstandingRent || 0;
   const avgRent =

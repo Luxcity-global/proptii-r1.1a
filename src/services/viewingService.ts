@@ -1,7 +1,7 @@
 import apiService from './api';
 import sseService from './sseService';
 import landlordUserService from './landlordUserService';
-import { publishViewingCopy, rememberViewings, rememberApplicant, applyRememberedApplicant } from './viewingInboxService';
+import { publishViewingCopy, rememberViewings, rememberApplicant, applyRememberedApplicant, forgetViewing, hasStoredViewing, isViewingRemoved } from './viewingInboxService';
 
 const CLOSED_VIEWING_STATUSES = new Set(['confirmed', 'completed', 'cancelled', 'rescheduled']);
 
@@ -173,7 +173,9 @@ export class ViewingPollingCoordinator {
         const response = await apiService.get('/viewing-requests');
         const payload = Array.isArray(response) ? response : (response?.data || []);
         const rows = Array.isArray(payload) ? payload : (payload?.data || []);
-        const items = (Array.isArray(rows) ? rows : []).map(normalizeViewingItem);
+        const items = (Array.isArray(rows) ? rows : [])
+          .map(normalizeViewingItem)
+          .filter((item) => item?.id && item.deleted !== true && !isViewingRemoved(item.id));
         if (serial !== this.requestSerial) return items;
         this.cachedData = items;
         this.lastFetchTime = Date.now();
@@ -195,6 +197,14 @@ export class ViewingPollingCoordinator {
 
     this.inFlightPromise = promise;
     return promise;
+  }
+
+  removeCached(id: string) {
+    if (!this.cachedData || !id) return;
+    const next = this.cachedData.filter((item) => item?.id !== id);
+    if (next.length === this.cachedData.length) return;
+    this.cachedData = next;
+    this.notifyAll(next);
   }
 
   /** Show a reschedule immediately so a later stale list cannot put the old slot back. */
@@ -522,14 +532,25 @@ class ViewingService {
   }
 
   async deleteViewingBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
+    const storedLocally = hasStoredViewing(bookingId);
     try {
       await apiService.delete(`/viewing-requests/${bookingId}`);
-      viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
+      this.forgetDeletedViewing(bookingId);
       return { success: true };
     } catch (error: any) {
+      if (error?.status === 404 && storedLocally) {
+        this.forgetDeletedViewing(bookingId);
+        return { success: true };
+      }
       console.error('Error deleting viewing booking:', error);
       return { success: false, error: error?.message || 'Unknown error' };
     }
+  }
+
+  private forgetDeletedViewing(bookingId: string) {
+    forgetViewing(bookingId);
+    viewingPollingCoordinator.removeCached(bookingId);
+    viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
   }
 
   subscribeToUserViewingBookings(

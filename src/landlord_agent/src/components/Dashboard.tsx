@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import { trackEvent } from "../../../utils/analytics";
+import { countPortfolio, isUnitOccupied } from "../utils/portfolioStats";
 import viewingService from "../../../services/viewingService";
 import { listViewingsForLandlord } from "../../../services/viewingInboxService";
 import { useMessagingContext } from "../../../contexts/MessagingContext";
@@ -159,17 +160,24 @@ function ContainerEmpty({
 
 function OccupancyDonut({
   occupied,
+  vacant,
+  renovating = 0,
   total,
 }: {
   occupied: number;
   vacant: number;
+  renovating?: number;
   total: number;
 }) {
   const pct = total > 0 ? occupied / total : 0;
+  const vacantPct = total > 0 ? vacant / total : 0;
+  const renovatingPct = total > 0 ? renovating / total : 0;
   const r = 72;
   const c = 2 * Math.PI * r;
   const occupiedLen = c * pct;
-  const vacantLen = Math.max(0, c - occupiedLen);
+  const vacantLen = c * vacantPct;
+  const renovatingLen = c * renovatingPct;
+  const cap = renovating > 0 ? "butt" : pct > 0 && pct < 1 ? "round" : "butt";
 
   return (
     <div className="ll-donut-wrap" aria-label={`Occupancy ${Math.round(pct * 100)}%`}>
@@ -182,7 +190,7 @@ function OccupancyDonut({
           stroke="#165c40"
           strokeWidth="38"
           strokeDasharray={`${occupiedLen} ${c}`}
-          strokeLinecap={pct > 0 && pct < 1 ? "round" : "butt"}
+          strokeLinecap={cap}
         />
         <circle
           cx="100"
@@ -193,8 +201,21 @@ function OccupancyDonut({
           strokeWidth="38"
           strokeDasharray={`${vacantLen} ${c}`}
           strokeDashoffset={-occupiedLen}
-          strokeLinecap={pct > 0 && pct < 1 ? "round" : "butt"}
+          strokeLinecap={cap}
         />
+        {renovatingLen > 0 && (
+          <circle
+            cx="100"
+            cy="100"
+            r={r}
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="38"
+            strokeDasharray={`${renovatingLen} ${c}`}
+            strokeDashoffset={-(occupiedLen + vacantLen)}
+            strokeLinecap="butt"
+          />
+        )}
       </svg>
     </div>
   );
@@ -612,24 +633,12 @@ export function Dashboard({
     });
   }, [properties.length, tenants.length]);
 
-  const tenantOccupiedIds = useMemo(
-    () => new Set((tenants || []).map((t) => t.propertyId)),
-    [tenants],
-  );
-
-  const totalProperties = properties.length;
-  const occupiedProperties = properties.filter((p) => {
-    const hasTenant = tenantOccupiedIds.has(p.id);
-    return p.status === "occupied" || hasTenant;
-  }).length;
-  const vacantProperties = properties.filter((p) => {
-    const hasTenant = tenantOccupiedIds.has(p.id);
-    return p.status === "vacant" && !hasTenant;
-  }).length;
-
-  const totalRent = properties
-    .filter((p) => p.status === "occupied" || tenantOccupiedIds.has(p.id))
-    .reduce((sum, p) => sum + (p.rent || 0), 0);
+  const portfolio = useMemo(() => countPortfolio(properties, tenants || []), [properties, tenants]);
+  const totalProperties = portfolio.total;
+  const occupiedProperties = portfolio.occupied;
+  const vacantProperties = portfolio.vacant;
+  const renovatingProperties = portfolio.renovating;
+  const totalRent = portfolio.monthlyRent;
 
   const revenueSeries = useMemo(() => {
     const monthlyData: { month: string; revenue: number }[] = [];
@@ -667,14 +676,14 @@ export function Dashboard({
 
   const occupancyBars = useMemo(() => {
     return properties.slice(0, 5).map((p) => {
-      const occupied = p.status === "occupied" || tenantOccupiedIds.has(p.id);
+      const occupied = isUnitOccupied(p, tenants || []);
       return {
         id: p.id,
         label: (p.address.split(",")[0] || p.address).slice(0, 14),
         pct: occupied ? 100 : p.status === "under-renovation" ? 50 : 0,
       };
     });
-  }, [properties, tenantOccupiedIds]);
+  }, [properties, tenants]);
 
   const topRent = useMemo(() => {
     return [...properties]
@@ -903,6 +912,7 @@ export function Dashboard({
                   <OccupancyDonut
                     occupied={occupiedProperties}
                     vacant={vacantProperties}
+                    renovating={renovatingProperties}
                     total={totalProperties}
                   />
                   <div className="ll-occ-meta">
@@ -919,6 +929,12 @@ export function Dashboard({
                     <span className="ll-legend-box vacant" />
                     <span>Vacant - {vacantProperties}</span>
                   </div>
+                  {renovatingProperties > 0 && (
+                    <div className="ll-legend-item">
+                      <span className="ll-legend-box renovating" />
+                      <span>Renovating - {renovatingProperties}</span>
+                    </div>
+                  )}
                 </div>
               </>
             )}

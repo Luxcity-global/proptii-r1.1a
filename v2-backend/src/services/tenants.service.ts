@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { dedupeTenants } from '../utils/dedupeTenants';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return Promise.race([
@@ -109,7 +110,7 @@ export class TenantsService {
       if (userId) {
         try {
           const snap1 = await withTimeout(col.where('userId', '==', userId).get(), 15000);
-          snap1.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+          snap1.docs.forEach((doc) => docMap.set(doc.id, { ...doc.data(), id: doc.id }));
         } catch (e: any) {
           this.logger.warn(`getTenants by userId error: ${e?.message}`);
         }
@@ -121,7 +122,7 @@ export class TenantsService {
       if (email && email !== userId) {
         try {
           const snap2 = await withTimeout(col.where('userId', '==', email).get(), 15000);
-          snap2.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+          snap2.docs.forEach((doc) => docMap.set(doc.id, { ...doc.data(), id: doc.id }));
         } catch (e: any) {
           this.logger.warn(`getTenants by email error: ${e?.message}`);
         }
@@ -131,7 +132,7 @@ export class TenantsService {
       if (extraUserId && extraUserId !== userId && extraUserId !== email) {
         try {
           const snap4 = await withTimeout(col.where('userId', '==', extraUserId).get(), 15000);
-          snap4.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+          snap4.docs.forEach((doc) => docMap.set(doc.id, { ...doc.data(), id: doc.id }));
         } catch (e: any) {
           this.logger.warn(`getTenants by extraUserId error: ${e?.message}`);
         }
@@ -144,23 +145,23 @@ export class TenantsService {
           const batch = ownedPropertyIds.slice(i, i + 30);
           try {
             const snap3 = await withTimeout(col.where('propertyId', 'in', batch).get(), 15000);
-            snap3.docs.forEach((doc) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+            snap3.docs.forEach((doc) => docMap.set(doc.id, { ...doc.data(), id: doc.id }));
           } catch (e: any) {
             this.logger.warn(`getTenants by propertyId batch error: ${e?.message}`);
           }
         }
       }
 
-      const tenants = Array.from(docMap.values()).map((data) => ({
-        id: data.id,
+      const tenants = dedupeTenants(Array.from(docMap.values()).map((data) => ({
         ...data,
+        id: data.id,
         createdAt: data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt,
         updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() || data.updatedAt,
         leaseStart: data.leaseStart?.toDate?.()?.toISOString?.() || data.leaseStart,
         leaseEnd: data.leaseEnd?.toDate?.()?.toISOString?.() || data.leaseEnd,
         firstPaymentDate: data.firstPaymentDate?.toDate?.()?.toISOString?.() || data.firstPaymentDate,
         lastPaymentDate: data.lastPaymentDate?.toDate?.()?.toISOString?.() || data.lastPaymentDate,
-      }));
+      })));
 
       return { success: true, tenants };
     } catch (err: any) {

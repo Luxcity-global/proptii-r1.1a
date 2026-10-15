@@ -1,5 +1,6 @@
 import apiService from '../../../services/api';
 import type { Tenant } from '../App';
+import { dedupeTenants } from './dedupeTenants';
 import { paymentScheduleService } from './paymentScheduleService';
 
 class TenantService {
@@ -61,7 +62,8 @@ class TenantService {
       // Unwrap ApiResponse envelope
       const payload = (response as any).data ?? response;
       const list = payload.tenants || payload || [];
-      return list.map((t: any) => this.mapTenant(t));
+      const rows = Array.isArray(list) ? list : [];
+      return dedupeTenants(rows).map((t: any) => this.mapTenant(t));
     } catch (error) {
       console.error('Error fetching tenants:', error);
       return [];

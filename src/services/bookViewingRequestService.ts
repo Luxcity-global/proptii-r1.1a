@@ -1,6 +1,6 @@
 import apiService from './api';
 import { viewingPollingCoordinator } from './viewingService';
-import { publishViewingCopy } from './viewingInboxService';
+import { forgetViewing, hasStoredViewing, publishViewingCopy } from './viewingInboxService';
 
 export interface BookViewingRequest {
   id: string;
@@ -138,11 +138,20 @@ class BookViewingRequestService {
   }
 
   async deleteRequest(requestId: string): Promise<{ success: boolean; error?: string }> {
+    const storedLocally = hasStoredViewing(requestId);
     try {
       await apiService.delete(`/viewing-requests/${requestId}`);
+      forgetViewing(requestId);
+      viewingPollingCoordinator.removeCached(requestId);
       viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
       return { success: true };
     } catch (error: any) {
+      if (error?.status === 404 && storedLocally) {
+        forgetViewing(requestId);
+        viewingPollingCoordinator.removeCached(requestId);
+        viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
+        return { success: true };
+      }
       console.error('Error deleting viewing request:', error);
       return { success: false, error: error?.message || 'Unknown error' };
     }

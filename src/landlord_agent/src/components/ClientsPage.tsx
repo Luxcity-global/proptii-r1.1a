@@ -28,8 +28,10 @@ import { referencingService } from '../services/referencingService';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { useLandlords, Landlord } from '../hooks/useLandlords';
 import { useTenants } from '../hooks/useTenants';
+import { clientListingKey, clientListings } from '../services/clientListings';
 import { invitationService, PendingInvitation } from '../services/invitationService';
 import { tenantService } from '../services/tenantService';
+import { countPortfolio } from '../utils/portfolioStats';
 import '../styles/clientsPage.css';
 
 interface ClientsPageProps {
@@ -255,6 +257,10 @@ export function ClientsPage({
 
   const { landlords: liveLandlords, isLoading: isLandlordsLoading, refresh: refreshLandlords } = useLandlords();
   const showLandlordTab = userRole === 'agent';
+  const clientRows = useMemo(
+    () => clientListings(tenants || [], properties || []),
+    [tenants, properties],
+  );
 
   useEffect(() => {
     const fetchReferencingStatuses = async () => {
@@ -380,7 +386,7 @@ export function ClientsPage({
     arrearsAlerts.forEach((alert) => arrearsByTenantId.set(alert.tenantId, alert));
     const query = debouncedSearch.toLowerCase();
 
-    let filtered = (tenants || []).filter((tenant) => {
+    let filtered = clientRows.filter((tenant) => {
       const matchesSearch =
         (tenant.name || '').toLowerCase().includes(query) ||
         (tenant.email || '').toLowerCase().includes(query) ||
@@ -475,7 +481,7 @@ export function ClientsPage({
     }
 
     return filtered;
-  }, [tenants, arrearsAlerts, debouncedSearch, tenantFilter, leaseExpiryFilter, tenantSortBy, propertyFilter]);
+  }, [clientRows, arrearsAlerts, debouncedSearch, tenantFilter, leaseExpiryFilter, tenantSortBy, propertyFilter]);
 
   const filteredTenants = filteredAndSortedTenants;
 
@@ -521,11 +527,9 @@ export function ClientsPage({
   const filteredLandlords = filteredAndSortedLandlords;
 
   const selectAllTenants = () => {
-    if (selectedTenants.length === filteredTenants.length) {
-      setSelectedTenants([]);
-    } else {
-      setSelectedTenants(filteredTenants.map((tenant) => tenant.id));
-    }
+    const ids = [...new Set(filteredTenants.map((tenant) => tenant.id))];
+    const allSelected = ids.length > 0 && ids.every((id) => selectedTenants.includes(id));
+    setSelectedTenants(allSelected ? [] : ids);
   };
 
   const selectAllLandlords = () => {
@@ -554,10 +558,11 @@ export function ClientsPage({
     const list = tenants || [];
     const props = properties || [];
     const activeTenants = list.filter((t) => t.status === 'active' || t.status === 'pending').length;
-    const occupiedCount = props.filter((p) => p.status === 'occupied').length || activeTenants;
-    const vacantCount = props.filter((p) => p.status === 'vacant').length;
-    const occupancyBase = occupiedCount + vacantCount;
-    const occupancyPct = occupancyBase > 0 ? Math.round((occupiedCount / occupancyBase) * 100) : list.length > 0 ? 100 : 0;
+    const portfolio = countPortfolio(props, list);
+    const occupiedCount = portfolio.occupied;
+    const vacantCount = portfolio.vacant;
+    const renovatingCount = portfolio.renovating;
+    const occupancyPct = portfolio.occupancyPct;
 
     const collected = list.filter((t) => t.paymentStatus === 'current').reduce((sum, t) => sum + (t.rentAmount || 0), 0);
     const due = list.reduce((sum, t) => sum + (t.rentAmount || 0), 0);
@@ -585,6 +590,7 @@ export function ClientsPage({
       activeTenants,
       occupiedCount,
       vacantCount,
+      renovatingCount,
       occupancyPct,
       collected,
       due,
@@ -687,7 +693,7 @@ export function ClientsPage({
             >
               <Users size={16} />
               <span>Tenants</span>
-              <span className="ll-cl-switcher-count">{isTenantsLoading ? '…' : (tenants || []).length}</span>
+              <span className="ll-cl-switcher-count">{isTenantsLoading ? '…' : clientRows.length}</span>
             </button>
             <button
               type="button"
@@ -726,10 +732,18 @@ export function ClientsPage({
                 <div className="ll-cl-kpi-meta">
                   <strong>{tenantKpis.occupiedCount} Occupied</strong>
                   <span>{tenantKpis.vacantCount} Vacant</span>
+                  {tenantKpis.renovatingCount > 0 && <span>{tenantKpis.renovatingCount} Renovating</span>}
                 </div>
                 <div className="ll-cl-seg-bar">
-                  <div className="ll-cl-seg-fill occ" style={{ width: `${tenantKpis.occupancyPct}%` }} />
-                  <div className="ll-cl-seg-fill vac" style={{ width: `${Math.max(0, 100 - tenantKpis.occupancyPct)}%` }} />
+                  {tenantKpis.occupiedCount > 0 && (
+                    <div className="ll-cl-seg-fill occ" style={{ width: `${(tenantKpis.occupiedCount / Math.max(properties.length, 1)) * 100}%` }} />
+                  )}
+                  {tenantKpis.renovatingCount > 0 && (
+                    <div className="ll-cl-seg-fill ren" style={{ width: `${(tenantKpis.renovatingCount / Math.max(properties.length, 1)) * 100}%` }} />
+                  )}
+                  {tenantKpis.vacantCount > 0 && (
+                    <div className="ll-cl-seg-fill vac" style={{ width: `${(tenantKpis.vacantCount / Math.max(properties.length, 1)) * 100}%` }} />
+                  )}
                 </div>
               </div>
               <div className="ll-cl-kpi-foot">
@@ -1212,9 +1226,9 @@ export function ClientsPage({
                         || 'not-started';
                       return (
                         <tr
-                          key={tenant.id}
+                          key={clientListingKey(tenant)}
                           className={selectedTenants.includes(tenant.id) ? 'is-selected' : ''}
-                          onClick={() => onViewTenant(tenant)}
+                          onClick={() => onViewTenant((tenants || []).find((row) => row.id === tenant.id) || tenant)}
                         >
                           <td className="check" onClick={(e) => e.stopPropagation()}>
                             <input
@@ -1277,11 +1291,11 @@ export function ClientsPage({
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" sideOffset={8} className="ll-cl-actions-menu">
-                                <DropdownMenuItem className="ll-cl-actions-item" onSelect={() => onViewTenant(tenant)}>
+                                <DropdownMenuItem className="ll-cl-actions-item" onSelect={() => onViewTenant((tenants || []).find((row) => row.id === tenant.id) || tenant)}>
                                   <Eye className="is-muted" />
                                   <span>View Details</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="ll-cl-actions-item" onSelect={() => onViewTenant(tenant, { tab: 'payment' })}>
+                                <DropdownMenuItem className="ll-cl-actions-item" onSelect={() => onViewTenant((tenants || []).find((row) => row.id === tenant.id) || tenant, { tab: 'payment' })}>
                                   <PoundSterling className="is-green" />
                                   <span>Log Payment</span>
                                 </DropdownMenuItem>

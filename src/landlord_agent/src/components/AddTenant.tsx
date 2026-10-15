@@ -21,6 +21,8 @@ import {
   Upload, UsersRound,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ExistingTenancyWarning } from './ExistingTenancyWarning';
+import { otherPropertyForPerson } from '../services/otherPropertyForPerson';
 import type { Property, Tenant, UserProfile } from '../App';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -268,6 +270,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
   const [globalError, setGE]      = useState<string|null>(null);
   const [isLoading, setLoading]   = useState(false);
   const [view, setView]           = useState<View>(() => 'step1');
+  const [secondPropertyWarning, setSecondPropertyWarning] = useState<Tenant | null>(null);
 
   // track which steps are done for the stepper badges
   const [done, setDone] = useState<Record<'step1'|'step2'|'step3', boolean>>({ step1:false, step2:false, step3:false });
@@ -341,52 +344,70 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
 
   // ─── Confirm & POST ───────────────────────────────────────────────────────
 
-  async function handleConfirm() {
+  async function handleConfirm(confirmedSecondProperty = false) {
     if (!userProfile) { setGE('You must be signed in.'); return; }
-    setGE(null); setLoading(true);
-    try {
-      const property = properties.find(p => p.id === form.propertyId);
-      const tenant: any = {
-        name:              form.name.trim(),
-        email:             form.email.trim().toLowerCase(),
-        phone:             form.phone.trim(),
-        propertyId:        form.propertyId,
-        propertyAddress:   property?.address ?? '',
-        rentAmount:        parseFloat(form.rentAmount),
-        paymentFrequency:  form.paymentFrequency,
-        firstPaymentDate:  fromISO(form.firstPaymentDate) ?? new Date(),
-        leaseStart:        fromISO(form.leaseStart)       ?? new Date(),
-        leaseEnd:          fromISO(form.leaseEnd)         ?? new Date(),
-        status:            'active',
-        referencingStatus: 'not-started',
-        paymentStatus:     'current',
-        emergencyContact:  { name: form.emergencyName.trim(), phone: form.emergencyPhone.trim(), relationship: form.emergencyRelationship },
-        defaultRiskScore:  75,
-        ...(form.employer       && { employer:       form.employer.trim() }),
-        ...(form.annualIncome   && { annualIncome:   parseFloat(form.annualIncome) }),
-        ...(form.employmentType && { employmentType: form.employmentType }),
-        ...(form.notes          && { notes:          form.notes.trim() }),
-      };
+    setGE(null);
+    const property = properties.find(p => p.id === form.propertyId);
+    const tenant: any = {
+      name:              form.name.trim(),
+      email:             form.email.trim().toLowerCase(),
+      phone:             form.phone.trim(),
+      propertyId:        form.propertyId,
+      propertyAddress:   property?.address ?? '',
+      rentAmount:        parseFloat(form.rentAmount),
+      paymentFrequency:  form.paymentFrequency,
+      firstPaymentDate:  fromISO(form.firstPaymentDate) ?? new Date(),
+      leaseStart:        fromISO(form.leaseStart)       ?? new Date(),
+      leaseEnd:          fromISO(form.leaseEnd)         ?? new Date(),
+      status:            'active',
+      referencingStatus: 'not-started',
+      paymentStatus:     'current',
+      emergencyContact:  { name: form.emergencyName.trim(), phone: form.emergencyPhone.trim(), relationship: form.emergencyRelationship },
+      defaultRiskScore:  75,
+      ...(form.employer       && { employer:       form.employer.trim() }),
+      ...(form.annualIncome   && { annualIncome:   parseFloat(form.annualIncome) }),
+      ...(form.employmentType && { employmentType: form.employmentType }),
+      ...(form.notes          && { notes:          form.notes.trim() }),
+    };
 
-      // ── Duplicate check ──────────────────────────────────────────────────
-      if (existingTenants?.length) {
-        const normEmail = tenant.email.toLowerCase().trim();
-        const emailDupe = existingTenants.find(
-          t => (t.email || '').toLowerCase().trim() === normEmail
+    const normEmail = tenant.email.toLowerCase().trim();
+    const sameEmail = (existingTenants || []).filter(
+      t => (t.email || '').toLowerCase().trim() === normEmail
+    );
+    const alreadyHere = sameEmail.find(t => t.propertyId && t.propertyId === form.propertyId);
+    if (alreadyHere) {
+      setGE(`${alreadyHere.name || 'This tenant'} is already attached to this property.`);
+      return;
+    }
+    const alreadyElsewhere = otherPropertyForPerson(existingTenants || [], properties, normEmail, form.propertyId);
+    if (alreadyElsewhere && !confirmedSecondProperty) {
+      setSecondPropertyWarning({
+        ...sameEmail[0],
+        id: sameEmail[0]?.id || 'existing',
+        name: alreadyElsewhere.name,
+        propertyAddress: alreadyElsewhere.address,
+      } as Tenant);
+      return;
+    }
+    if (!alreadyElsewhere) {
+      const unassigned = sameEmail.find(t => !t.propertyId);
+      if (unassigned) {
+        setGE(
+          `A tenant with this email already exists: ${unassigned.name}. ` +
+          `Use Edit from the Clients tab to update their details.`
         );
-        if (emailDupe) {
-          throw new Error(
-            `A tenant with this email already exists: ${emailDupe.name}. ` +
-            `Use Edit from the Clients tab to update their details.`
-          );
-        }
+        return;
       }
+    }
 
+    setSecondPropertyWarning(null);
+    setLoading(true);
+    try {
       await onSave(tenant);
+      setSecondPropertyWarning(null);
       setView('success');
     } catch (err: any) {
       setGE(err?.message || 'Failed to save tenant. Please try again.');
-      setView('form' as any);
       setView('step3');
     } finally {
       setLoading(false);
@@ -632,12 +653,20 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
             style={{ borderColor:'#136C9E', color:'#136C9E', fontFamily:'Archivo,sans-serif' }}>
             Edit Details
           </button>
-          <button type="button" onClick={handleConfirm} disabled={isLoading}
+          <button type="button" onClick={() => { void handleConfirm(); }} disabled={isLoading}
             className="flex-1 h-[50px] rounded-[14px] font-semibold text-[15px] text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 hover:-translate-y-px"
             style={{ background:'#DC5F12', fontFamily:'Archivo,sans-serif', boxShadow:'0 4px 14px rgba(220,95,18,0.32)' }}>
             {isLoading ? <><Loader2 size={18} className="animate-spin"/>Adding…</> : <><CheckCircle size={18}/>Confirm &amp; Add Tenant</>}
           </button>
         </div>
+        <ExistingTenancyWarning
+          open={!!secondPropertyWarning}
+          tenantName={secondPropertyWarning?.name || form.name}
+          currentAddress={secondPropertyWarning?.propertyAddress}
+          nextAddress={property?.address}
+          onCancel={() => setSecondPropertyWarning(null)}
+          onConfirm={() => { void handleConfirm(true); }}
+        />
       </Shell>
     );
   }
@@ -857,6 +886,14 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
         </div>
       )}
 
+      <ExistingTenancyWarning
+        open={!!secondPropertyWarning}
+        tenantName={secondPropertyWarning?.name || form.name}
+        currentAddress={secondPropertyWarning?.propertyAddress}
+        nextAddress={properties.find(p => p.id === form.propertyId)?.address}
+        onCancel={() => setSecondPropertyWarning(null)}
+        onConfirm={() => { void handleConfirm(true); }}
+      />
     </Shell>
   );
 }

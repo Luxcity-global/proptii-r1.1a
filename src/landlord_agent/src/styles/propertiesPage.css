@@ -330,6 +330,11 @@
   height: 100%;
 }
 
+.ll-props-seg-fill.ren {
+  background: #f59e0b;
+  height: 100%;
+}
+
 .ll-props-kpi-foot {
   display: flex;
   align-items: center;

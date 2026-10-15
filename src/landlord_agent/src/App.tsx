@@ -1719,6 +1719,29 @@ export function AppContent() {
     return id;
   };
 
+  // A tenant who already lives at another property gets a new tenancy row.
+  // The original record stays attached to its current property.
+  const copyTenantOntoProperty = async (tenant: Tenant, property: Property) => {
+    await addTenant({
+      name: tenant.name,
+      email: tenant.email,
+      phone: tenant.phone || '',
+      propertyId: property.id,
+      propertyAddress: property.address,
+      rentAmount: tenant.rentAmount,
+      paymentFrequency: tenant.paymentFrequency || 'monthly',
+      firstPaymentDate: tenant.firstPaymentDate || tenant.leaseStart,
+      leaseStart: tenant.leaseStart,
+      leaseEnd: tenant.leaseEnd,
+      status: 'active',
+      referencingStatus: tenant.referencingStatus || 'not-started',
+      paymentStatus: tenant.paymentStatus || 'current',
+      emergencyContact: tenant.emergencyContact ?? { name: '', phone: '', relationship: '' },
+      defaultRiskScore: tenant.defaultRiskScore,
+      ...(tenant.notes ? { notes: tenant.notes } : {}),
+    });
+  };
+
   // addLandlord is handled entirely within AddLandlordWizard via landlordService.createLandlord()
   // The ClientsPage reloads landlords via useLandlords() on every mount.
 
@@ -2541,6 +2564,7 @@ export function AppContent() {
         return (
           <PortfolioInsights
             properties={properties}
+            tenants={tenants}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
             onBack={() => setNavigationScreen('dashboard')}
@@ -3076,6 +3100,7 @@ export function AppContent() {
           <PropertyDetails
             key={selectedProperty?.id || 'property-details'}
             property={selectedProperty}
+            properties={properties}
             tenants={tenants}
             onBack={() => navigateToMainApp('properties')}
             onEdit={(property) => {
@@ -3129,14 +3154,20 @@ export function AppContent() {
               const tenant = tenants.find(t => t.id === tenantId);
               if (!tenant) return;
 
-              // Update the property to assign the tenant
               try {
+                if (tenant.propertyId && tenant.propertyId !== selectedProperty.id) {
+                  await copyTenantOntoProperty(tenant, selectedProperty);
+                  const updatedProperty = await propertyService.getProperty(selectedProperty.id);
+                  if (updatedProperty) setSelectedProperty(updatedProperty);
+                  return;
+                }
+
+                // Unassigned tenant: attach this record. Do not copy it.
                 await updateProperty(selectedProperty.id, {
                   status: 'occupied',
                   tenantId: tenant.id
                 });
 
-                // Update the tenant's property assignment
                 await tenantService.updateTenant(tenant.id, {
                   propertyId: selectedProperty.id,
                   propertyAddress: selectedProperty.address
@@ -3219,6 +3250,7 @@ export function AppContent() {
                 }
 
                 console.log(`✅ Successfully removed tenant ${tenantId} from property ${propertyId}`);
+                invalidateTenants();
               } catch (error) {
                 console.error('❌ Failed to remove tenant from property:', error);
                 alert('Failed to remove tenant from property. Please try again.');
@@ -3236,8 +3268,10 @@ export function AppContent() {
                   return;
                 }
 
+                const alreadyElsewhere = Boolean(newTenant.propertyId && newTenant.propertyId !== propertyId);
+
                 // Remove current tenant's property assignment
-                if (currentTenant?.id) {
+                if (currentTenant?.id && currentTenant.id !== newTenant.id) {
                   await tenantService.updateTenant(currentTenant.id, {
                     propertyId: '',
                     propertyAddress: ''
@@ -3249,17 +3283,21 @@ export function AppContent() {
                   }
                 }
 
-                // Assign new tenant to property
-                await tenantService.updateTenant(newTenantId, {
-                  propertyId: propertyId,
-                  propertyAddress: selectedProperty.address
-                });
+                if (alreadyElsewhere) {
+                  await copyTenantOntoProperty(newTenant, selectedProperty);
+                } else {
+                  // Assign new tenant to property
+                  await tenantService.updateTenant(newTenantId, {
+                    propertyId: propertyId,
+                    propertyAddress: selectedProperty.address
+                  });
 
-                // Update property with new tenant
-                await updateProperty(propertyId, {
-                  status: 'occupied',
-                  tenantId: newTenantId
-                });
+                  // Update property with new tenant
+                  await updateProperty(propertyId, {
+                    status: 'occupied',
+                    tenantId: newTenantId
+                  });
+                }
 
                 // Refresh new tenant data
                 const updatedNewTenant = await tenantService.getTenant(newTenantId);

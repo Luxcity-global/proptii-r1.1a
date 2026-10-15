@@ -43,6 +43,7 @@ import {
 } from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
+import { countPortfolio, isUnitOccupied } from '../utils/portfolioStats';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import '../styles/propertiesPage.css';
 
@@ -295,14 +296,14 @@ export function PropertiesPage({
     return { status: 'compliant' as const, count: 0 };
   };
 
-  const isOccupied = (property: Property, tenant?: Tenant) => {
-    const hasTenant = Boolean(tenant || property.tenantId || property.tenant);
-    return property.status === 'occupied' || hasTenant;
-  };
+  const isOccupied = (property: Property, tenant?: Tenant) =>
+    isUnitOccupied(
+      tenant ? { ...property, tenant: property.tenant || tenant, tenantId: property.tenantId || tenant.id } : property,
+      tenants || [],
+    );
 
-  const isVacant = (property: Property, tenant?: Tenant) => {
-    return property.status === 'vacant' && !isOccupied(property, tenant);
-  };
+  const isVacant = (property: Property, tenant?: Tenant) =>
+    !isOccupied(property, tenant) && property.status !== 'under-renovation';
 
   const isLeaseExpiring = (tenant?: Tenant, withinDays = 90) => {
     if (!tenant || tenant.status !== 'active') return false;
@@ -354,6 +355,7 @@ export function PropertiesPage({
   const {
     occupiedCount,
     vacantCount,
+    renovatingCount,
     occupancyPct,
     averageRent,
     rentSeries,
@@ -370,8 +372,7 @@ export function PropertiesPage({
   } = useMemo(() => {
     const now = new Date();
     const list = properties || [];
-    let occupied = 0;
-    let vacant = 0;
+    const portfolio = countPortfolio(list, tenants || []);
     let rentSum = 0;
     const endingSoon = new Set<string>();
     let e30 = 0;
@@ -387,9 +388,6 @@ export function PropertiesPage({
 
     list.forEach((property) => {
       const tenant = getTenantForProperty(property);
-      const occupiedProp = isOccupied(property, tenant);
-      if (occupiedProp) occupied += 1;
-      if (isVacant(property, tenant)) vacant += 1;
       rentSum += property.rent || 0;
       if ((property.rent || 0) > maxRent) maxRent = property.rent || 0;
       const created = asDate(property.createdAt);
@@ -454,9 +452,10 @@ export function PropertiesPage({
     const trend = firstPositive > 0 ? ((lastValue - firstPositive) / firstPositive) * 100 : 0;
 
     return {
-      occupiedCount: occupied,
-      vacantCount: vacant,
-      occupancyPct: list.length > 0 ? Math.round((occupied / list.length) * 100) : 0,
+      occupiedCount: portfolio.occupied,
+      vacantCount: portfolio.vacant,
+      renovatingCount: portfolio.renovating,
+      occupancyPct: portfolio.occupancyPct,
       averageRent: list.length > 0 ? Math.round(rentSum / list.length) : 0,
       rentSeries: monthly,
       rentTrendPct: trend,
@@ -824,10 +823,18 @@ export function PropertiesPage({
                   <div className="ll-props-kpi-meta">
                     <strong>{occupiedCount} Occupied</strong>
                     <span>{vacantCount} Vacant</span>
+                    {renovatingCount > 0 && <span>{renovatingCount} Renovating</span>}
             </div>
                   <div className="ll-props-seg-bar">
-                    <div className="ll-props-seg-fill occ" style={{ width: `${occupancyPct}%` }} />
-                    <div className="ll-props-seg-fill vac" style={{ width: `${Math.max(0, 100 - occupancyPct)}%` }} />
+                    {occupiedCount > 0 && (
+                      <div className="ll-props-seg-fill occ" style={{ width: `${(occupiedCount / Math.max(properties.length, 1)) * 100}%` }} />
+                    )}
+                    {renovatingCount > 0 && (
+                      <div className="ll-props-seg-fill ren" style={{ width: `${(renovatingCount / Math.max(properties.length, 1)) * 100}%` }} />
+                    )}
+                    {vacantCount > 0 && (
+                      <div className="ll-props-seg-fill vac" style={{ width: `${(vacantCount / Math.max(properties.length, 1)) * 100}%` }} />
+                    )}
             </div>
           </div>
                 <div className="ll-props-kpi-foot">

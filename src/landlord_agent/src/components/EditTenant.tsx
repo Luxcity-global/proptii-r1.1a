@@ -31,6 +31,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ExistingTenancyWarning } from './ExistingTenancyWarning';
 import type { Property, Tenant, UserProfile } from '../App';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -171,6 +172,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [moveWarning, setMoveWarning] = useState(false);
   // All three open by default in edit mode — data is already present
   const [open, setOpen] = useState<[boolean, boolean, boolean]>([true, true, true]);
 
@@ -236,13 +238,18 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
-  async function handleSave(ev: React.FormEvent) {
-    ev.preventDefault();
+  async function handleSave(ev?: React.FormEvent, confirmedMove = false) {
+    ev?.preventDefault();
     setGlobalError(null);
     if (!userProfile) { setGlobalError('You must be signed in to edit a tenant.'); return; }
     if (!validate()) {
       setGlobalError('Please fix the highlighted errors before saving.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const moving = Boolean(tenant.propertyId && form.propertyId && tenant.propertyId !== form.propertyId);
+    if (moving && !confirmedMove) {
+      setMoveWarning(true);
       return;
     }
     setIsLoading(true);
@@ -605,6 +612,18 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
           </button>
         </div>
       </form>
+      <ExistingTenancyWarning
+        open={moveWarning}
+        mode="move"
+        tenantName={tenant.name}
+        currentAddress={tenant.propertyAddress}
+        nextAddress={properties.find(p => p.id === form.propertyId)?.address}
+        onCancel={() => setMoveWarning(false)}
+        onConfirm={() => {
+          setMoveWarning(false);
+          void handleSave(undefined, true);
+        }}
+      />
     </div>
   );
 }

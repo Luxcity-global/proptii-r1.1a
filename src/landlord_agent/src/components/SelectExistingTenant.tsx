@@ -30,6 +30,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import type { Property, Tenant } from '../App';
 import { tenantService } from '../services/tenantService';
+import { otherPropertyForPerson } from '../services/otherPropertyForPerson';
+import { ExistingTenancyWarning } from './ExistingTenancyWarning';
 import { trackEvent } from '../../../utils/analytics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -113,6 +115,7 @@ export function SelectExistingTenant({
   const [leaseErrors, setLeaseErrors] = useState<Partial<Record<keyof LeaseDetails, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [elsewhereWarning, setElsewhereWarning] = useState<{ name: string; address: string } | null>(null);
 
   // Client-side filtered list — only tenants who are NOT currently occupying a property
   // (status ended, or a different property, or no property).
@@ -173,11 +176,22 @@ export function SelectExistingTenant({
     return Object.keys(e).length === 0;
   }
 
-  async function handleCreate() {
+  async function handleCreate(confirmedSecondProperty = false) {
     if (!validateLease()) return;
     if (!selectedTenant || !selectedProperty) return;
     if (!userId) {
       setSubmitError('User ID not found. Please log in again.');
+      return;
+    }
+
+    const elsewhere = otherPropertyForPerson(
+      existingTenants,
+      properties,
+      selectedTenant.email,
+      selectedProperty.id,
+    );
+    if (elsewhere && !confirmedSecondProperty) {
+      setElsewhereWarning(elsewhere);
       return;
     }
 
@@ -203,7 +217,32 @@ export function SelectExistingTenant({
         defaultRiskScore: selectedTenant.defaultRiskScore ?? 75,
       };
 
-      await tenantService.createTenant(tenantData, userId);
+      const emailKey = selectedTenant.email.trim().toLowerCase();
+      const sameTenancy = existingTenants.find((tenant) =>
+        tenant.email.trim().toLowerCase() === emailKey &&
+        tenant.propertyId === selectedProperty.id
+      );
+      if (sameTenancy) {
+        await tenantService.updateTenant(sameTenancy.id, {
+          name: tenantData.name,
+          email: tenantData.email,
+          phone: tenantData.phone,
+          propertyId: tenantData.propertyId,
+          propertyAddress: tenantData.propertyAddress,
+          rentAmount: tenantData.rentAmount,
+          paymentFrequency: tenantData.paymentFrequency,
+          firstPaymentDate: tenantData.firstPaymentDate,
+          leaseStart: tenantData.leaseStart,
+          leaseEnd: tenantData.leaseEnd,
+          status: 'active',
+          referencingStatus: tenantData.referencingStatus,
+          paymentStatus: tenantData.paymentStatus,
+          emergencyContact: tenantData.emergencyContact,
+          defaultRiskScore: tenantData.defaultRiskScore,
+        });
+      } else {
+        await tenantService.createTenant(tenantData, userId);
+      }
       trackEvent('landlord_existing_tenant_reassigned', {
         property_address: selectedProperty.address,
       });
@@ -414,7 +453,7 @@ export function SelectExistingTenant({
             </button>
             <button
               type="button"
-              onClick={handleCreate}
+              onClick={() => { void handleCreate(); }}
               disabled={isLoading}
               className="flex-1 py-3.5 rounded-xl font-semibold text-sm text-white transition-all disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-2"
               style={{ background: 'linear-gradient(135deg, #DC5F12, #DC5F12)' }}
@@ -433,11 +472,20 @@ export function SelectExistingTenant({
             </button>
           </div>
         </div>
+        <ExistingTenancyWarning
+          open={!!elsewhereWarning}
+          tenantName={elsewhereWarning?.name || selectedTenant?.name || 'This tenant'}
+          currentAddress={elsewhereWarning?.address}
+          nextAddress={selectedProperty?.address}
+          onCancel={() => setElsewhereWarning(null)}
+          onConfirm={() => {
+            setElsewhereWarning(null);
+            void handleCreate(true);
+          }}
+        />
       </div>
     );
   }
-
-  // ─── Step 1: Select tenant + property ────────────────────────────────────
 
   return (
     <div

@@ -2,6 +2,7 @@ import { auth, db } from '../config/firebaseConfig';
 
 const APPLICANT_KEY = 'proptii.viewingApplicants.v1';
 const STORAGE_KEY = 'proptii.viewingInbox.v1';
+const REMOVED_KEY = 'proptii.viewingRemoved.v1';
 
 function readApplicants(): Record<string, { fullName?: string; email?: string; phoneNumber?: string; managerEmail?: string }> {
   if (typeof localStorage === 'undefined') return {};
@@ -87,6 +88,42 @@ function titleKeys(value: unknown): string[] {
   return first && first !== full ? [full, first] : [full];
 }
 
+function readRemoved(): Set<string> {
+  if (typeof localStorage === 'undefined') return new Set();
+  try {
+    const parsed = JSON.parse(localStorage.getItem(REMOVED_KEY) || '[]');
+    return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string' && id) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** A booking the landlord removed. List refreshes must not put that local copy back. */
+export function isViewingRemoved(id: string): boolean {
+  return Boolean(id) && readRemoved().has(id);
+}
+
+export function hasStoredViewing(id: string): boolean {
+  return Boolean(id) && Boolean(readStored()[id]);
+}
+
+export function forgetViewing(id: string): void {
+  if (!id || typeof localStorage === 'undefined') return;
+  try {
+    const current = readStored();
+    delete current[id];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    const applicants = readApplicants();
+    delete applicants[id];
+    localStorage.setItem(APPLICANT_KEY, JSON.stringify(applicants));
+    const removed = Array.from(readRemoved());
+    if (!removed.includes(id)) removed.push(id);
+    localStorage.setItem(REMOVED_KEY, JSON.stringify(removed.slice(-200)));
+  } catch {
+    /* the next list load still hides a server copy marked deleted */
+  }
+}
+
 function readStored(): Record<string, any> {
   if (typeof localStorage === 'undefined') return {};
   try {
@@ -103,7 +140,10 @@ export function rememberViewings(items: any[]): void {
   try {
     const current = readStored();
     for (const item of items) {
-      if (!item?.id) continue;
+      if (!item?.id || item.deleted === true || isViewingRemoved(item.id)) {
+        if (item?.id) delete current[item.id];
+        continue;
+      }
       const previous = current[item.id];
       const agent = emailOf(item?.property?.agent?.email || item?.agentEmail || item?.landlordEmail || previous?.agentEmail);
       const previousTenant = emailOf(previous?.viewingDetails?.userDetails?.email || previous?.tenantEmail);
@@ -230,7 +270,12 @@ export async function listViewingsForLandlord(options: {
   );
   const byId = new Map<string, any>();
   const add = (item: any) => {
-    if (!item?.id || byId.has(item.id)) return;
+    if (!item?.id) return;
+    if (item.deleted === true || isViewingRemoved(item.id)) {
+      byId.delete(item.id);
+      return;
+    }
+    if (byId.has(item.id)) return;
     if (!isForLandlord(item, uids, email, titles)) return;
     byId.set(item.id, applyRememberedApplicant(asBooking(item)));
   };
@@ -263,7 +308,12 @@ export async function listViewingsForTenant(email?: string | null): Promise<any[
   ];
   const byId = new Map<string, any>();
   for (const item of rows) {
-    if (!item?.id || byId.has(item.id)) continue;
+    if (!item?.id) continue;
+    if (item.deleted === true || isViewingRemoved(item.id)) {
+      byId.delete(item.id);
+      continue;
+    }
+    if (byId.has(item.id)) continue;
     byId.set(item.id, applyRememberedApplicant(asBooking(item)));
   }
   return Array.from(byId.values());
@@ -271,7 +321,7 @@ export async function listViewingsForTenant(email?: string | null): Promise<any[
 
 /** So the landlord can open the booking from their email even when the API omits it. */
 export async function publishViewingCopy(item: any): Promise<void> {
-  if (!item) return;
+  if (!item || item.deleted === true || isViewingRemoved(item.id)) return;
   const authUser = auth.currentUser;
   const uid = authUser?.uid || item.userId || item.tenantId || '';
   const agentEmail = emailOf(item.agentEmail || item.property?.agent?.email);

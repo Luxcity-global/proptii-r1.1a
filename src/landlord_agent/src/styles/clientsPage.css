@@ -408,6 +408,11 @@
   height: 100%;
 }
 
+.ll-cl-seg-fill.ren {
+  background: #f59e0b;
+  height: 100%;
+}
+
 .ll-cl-seg-fill.vac {
   background: #8d7943;
   border-radius: 0 999px 999px 0;

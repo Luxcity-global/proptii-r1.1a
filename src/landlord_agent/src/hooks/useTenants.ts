@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { tenantService } from '../services/tenantService';
+import { dedupeTenants } from '../services/dedupeTenants';
 import { getAgentDummyTenants, isAgentTestAccount, mergeById } from '../data/agentTestPersona';
 import type { Tenant } from '../App';
 
@@ -67,6 +68,7 @@ export function useTenants({ userId, propertyIds = [] }: UseTenantsOptions): Use
         if (isAgentTestAccount(userId, user?.email)) {
           list = mergeById(getAgentDummyTenants(), list) as Tenant[];
         }
+        list = dedupeTenants(list) as Tenant[];
 
         if (!cancelled) {
           setTenants(list);

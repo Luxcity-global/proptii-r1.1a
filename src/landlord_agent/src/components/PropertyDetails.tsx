@@ -61,6 +61,8 @@ import {
 } from "lucide-react";
 import { Property, PropertyPhoto, Tenant, PropertyDocument } from "../App";
 import { DocumentUploadModal } from "./DocumentUploadModal";
+import { ExistingTenancyWarning } from "./ExistingTenancyWarning";
+import { otherPropertyForPerson } from "../services/otherPropertyForPerson";
 import {
   Select,
   SelectContent,
@@ -239,6 +241,7 @@ const ROOM_TYPES = [
 
 interface PropertyDetailsProps {
   property: Property | null;
+  properties?: Property[];
   tenants?: Tenant[];
   onBack: () => void;
   onEdit: (property: Property) => void;
@@ -259,6 +262,7 @@ interface PropertyDetailsProps {
 
 export function PropertyDetails({
   property,
+  properties = [],
   tenants = [],
   onBack,
   onEdit,
@@ -278,6 +282,13 @@ export function PropertyDetails({
   const [heroIdx, setHeroIdx] = useState(0);
   const [showChangeTenantDialog, setShowChangeTenantDialog] = useState(false);
   const [newTenantId, setNewTenantId] = useState("");
+  const [assignKey, setAssignKey] = useState(0);
+  const [pendingSecondProperty, setPendingSecondProperty] = useState<{
+    tenantId: string;
+    name: string;
+    currentAddress: string;
+    mode: "assign" | "change";
+  } | null>(null);
 
   // ── Photo management state ─────────────────────────────────────────────────
   const [localPhotos, setLocalPhotos] = useState<PropertyPhoto[]>([]);
@@ -1209,7 +1220,23 @@ export function PropertyDetails({
                   {availableTenants.length > 0 && onSelectExistingTenant && (
                     <div className="mt-3">
                       <p className="text-[11px] text-[#94a3b8] font-semibold mb-2">Or assign existing tenant</p>
-                      <Select onValueChange={onSelectExistingTenant}>
+                      <Select
+                        key={assignKey}
+                        onValueChange={(tenantId) => {
+                          const tenant = tenants.find(t => t.id === tenantId);
+                          const elsewhere = otherPropertyForPerson(tenants, properties, tenant?.email, property.id);
+                          if (elsewhere) {
+                            setPendingSecondProperty({
+                              tenantId,
+                              name: elsewhere.name,
+                              currentAddress: elsewhere.address,
+                              mode: 'assign',
+                            });
+                            return;
+                          }
+                          onSelectExistingTenant?.(tenantId);
+                        }}
+                      >
                         <SelectTrigger className="w-full rounded-[10px] border-[#e2e8f0] text-[13px]">
                           <SelectValue placeholder="Select tenant…" />
                         </SelectTrigger>
@@ -1433,11 +1460,25 @@ export function PropertyDetails({
               type="button"
               disabled={!newTenantId}
               onClick={() => {
-                if (newTenantId && onChangeTenant) {
-                  onChangeTenant(property.id, newTenantId);
+                if (!newTenantId || !onChangeTenant) return;
+                const chosen = tenants.find(t => t.id === newTenantId);
+                const elsewhere = chosen && chosen.propertyId !== property.id
+                  ? otherPropertyForPerson(tenants, properties, chosen.email, property.id)
+                  : null;
+                if (elsewhere) {
+                  setPendingSecondProperty({
+                    tenantId: newTenantId,
+                    name: elsewhere.name,
+                    currentAddress: elsewhere.address,
+                    mode: 'change',
+                  });
                   setShowChangeTenantDialog(false);
                   setNewTenantId("");
+                  return;
                 }
+                onChangeTenant(property.id, newTenantId);
+                setShowChangeTenantDialog(false);
+                setNewTenantId('');
               }}
               className="px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white disabled:opacity-40 transition-all hover:opacity-90"
               style={{ background: "#136C9E", fontFamily: "Archivo,sans-serif" }}
@@ -1447,6 +1488,27 @@ export function PropertyDetails({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ExistingTenancyWarning
+        open={!!pendingSecondProperty}
+        tenantName={pendingSecondProperty?.name || "This tenant"}
+        currentAddress={pendingSecondProperty?.currentAddress}
+        nextAddress={property?.address}
+        onCancel={() => {
+          setPendingSecondProperty(null);
+          setAssignKey(key => key + 1);
+          setNewTenantId("");
+        }}
+        onConfirm={() => {
+          const pending = pendingSecondProperty;
+          setPendingSecondProperty(null);
+          setAssignKey(key => key + 1);
+          if (!pending) return;
+          if (pending.mode === "assign") onSelectExistingTenant?.(pending.tenantId);
+          else onChangeTenant?.(property.id, pending.tenantId);
+          setNewTenantId("");
+        }}
+      />
 
       {/* ── Photo preview lightbox ──────────────────────────────────────── */}
       <Dialog open={!!previewPhoto} onOpenChange={() => setPreviewPhoto(null)}>

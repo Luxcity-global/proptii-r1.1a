@@ -536,6 +536,10 @@
   border: 1px solid rgba(6, 78, 59, 0.25);
 }
 
+.ll-legend-box.renovating {
+  background: #f59e0b;
+}
+
 /* Mid grid */
 .ll-mid-grid {
   display: grid;

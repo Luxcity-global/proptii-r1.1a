@@ -25,7 +25,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import viewingService, { ViewingBooking, ViewingStats, viewingPollingCoordinator } from '../../../services/viewingService';
-import { applyRememberedApplicant, listViewingsForLandlord, rememberApplicant, rememberViewings } from '../../../services/viewingInboxService';
+import { applyRememberedApplicant, isViewingRemoved, listViewingsForLandlord, rememberApplicant, rememberViewings } from '../../../services/viewingInboxService';
 import {
   bookViewingRequestService,
   BookViewingRequest
@@ -628,6 +628,15 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       unsubscribeStats?.();
     };
   }, [managerId, managerEmail, isAuthenticatedUser, isAgentPersona, ownedAddresses]);
+
+  useEffect(() => {
+    const keep = <T extends { id: string }>(items: T[]) => {
+      const next = items.filter((item) => !item?.id || !isViewingRemoved(item.id));
+      return next.length === items.length && next.every((item, index) => item === items[index]) ? items : next;
+    };
+    setBookings((prev) => keep(prev));
+    setRequests((prev) => keep(prev));
+  }, [bookings, requests]);
 
   // Function to check if a viewing date/time has passed
   const isViewingDatePassed = (viewing: ViewingBooking): boolean => {
@@ -1485,7 +1494,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
 
     setIsDeleting(true);
     try {
-      const deletePromises = Array.from(selectedViewings).map(async (itemId) => {
+      const selectedIds = Array.from(selectedViewings);
+      const deletePromises = selectedIds.map(async (itemId) => {
         // Check if it's a request or a booking
         const isRequest = requests.some(r => r.id === itemId);
         
@@ -1505,6 +1515,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       });
 
       const results = await Promise.all(deletePromises);
+      const removedIds = new Set(selectedIds.filter((id, index) => results[index]?.success));
+      if (removedIds.size > 0) {
+        setBookings((prev) => prev.filter((item) => !removedIds.has(item.id)));
+        setRequests((prev) => prev.filter((item) => !removedIds.has(item.id)));
+      }
       const failed = results.filter(r => !r.success);
       
       if (failed.length > 0) {

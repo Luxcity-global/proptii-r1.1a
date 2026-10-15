@@ -63,13 +63,22 @@ export function TenantSelection({
     if (!trimmed || !valid) { setChecked(false); setExistingMatch(null); setIsChecking(false); return; }
     setIsChecking(true);
     debounceRef.current = setTimeout(() => {
-      const match = existingTenants.find(t => (t.email || '').toLowerCase().trim() === trimmed);
-      setExistingMatch(match ?? null);
+      const matches = existingTenants.filter(t => (t.email || '').toLowerCase().trim() === trimmed);
+      const attached = matches.find(t => t.propertyId && t.propertyId !== 'setup-property');
+      const listed = properties.find(p =>
+        (p.tenant?.email || '').trim().toLowerCase() === trimmed ||
+        matches.some(m => m.id && (p.tenantId === m.id || p.tenant?.id === m.id))
+      );
+      const match = attached
+        || (listed && matches[0] ? { ...matches[0], propertyId: listed.id, propertyAddress: listed.address } : null)
+        || matches[0]
+        || null;
+      setExistingMatch(match);
       setChecked(true);
       setIsChecking(false);
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [email, existingTenants]);
+  }, [email, existingTenants, properties]);
 
   function confirmModal() {
     if (modalSelected === 'multiple') {
@@ -280,9 +289,23 @@ export function TenantSelection({
                   <div>
                     <p className="font-semibold text-amber-800 text-sm">{existingMatch.name || trimmedEmail} is already your tenant</p>
                     <p className="text-amber-700 text-xs mt-0.5">Currently assigned to <span className="font-medium">{existingMatch.propertyAddress || 'a property'}</span>.</p>
+                    {existingMatch.propertyId && (
+                      <p className="text-amber-700 text-xs mt-1">Adding them to another property keeps both tenancies. You will confirm before it is saved.</p>
+                    )}
                   </div>
                 </div>
-                <p className="text-xs text-amber-700 pl-8">To reassign them, use <strong>Edit</strong> from their tenant card in the Clients tab.</p>
+                {existingMatch.propertyId ? (
+                  <button
+                    type="button"
+                    onClick={() => onManualInput(trimmedEmail)}
+                    className={BTN_PRIMARY}
+                    style={{ background: `linear-gradient(135deg, ${PRIMARY_ORANGE}, #e07030)` }}
+                  >
+                    <UserPlus className="w-4 h-4" /> Add to another property
+                  </button>
+                ) : (
+                  <p className="text-xs text-amber-700 pl-8">To update them, use <strong>Edit</strong> from their tenant card in the Clients tab.</p>
+                )}
               </div>
             )}
 
