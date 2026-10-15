@@ -632,13 +632,21 @@ export function PropertyDetails({
               {heroPhotos.length > 0 ? (
                 <div>
                   <div
-                    className="relative w-full rounded-[16px] overflow-hidden bg-[#e2e8f0] aspect-[16/9] max-h-[340px] group cursor-pointer"
+                    className="relative w-full rounded-[20px] overflow-hidden bg-slate-900 h-[360px] sm:h-[420px] md:h-[480px] flex items-center justify-center group cursor-pointer shadow-sm border border-slate-200/60"
                     onClick={() => setPreviewPhoto(heroPhoto as any)}
                   >
+                    {/* Ambient blurred backdrop to gracefully fill letterbox edges with the photo's matching colors */}
+                    <img
+                      src={heroPhoto!.url}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-30 pointer-events-none select-none"
+                    />
+                    {/* Full photo displayed without any cropping */}
                     <img
                       src={heroPhoto!.url}
                       alt={heroPhoto!.room ?? "Property"}
-                      className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.02]"
+                      className="relative z-[1] w-full h-full object-contain transition-transform duration-300 group-hover:scale-[1.01]"
                     />
                     {/* Expand icon on hover */}
                     <button

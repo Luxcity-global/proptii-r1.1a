@@ -1270,7 +1270,7 @@
 .ll-docs-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 70;
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(2px);
   display: flex;
@@ -1408,7 +1408,7 @@
 .ll-docs-drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 50;
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(2px);
 }

@@ -1,0 +1,24 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "label": "SelectExistingTenant missing preselectedPropertyId",
+      "detail": "In the add-tenant-from-wizard path, SelectExistingTenant is not passed preselectedPropertyId={selectedProperty?.id}. If the component requires the caller to supply the target property ID to perform the tenant-to-property association, the user will land on property-details for a property with no tenant linked. Add the prop, or confirm the component auto-assigns using selectedProperty from surrounding state.",
+      "severity": "blocking"
+    },
+    {
+      "id": 2,
+      "label": "Add Another Tenant re-entry with live sentinel",
+      "detail": "After a successful save in the wizard flow, the AddTenant success screen's 'Add Another Tenant' button resets the form internally without calling onBack, leaving previousScreen === 'add-tenant-from-wizard' set. A second tenant save correctly uses selectedProperty.id, but if selectedProperty is cleared by a background refresh between saves, the save throws 'Cannot link tenant: the property was not found.' Add a guard or a comment documenting the invariant that selectedProperty must remain set.",
+      "severity": "moderate"
+    },
+    {
+      "id": 3,
+      "label": "Partial image-upload silent degradation",
+      "detail": "When some but not all image uploads fail, savePropertyFromWizard saves the property with a reduced photo set and shows no warning to the user. Surface a non-blocking message (e.g. '2 of 4 photos uploaded — add the rest from Property Details'). Same gap exists in onPublish; fix together.",
+      "severity": "minor"
+    }
+  ],
+  "reviewDoc": "/home/angeli/Desktop/luxcity/proptii-r1.1a/.agents/tasks/add-property-tenant-review.md"
+}

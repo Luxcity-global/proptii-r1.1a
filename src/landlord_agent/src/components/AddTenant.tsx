@@ -282,6 +282,21 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
     if (p?.rent && !form.rentAmount) sf('rentAmount', String(p.rent));
   }, [form.propertyId]);
 
+  // Sync preselectedPropertyId into form when provided
+  useEffect(() => {
+    if (preselectedPropertyId) {
+      setForm(prev => {
+        if (prev.propertyId === preselectedPropertyId && prev.rentAmount) return prev;
+        const p = properties.find(prop => prop.id === preselectedPropertyId);
+        return {
+          ...prev,
+          propertyId: preselectedPropertyId,
+          ...(p?.rent && !prev.rentAmount ? { rentAmount: String(p.rent) } : {}),
+        };
+      });
+    }
+  }, [preselectedPropertyId, properties]);
+
   function sf(f: keyof FormData, v: string) {
     setForm(prev => ({...prev, [f]:v}));
     if (errors[f]) setErrors(prev => ({...prev, [f]:undefined}));
@@ -420,7 +435,10 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
 
   const shellBack = () => {
     if (view==='mode' || view==='success') { onBack(); return; }
-    if (view==='step1') setView('mode');
+    if (view==='step1') {
+      if (preselectedPropertyId) onBack();
+      else setView('mode');
+    }
     else if (view==='step2') setView('step1');
     else if (view==='step3') setView('step2');
     else if (view==='summary') setView('step3');

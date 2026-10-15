@@ -2788,7 +2788,7 @@ export function AppContent() {
                 const createdProperty = await savePropertyFromWizard(wizardData);
                 setSelectedProperty(createdProperty);
                 setPreviousScreen('add-tenant-from-wizard');
-                setShowTenantPopup(true);
+                navigateToScreen('add-tenant');
               } catch (err: any) {
                 // Stay on wizard Step 5 — wizard's globalError banner shows the error
                 throw err;
@@ -3144,9 +3144,8 @@ export function AppContent() {
               trackEvent('landlord_add_tenant_clicked', { source: 'property_details' });
               editingTenantRef.current = null;
               setSelectedTenant(null);
-              // Clear any stale wizard sentinel so it doesn't misroute this fresh flow
-              setPreviousScreen(null);
-              navigateToScreen('tenant-selection');
+              setPreviousScreen('add-tenant-from-wizard');
+              navigateToScreen('add-tenant');
             }}
             onSelectExistingTenant={async (tenantId) => {
               if (!selectedProperty) return;

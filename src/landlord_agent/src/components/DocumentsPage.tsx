@@ -23,7 +23,6 @@ import {
   Settings,
   Bell,
   Eye,
-  Share2,
   X,
   Link2,
 } from 'lucide-react';
@@ -2444,37 +2443,14 @@ export function DocumentsPage({
                 <Download size={15} />
                 Download
               </button>
-              <button
-                type="button"
-                className="ll-docs-drawer-share"
-                onClick={() => handleShareDocument(inspectionDoc)}
-              >
-                <Share2 size={15} />
-                Share
-              </button>
-              {inspectionDoc.isUnassigned || !inspectionDoc.propertyId ? (
-                onAssignDocument && (
-                  <button
-                    type="button"
-                    className="ll-docs-drawer-share"
-                    onClick={() => openAssignModal(inspectionDoc)}
-                  >
-                    <Link2 size={15} />
-                    Assign
-                  </button>
-                )
-              ) : (
+              {(inspectionDoc.isUnassigned || !inspectionDoc.propertyId) && onAssignDocument && (
                 <button
                   type="button"
                   className="ll-docs-drawer-share"
-                  onClick={() => {
-                    const property = getPropertyByDocument(inspectionDoc.propertyId);
-                    closeInspectionDrawer();
-                    if (property) onManageDocuments(property);
-                  }}
+                  onClick={() => openAssignModal(inspectionDoc)}
                 >
-                  <FolderOpen size={15} />
-                  Manage
+                  <Link2 size={15} />
+                  Assign
                 </button>
               )}
               {onDeleteDocuments && (
@@ -2621,7 +2597,7 @@ export function DocumentsPage({
       )}
 
       <AlertDialog open={!!documentToDelete} onOpenChange={(open) => !open && setDocumentToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[100]">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Document</AlertDialogTitle>
             <AlertDialogDescription>
