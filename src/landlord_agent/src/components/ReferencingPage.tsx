@@ -33,6 +33,7 @@ import {
 import { PassportModal, derivePassportSteps } from './PassportModal';
 import { CommsModal } from './CommsModal';
 import { useAuth } from '../../../contexts/AuthContext';
+import { isTenantDeleted } from '../utils/deletedTenants';
 import '../styles/referencingPage.css';
 
 const API = getResolvedApiBaseUrl();
@@ -232,6 +233,7 @@ function ReceivedPassports({
   const [commsShare, setCommsShare] = useState<ReceivedShare | null>(null);
 
   const filtered = shares.filter((s) => {
+    if (isTenantDeleted(s.id, s.tenantEmail)) return false;
     const q = search.toLowerCase();
     return (
       s.tenantName?.toLowerCase().includes(q) ||
@@ -584,7 +586,10 @@ function RequestReferencing({
     }
   };
 
-  const filteredTenants = tenants.filter((t) => {
+  const activeTenants = tenants.filter((t) => !isTenantDeleted(t.id, t.email));
+  const activeSentRequests = sentRequests.filter((req) => !isTenantDeleted(undefined, req.tenantEmail));
+
+  const filteredTenants = activeTenants.filter((t) => {
     const q = search.toLowerCase();
     return (
       t.name?.toLowerCase().includes(q) ||
@@ -706,7 +711,7 @@ function RequestReferencing({
               </tr>
             </thead>
             <tbody>
-              {tenants.length === 0 ? (
+              {activeTenants.length === 0 ? (
                 <tr className="ll-ref-empty-row">
                   <td colSpan={5} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>
                     No tenants in your clients list yet.
@@ -725,7 +730,7 @@ function RequestReferencing({
                     || 'not-started';
                   const reqState = requestStates[tenant.email];
                   const isLoading = reqState?.loading;
-                  const sentAlready = sentRequests.some(
+                  const sentAlready = activeSentRequests.some(
                     (request) => request.tenantEmail.trim().toLowerCase() === tenant.email.trim().toLowerCase(),
                   );
                   const isSent = reqState?.success || sentAlready;
@@ -795,7 +800,7 @@ function RequestReferencing({
         </div>
         <div className="ll-ref-table-foot">
           <span>
-            Showing {filteredTenants.length} of {tenants.length} existing tenants
+            Showing {filteredTenants.length} of {activeTenants.length} existing tenants
           </span>
         </div>
       </div>
@@ -830,14 +835,14 @@ function RequestReferencing({
                     Loading sent requests…
                   </td>
                 </tr>
-              ) : sentRequests.length === 0 ? (
+              ) : activeSentRequests.length === 0 ? (
                 <tr className="ll-ref-empty-row">
                   <td colSpan={5} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>
                     No referencing requests sent yet.
                   </td>
                 </tr>
               ) : (
-                sentRequests.map((request) => (
+                activeSentRequests.map((request) => (
                   <tr key={request.id}>
                     <td>{request.tenantName || 'Tenant'}</td>
                     <td>{request.tenantEmail}</td>
@@ -900,10 +905,11 @@ export function ReferencingPage({
           steps: derivePassportSteps(share.formData, share.passportStatus || 'in-progress'),
         };
       });
-      setShares(agentPersona ? mergeById(getAgentDummyReceivedShares(), live) : live);
+      const merged = agentPersona ? mergeById(getAgentDummyReceivedShares(), live) : live;
+      setShares(merged.filter((share) => !isTenantDeleted(share.id, share.tenantEmail)));
     } catch {
       if (agentPersona) {
-        setShares(getAgentDummyReceivedShares());
+        setShares(getAgentDummyReceivedShares().filter((share) => !isTenantDeleted(share.id, share.tenantEmail)));
         setSharesError(null);
       } else {
         setSharesError('Could not load received referencings.');
@@ -922,7 +928,8 @@ export function ReferencingPage({
       });
       if (!res.ok) throw new Error('Failed to load');
       const json = await res.json();
-      setSentRequests(Array.isArray(json.data) ? json.data : []);
+      const raw = Array.isArray(json.data) ? json.data : [];
+      setSentRequests(raw.filter((req: any) => !isTenantDeleted(undefined, req.tenantEmail)));
     } catch {
       setSentRequests([]);
     } finally {
@@ -935,12 +942,29 @@ export function ReferencingPage({
     loadSentRequests();
   }, [userProfile?.email]);
 
+  // Sync referencing lists immediately if any client is deleted anywhere in the app
   useEffect(() => {
-    if (!tenants.length) {
+    const handleDeleted = () => {
+      loadShares();
+      loadSentRequests();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('proptii_deleted_tenant_updated', handleDeleted);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('proptii_deleted_tenant_updated', handleDeleted);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const active = tenants.filter((t) => !isTenantDeleted(t.id, t.email));
+    if (!active.length) {
       setLoadingStatuses(false);
       return;
     }
-    const emails = tenants.filter((t) => t.email?.trim()).map((t) => t.email);
+    const emails = active.filter((t) => t.email?.trim()).map((t) => t.email);
     referencingService
       .getReferencingStatusForTenants(emails)
       .then((map) => setStatuses(map))
@@ -948,8 +972,10 @@ export function ReferencingPage({
   }, [tenants]);
 
   const kpis = useMemo(() => {
-    const pendingShares = shares.filter((s) => s.status === 'sent' || s.status === 'viewed').length;
-    const completedShares = shares.filter((s) => s.status === 'claimed').length;
+    const validShares = shares.filter((s) => !isTenantDeleted(s.id, s.tenantEmail));
+    const validSent = sentRequests.filter((r) => !isTenantDeleted(undefined, r.tenantEmail));
+    const pendingShares = validShares.filter((s) => s.status === 'sent' || s.status === 'viewed').length;
+    const completedShares = validShares.filter((s) => s.status === 'claimed').length;
     let pendingTenants = 0;
     let completedTenants = 0;
     statuses.forEach((status) => {
@@ -957,7 +983,7 @@ export function ReferencingPage({
       if (status === 'complete') completedTenants += 1;
     });
     return {
-      sent: sentRequests.length,
+      sent: validSent.length,
       pending: pendingShares + pendingTenants,
       completed: completedShares + completedTenants,
     };

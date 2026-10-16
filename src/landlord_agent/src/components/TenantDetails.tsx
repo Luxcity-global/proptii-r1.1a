@@ -76,7 +76,7 @@ interface TenantDetailsProps {
   onEdit?: (tenant: Tenant) => void;
   onMessage?: (tenant: Tenant) => void;
   onTenantUpdate?: (tenant: Tenant) => void;
-  onDeleteTenant?: (tenantId: string) => Promise<void> | void;
+  onDeleteTenant?: (tenantId: string, tenantObj?: Tenant) => Promise<void> | void;
   initialTab?: string;
 }
 
@@ -1215,7 +1215,7 @@ const asDate = (value: unknown): Date | null => {
                 if (!displayTenant || !onDeleteTenant) return;
                 try {
                   setIsDeletingTenant(true);
-                  await onDeleteTenant(displayTenant.id);
+                  await onDeleteTenant(displayTenant.id, displayTenant);
                   setShowDeleteTenantModal(false);
                   onBack();
                 } catch (err) {

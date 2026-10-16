@@ -55,7 +55,7 @@ interface ClientsPageProps {
   onAddTenant: () => void;
   onAddLandlord: () => void;
   onViewLandlord: (landlord: Landlord) => void;
-  onDeleteTenant?: (tenantId: string) => void;
+  onDeleteTenant?: (tenantId: string, tenantObj?: Tenant) => Promise<void> | void;
   onArchiveTenant?: (tenantId: string) => void;
   onExportTenants?: (format: 'json' | 'csv' | 'excel' | 'pdf') => void;
   onDeleteLandlord?: (landlordId: string) => void;
@@ -328,9 +328,12 @@ export function ClientsPage({
     setShowBulkActions(false);
   };
 
-  const handleBulkDeleteTenants = () => {
+  const handleBulkDeleteTenants = async () => {
     if (onDeleteTenant) {
-      selectedTenants.forEach((tenantId) => onDeleteTenant(tenantId));
+      for (const tenantId of selectedTenants) {
+        const tenantObj = (tenants || []).find((t) => t.id === tenantId);
+        await onDeleteTenant(tenantId, tenantObj);
+      }
       clearSelection();
       // Re-fetch after deletes so the list reflects the real server state
       invalidateTenants();
@@ -1554,7 +1557,7 @@ export function ClientsPage({
                 if (!tenantToDelete || !onDeleteTenant) return;
                 try {
                   setIsDeletingClient(true);
-                  await onDeleteTenant(tenantToDelete.id);
+                  await onDeleteTenant(tenantToDelete.id, tenantToDelete);
                   setTenantToDelete(null);
                   invalidateTenants();
                 } catch (err) {

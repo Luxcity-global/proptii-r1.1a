@@ -56,6 +56,7 @@ import { useMessagingPoller } from '../../hooks/useMessagingPoller';
 import { trackEvent } from '../../utils/analytics';
 import { useTenants } from './hooks/useTenants';
 import { isPropertyArchived } from './utils/portfolioStats';
+import { recordDeletedTenant } from './utils/deletedTenants';
 
 function LandlordMessagingPoller() {
   useMessagingPoller();
@@ -1723,6 +1724,95 @@ export function AppContent() {
     return id;
   };
 
+  const handleDeleteTenant = useCallback(async (tenantId: string, tenantObj?: Tenant) => {
+    try {
+      const targetTenant = tenantObj
+        || tenants.find((t) => t.id === tenantId)
+        || (selectedTenant?.id === tenantId ? selectedTenant : null);
+      const propertyId = targetTenant?.propertyId;
+      const tenantEmail = targetTenant?.email?.toLowerCase().trim();
+
+      // 1. Record as deleted in localStorage immediately so all hooks/pages filter it out synchronously
+      recordDeletedTenant(tenantId, tenantEmail);
+
+      // 2. Call backend to delete tenant
+      await tenantService.deleteTenant(tenantId);
+
+      // 3. Find any matching properties in current state
+      const matchingProps = properties.filter((p) =>
+        (propertyId && p.id === propertyId) ||
+        p.tenantId === tenantId ||
+        p.tenant?.id === tenantId ||
+        (tenantEmail && p.tenant?.email?.toLowerCase().trim() === tenantEmail)
+      );
+
+      // 4. Vacate each property in the backend
+      for (const p of matchingProps) {
+        try {
+          await propertyService.updateProperty(p.id, {
+            status: 'vacant',
+            tenantId: null as any,
+          });
+        } catch (propErr) {
+          console.warn(`Failed to vacate property ${p.id}:`, propErr);
+        }
+      }
+
+      // 5. Update local properties state
+      setProperties((prev) =>
+        prev.map((p) => {
+          if (
+            (propertyId && p.id === propertyId) ||
+            p.tenantId === tenantId ||
+            p.tenant?.id === tenantId ||
+            (tenantEmail && p.tenant?.email?.toLowerCase().trim() === tenantEmail)
+          ) {
+            return {
+              ...p,
+              status: 'vacant' as const,
+              tenantId: undefined,
+              tenant: undefined,
+            };
+          }
+          return p;
+        })
+      );
+
+      // 6. Update selectedProperty if it matches
+      setSelectedProperty((prev) => {
+        if (!prev) return null;
+        if (
+          (propertyId && prev.id === propertyId) ||
+          prev.tenantId === tenantId ||
+          prev.tenant?.id === tenantId ||
+          (tenantEmail && prev.tenant?.email?.toLowerCase().trim() === tenantEmail)
+        ) {
+          return {
+            ...prev,
+            status: 'vacant' as const,
+            tenantId: undefined,
+            tenant: undefined,
+          };
+        }
+        return prev;
+      });
+
+      // 7. Clear selectedTenant if it's the one deleted
+      if (selectedTenant?.id === tenantId) {
+        setSelectedTenant(null);
+      }
+
+      // 8. Invalidate App's useTenants so referencing page and other views refresh
+      invalidateTenants();
+
+      toast.success('Client deleted successfully');
+    } catch (err: any) {
+      console.error('Failed to delete tenant:', err);
+      toast.error(`Failed to delete client: ${err?.message || 'Unknown error'}`);
+      throw err;
+    }
+  }, [tenants, selectedTenant, properties, invalidateTenants]);
+
   // A tenant who already lives at another property gets a new tenancy row.
   // The original record stays attached to its current property.
   const copyTenantOntoProperty = async (tenant: Tenant, property: Property) => {
@@ -2477,20 +2567,7 @@ export function AppContent() {
               selectLandlord(landlord);
               navigateToScreen('landlord-details');
             }}
-            onDeleteTenant={async (tenantId) => {
-              try {
-                const tenantToDelete = selectedTenant?.id === tenantId ? selectedTenant : null;
-                const propertyId = tenantToDelete?.propertyId;
-                await tenantService.deleteTenant(tenantId);
-                if (propertyId) {
-                  propertyService.updateProperty(propertyId, { status: 'vacant', tenantId: undefined as any })
-                    .catch(e => console.warn('Failed to vacate property:', e));
-                }
-              } catch (e) {
-                console.error('Failed to delete tenant:', e);
-              }
-              // useTenants in ClientsPage will re-fetch via invalidate() called inside ClientsPage
-            }}
+            onDeleteTenant={handleDeleteTenant}
             onArchiveTenant={async (tenantId) => {
               try {
                 await tenantService.updateTenant(tenantId, { status: 'ended' });
@@ -3065,23 +3142,9 @@ export function AppContent() {
                   setClientDetailsTab('overview');
                   navigateToMainApp('clients');
                 }}
-                onDeleteTenant={async (tenantId) => {
-                  try {
-                    const tenantToDelete = selectedTenant?.id === tenantId ? selectedTenant : null;
-                    const propertyId = tenantToDelete?.propertyId;
-                    await tenantService.deleteTenant(tenantId);
-                    if (propertyId) {
-                      propertyService.updateProperty(propertyId, { status: 'vacant', tenantId: undefined as any })
-                        .catch(e => console.warn('Failed to vacate property:', e));
-                    }
-                    toast.success('Tenant successfully deleted');
-                    invalidateTenants();
-                    setSelectedTenant(null);
-                    navigateToMainApp('clients');
-                  } catch (e) {
-                    console.error('Failed to delete tenant:', e);
-                    toast.error(`Failed to delete tenant: ${(e as any)?.message || 'Unknown error'}`);
-                  }
+                onDeleteTenant={async (tenantId, tenantObj) => {
+                  await handleDeleteTenant(tenantId, tenantObj || selectedTenant || undefined);
+                  navigateToMainApp('clients');
                 }}
                 onMessage={() => {
                   handleNavigation('messages');

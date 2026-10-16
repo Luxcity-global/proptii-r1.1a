@@ -225,7 +225,85 @@ export class TenantsService {
     if (!col) return { success: true };
 
     try {
+      // 1. Fetch tenant doc first to extract propertyId and email
+      let propertyId: string | undefined;
+      let tenantEmail: string | undefined;
+      try {
+        const snap = await withTimeout(col.doc(id).get());
+        if (snap && snap.exists) {
+          const data = snap.data();
+          propertyId = data?.propertyId;
+          tenantEmail = data?.email;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Could not fetch tenant before delete: ${err?.message || err}`);
+      }
+
+      // 2. Delete the tenant document
       await withTimeout(col.doc(id).delete());
+
+      // 3. Clear property attachment and mark vacant in Firestore
+      const db = this.db;
+      if (db) {
+        try {
+          if (propertyId) {
+            try {
+              await db.collection('properties').doc(propertyId).set(
+                {
+                  status: 'vacant',
+                  tenantId: admin.firestore.FieldValue.delete(),
+                  tenant: admin.firestore.FieldValue.delete(),
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true },
+              );
+              this.logger.log(`Vacated property ${propertyId} linked to deleted tenant ${id}`);
+            } catch (pErr: any) {
+              this.logger.warn(`Failed to vacate property ${propertyId}: ${pErr?.message || pErr}`);
+            }
+          }
+
+          // Also query properties where tenantId == id
+          try {
+            const propSnap = await db.collection('properties').where('tenantId', '==', id).get();
+            for (const doc of propSnap.docs) {
+              if (doc.id !== propertyId) {
+                await doc.ref.set(
+                  {
+                    status: 'vacant',
+                    tenantId: admin.firestore.FieldValue.delete(),
+                    tenant: admin.firestore.FieldValue.delete(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  { merge: true },
+                );
+                this.logger.log(`Vacated matching property ${doc.id} for deleted tenant ${id}`);
+              }
+            }
+          } catch (propSnapErr: any) {
+            this.logger.warn(`Failed to query properties by tenantId: ${propSnapErr?.message || propSnapErr}`);
+          }
+        } catch (propErr: any) {
+          this.logger.warn(`Failed to clean up properties on tenant delete: ${propErr?.message || propErr}`);
+        }
+
+        // 4. Clean up referencing_requests for this tenant email
+        if (tenantEmail) {
+          try {
+            const normalizedEmail = tenantEmail.toLowerCase().trim();
+            const refSnap = await db.collection('referencing_requests').where('tenantEmail', '==', normalizedEmail).get();
+            for (const doc of refSnap.docs) {
+              await doc.ref.delete();
+            }
+            if (refSnap.size > 0) {
+              this.logger.log(`Deleted ${refSnap.size} referencing_requests for ${normalizedEmail}`);
+            }
+          } catch (refErr: any) {
+            this.logger.warn(`Failed to clean up referencing_requests on tenant delete: ${refErr?.message || refErr}`);
+          }
+        }
+      }
+
       return { success: true };
     } catch (err: any) {
       this.logger.warn(`deleteTenant error: ${err?.message || err}`);

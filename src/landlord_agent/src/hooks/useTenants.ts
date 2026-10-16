@@ -12,6 +12,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { tenantService } from '../services/tenantService';
 import { dedupeTenants } from '../services/dedupeTenants';
 import { getAgentDummyTenants, isAgentTestAccount, mergeById } from '../data/agentTestPersona';
+import { isTenantDeleted } from '../utils/deletedTenants';
 import type { Tenant } from '../App';
 
 interface UseTenantsOptions {
@@ -44,6 +45,21 @@ export function useTenants({ userId, propertyIds = [] }: UseTenantsOptions): Use
 
   const invalidate = useCallback(() => setFetchKey((k) => k + 1), []);
 
+  // Listen for deleted tenant updates to sync all hook instances across the app
+  useEffect(() => {
+    const handleDeletedUpdate = () => {
+      invalidate();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('proptii_deleted_tenant_updated', handleDeletedUpdate);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('proptii_deleted_tenant_updated', handleDeletedUpdate);
+      }
+    };
+  }, [invalidate]);
+
   useEffect(() => {
     if (!userId) {
       setTenants([]);
@@ -69,6 +85,9 @@ export function useTenants({ userId, propertyIds = [] }: UseTenantsOptions): Use
           list = mergeById(getAgentDummyTenants(), list) as Tenant[];
         }
         list = dedupeTenants(list) as Tenant[];
+
+        // Filter out any tenant marked as deleted
+        list = list.filter((t) => !isTenantDeleted(t.id, t.email));
 
         if (!cancelled) {
           setTenants(list);

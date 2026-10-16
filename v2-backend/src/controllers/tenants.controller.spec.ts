@@ -12,6 +12,7 @@ describe('TenantsController & TenantsService', () => {
 
     const mockDocRef = {
       set: vi.fn().mockResolvedValue(undefined),
+      update: vi.fn().mockResolvedValue(undefined),
       get: vi.fn().mockResolvedValue({
         exists: true,
         id: 't-123',
@@ -33,6 +34,7 @@ describe('TenantsController & TenantsService', () => {
         docs: [
           {
             id: 't-123',
+            ref: mockDocRef,
             data: () => ({
               name: 'Jane Doe',
               email: 'jane@example.com',

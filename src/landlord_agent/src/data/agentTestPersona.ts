@@ -3,6 +3,7 @@ import type { Contract } from '../components/ContractsPage';
 import type { Landlord } from '../hooks/useLandlords';
 import type { ViewingBooking } from '../../../services/viewingService';
 import type { BookViewingRequest } from '../../../services/bookViewingRequestService';
+import { isTenantDeleted } from '../utils/deletedTenants';
 
 export const AGENT_TEST_ID = 'agent-test-001';
 export const AGENT_TEST_EMAIL = 'agent@test.proptii.co';
@@ -37,13 +38,34 @@ export function mergeById<T extends { id: string }>(dummy: T[], live: T[]): T[] 
  * tenants when the live record has none (so Documents & Clients stay demo-ready).
  */
 export function mergeAgentDemoProperties(dummy: Property[], live: Property[]): Property[] {
-  const byId = new Map(dummy.map((item) => [item.id, item]));
+  const byId = new Map(
+    dummy.map((item) => {
+      if (item.tenant && isTenantDeleted(item.tenant.id, item.tenant.email)) {
+        return [item.id, { ...item, status: 'vacant' as const, tenant: undefined, tenantId: undefined }];
+      }
+      return [item.id, item];
+    })
+  );
   live.forEach((liveProp) => {
     const base = byId.get(liveProp.id);
     if (!base) {
-      byId.set(liveProp.id, liveProp);
+      if (liveProp.tenant && isTenantDeleted(liveProp.tenant.id, liveProp.tenant.email)) {
+        byId.set(liveProp.id, { ...liveProp, status: 'vacant', tenant: undefined, tenantId: undefined });
+      } else {
+        byId.set(liveProp.id, liveProp);
+      }
       return;
     }
+    const isLiveVacant = liveProp.status === 'vacant';
+    const resolvedTenant = isLiveVacant
+      ? undefined
+      : (liveProp.tenant !== undefined ? liveProp.tenant : base.tenant);
+    const resolvedTenantId = isLiveVacant
+      ? undefined
+      : (liveProp.tenantId !== undefined ? liveProp.tenantId : base.tenantId);
+
+    const isDeleted = resolvedTenant && isTenantDeleted(resolvedTenant.id, resolvedTenant.email);
+
     byId.set(liveProp.id, {
       ...base,
       ...liveProp,
@@ -53,8 +75,9 @@ export function mergeAgentDemoProperties(dummy: Property[], live: Property[]): P
           : base.documents,
       photos:
         liveProp.photos && liveProp.photos.length > 0 ? liveProp.photos : base.photos,
-      tenant: liveProp.tenant || base.tenant,
-      tenantId: liveProp.tenantId || base.tenantId,
+      tenant: isDeleted || isLiveVacant ? undefined : resolvedTenant,
+      tenantId: isDeleted || isLiveVacant ? undefined : resolvedTenantId,
+      status: isDeleted && liveProp.status === 'occupied' ? 'vacant' : liveProp.status,
     });
   });
   return Array.from(byId.values());
@@ -256,7 +279,7 @@ export function getAgentDummyTenants(): Tenant[] {
       emergencyContact: { name: 'David Chen', relationship: 'Father', phone: '+44 7700 900555' },
       notes: 'On a payment plan for remaining arrears. Check-in due at the end of the month.',
     },
-  ];
+  ].filter((tenant) => !isTenantDeleted(tenant.id, tenant.email));
 }
 
 /** Demo stock for the agent dashboard, Properties, and Clients. */
@@ -382,10 +405,16 @@ export function getAgentDummyProperties(): Property[] {
     },
   ];
 
-  return base.map((property) => ({
-    ...property,
-    tenant: byPropertyId.get(property.id),
-  }));
+  return base.map((property) => {
+    const tenant = byPropertyId.get(property.id);
+    const isVacant = !tenant || isTenantDeleted(tenant.id, tenant.email);
+    return {
+      ...property,
+      status: isVacant ? 'vacant' : property.status,
+      tenant: isVacant ? undefined : tenant,
+      tenantId: isVacant ? undefined : property.tenantId,
+    };
+  });
 }
 
 export type PassportStepStatus = 'Filled' | 'Progress Saved' | 'Not Started';
@@ -550,7 +579,7 @@ export function getAgentDummyReceivedShares(): AgentDummyReceivedShare[] {
       ],
       steps: passportSteps([SAVED, FILLED, IDLE, IDLE, IDLE]),
     },
-  ];
+  ].filter((share) => !isTenantDeleted(share.id, share.tenantEmail));
 }
 
 /** Demo contracts so the agent Contracts page is populated in local testing. */
