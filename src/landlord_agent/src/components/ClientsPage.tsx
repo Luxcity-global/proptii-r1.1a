@@ -23,6 +23,14 @@ import {
   Mail,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 import { Tenant, Property, ArrearsAlert, UserRole, UserProfile } from '../App';
 import { referencingService } from '../services/referencingService';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
@@ -247,6 +255,9 @@ export function ClientsPage({
   const [isLoadingReferencingStatuses, setIsLoadingReferencingStatuses] = useState(false);
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(false);
+  const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
+  const [landlordToDelete, setLandlordToDelete] = useState<Landlord | null>(null);
+  const [isDeletingClient, setIsDeletingClient] = useState(false);
 
   // ── Data hooks ────────────────────────────────────────────────────────────
   // useTenants owns all tenant state — no polling, invalidate() after writes
@@ -1310,6 +1321,15 @@ export function ClientsPage({
                                   <Bell className="is-amber" />
                                   <span>Send Reminder</span>
                                 </DropdownMenuItem>
+                                {onDeleteTenant && (
+                                  <DropdownMenuItem
+                                    className="ll-cl-actions-item"
+                                    onSelect={() => setTenantToDelete(tenant)}
+                                  >
+                                    <Trash2 className="is-red" />
+                                    <span style={{ color: '#dc2626' }}>Delete Tenant</span>
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>
@@ -1423,6 +1443,15 @@ export function ClientsPage({
                                   <PoundSterling className="is-green" />
                                   <span>Send Statement</span>
                                 </DropdownMenuItem>
+                                {onDeleteLandlord && (
+                                  <DropdownMenuItem
+                                    className="ll-cl-actions-item"
+                                    onSelect={() => setLandlordToDelete(landlord)}
+                                  >
+                                    <Trash2 className="is-red" />
+                                    <span style={{ color: '#dc2626' }}>Delete Landlord</span>
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>
@@ -1495,6 +1524,96 @@ export function ClientsPage({
           </div>
         </div>
       </div>
+
+      {/* ── Single Tenant Deletion Dialog ────────────────────────────────────── */}
+      <Dialog open={!!tenantToDelete} onOpenChange={(open) => !open && setTenantToDelete(null)}>
+        <DialogContent className="rounded-[20px] max-w-md">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+              <Trash2 size={24} />
+            </div>
+            <DialogTitle style={{ fontFamily: "Archivo,sans-serif" }}>Delete Client</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete tenant <strong>{tenantToDelete?.name}</strong>? This will remove the tenant profile, tenancy record, and referencing history. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <button
+              type="button"
+              disabled={isDeletingClient}
+              className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={() => setTenantToDelete(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isDeletingClient}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center justify-center gap-2"
+              onClick={async () => {
+                if (!tenantToDelete || !onDeleteTenant) return;
+                try {
+                  setIsDeletingClient(true);
+                  await onDeleteTenant(tenantToDelete.id);
+                  setTenantToDelete(null);
+                  invalidateTenants();
+                } catch (err) {
+                  console.error('Failed to delete tenant:', err);
+                } finally {
+                  setIsDeletingClient(false);
+                }
+              }}
+            >
+              {isDeletingClient ? 'Deleting...' : 'Delete Tenant'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Single Landlord Deletion Dialog ──────────────────────────────────── */}
+      <Dialog open={!!landlordToDelete} onOpenChange={(open) => !open && setLandlordToDelete(null)}>
+        <DialogContent className="rounded-[20px] max-w-md">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+              <Trash2 size={24} />
+            </div>
+            <DialogTitle style={{ fontFamily: "Archivo,sans-serif" }}>Delete Landlord</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete landlord <strong>{landlordToDelete?.name}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <button
+              type="button"
+              disabled={isDeletingClient}
+              className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={() => setLandlordToDelete(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isDeletingClient}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center justify-center gap-2"
+              onClick={async () => {
+                if (!landlordToDelete || !onDeleteLandlord) return;
+                try {
+                  setIsDeletingClient(true);
+                  await onDeleteLandlord(landlordToDelete.id);
+                  setLandlordToDelete(null);
+                  setTimeout(refreshLandlords, 500);
+                } catch (err) {
+                  console.error('Failed to delete landlord:', err);
+                } finally {
+                  setIsDeletingClient(false);
+                }
+              }}
+            >
+              {isDeletingClient ? 'Deleting...' : 'Delete Landlord'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

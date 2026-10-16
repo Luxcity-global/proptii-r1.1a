@@ -30,7 +30,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { invitationService } from '../services/invitationService';
 import { tenantService } from '../services/tenantService';
-import { renderProptiiEmail } from '../../../utils/proptiiEmailLayout';
+import { renderProptiiEmail, escapeEmailHtml } from '../../../utils/proptiiEmailLayout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,22 +59,69 @@ const LABEL = 'block text-sm font-semibold text-gray-700 mb-1.5';
 function buildEmailHtml(
   propertyAddress: string,
   inviteLink: string,
-  customMessage?: string
+  customMessage?: string,
+  landlordName?: string
 ): string {
+  const landlordGreeting = landlordName
+    ? `<p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 16px;">
+        Your landlord, <strong style="color: #0F172A;">${escapeEmailHtml(landlordName)}</strong>, has invited you to create your official tenant profile on Proptii.
+       </p>`
+    : `<p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 16px;">
+        You have been invited by your landlord to create your official tenant profile on Proptii.
+       </p>`;
+
+  const propertyCard = `
+    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #136C9E; border-radius: 10px; padding: 18px 20px; margin: 20px 0;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #136C9E; margin-bottom: 6px;">
+        Property Details
+      </div>
+      <div style="font-size: 17px; font-weight: 700; color: #0F172A; line-height: 1.4;">
+        ${escapeEmailHtml(propertyAddress)}
+      </div>
+      ${landlordName ? `<div style="font-size: 13px; color: #64748B; margin-top: 8px;">Landlord: <strong style="color: #334155;">${escapeEmailHtml(landlordName)}</strong></div>` : ''}
+    </div>
+  `;
+
+  const messageCard = customMessage
+    ? `
+      <div style="background: #FFFBEB; border: 1px solid #FDE68A; border-left: 4px solid #F59E0B; border-radius: 10px; padding: 16px 20px; margin: 20px 0;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #B45309; margin-bottom: 6px;">
+          Note from ${landlordName ? escapeEmailHtml(landlordName) : 'Your Landlord'}
+        </div>
+        <div style="font-size: 14px; color: #78350F; font-style: italic; line-height: 1.5;">
+          &ldquo;${escapeEmailHtml(customMessage)}&rdquo;
+        </div>
+      </div>
+    `
+    : '';
+
+  const nextSteps = `
+    <div style="background: #FFFFFF; border: 1px dashed #CBD5E1; border-radius: 10px; padding: 16px 20px; margin: 24px 0 20px;">
+      <div style="font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 8px;">Once connected, you can:</div>
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; font-size: 13px; color: #475569; line-height: 1.6;">
+        <tr><td style="padding: 3px 0;">✓ Review your tenancy agreements and digital lease documents</td></tr>
+        <tr><td style="padding: 3px 0;">✓ Message directly with ${landlordName ? escapeEmailHtml(landlordName) : 'your landlord'} in real time</td></tr>
+        <tr><td style="padding: 3px 0;">✓ Track payments and submit maintenance requests easily</td></tr>
+      </table>
+    </div>
+  `;
+
   return renderProptiiEmail({
     title: 'Tenant Invitation',
     buttonLabel: 'Create Account & Complete Profile',
     buttonHref: inviteLink,
     bodyHtml: `
-      <p>Hello,</p>
-      <p>You have been invited to create your tenant profile on Proptii.</p>
-      <div class="details">
-        <h3>Property</h3>
-        <p>${propertyAddress}</p>
-      </div>
-      ${customMessage ? `<div class="details"><p><strong>Message from your landlord:</strong><br/>${customMessage}</p></div>` : ''}
-      <p>Click the button below to create your account and complete your tenant profile.</p>
-      <p>If you have any questions, please contact your landlord directly.</p>
+      <p style="font-size: 16px; font-weight: 600; color: #0F172A; margin: 0 0 8px;">Hello,</p>
+      ${landlordGreeting}
+      ${propertyCard}
+      ${messageCard}
+      ${nextSteps}
+      <p style="font-size: 14px; color: #64748B; margin: 20px 0 0; line-height: 1.5;">
+        Click the button below to create your account and complete your tenant profile.
+      </p>
+      <p style="font-size: 13px; color: #94A3B8; margin: 8px 0 0;">
+        If you have any questions, please contact ${landlordName ? escapeEmailHtml(landlordName) : 'your landlord'} directly.
+      </p>
     `,
   });
 }
@@ -160,13 +207,17 @@ export function InviteTenant({
       }
 
       // 2. Build tokenized invitation link and email content
+      const resolvedLandlordName = (landlordName || '').trim();
       const inviteLink = buildInviteLink(inviteToken, propertyId, landlordEmail, landlordId);
       const html = buildEmailHtml(
         selectedProperty.address,
         inviteLink,
-        customMessage.trim() || undefined
+        customMessage.trim() || undefined,
+        resolvedLandlordName || undefined
       );
-      const subject = `You've been invited to join as a tenant — ${selectedProperty.address}`;
+      const subject = resolvedLandlordName
+        ? `${resolvedLandlordName} invited you to join as a tenant — ${selectedProperty.address}`
+        : `You've been invited to join as a tenant — ${selectedProperty.address}`;
 
       // 3. Send the email (with one retry on network errors)
       const API_BASE = PRIMARY_API_BASE_URL.replace(/\/api$/, '');

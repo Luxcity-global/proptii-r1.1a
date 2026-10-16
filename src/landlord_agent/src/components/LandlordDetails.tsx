@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Trash2, Loader2 } from 'lucide-react';
 import type { Landlord } from '../hooks/useLandlords';
 import { ClientDetailsDrawer, clientInitials, type ClientStatusTone } from './ClientDetailsDrawer';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 
 interface LandlordDetailsProps {
   landlord: Landlord | null;
   onBack: () => void;
   onEdit?: (landlord: Landlord) => void;
+  onDeleteLandlord?: (landlordId: string) => Promise<void> | void;
 }
 
 const statusTone = (status?: string): ClientStatusTone => {
@@ -16,8 +25,10 @@ const statusTone = (status?: string): ClientStatusTone => {
   return 'inactive';
 };
 
-export function LandlordDetails({ landlord, onBack }: LandlordDetailsProps) {
+export function LandlordDetails({ landlord, onBack, onEdit, onDeleteLandlord }: LandlordDetailsProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!landlord) {
     return (
@@ -68,6 +79,26 @@ export function LandlordDetails({ landlord, onBack }: LandlordDetailsProps) {
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onClose={onBack}
+      actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {onEdit ? (
+            <button type="button" className="ll-cd-comm" onClick={() => onEdit(landlord)}>
+              Edit
+            </button>
+          ) : null}
+          {onDeleteLandlord ? (
+            <button
+              type="button"
+              className="ll-cd-comm"
+              style={{ color: '#dc2626', borderColor: '#fca5a5', background: '#fef2f2' }}
+              onClick={() => setShowDeleteModal(true)}
+            >
+              <Trash2 size={13} style={{ marginRight: '4px', verticalAlign: 'middle', display: 'inline-block' }} />
+              Delete Client
+            </button>
+          ) : null}
+        </div>
+      }
     >
       {activeTab === 'overview' && (
         <>
@@ -179,6 +210,52 @@ export function LandlordDetails({ landlord, onBack }: LandlordDetailsProps) {
           )}
         </section>
       )}
+
+      {/* ── Delete Landlord Confirmation Dialog ─────────────────────────────── */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="rounded-[20px] max-w-md">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+              <Trash2 size={24} />
+            </div>
+            <DialogTitle style={{ fontFamily: "Archivo,sans-serif" }}>Delete Client</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete landlord <strong>{landlord.name}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <button
+              type="button"
+              disabled={isDeleting}
+              className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={() => setShowDeleteModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isDeleting}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center justify-center gap-2"
+              onClick={async () => {
+                if (!landlord || !onDeleteLandlord) return;
+                try {
+                  setIsDeleting(true);
+                  await onDeleteLandlord(landlord.id);
+                  setShowDeleteModal(false);
+                  onBack();
+                } catch (err) {
+                  console.error("Failed to delete landlord:", err);
+                } finally {
+                  setIsDeleting(false);
+                }
+              }}
+            >
+              {isDeleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              {isDeleting ? "Deleting..." : "Delete Client"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ClientDetailsDrawer>
   );
 }

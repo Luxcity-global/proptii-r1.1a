@@ -119,6 +119,10 @@ export const TenantInvitePage: React.FC = () => {
           if (res.conversationId) {
             setClaimedConversationId(res.conversationId);
           }
+          if (user?.id) {
+            const { setRole } = await import('../services/roleService');
+            void setRole(user.id, user.email || '', 'tenant', 'claim_token');
+          }
           patchUser({ roles: ['tenant'], roleResolved: true });
           setClaimSuccess(true);
         } else {

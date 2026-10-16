@@ -9,6 +9,14 @@ import {
   Loader2,
   Trash2,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 
 import { Tenant } from '../App';
 import { referencingService, ReferencingDocument } from '../services/referencingService';
@@ -68,11 +76,14 @@ interface TenantDetailsProps {
   onEdit?: (tenant: Tenant) => void;
   onMessage?: (tenant: Tenant) => void;
   onTenantUpdate?: (tenant: Tenant) => void;
+  onDeleteTenant?: (tenantId: string) => Promise<void> | void;
   initialTab?: string;
 }
 
-export function TenantDetails({ tenant, onBack, onEdit, onMessage, onTenantUpdate, initialTab = 'overview' }: TenantDetailsProps) {
+export function TenantDetails({ tenant, onBack, onEdit, onMessage, onTenantUpdate, onDeleteTenant, initialTab = 'overview' }: TenantDetailsProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [showDeleteTenantModal, setShowDeleteTenantModal] = useState(false);
+  const [isDeletingTenant, setIsDeletingTenant] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [referencingStatus, setReferencingStatus] = useState<'not-started' | 'in-progress' | 'complete'>('not-started');
   const [referencingData, setReferencingData] = useState<ReferencingDocument | null>(null);
@@ -713,11 +724,24 @@ const asDate = (value: unknown): Date | null => {
         onMessage={onMessage && displayTenant ? () => onMessage(displayTenant) : undefined}
         loading={isLoadingTenant}
         actions={
-          onEdit ? (
-            <button type="button" className="ll-cd-comm" onClick={() => onEdit(displayTenant)}>
-              Edit
-            </button>
-          ) : null
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {onEdit ? (
+              <button type="button" className="ll-cd-comm" onClick={() => onEdit(displayTenant)}>
+                Edit
+              </button>
+            ) : null}
+            {onDeleteTenant ? (
+              <button
+                type="button"
+                className="ll-cd-comm"
+                style={{ color: '#dc2626', borderColor: '#fca5a5', background: '#fef2f2' }}
+                onClick={() => setShowDeleteTenantModal(true)}
+              >
+                <Trash2 size={13} style={{ marginRight: '4px', verticalAlign: 'middle', display: 'inline-block' }} />
+                Delete Client
+              </button>
+            ) : null}
+          </div>
         }
       >
         {activeTab === 'overview' && (
@@ -1161,6 +1185,52 @@ const asDate = (value: unknown): Date | null => {
         }}
         onUpload={handleDocumentUpload}
       />
+
+      {/* ── Delete Tenant Confirmation Dialog ─────────────────────────────── */}
+      <Dialog open={showDeleteTenantModal} onOpenChange={setShowDeleteTenantModal}>
+        <DialogContent className="rounded-[20px] max-w-md">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+              <Trash2 size={24} />
+            </div>
+            <DialogTitle style={{ fontFamily: "Archivo,sans-serif" }}>Delete Client</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete <strong>{displayTenant.name}</strong>? This will remove the tenant profile, tenancy record, and referencing history. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <button
+              type="button"
+              disabled={isDeletingTenant}
+              className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={() => setShowDeleteTenantModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isDeletingTenant}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center justify-center gap-2"
+              onClick={async () => {
+                if (!displayTenant || !onDeleteTenant) return;
+                try {
+                  setIsDeletingTenant(true);
+                  await onDeleteTenant(displayTenant.id);
+                  setShowDeleteTenantModal(false);
+                  onBack();
+                } catch (err) {
+                  console.error("Failed to delete tenant:", err);
+                } finally {
+                  setIsDeletingTenant(false);
+                }
+              }}
+            >
+              {isDeletingTenant ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              {isDeletingTenant ? "Deleting..." : "Delete Client"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

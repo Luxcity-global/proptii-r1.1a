@@ -58,6 +58,7 @@ import {
   Save,
   Loader2,
   Download,
+  Trash2,
 } from "lucide-react";
 import { Property, PropertyPhoto, Tenant, PropertyDocument } from "../App";
 import { DocumentUploadModal } from "./DocumentUploadModal";
@@ -256,6 +257,7 @@ interface PropertyDetailsProps {
     propertyId: string,
     doc: { name: string; type: string; file: File; expiryDate?: string }
   ) => Promise<void>;
+  onDeleteProperty?: (property: Property) => Promise<void> | void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -274,6 +276,7 @@ export function PropertyDetails({
   onRemoveTenant,
   onChangeTenant,
   onDocumentUpload,
+  onDeleteProperty,
 }: PropertyDetailsProps) {
   // ── Tab & hero state ──────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<
@@ -281,6 +284,8 @@ export function PropertyDetails({
   >("overview");
   const [heroIdx, setHeroIdx] = useState(0);
   const [showChangeTenantDialog, setShowChangeTenantDialog] = useState(false);
+  const [showDeletePropertyDialog, setShowDeletePropertyDialog] = useState(false);
+  const [isDeletingProperty, setIsDeletingProperty] = useState(false);
   const [newTenantId, setNewTenantId] = useState("");
   const [assignKey, setAssignKey] = useState(0);
   const [pendingSecondProperty, setPendingSecondProperty] = useState<{
@@ -603,6 +608,17 @@ export function PropertyDetails({
               >
                 <Archive size={14} className="mr-2 text-[#64748b]" /> Mark as Renovation
               </DropdownMenuItem>
+              {onDeleteProperty && (
+                <>
+                  <div className="h-px bg-[#f1f5f9] my-1" />
+                  <DropdownMenuItem
+                    className="rounded-[10px] cursor-pointer text-[13px] text-red-600 focus:text-red-700 focus:bg-red-50"
+                    onSelect={() => setShowDeletePropertyDialog(true)}
+                  >
+                    <Trash2 size={14} className="mr-2 text-red-600" /> Delete Property
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -1085,6 +1101,17 @@ export function PropertyDetails({
                     {label}
                   </button>
                 ))}
+                {onDeleteProperty && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePropertyDialog(true)}
+                    className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-[12px] text-[13px] font-semibold text-red-600 transition-all hover:bg-red-50 text-left mt-1 border-t border-[#f1f5f9] pt-2.5"
+                    style={{ fontFamily: "Archivo,sans-serif" }}
+                  >
+                    <Trash2 size={15} className="text-red-500 shrink-0" />
+                    Delete Property
+                  </button>
+                )}
               </div>
             </SCard>
 
@@ -1547,6 +1574,52 @@ export function PropertyDetails({
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Property Confirmation Dialog ─────────────────────────────── */}
+      <Dialog open={showDeletePropertyDialog} onOpenChange={setShowDeletePropertyDialog}>
+        <DialogContent className="rounded-[20px] max-w-md">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
+              <Trash2 size={24} />
+            </div>
+            <DialogTitle style={{ fontFamily: "Archivo,sans-serif" }}>Delete Property</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete <strong>{property?.address}</strong>? This will remove the listing and all associated records. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <button
+              type="button"
+              disabled={isDeletingProperty}
+              className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={() => setShowDeletePropertyDialog(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isDeletingProperty}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center justify-center gap-2"
+              onClick={async () => {
+                if (!property || !onDeleteProperty) return;
+                try {
+                  setIsDeletingProperty(true);
+                  await onDeleteProperty(property);
+                  setShowDeletePropertyDialog(false);
+                  onBack();
+                } catch (err) {
+                  console.error("Failed to delete property:", err);
+                } finally {
+                  setIsDeletingProperty(false);
+                }
+              }}
+            >
+              {isDeletingProperty ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              {isDeletingProperty ? "Deleting..." : "Delete Property"}
+            </button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

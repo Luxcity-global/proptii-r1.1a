@@ -2526,9 +2526,14 @@ export function AppContent() {
                 if (win) { win.document.write(html); win.document.close(); }
               }
             }}
-            onDeleteLandlord={(landlordId) => {
-              // In real app, this would delete from landlord state
-              console.log('Delete landlord:', landlordId);
+            onDeleteLandlord={async (landlordId) => {
+              try {
+                await landlordService.deleteLandlord(landlordId);
+                toast.success('Landlord successfully deleted');
+              } catch (err: any) {
+                console.error('Failed to delete landlord:', err);
+                toast.error(`Failed to delete landlord: ${err?.message || 'Unknown error'}`);
+              }
             }}
             onArchiveLandlord={(landlordId) => {
               // In real app, this would archive the landlord
@@ -3033,6 +3038,24 @@ export function AppContent() {
                   setClientDetailsTab('overview');
                   navigateToMainApp('clients');
                 }}
+                onDeleteTenant={async (tenantId) => {
+                  try {
+                    const tenantToDelete = selectedTenant?.id === tenantId ? selectedTenant : null;
+                    const propertyId = tenantToDelete?.propertyId;
+                    await tenantService.deleteTenant(tenantId);
+                    if (propertyId) {
+                      propertyService.updateProperty(propertyId, { status: 'vacant', tenantId: undefined as any })
+                        .catch(e => console.warn('Failed to vacate property:', e));
+                    }
+                    toast.success('Tenant successfully deleted');
+                    invalidateTenants();
+                    setSelectedTenant(null);
+                    navigateToMainApp('clients');
+                  } catch (e) {
+                    console.error('Failed to delete tenant:', e);
+                    toast.error(`Failed to delete tenant: ${(e as any)?.message || 'Unknown error'}`);
+                  }
+                }}
                 onMessage={() => {
                   handleNavigation('messages');
                 }}
@@ -3089,6 +3112,17 @@ export function AppContent() {
                 onEdit={(landlord) => {
                   setSelectedLandlord(landlord);
                 }}
+                onDeleteLandlord={async (landlordId) => {
+                  try {
+                    await landlordService.deleteLandlord(landlordId);
+                    toast.success('Landlord successfully deleted');
+                    setSelectedLandlord(null);
+                    navigateToMainApp('clients');
+                  } catch (err: any) {
+                    console.error('Failed to delete landlord:', err);
+                    toast.error(`Failed to delete landlord: ${err?.message || 'Unknown error'}`);
+                  }
+                }}
               />
             )}
           </>
@@ -3103,6 +3137,7 @@ export function AppContent() {
             properties={properties}
             tenants={tenants}
             onBack={() => navigateToMainApp('properties')}
+            onDeleteProperty={deleteProperty}
             onEdit={(property) => {
               // Enter editing mode with the new single-page EditProperty form
               setSelectedProperty(property);

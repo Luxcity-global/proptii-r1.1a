@@ -146,9 +146,26 @@ export class FirebaseAuthGuard implements CanActivate {
         let role = decodedToken.role;
         if (!role) {
           try {
-            const userDoc = await admin.firestore().collection('users').doc(decodedToken.uid).get();
+            const db = admin.firestore();
+            const userDoc = await db.collection('users').doc(decodedToken.uid).get();
             if (userDoc.exists) {
-              role = userDoc.data()?.role;
+              const uData = userDoc.data();
+              role = uData?.role || uData?.primaryRole || (Array.isArray(uData?.roles) && uData.roles.length > 0 ? uData.roles[0] : null);
+            }
+            if (!role) {
+              const tSnap = await db.collection('tenants')
+                .where('authUid', '==', decodedToken.uid)
+                .limit(1)
+                .get();
+              if (!tSnap.empty) {
+                role = 'tenant';
+              } else {
+                const tSnap2 = await db.collection('tenants')
+                  .where('tenantUserId', '==', decodedToken.uid)
+                  .limit(1)
+                  .get();
+                if (!tSnap2.empty) role = 'tenant';
+              }
             }
           } catch {}
         }

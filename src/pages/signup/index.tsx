@@ -70,11 +70,19 @@ const DedicatedSignupPage: React.FC = () => {
       return;
     }
 
-    const returnPath = sessionStorage.getItem('redirectAfterLogin');
+    const queryRedirect = searchParams.get('redirect');
+    const returnPath = queryRedirect || sessionStorage.getItem('redirectAfterLogin');
     if (returnPath?.includes('/signup/pay-now') || returnPath?.includes('/billing/')) {
       hasHandledAuthRedirect.current = true;
       sessionStorage.removeItem('redirectAfterLogin');
       sessionStorage.removeItem('signup_auto_msal_for_paynow');
+      navigate(returnPath, { replace: true });
+      return;
+    }
+
+    if (returnPath && (returnPath.startsWith('/invite') || returnPath.startsWith('/claim'))) {
+      hasHandledAuthRedirect.current = true;
+      sessionStorage.removeItem('redirectAfterLogin');
       navigate(returnPath, { replace: true });
       return;
     }

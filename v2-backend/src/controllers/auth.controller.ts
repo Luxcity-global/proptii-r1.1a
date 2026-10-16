@@ -29,10 +29,30 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Missing or invalid authentication token' })
   async getMe(@Req() req: any) {
     const user = req.user;
+    let role = user.role;
+    if (!role && admin.apps.length) {
+      try {
+        const db = admin.firestore();
+        const uDoc = await db.collection('users').doc(user.uid).get();
+        if (uDoc.exists) {
+          const u = uDoc.data();
+          role = u?.role || u?.primaryRole || (Array.isArray(u?.roles) && u.roles.length > 0 ? u.roles[0] : null);
+        }
+        if (!role) {
+          const tSnap = await db.collection('tenants').where('authUid', '==', user.uid).limit(1).get();
+          if (!tSnap.empty) {
+            role = 'tenant';
+          } else {
+            const tSnap2 = await db.collection('tenants').where('tenantUserId', '==', user.uid).limit(1).get();
+            if (!tSnap2.empty) role = 'tenant';
+          }
+        }
+      } catch {}
+    }
     return {
       uid: user.uid,
       email: user.email,
-      role: user.role || null,
+      role: role || null,
     };
   }
 

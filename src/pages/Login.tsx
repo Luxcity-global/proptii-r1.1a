@@ -75,7 +75,10 @@ export const LoginPage: React.FC = () => {
         fromPath.toLowerCase().startsWith('/proptiiadmin/') ||
         fromPath.toLowerCase() === '/admin' ||
         fromPath.toLowerCase().startsWith('/admin/');
-      let targetPath = hasRole || isAdminDest ? from : '/select-role';
+      const isInviteDest =
+        fromPath.toLowerCase().startsWith('/invite') ||
+        fromPath.toLowerCase().startsWith('/claim');
+      let targetPath = hasRole || isAdminDest || isInviteDest ? from : '/select-role';
 
       if (hasRole && !isAdminDest) {
         const isLandlord = user.roles.includes('landlord') || user.roles.includes('agent');

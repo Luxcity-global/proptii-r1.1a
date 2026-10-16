@@ -222,10 +222,13 @@ export class TenantInvitationsController {
         : ['tenant'];
       await db.collection('users').doc(userUid).set(
         {
+          role: 'tenant',
           roles: rolesUnion,
           primaryRole: 'tenant',
           email: userEmail,
           displayName: userName,
+          roleSource: 'invitation_claim',
+          roleAssignedAt: new Date().toISOString(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true },
