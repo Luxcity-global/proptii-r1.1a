@@ -4,6 +4,8 @@ export interface PortfolioUnit {
   rent?: number | null;
   tenantId?: string | null;
   tenant?: unknown;
+  archived?: boolean | null;
+  isArchived?: boolean | null;
 }
 
 export interface PortfolioTenantLink {
@@ -20,8 +22,17 @@ export interface PortfolioCounts {
   monthlyRent: number;
 }
 
+/** Determine whether a property has been moved to the archive. */
+export function isPropertyArchived(
+  property: { status?: string | null; archived?: boolean | null; isArchived?: boolean | null } | null | undefined
+): boolean {
+  if (!property) return false;
+  return property.status === 'archived' || property.archived === true || property.isArchived === true;
+}
+
 /** A unit is occupied when its status says so, or a tenant record is linked to it. */
 export function isUnitOccupied(property: PortfolioUnit, tenants: PortfolioTenantLink[] = []): boolean {
+  if (isPropertyArchived(property)) return false;
   const linked = tenants.some((tenant) =>
     (Boolean(tenant.propertyId) && tenant.propertyId === property.id)
     || (Boolean(property.tenantId) && Boolean(tenant.id) && tenant.id === property.tenantId),
@@ -32,9 +43,10 @@ export function isUnitOccupied(property: PortfolioUnit, tenants: PortfolioTenant
 /**
  * Occupied, vacant, and renovating always add up to the portfolio size.
  * Monthly rent is the rent on occupied units only, matching the dashboard revenue card.
+ * Archived properties are excluded from active portfolio calculations.
  */
 export function countPortfolio(properties: PortfolioUnit[] | null | undefined, tenants: PortfolioTenantLink[] = []): PortfolioCounts {
-  const list = properties || [];
+  const list = (properties || []).filter((p) => !isPropertyArchived(p));
   let occupied = 0;
   let vacant = 0;
   let renovating = 0;
@@ -61,3 +73,4 @@ export function countPortfolio(properties: PortfolioUnit[] | null | undefined, t
     monthlyRent,
   };
 }
+

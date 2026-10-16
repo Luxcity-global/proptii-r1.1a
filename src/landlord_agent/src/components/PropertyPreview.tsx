@@ -16,6 +16,7 @@ import {
   CheckCircle,
   Clock,
   Archive,
+  ArchiveRestore,
   MoreHorizontal,
   BarChart3,
   User,
@@ -26,6 +27,8 @@ import {
   Menu
 } from 'lucide-react';
 import { Property } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
+
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -174,9 +177,19 @@ export function PropertyPreview({
     return labels[type] || type;
   };
 
-  const archiveProperty = () => {
-    updateProperty(property.id, { status: 'under-renovation' });
+  const isArchived = isPropertyArchived(property);
+  const toggleArchiveProperty = () => {
+    if (!property) return;
+    const nextStatus = isArchived
+      ? ((property.tenant || (property as any).tenantId) ? 'occupied' : 'vacant')
+      : 'archived';
+    updateProperty(property.id, {
+      status: nextStatus as any,
+      archived: !isArchived,
+      isArchived: !isArchived,
+    } as any);
   };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -288,10 +301,20 @@ export function PropertyPreview({
                     <Edit3 className="w-4 h-4 mr-2" />
                     Edit
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={archiveProperty}>
-                    <Archive className="w-4 h-4 mr-2" />
-                    Archive Property
+                  <DropdownMenuItem onClick={toggleArchiveProperty}>
+                    {isArchived ? (
+                      <>
+                        <ArchiveRestore className="w-4 h-4 mr-2" />
+                        Restore Property
+                      </>
+                    ) : (
+                      <>
+                        <Archive className="w-4 h-4 mr-2" />
+                        Archive Property
+                      </>
+                    )}
                   </DropdownMenuItem>
+
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

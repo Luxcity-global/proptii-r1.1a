@@ -1051,6 +1051,14 @@
 
 .ll-props-status.renovation .dot { background: #3b82f6; }
 
+.ll-props-status.archived {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+.ll-props-status.archived .dot { background: #64748b; }
+
 .ll-props-icon-btn {
   width: 36px;
   height: 36px;
@@ -1227,6 +1235,11 @@
   backdrop-filter: blur(4px);
 }
 
+.ll-props-badge.archived {
+  background: #475569;
+  color: #fff;
+}
+
 .ll-props-card-check {
   position: absolute;
   top: 12px;
@@ -1372,6 +1385,11 @@
   border: 1px solid rgba(226, 232, 240, 0.7);
 }
 
+.ll-props-tenant-box.archived {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+}
+
 .ll-props-tenant-box-head {
   display: flex;
   align-items: center;
@@ -1393,6 +1411,7 @@
 .ll-props-tenant-box.occupied .ll-props-tenant-label { color: #047857; }
 .ll-props-tenant-box.expiring .ll-props-tenant-label { color: #e11d48; }
 .ll-props-tenant-box.vacant .ll-props-tenant-label { color: #64748b; }
+.ll-props-tenant-box.archived .ll-props-tenant-label { color: #64748b; }
 
 .ll-props-action-needed {
   background: #ffe4e6;

@@ -39,6 +39,7 @@ import {
   CheckCircle,
   Clock,
   Archive,
+  ArchiveRestore,
   User,
   UserPlus,
   UserX,
@@ -61,6 +62,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Property, PropertyPhoto, Tenant, PropertyDocument } from "../App";
+import { isPropertyArchived } from "../utils/portfolioStats";
 import { DocumentUploadModal } from "./DocumentUploadModal";
 import { ExistingTenancyWarning } from "./ExistingTenancyWarning";
 import { otherPropertyForPerson } from "../services/otherPropertyForPerson";
@@ -133,7 +135,7 @@ function initials(name: string): string {
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
-type StatusKey = "occupied" | "vacant" | "under-renovation" | "draft";
+type StatusKey = "occupied" | "vacant" | "under-renovation" | "draft" | "archived";
 
 const STATUS_META: Record<
   StatusKey,
@@ -156,6 +158,12 @@ const STATUS_META: Record<
     label: "Draft",
     dot: "#94a3b8",
     bg: "#f1f5f9",
+    text: "#475569",
+  },
+  archived: {
+    label: "Archived",
+    dot: "#64748b",
+    bg: "#f8fafc",
     text: "#475569",
   },
 };
@@ -258,6 +266,7 @@ interface PropertyDetailsProps {
     doc: { name: string; type: string; file: File; expiryDate?: string }
   ) => Promise<void>;
   onDeleteProperty?: (property: Property) => Promise<void> | void;
+  onArchiveProperty?: (property: Property) => Promise<void> | void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -277,6 +286,7 @@ export function PropertyDetails({
   onChangeTenant,
   onDocumentUpload,
   onDeleteProperty,
+  onArchiveProperty,
 }: PropertyDetailsProps) {
   // ── Tab & hero state ──────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<
@@ -606,7 +616,29 @@ export function PropertyDetails({
                 className="rounded-[10px] cursor-pointer text-[13px]"
                 onSelect={() => updateProperty(property.id, { status: "under-renovation" })}
               >
-                <Archive size={14} className="mr-2 text-[#64748b]" /> Mark as Renovation
+                <Clock size={14} className="mr-2 text-[#64748b]" /> Mark as Renovation
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="rounded-[10px] cursor-pointer text-[13px]"
+                onSelect={() => {
+                  if (onArchiveProperty) {
+                    onArchiveProperty(property);
+                  } else {
+                    const isArch = isPropertyArchived(property);
+                    const nextStatus = isArch ? ((property.tenant || property.tenantId) ? 'occupied' : 'vacant') : 'archived';
+                    updateProperty(property.id, { status: nextStatus as any, archived: !isArch, isArchived: !isArch } as any);
+                  }
+                }}
+              >
+                {isPropertyArchived(property) ? (
+                  <>
+                    <ArchiveRestore size={14} className="mr-2 text-[#64748b]" /> Restore Property
+                  </>
+                ) : (
+                  <>
+                    <Archive size={14} className="mr-2 text-[#64748b]" /> Archive Property
+                  </>
+                )}
               </DropdownMenuItem>
               {onDeleteProperty && (
                 <>

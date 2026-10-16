@@ -25,4 +25,16 @@ describe('countPortfolio', () => {
     const stats = countPortfolio([], [{ id: 'tenant-1', propertyId: 'missing' }]);
     expect(stats).toMatchObject({ total: 0, occupied: 0, vacant: 0, renovating: 0, occupancyPct: 0, monthlyRent: 0 });
   });
+
+  it('excludes archived properties from the active portfolio', () => {
+    const listWithArchived = [
+      ...properties,
+      { id: 'f', status: 'archived', rent: 1200 },
+      { id: 'g', status: 'vacant', rent: 500, archived: true },
+    ];
+    const stats = countPortfolio(listWithArchived, [{ id: 'tenant-b', propertyId: 'b' }]);
+    expect(stats.total).toBe(5);
+    expect(stats.monthlyRent).toBe(2400);
+  });
 });
+

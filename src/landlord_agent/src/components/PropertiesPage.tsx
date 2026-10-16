@@ -15,6 +15,7 @@ import {
   Trash2,
   Download,
   Archive,
+  ArchiveRestore,
   CheckSquare,
   Square,
   Copy,
@@ -43,7 +44,7 @@ import {
 } from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
-import { countPortfolio, isUnitOccupied } from '../utils/portfolioStats';
+import { countPortfolio, isUnitOccupied, isPropertyArchived } from '../utils/portfolioStats';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import '../styles/propertiesPage.css';
 
@@ -73,9 +74,9 @@ interface PropertiesPageProps {
   userProfile?: UserProfile | null;
 }
 
-type FilterTab = 'all' | 'attention' | 'vacant' | 'expiring' | 'drafts';
+type FilterTab = 'all' | 'attention' | 'vacant' | 'expiring' | 'drafts' | 'archived';
 type ViewMode = 'table' | 'grid';
-type DisplayStatus = 'occupied' | 'vacant' | 'expiring' | 'renovation';
+type DisplayStatus = 'occupied' | 'vacant' | 'expiring' | 'renovation' | 'archived';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
@@ -177,6 +178,8 @@ function statusLabel(status: DisplayStatus): string {
       return 'Rent Expiring';
     case 'renovation':
       return 'Under Renovation';
+    case 'archived':
+      return 'Archived';
     default:
       return 'Occupied';
   }
@@ -297,13 +300,14 @@ export function PropertiesPage({
   };
 
   const isOccupied = (property: Property, tenant?: Tenant) =>
+    !isPropertyArchived(property) &&
     isUnitOccupied(
       tenant ? { ...property, tenant: property.tenant || tenant, tenantId: property.tenantId || tenant.id } : property,
       tenants || [],
     );
 
   const isVacant = (property: Property, tenant?: Tenant) =>
-    !isOccupied(property, tenant) && property.status !== 'under-renovation';
+    !isPropertyArchived(property) && !isOccupied(property, tenant) && property.status !== 'under-renovation';
 
   const isLeaseExpiring = (tenant?: Tenant, withinDays = 90) => {
     if (!tenant || tenant.status !== 'active') return false;
@@ -312,6 +316,7 @@ export function PropertiesPage({
   };
 
   const displayStatus = (property: Property, tenant?: Tenant): DisplayStatus => {
+    if (isPropertyArchived(property)) return 'archived';
     if (isLeaseExpiring(tenant, 90)) return 'expiring';
     if (isOccupied(property, tenant)) return 'occupied';
     if (property.status === 'under-renovation') return 'renovation';
@@ -334,6 +339,7 @@ export function PropertiesPage({
   };
 
   const needsAttention = (property: Property, tenant?: Tenant) => {
+    if (isPropertyArchived(property)) return false;
     const compliance = getComplianceStatus(property);
     return (
       isVacant(property, tenant) ||
@@ -372,7 +378,8 @@ export function PropertiesPage({
   } = useMemo(() => {
     const now = new Date();
     const list = properties || [];
-    const portfolio = countPortfolio(list, tenants || []);
+    const activeList = list.filter((p) => !isPropertyArchived(p));
+    const portfolio = countPortfolio(activeList, tenants || []);
     let rentSum = 0;
     const endingSoon = new Set<string>();
     let e30 = 0;
@@ -386,7 +393,7 @@ export function PropertiesPage({
     let newestId = '';
     let newestTime = -Infinity;
 
-    list.forEach((property) => {
+    activeList.forEach((property) => {
       const tenant = getTenantForProperty(property);
       rentSum += property.rent || 0;
       if ((property.rent || 0) > maxRent) maxRent = property.rent || 0;
@@ -428,7 +435,7 @@ export function PropertiesPage({
       const monthName = monthStart.toLocaleDateString('en-GB', { month: 'short' });
       let sum = 0;
       let count = 0;
-      list.forEach((property) => {
+      activeList.forEach((property) => {
         const added = asDate(property.createdAt) || new Date(0);
         if (added > monthEnd) return;
         const tenant = getTenantForProperty(property);
@@ -456,7 +463,7 @@ export function PropertiesPage({
       vacantCount: portfolio.vacant,
       renovatingCount: portfolio.renovating,
       occupancyPct: portfolio.occupancyPct,
-      averageRent: list.length > 0 ? Math.round(rentSum / list.length) : 0,
+      averageRent: activeList.length > 0 ? Math.round(rentSum / activeList.length) : 0,
       rentSeries: monthly,
       rentTrendPct: trend,
       endingSoonCount: endingSoon.size,
@@ -473,15 +480,34 @@ export function PropertiesPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [properties, tenants, arrearsAlerts]);
 
+  const archivedCount = useMemo(() => {
+    return (properties || []).filter((p) => isPropertyArchived(p)).length;
+  }, [properties]);
+
   const filteredAndSortedProperties = useMemo(() => {
     let filtered = (properties || []).filter((property) => {
+      const isArchived = isPropertyArchived(property);
+      const city = cityFromAddress(property.address);
+      const matchesLocation = locationFilter === 'all' || city === locationFilter;
+
+      // Viewing archived tab directly
+      if (filterTab === 'archived') {
+        return isArchived && matchesLocation;
+      }
+
+      // Rent status dropdown specifically filtered to archived
+      if (leaseStatusFilter === 'archived') {
+        return isArchived && matchesLocation;
+      }
+
+      // In all other tabs/filters, hide archived properties completely
+      if (isArchived) return false;
+
       const tenant = getTenantForProperty(property);
       const occupied = isOccupied(property, tenant);
       const vacant = isVacant(property, tenant);
       const expiring = isLeaseExpiring(tenant, 90);
       const pay = paymentKind(tenant);
-      const city = cityFromAddress(property.address);
-      const matchesLocation = locationFilter === 'all' || city === locationFilter;
 
       let matchesTab = true;
       if (filterTab === 'attention') matchesTab = needsAttention(property, tenant);
@@ -620,6 +646,13 @@ export function PropertiesPage({
   };
 
   const emptyCopy = (() => {
+    if (filterTab === 'archived') {
+      return {
+        title: 'No archived properties',
+        description: 'You have not archived any properties yet. Archived properties will appear here and are hidden from active portfolio views.',
+        tone: 'default' as const,
+      };
+    }
     if (filterTab === 'drafts') {
       return {
         title: 'No draft properties found',
@@ -694,8 +727,17 @@ export function PropertiesPage({
           Duplicate Property
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onArchiveProperty?.(property)}>
-          <Archive className="mr-2 h-4 w-4" />
-          Archive Property
+          {isPropertyArchived(property) ? (
+            <>
+              <ArchiveRestore className="mr-2 h-4 w-4" />
+              Restore Property
+            </>
+          ) : (
+            <>
+              <Archive className="mr-2 h-4 w-4" />
+              Archive Property
+            </>
+          )}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setPropertyToDelete(property)} className="text-red-600 focus:text-red-600">
           <Trash2 className="mr-2 h-4 w-4" />
@@ -706,6 +748,7 @@ export function PropertiesPage({
   );
 
   const cardBadge = (property: Property, tenant?: Tenant): { label: string; className: string } | null => {
+    if (isPropertyArchived(property)) return { label: 'Archived', className: 'archived' };
     const status = displayStatus(property, tenant);
     if (property.id === latestId) return { label: '★ Latest', className: 'latest' };
     if (highestRent > 0 && property.rent === highestRent) return { label: '★ Highest Rent', className: 'highest' };
@@ -725,8 +768,12 @@ export function PropertiesPage({
         <div>
             <h1>Properties</h1>
             <p>
-              {isPortfolioLoading ? 'Loading portfolio…' : `${properties.length} ${properties.length === 1 ? 'property' : 'properties'} · Portfolio overview`}
-          </p>
+              {isPortfolioLoading
+                ? 'Loading portfolio…'
+                : filterTab === 'archived'
+                  ? `${archivedCount} ${archivedCount === 1 ? 'archived property' : 'archived properties'} · Archive view`
+                  : `${properties.length - archivedCount} ${properties.length - archivedCount === 1 ? 'active property' : 'active properties'} · Portfolio overview`}
+            </p>
         </div>
           <div className="ll-props-header-actions">
             <button
@@ -951,6 +998,7 @@ export function PropertiesPage({
                 ['vacant', 'Vacant'],
                 ['expiring', 'Rent Expiring'],
                 ['drafts', 'Drafts'],
+                ['archived', `Archived${archivedCount > 0 ? ` (${archivedCount})` : ''}`],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -984,6 +1032,7 @@ export function PropertiesPage({
                 { value: 'occupied', label: 'Occupied' },
                 { value: 'expiring', label: 'Rent Expiring' },
                 { value: 'vacant', label: 'Vacant' },
+                { value: 'archived', label: 'Archived' },
               ]}
             />
 
@@ -1058,7 +1107,15 @@ export function PropertiesPage({
                 </DropdownMenuContent>
               </DropdownMenu>
               <button type="button" className="ll-props-bulk-btn" onClick={handleBulkArchive} disabled={!onArchiveProperty}>
-                <Archive size={14} /> Archive
+                {filterTab === 'archived' ? (
+                  <>
+                    <ArchiveRestore size={14} /> Restore
+                  </>
+                ) : (
+                  <>
+                    <Archive size={14} /> Archive
+                  </>
+                )}
               </button>
               <button type="button" className="ll-props-bulk-btn danger" onClick={handleBulkDelete} disabled={!onDeleteProperty}>
                 <Trash2 size={14} /> Delete
@@ -1279,6 +1336,7 @@ export function PropertiesPage({
                       )}
                     {badge && <div className={`ll-props-badge ${badge.className}`}>{badge.label}</div>}
                     {status === 'vacant' && <div className="ll-props-vacant-overlay">Vacant</div>}
+                    {status === 'archived' && <div className="ll-props-vacant-overlay" style={{ background: 'rgba(51, 65, 85, 0.85)' }}>Archived</div>}
                     <button
                       type="button"
                       className={`ll-props-card-check${selectedProperties.has(property.id) ? ' selected' : ''}`}
@@ -1317,14 +1375,14 @@ export function PropertiesPage({
                     </div>
                     )}
                     <div className={`ll-props-tenant-box ${status === 'renovation' ? 'vacant' : status}`}>
-                      {status === 'vacant' || status === 'renovation' ? (
+                      {status === 'vacant' || status === 'renovation' || status === 'archived' ? (
                         <>
                           <div className="ll-props-tenant-label">
                             <span className="dot" style={{ width: 6, height: 6, borderRadius: 99, background: '#94a3b8', display: 'inline-block' }} />
-                            {status === 'renovation' ? 'Under renovation' : 'Vacant'}
+                            {status === 'archived' ? 'Archived' : status === 'renovation' ? 'Under renovation' : 'Vacant'}
                     </div>
                           <div style={{ color: '#64748b', marginTop: 4 }}>
-                            {status === 'renovation' ? 'Property is currently being renovated.' : 'No current tenant'}
+                            {status === 'archived' ? 'Property is currently archived.' : status === 'renovation' ? 'Property is currently being renovated.' : 'No current tenant'}
                           </div>
                         </>
                       ) : (

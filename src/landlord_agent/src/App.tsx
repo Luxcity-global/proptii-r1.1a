@@ -55,6 +55,7 @@ import { MessagingProvider } from '../../contexts/MessagingContext';
 import { useMessagingPoller } from '../../hooks/useMessagingPoller';
 import { trackEvent } from '../../utils/analytics';
 import { useTenants } from './hooks/useTenants';
+import { isPropertyArchived } from './utils/portfolioStats';
 
 function LandlordMessagingPoller() {
   useMessagingPoller();
@@ -122,7 +123,7 @@ export interface Property {
   bathrooms?: number;
   squareFootage?: number;
   rent: number;
-  status: 'vacant' | 'occupied' | 'under-renovation' | 'draft';
+  status: 'vacant' | 'occupied' | 'under-renovation' | 'draft' | 'archived';
   amenities: string[];
   notes: string;
   photos: PropertyPhoto[];
@@ -145,6 +146,9 @@ export interface Property {
   createdAt: Date;
   tenant?: Tenant;
   tenantId?: string;
+  userId?: string;
+  archived?: boolean;
+  isArchived?: boolean;
 }
 
 export interface PropertyPhoto {
@@ -1761,17 +1765,40 @@ export function AppContent() {
 
   const archiveProperty = async (property: Property) => {
     try {
-      await propertyService.updateProperty(property.id, { status: 'under-renovation' } as any);
+      const isCurrentlyArchived = isPropertyArchived(property);
+      const nextStatus = isCurrentlyArchived
+        ? ((property.tenant || (property as any).tenantId) ? 'occupied' : 'vacant')
+        : 'archived';
+      const isArchived = !isCurrentlyArchived;
+
+      await propertyService.updateProperty(property.id, {
+        status: nextStatus as any,
+        archived: isArchived,
+        isArchived: isArchived,
+      } as any);
+
       setProperties(prev =>
-        prev.map(p => p.id === property.id ? { ...p, status: 'under-renovation' as any } : p)
+        prev.map(p => p.id === property.id ? {
+          ...p,
+          status: nextStatus as any,
+          archived: isArchived,
+          isArchived: isArchived,
+        } : p)
       );
+
       if (selectedProperty?.id === property.id) {
-        setSelectedProperty(prev => prev ? { ...prev, status: 'under-renovation' as any } : null);
+        setSelectedProperty(prev => prev ? {
+          ...prev,
+          status: nextStatus as any,
+          archived: isArchived,
+          isArchived: isArchived,
+        } : null);
       }
-      console.log('Archived property:', property.id);
+
+      toast.success(isCurrentlyArchived ? 'Property restored from archive' : 'Property moved to archive');
     } catch (error) {
-      console.error('Failed to archive property:', error);
-      alert(`Failed to archive property: ${(error as any)?.message || 'Unknown error'}`);
+      console.error('Failed to update archive status for property:', error);
+      toast.error(`Failed to update archive status: ${(error as any)?.message || 'Unknown error'}`);
     }
   };
 
@@ -3138,6 +3165,7 @@ export function AppContent() {
             tenants={tenants}
             onBack={() => navigateToMainApp('properties')}
             onDeleteProperty={deleteProperty}
+            onArchiveProperty={archiveProperty}
             onEdit={(property) => {
               // Enter editing mode with the new single-page EditProperty form
               setSelectedProperty(property);

@@ -106,6 +106,8 @@ function mapFromApi(data: any): Property {
         createdAt: toDate(data.createdAt) ?? new Date(),
         tenantId: data.tenantId,
         userId: data.userId,
+        archived: Boolean(data.archived ?? (data.status === 'archived')),
+        isArchived: Boolean(data.isArchived ?? data.archived ?? (data.status === 'archived')),
     } as unknown as Property;
 }
 
@@ -132,8 +134,11 @@ function mapToApi(property: Omit<Property, 'id' | 'createdAt' | 'tenant'>): Reco
         photos,
         documents: property.documents ?? [],
         status: property.status ?? 'vacant',
+        archived: Boolean((property as any).archived ?? (property.status === 'archived')),
+        isArchived: Boolean((property as any).isArchived ?? (property as any).archived ?? (property.status === 'archived')),
     };
 }
+
 
 // ---------------------------------------------------------------------------
 // CRUD
