@@ -1243,12 +1243,13 @@ export function PropertyDetails({
                           <UserCheck size={13} /> Change
                         </button>
                       )}
-                      {onRemoveTenant && property.tenant.id && (
+                      {onRemoveTenant && (property.tenant?.id || property.tenantId) && (
                         <button
                           type="button"
                           onClick={() => {
-                            if (window.confirm(`Remove ${property.tenant?.name} from this property?`)) {
-                              onRemoveTenant(property.tenant!.id, property.id);
+                            const tid = property.tenant?.id || property.tenantId;
+                            if (tid && window.confirm(`Remove ${property.tenant?.name || 'this tenant'} from this property?`)) {
+                              onRemoveTenant(tid, property.id);
                             }
                           }}
                           className="flex-1 h-9 rounded-[10px] border flex items-center justify-center gap-1 text-[12px] font-semibold transition-all hover:bg-red-50"

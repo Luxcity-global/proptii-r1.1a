@@ -1,3 +1,5 @@
+import { isTenantDeleted } from './deletedTenants';
+
 export interface PortfolioUnit {
   id: string;
   status?: string | null;
@@ -33,10 +35,25 @@ export function isPropertyArchived(
 /** A unit is occupied when its status says so, or a tenant record is linked to it. */
 export function isUnitOccupied(property: PortfolioUnit, tenants: PortfolioTenantLink[] = []): boolean {
   if (isPropertyArchived(property)) return false;
-  const linked = tenants.some((tenant) =>
-    (Boolean(tenant.propertyId) && tenant.propertyId === property.id)
-    || (Boolean(property.tenantId) && Boolean(tenant.id) && tenant.id === property.tenantId),
-  );
+
+  const tenantEmail = typeof (property.tenant as any)?.email === 'string' ? (property.tenant as any).email : undefined;
+  const tenantId = property.tenantId || (property.tenant as any)?.id;
+  if (isTenantDeleted(tenantId, tenantEmail)) {
+    return false;
+  }
+
+  const linked = tenants.some((tenant) => {
+    if (isTenantDeleted(tenant.id, (tenant as any)?.email)) return false;
+    return (
+      (Boolean(tenant.propertyId) && tenant.propertyId === property.id) ||
+      (Boolean(property.tenantId) && Boolean(tenant.id) && tenant.id === property.tenantId)
+    );
+  });
+
+  if (property.status === 'vacant') {
+    return linked;
+  }
+
   return property.status === 'occupied' || Boolean(property.tenantId) || Boolean(property.tenant) || linked;
 }
 

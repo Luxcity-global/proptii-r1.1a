@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { countPortfolio } from './portfolioStats';
+import { describe, expect, it, beforeEach } from 'vitest';
+import { countPortfolio, isUnitOccupied, isPropertyArchived } from './portfolioStats';
+import { recordDeletedTenant } from './deletedTenants';
 
-describe('countPortfolio', () => {
+describe('portfolioStats', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   const properties = [
     { id: 'a', status: 'occupied', rent: 1000 },
     { id: 'b', status: 'vacant', rent: 800, tenantId: 'tenant-b' },
@@ -36,5 +41,44 @@ describe('countPortfolio', () => {
     expect(stats.total).toBe(5);
     expect(stats.monthlyRent).toBe(2400);
   });
+
+  it('identifies archived properties properly', () => {
+    expect(isPropertyArchived({ status: 'archived' })).toBe(true);
+    expect(isPropertyArchived({ archived: true })).toBe(true);
+    expect(isPropertyArchived({ isArchived: true })).toBe(true);
+    expect(isPropertyArchived({ status: 'occupied', archived: false })).toBe(false);
+    expect(isPropertyArchived(null)).toBe(false);
+  });
+
+  it('treats property with deleted tenant as vacant/not occupied', () => {
+    recordDeletedTenant('tenant-deleted-1', 'deleted@example.com');
+
+    const prop = {
+      id: 'prop-1',
+      status: 'occupied',
+      tenantId: 'tenant-deleted-1',
+      tenant: { id: 'tenant-deleted-1', email: 'deleted@example.com' },
+    };
+
+    expect(isUnitOccupied(prop, [])).toBe(false);
+
+    const stats = countPortfolio([prop], []);
+    expect(stats.occupied).toBe(0);
+    expect(stats.vacant).toBe(1);
+  });
+
+  it('treats vacant property without linked tenant as vacant', () => {
+    const prop = {
+      id: 'prop-2',
+      status: 'vacant',
+    };
+
+    expect(isUnitOccupied(prop, [])).toBe(false);
+
+    const stats = countPortfolio([prop], []);
+    expect(stats.occupied).toBe(0);
+    expect(stats.vacant).toBe(1);
+  });
 });
+
 

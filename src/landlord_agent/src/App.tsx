@@ -1738,41 +1738,59 @@ export function AppContent() {
         || (selectedTenant?.id === tenantId ? selectedTenant : null);
       const propertyId = targetTenant?.propertyId;
       const tenantEmail = targetTenant?.email?.toLowerCase().trim();
+      const propertyAddress = targetTenant?.propertyAddress?.toLowerCase().trim();
 
       // 1. Record as deleted in localStorage immediately so all hooks/pages filter it out synchronously
       recordDeletedTenant(tenantId, tenantEmail);
 
-      // 2. Call backend to delete tenant
-      await tenantService.deleteTenant(tenantId);
+      // 2. Call backend to delete tenant (wrapped in try/catch so failure doesn't abort vacating)
+      try {
+        await tenantService.deleteTenant(tenantId);
+      } catch (backendErr) {
+        console.warn('Backend delete tenant warning (could be demo/local tenant):', backendErr);
+      }
 
-      // 3. Find any matching properties in current state
-      const matchingProps = properties.filter((p) =>
-        (propertyId && p.id === propertyId) ||
-        p.tenantId === tenantId ||
-        p.tenant?.id === tenantId ||
-        (tenantEmail && p.tenant?.email?.toLowerCase().trim() === tenantEmail)
-      );
+      // 3. Find any matching properties in current state and target propertyId
+      const candidatePropertyIds = new Set<string>();
+      if (propertyId) candidatePropertyIds.add(propertyId);
+
+      properties.forEach((p) => {
+        const matchesAddress = Boolean(propertyAddress && p.address && p.address.toLowerCase().trim() === propertyAddress);
+        if (
+          (propertyId && p.id === propertyId) ||
+          p.tenantId === tenantId ||
+          p.tenant?.id === tenantId ||
+          (tenantEmail && p.tenant?.email?.toLowerCase().trim() === tenantEmail) ||
+          matchesAddress
+        ) {
+          candidatePropertyIds.add(p.id);
+        }
+      });
 
       // 4. Vacate each property in the backend
-      for (const p of matchingProps) {
+      for (const propId of candidatePropertyIds) {
         try {
-          await propertyService.updateProperty(p.id, {
+          await propertyService.updateProperty(propId, {
             status: 'vacant',
             tenantId: null as any,
+            tenant: null as any,
           });
         } catch (propErr) {
-          console.warn(`Failed to vacate property ${p.id}:`, propErr);
+          console.warn(`Failed to vacate property ${propId}:`, propErr);
         }
       }
 
       // 5. Update local properties state
       setProperties((prev) =>
         prev.map((p) => {
+          const matchesAddress = Boolean(propertyAddress && p.address && p.address.toLowerCase().trim() === propertyAddress);
           if (
+            candidatePropertyIds.has(p.id) ||
             (propertyId && p.id === propertyId) ||
             p.tenantId === tenantId ||
             p.tenant?.id === tenantId ||
-            (tenantEmail && p.tenant?.email?.toLowerCase().trim() === tenantEmail)
+            (tenantEmail && p.tenant?.email?.toLowerCase().trim() === tenantEmail) ||
+            matchesAddress
           ) {
             return {
               ...p,
@@ -1788,11 +1806,14 @@ export function AppContent() {
       // 6. Update selectedProperty if it matches
       setSelectedProperty((prev) => {
         if (!prev) return null;
+        const matchesAddress = Boolean(propertyAddress && prev.address && prev.address.toLowerCase().trim() === propertyAddress);
         if (
+          candidatePropertyIds.has(prev.id) ||
           (propertyId && prev.id === propertyId) ||
           prev.tenantId === tenantId ||
           prev.tenant?.id === tenantId ||
-          (tenantEmail && prev.tenant?.email?.toLowerCase().trim() === tenantEmail)
+          (tenantEmail && prev.tenant?.email?.toLowerCase().trim() === tenantEmail) ||
+          matchesAddress
         ) {
           return {
             ...prev,
@@ -3337,21 +3358,30 @@ export function AppContent() {
               try {
                 console.log(`🔄 Removing tenant ${tenantId} from property ${propertyId}`);
 
-                // Remove tenant's property assignment
-                await tenantService.updateTenant(tenantId, {
-                  propertyId: '',
-                  propertyAddress: ''
-                });
-                console.log(`✅ Updated tenant ${tenantId} to remove property assignment`);
+                // 1. Remove tenant's property assignment in backend (best-effort)
+                try {
+                  await tenantService.updateTenant(tenantId, {
+                    propertyId: '',
+                    propertyAddress: '',
+                  });
+                  console.log(`✅ Updated tenant ${tenantId} to remove property assignment`);
+                } catch (tErr) {
+                  console.warn(`Warning updating tenant ${tenantId}:`, tErr);
+                }
 
-                // Update property: remove tenantId field and set status to vacant
-                await propertyService.updateProperty(propertyId, {
-                  status: 'vacant',
-                  tenantId: null
-                });
-                console.log(`✅ Updated property ${propertyId} to remove tenantId and set status to vacant`);
+                // 2. Update property in backend: set status to vacant, remove tenantId and tenant
+                try {
+                  await propertyService.updateProperty(propertyId, {
+                    status: 'vacant',
+                    tenantId: null as any,
+                    tenant: null as any,
+                  });
+                  console.log(`✅ Updated property ${propertyId} to remove tenantId and set status to vacant`);
+                } catch (pErr) {
+                  console.warn(`Warning updating property ${propertyId}:`, pErr);
+                }
 
-                // Update local state immediately
+                // 3. Update local state immediately — ensure status is vacant, tenant is cleared
                 setProperties(prev =>
                   prev.map(p =>
                     p.id === propertyId
@@ -3360,32 +3390,17 @@ export function AppContent() {
                   )
                 );
 
-                if (selectedProperty && selectedProperty.id === propertyId) {
-                  setSelectedProperty(prev => prev ? {
+                setSelectedProperty(prev => {
+                  if (!prev || prev.id !== propertyId) return prev;
+                  return {
                     ...prev,
                     status: 'vacant' as const,
                     tenantId: undefined,
-                    tenant: undefined
-                  } : null);
-                }
+                    tenant: undefined,
+                  };
+                });
 
-                // Refresh tenant data
-                const updatedTenant = await tenantService.getTenant(tenantId);
-                if (updatedTenant) {
-                  console.log(`✅ Refreshed tenant data for ${tenantId}`);
-                }
-
-                // Refresh property data from Firestore to ensure consistency
-                const updatedProperty = await propertyService.getProperty(propertyId);
-                if (updatedProperty) {
-                  setSelectedProperty(updatedProperty);
-                  setProperties(prev =>
-                    prev.map(p => p.id === propertyId ? updatedProperty : p)
-                  );
-                  console.log(`✅ Refreshed property data for ${propertyId}`);
-                }
-
-                // Trigger alert regeneration after tenant removal
+                // 4. Trigger alert regeneration after tenant removal
                 const currentUserId = getCurrentUserId();
                 if (currentUserId) {
                   console.log('🔄 Triggering alert regeneration after tenant removal');
@@ -3396,9 +3411,10 @@ export function AppContent() {
 
                 console.log(`✅ Successfully removed tenant ${tenantId} from property ${propertyId}`);
                 invalidateTenants();
-              } catch (error) {
+                toast.success('Tenant removed from property');
+              } catch (error: any) {
                 console.error('❌ Failed to remove tenant from property:', error);
-                alert('Failed to remove tenant from property. Please try again.');
+                toast.error(`Failed to remove tenant: ${error?.message || 'Unknown error'}`);
               }
             }}
             onChangeTenant={async (propertyId, newTenantId) => {

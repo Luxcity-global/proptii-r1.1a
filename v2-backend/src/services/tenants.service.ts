@@ -228,12 +228,14 @@ export class TenantsService {
       // 1. Fetch tenant doc first to extract propertyId and email
       let propertyId: string | undefined;
       let tenantEmail: string | undefined;
+      let propertyAddress: string | undefined;
       try {
         const snap = await withTimeout(col.doc(id).get());
         if (snap && snap.exists) {
           const data = snap.data();
           propertyId = data?.propertyId;
           tenantEmail = data?.email;
+          propertyAddress = data?.propertyAddress;
         }
       } catch (err: any) {
         this.logger.warn(`Could not fetch tenant before delete: ${err?.message || err}`);
@@ -282,6 +284,29 @@ export class TenantsService {
             }
           } catch (propSnapErr: any) {
             this.logger.warn(`Failed to query properties by tenantId: ${propSnapErr?.message || propSnapErr}`);
+          }
+
+          // Also query properties matching propertyAddress
+          if (propertyAddress) {
+            try {
+              const addrSnap = await db.collection('properties').where('address', '==', propertyAddress).get();
+              for (const doc of addrSnap.docs) {
+                if (doc.id !== propertyId) {
+                  await doc.ref.set(
+                    {
+                      status: 'vacant',
+                      tenantId: admin.firestore.FieldValue.delete(),
+                      tenant: admin.firestore.FieldValue.delete(),
+                      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    { merge: true },
+                  );
+                  this.logger.log(`Vacated matching property by address ${doc.id} for deleted tenant ${id}`);
+                }
+              }
+            } catch (addrErr: any) {
+              this.logger.warn(`Failed to query properties by address: ${addrErr?.message || addrErr}`);
+            }
           }
         } catch (propErr: any) {
           this.logger.warn(`Failed to clean up properties on tenant delete: ${propErr?.message || propErr}`);

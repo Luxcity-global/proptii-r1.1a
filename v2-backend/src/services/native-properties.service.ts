@@ -224,6 +224,13 @@ export class NativePropertiesService {
       specificationWarning: specWarning || null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
+
+    if (cleanedData.status === 'vacant' || cleanedData.tenantId === null) {
+      updatedData.status = cleanedData.status || 'vacant';
+      updatedData.tenantId = null;
+      updatedData.tenant = null;
+    }
+
     await docRef.update(updatedData);
     return { id, ...existing, ...updatedData };
   }

@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import { trackEvent } from "../../../utils/analytics";
-import { countPortfolio, isUnitOccupied } from "../utils/portfolioStats";
+import { countPortfolio, isUnitOccupied, isPropertyArchived } from "../utils/portfolioStats";
 import viewingService from "../../../services/viewingService";
 import { listViewingsForLandlord } from "../../../services/viewingInboxService";
 import { useMessagingContext } from "../../../contexts/MessagingContext";
@@ -57,7 +57,7 @@ interface DashboardProps {
   onSignIn?: () => void;
 }
 
-type PropertyPill = "all" | "latest" | "highest" | "expiring";
+type PropertyPill = "all" | "latest" | "highest" | "expiring" | "archived";
 
 const defaultSignIn = () => {
   if (window.self !== window.top) {
@@ -650,6 +650,7 @@ export function Dashboard({
       const monthName = monthStart.toLocaleDateString("en-GB", { month: "short" });
       let monthlyRevenue = 0;
       properties.forEach((property) => {
+        if (isPropertyArchived(property)) return;
         const propertyAddedDate = property.createdAt || new Date();
         if (propertyAddedDate > monthEnd) return;
         if (property.tenant) {
@@ -675,18 +676,22 @@ export function Dashboard({
   const maxRevenue = Math.max(...revenueSeries.map((r) => r.revenue), 1);
 
   const occupancyBars = useMemo(() => {
-    return properties.slice(0, 5).map((p) => {
-      const occupied = isUnitOccupied(p, tenants || []);
-      return {
-        id: p.id,
-        label: (p.address.split(",")[0] || p.address).slice(0, 14),
-        pct: occupied ? 100 : p.status === "under-renovation" ? 50 : 0,
-      };
-    });
+    return properties
+      .filter((p) => !isPropertyArchived(p))
+      .slice(0, 5)
+      .map((p) => {
+        const occupied = isUnitOccupied(p, tenants || []);
+        return {
+          id: p.id,
+          label: (p.address.split(",")[0] || p.address).slice(0, 14),
+          pct: occupied ? 100 : p.status === "under-renovation" ? 50 : 0,
+        };
+      });
   }, [properties, tenants]);
 
   const topRent = useMemo(() => {
-    return [...properties]
+    return properties
+      .filter((p) => !isPropertyArchived(p))
       .sort((a, b) => (b.rent || 0) - (a.rent || 0))
       .slice(0, 4)
       .map((p) => ({
@@ -705,7 +710,8 @@ export function Dashboard({
       if (t.includes("hmo") || t.includes("shared")) return "HMO";
       return "Other";
     };
-    const counts = properties.reduce((acc, p) => {
+    const activeProperties = properties.filter((p) => !isPropertyArchived(p));
+    const counts = activeProperties.reduce((acc, p) => {
       const key = normalizeType(p.type);
       acc[key] = (acc[key] || 0) + 1;
       return acc;
@@ -718,7 +724,7 @@ export function Dashboard({
       HMO: "#16a34a",
       Other: "#f59e0b",
     };
-    const total = properties.length || 1;
+    const total = activeProperties.length || 1;
     return Object.entries(counts).map(([name, value]) => ({
       name,
       value,
@@ -729,19 +735,26 @@ export function Dashboard({
 
   const documentChips = useMemo(() => {
     const docs: Array<{ id: string; name: string; type: string; property?: Property }> = [];
-    properties.forEach((p) => {
-      (p.documents || []).forEach((d) => {
-        docs.push({ id: d.id, name: d.name, type: d.type, property: p });
+    properties
+      .filter((p) => !isPropertyArchived(p))
+      .forEach((p) => {
+        (p.documents || []).forEach((d) => {
+          docs.push({ id: d.id, name: d.name, type: d.type, property: p });
+        });
       });
-    });
     unassignedDocuments.forEach((d) => {
       docs.push({ id: d.id, name: d.name, type: d.type || "other" });
     });
     return docs.slice(0, 8);
   }, [properties, unassignedDocuments]);
 
+  const archivedCount = useMemo(() => properties.filter(isPropertyArchived).length, [properties]);
+
   const displayProperties = useMemo(() => {
-    let list = [...properties];
+    if (propertyPill === "archived") {
+      return properties.filter(isPropertyArchived);
+    }
+    let list = properties.filter((p) => !isPropertyArchived(p));
     if (propertyPill === "latest") {
       list.sort((a, b) => {
         const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -764,7 +777,7 @@ export function Dashboard({
   }, [properties, propertyPill]);
 
   const userName = userProfile?.name || "there";
-  const maxRent = Math.max(...properties.map((p) => p.rent || 0), 0);
+  const maxRent = Math.max(...properties.filter((p) => !isPropertyArchived(p)).map((p) => p.rent || 0), 0);
 
   if (!isUserAuthenticated) {
     return <DashboardGlobalEmpty variant="guest" userName={userName} onSignIn={onSignIn} />;
@@ -1150,7 +1163,7 @@ export function Dashboard({
             )}
           </div>
 
-          {totalProperties > 0 && (
+          {(totalProperties > 0 || archivedCount > 0) && (
             <div className="ll-filter-pills">
               {(
                 [
@@ -1158,13 +1171,16 @@ export function Dashboard({
                   ["latest", "Latest Property"],
                   ["highest", "Highest Rent"],
                   ["expiring", "Expiring Soon"],
+                  ...(archivedCount > 0 || propertyPill === "archived"
+                    ? [["archived", `Archived (${archivedCount})`]]
+                    : []),
                 ] as const
               ).map(([id, label]) => (
                 <button
                   key={id}
                   type="button"
                   className={`ll-filter-pill ${propertyPill === id ? "active" : ""}`}
-                  onClick={() => setPropertyPill(id)}
+                  onClick={() => setPropertyPill(id as PropertyPill)}
                 >
                   {label}
                 </button>
@@ -1210,13 +1226,15 @@ export function Dashboard({
                         </div>
                       )}
                       <div className="ll-prop-badge">
-                        {propertyPill === "highest" || showHighest
-                          ? "Highest Rent"
-                          : property.status === "occupied"
-                            ? "Occupied"
-                            : property.status === "vacant"
-                              ? "Vacant"
-                              : "Renovating"}
+                        {isPropertyArchived(property)
+                          ? "Archived"
+                          : propertyPill === "highest" || showHighest
+                            ? "Highest Rent"
+                            : isUnitOccupied(property, tenants)
+                              ? "Occupied"
+                              : property.status === "under-renovation"
+                                ? "Renovating"
+                                : "Vacant"}
                       </div>
                     </div>
                     <div className="ll-prop-body">
