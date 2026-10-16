@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Mail, Phone, MessageSquare, X } from 'lucide-react';
 import '../styles/clientDetails.css';
 
