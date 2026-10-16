@@ -33,7 +33,10 @@ export interface Conversation {
     /** Optional fields for shadow conversations */
     agentEmail?: string;
     propertyTitle?: string;
+    propertyAddress?: string;
     tenantName?: string;
+    landlordName?: string;
+    landlordEmail?: string;
     unreadForTenant?: number;
     unreadForLandlord?: number;
 }

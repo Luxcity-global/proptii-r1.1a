@@ -7,6 +7,7 @@ export interface PendingInvitation {
   propertyAddress: string;
   landlordId: string;
   landlordEmail: string;
+  landlordName?: string;
   inviteType: 'new-tenant' | 'existing-tenant';
   customMessage?: string;
   sentAt: Date;

@@ -233,7 +233,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
     const q = search.trim().toLowerCase();
     if (!q) return true;
     const name = (conv.tenantName || '').toLowerCase();
-    const property = (conv.propertyTitle || conv.propertyId || '').toLowerCase();
+    const property = (conv.propertyAddress || conv.propertyTitle || conv.propertyId || '').toLowerCase();
     return name.includes(q) || property.includes(q);
   });
 
@@ -248,7 +248,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
       ['Name', 'Property', 'Last message', 'Tab'],
       ...filteredConvs.map((conv) => [
         conv.tenantName || 'Tenant',
-        conv.propertyTitle || conv.propertyId || '',
+        conv.propertyAddress || conv.propertyTitle || conv.propertyId || '',
         conv.lastMessageAt || '',
         activeTab,
       ]),
@@ -365,7 +365,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                   const name = !conv.tenantId
                     ? `${conv.tenantName || 'Guest'} (Guest)`
                     : conv.tenantName || 'Tenant';
-                  const property = conv.propertyTitle || conv.propertyId || '';
+                  const property = conv.propertyAddress || conv.propertyTitle || conv.propertyId || '';
                   const time = formatTime(conv.lastMessageAt);
                   return (
                     <button
@@ -458,7 +458,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h3>{activeConversation?.tenantName || 'Tenant'}</h3>
-                    <p>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
+                    <p>{activeConversation?.propertyAddress || activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
                   </div>
                   {/* Export full conversation */}
                   <button

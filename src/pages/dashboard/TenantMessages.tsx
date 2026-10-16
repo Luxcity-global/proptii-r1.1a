@@ -36,7 +36,8 @@ function isUnread(conv: Conversation): boolean {
 }
 
 function participantName(conv: Conversation): string {
-  return conv.landlordId === 'UNCLAIMED' ? 'External Agent' : 'Landlord';
+  if (conv.landlordId === 'UNCLAIMED') return 'External Agent';
+  return conv.landlordName || (conv.landlordEmail ? conv.landlordEmail.split('@')[0] : 'Landlord');
 }
 
 function formatTime(iso: string | null): { label: string; fresh: boolean } {
@@ -82,16 +83,19 @@ const TenantMessages: React.FC = () => {
   const pendingConversationRef = useRef<{ id: string; conversation?: Conversation; prefilledMessage?: string } | null>(null);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const queryConvId = searchParams.get('conv') || searchParams.get('conversationId');
     const state = location.state as { prefilledMessage?: string; conversationId?: string; conversation?: Conversation } | null;
-    if (state?.conversationId) {
-      const convId = state.conversationId;
+    const convId = state?.conversationId || queryConvId;
+
+    if (convId) {
       pendingConversationRef.current = {
         id: convId,
-        conversation: state.conversation,
-        prefilledMessage: state.prefilledMessage,
+        conversation: state?.conversation,
+        prefilledMessage: state?.prefilledMessage,
       };
 
-      if (state.conversation) {
+      if (state?.conversation) {
         _setConversations((prev) => {
           if (prev.some((c) => c.id === state.conversation!.id)) return prev;
           return [state.conversation!, ...prev];
@@ -99,16 +103,18 @@ const TenantMessages: React.FC = () => {
       }
 
       setActiveConversationId(convId);
-      const isUnclaimed = state.conversation?.landlordId === 'UNCLAIMED';
+      const isUnclaimed = state?.conversation?.landlordId === 'UNCLAIMED';
       setActiveTab(isUnclaimed ? 'external' : 'inbox');
 
-      if (state.prefilledMessage) {
+      if (state?.prefilledMessage) {
         setPrefilledDrafts((prev) => ({ ...prev, [convId]: state.prefilledMessage! }));
       }
 
-      navigate(location.pathname, { replace: true, state: {} });
+      if (state?.conversationId) {
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+      }
     }
-  }, [location.state, location.pathname, navigate, setActiveConversationId, _setConversations]);
+  }, [location.state, location.search, location.pathname, navigate, setActiveConversationId, _setConversations]);
 
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -135,16 +141,30 @@ const TenantMessages: React.FC = () => {
       if (activeConv) {
         if (activeConv.landlordId === 'UNCLAIMED') {
           setActiveTab('external');
-        } else if (!activeConv.lastMessageAt) {
-          setActiveTab('draft');
         } else if (isUnread(activeConv)) {
+          setActiveTab('inbox');
+        } else if (activeConv.lastMessageAt) {
+          setActiveTab('read');
+        } else {
+          setActiveTab('inbox');
+        }
+      }
+    } else if (!activeConversationId && conversations.length > 0) {
+      const unreadFirst = conversations.find((c) => c.landlordId !== 'UNCLAIMED' && isUnread(c));
+      const firstLandlord = conversations.find((c) => c.landlordId !== 'UNCLAIMED');
+      const target = unreadFirst || firstLandlord || conversations[0];
+      if (target) {
+        setActiveConversationId(target.id);
+        if (target.landlordId === 'UNCLAIMED') {
+          setActiveTab('external');
+        } else if (isUnread(target)) {
           setActiveTab('inbox');
         } else {
           setActiveTab('read');
         }
       }
     }
-  }, [activeConversationId, conversations]);
+  }, [activeConversationId, conversations, setActiveConversationId]);
 
   const handleSelect = useCallback((id: string) => {
     setActiveConversationId(id);
@@ -200,7 +220,7 @@ const TenantMessages: React.FC = () => {
     ?? 'Tenant';
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
-  const inboxConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && isUnread(c));
+  const inboxConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && (isUnread(c) || !c.lastMessageAt));
   const readConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && c.lastMessageAt && !isUnread(c));
   const draftConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && !c.lastMessageAt);
   const externalConvs = conversations.filter((c) => c.landlordId === 'UNCLAIMED');
@@ -225,7 +245,7 @@ const TenantMessages: React.FC = () => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     const name = participantName(conv).toLowerCase();
-    const property = (conv.propertyTitle || conv.propertyId || '').toLowerCase();
+    const property = (conv.propertyAddress || conv.propertyTitle || conv.propertyId || '').toLowerCase();
     return name.includes(q) || property.includes(q);
   });
 
@@ -241,7 +261,7 @@ const TenantMessages: React.FC = () => {
       ['Name', 'Property', 'Last message', 'Tab'],
       ...filteredConvs.map((conv) => [
         participantName(conv),
-        conv.propertyTitle || conv.propertyId || '',
+        conv.propertyAddress || conv.propertyTitle || conv.propertyId || '',
         conv.lastMessageAt || '',
         activeTab,
       ]),
@@ -323,7 +343,7 @@ const TenantMessages: React.FC = () => {
               ) : (
                 filteredConvs.map((conv) => {
                   const name = participantName(conv);
-                  const property = conv.propertyTitle || conv.propertyId || '';
+                  const property = conv.propertyAddress || conv.propertyTitle || conv.propertyId || '';
                   const time = formatTime(conv.lastMessageAt);
                   return (
                     <button
@@ -416,7 +436,7 @@ const TenantMessages: React.FC = () => {
                   </div>
                   <div>
                     <h3>{activeConversation ? participantName(activeConversation) : 'Landlord'}</h3>
-                    <p>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
+                    <p>{activeConversation?.propertyAddress || activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
                   </div>
                 </div>
 

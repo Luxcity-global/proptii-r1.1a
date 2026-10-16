@@ -40,6 +40,7 @@ interface InviteTenantProps {
   onSuccess: () => void;
   landlordEmail?: string;
   landlordId?: string;
+  landlordName?: string;
   /** Pre-filled email from the TenantSelection email-first flow */
   prefillEmail?: string;
   /** Called immediately after invite is sent so the pending record shows in the list */
@@ -104,6 +105,7 @@ export function InviteTenant({
   onSuccess,
   landlordEmail,
   landlordId,
+  landlordName,
   prefillEmail,
   onTenantCreated,
 }: InviteTenantProps) {
@@ -148,6 +150,7 @@ export function InviteTenant({
           propertyAddress: selectedProperty.address,
           landlordId: landlordId ?? '',
           landlordEmail: landlordEmail ?? '',
+          landlordName: landlordName ?? '',
           inviteType: 'new-tenant',
           customMessage: customMessage.trim() || undefined,
         });

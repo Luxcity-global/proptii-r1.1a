@@ -3624,6 +3624,7 @@ export function AppContent() {
             properties={properties}
             landlordEmail={userProfile?.email}
             landlordId={getCurrentUserId() || undefined}
+            landlordName={userProfile?.name || (userProfile as any)?.fullName || (userProfile as any)?.displayName || ''}
             prefillEmail={prefillEmailRef.current}
             onTenantCreated={(tenant) => {
               invalidateTenants();

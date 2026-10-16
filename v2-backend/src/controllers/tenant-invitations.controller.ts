@@ -310,24 +310,95 @@ export class TenantInvitationsController {
           .limit(1)
           .get();
 
+        // Resolve landlordName
+        let landlordName = inv.landlordName || '';
+        if (!landlordName && inv.landlordId) {
+          try {
+            const lUserDoc = await db.collection('users').doc(inv.landlordId).get();
+            if (lUserDoc.exists) {
+              const lData = lUserDoc.data();
+              landlordName = lData?.name || lData?.displayName || lData?.fullName || '';
+            }
+          } catch (_) {}
+        }
+        if (!landlordName && inv.landlordEmail) {
+          landlordName = inv.landlordEmail.split('@')[0];
+        }
+
+        // Resolve propertyAddress and propertyTitle
+        let propertyAddress = inv.propertyAddress || '';
+        let propertyTitle = inv.propertyAddress || '';
+        if ((!propertyAddress || !propertyTitle) && inv.propertyId) {
+          try {
+            const pDoc = await db.collection('properties').doc(inv.propertyId).get();
+            if (pDoc.exists) {
+              const pData = pDoc.data();
+              propertyAddress = propertyAddress || pData?.address || pData?.title || '';
+              propertyTitle = propertyTitle || pData?.title || pData?.address || '';
+            }
+          } catch (_) {}
+        }
+
+        const nowIso = new Date().toISOString();
+        const welcomeText = inv.customMessage
+          ? `Welcome to your new home at ${propertyAddress || 'the property'}!\n\n${inv.customMessage}`
+          : `Welcome to your new home at ${propertyAddress || 'the property'}! Feel free to reach out here if you have any questions.`;
+
         if (!cSnap.empty) {
           conversationId = cSnap.docs[0].id;
+          const existingData = cSnap.docs[0].data();
+          const patch: any = {};
+          if ((!existingData.landlordName || existingData.landlordName === 'Landlord') && landlordName) {
+            patch.landlordName = landlordName;
+          }
+          if (!existingData.propertyAddress && propertyAddress) {
+            patch.propertyAddress = propertyAddress;
+          }
+          if (!existingData.propertyTitle && (propertyTitle || propertyAddress)) {
+            patch.propertyTitle = propertyTitle || propertyAddress;
+          }
+          if (Object.keys(patch).length > 0) {
+            await convCol.doc(conversationId).set(patch, { merge: true });
+          }
         } else {
           conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+          // Create welcome message in messages collection so thread has content and is active
+          const msgCol = db.collection('messages');
+          const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+          await msgCol.doc(msgId).set({
+            id: msgId,
+            conversationId,
+            senderId: inv.landlordId,
+            senderRole: 'landlord',
+            body: welcomeText,
+            attachmentIds: [],
+            sentAt: nowIso,
+            readAt: null,
+            isDeleted: false,
+          });
+
           await convCol.doc(conversationId).set({
             id: conversationId,
             propertyId: inv.propertyId,
-            propertyAddress: inv.propertyAddress || '',
+            propertyAddress: propertyAddress || '',
+            propertyTitle: propertyTitle || propertyAddress || 'Property Listing',
             landlordId: inv.landlordId,
+            landlordName: landlordName || 'Landlord',
             landlordEmail: inv.landlordEmail || '',
             tenantId: userUid,
             tenantEmail: userEmail,
             tenantName: userName,
+            lastMessage: welcomeText,
             lastMessagePreview: 'Welcome to your new home!',
+            lastMessageAt: nowIso,
+            unreadForTenant: 1,
+            unreadForLandlord: 0,
+            unreadCountTenant: 1,
             unreadCountLandlord: 0,
-            unreadCountTenant: 0,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            isDeleted: false,
+            createdAt: nowIso,
+            updatedAt: nowIso,
           });
         }
       } catch (cErr: any) {

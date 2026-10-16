@@ -39,6 +39,7 @@ export const TenantInvitePage: React.FC = () => {
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimSuccess, setClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [claimedConversationId, setClaimedConversationId] = useState<string | null>(null);
   const claimAttemptedRef = useRef(false);
 
   // ── Step 1: Validate Invitation Token ─────────────────────────────────────────
@@ -115,6 +116,9 @@ export const TenantInvitePage: React.FC = () => {
       try {
         const res = await invitationService.claimInvitation(token);
         if (res.success) {
+          if (res.conversationId) {
+            setClaimedConversationId(res.conversationId);
+          }
           patchUser({ roles: ['tenant'], roleResolved: true });
           setClaimSuccess(true);
         } else {
@@ -231,7 +235,8 @@ export const TenantInvitePage: React.FC = () => {
             </Link>
 
             <Link
-              to="/dashboard/messages"
+              to={claimedConversationId ? `/dashboard/messages?conv=${claimedConversationId}` : '/dashboard/messages'}
+              state={claimedConversationId ? { conversationId: claimedConversationId } : undefined}
               className="p-4 rounded-2xl border border-gray-100 bg-gray-50 hover:bg-orange-50 hover:border-[#DC5F12] transition-all group flex flex-col justify-between"
             >
               <div>

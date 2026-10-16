@@ -51,6 +51,83 @@ export class CommunicationService {
         if (d.isDeleted !== true) convMap.set(doc.id, { id: doc.id, ...d, messages: [] });
       });
 
+      // Hydrate missing landlordName, propertyAddress, propertyTitle for existing conversations
+      const missingLandlords = new Set<string>();
+      const missingProperties = new Set<string>();
+
+      for (const conv of convMap.values()) {
+        if ((!conv.landlordName || conv.landlordName === 'Landlord') && conv.landlordId && conv.landlordId !== 'UNCLAIMED') {
+          missingLandlords.add(conv.landlordId);
+        }
+        if ((!conv.propertyAddress || !conv.propertyTitle) && conv.propertyId) {
+          missingProperties.add(conv.propertyId);
+        }
+      }
+
+      const db = this.db;
+      if (db) {
+        const landlordMap = new Map<string, string>();
+        const propertyMap = new Map<string, { address?: string; title?: string }>();
+
+        if (missingLandlords.size > 0) {
+          await Promise.all(
+            Array.from(missingLandlords).map(async (lid) => {
+              try {
+                const uDoc = await db.collection('users').doc(lid).get();
+                if (uDoc.exists) {
+                  const u = uDoc.data();
+                  const name = u?.name || u?.displayName || u?.fullName;
+                  if (name) landlordMap.set(lid, name);
+                }
+              } catch (_) {}
+            })
+          );
+        }
+
+        if (missingProperties.size > 0) {
+          await Promise.all(
+            Array.from(missingProperties).map(async (pid) => {
+              try {
+                const pDoc = await db.collection('properties').doc(pid).get();
+                if (pDoc.exists) {
+                  const p = pDoc.data();
+                  propertyMap.set(pid, {
+                    address: p?.address || p?.title,
+                    title: p?.title || p?.address,
+                  });
+                }
+              } catch (_) {}
+            })
+          );
+        }
+
+        for (const conv of convMap.values()) {
+          let updated = false;
+          const patch: any = {};
+          if ((!conv.landlordName || conv.landlordName === 'Landlord') && landlordMap.has(conv.landlordId)) {
+            conv.landlordName = landlordMap.get(conv.landlordId);
+            patch.landlordName = conv.landlordName;
+            updated = true;
+          }
+          if (propertyMap.has(conv.propertyId)) {
+            const pInfo = propertyMap.get(conv.propertyId)!;
+            if (!conv.propertyAddress && pInfo.address) {
+              conv.propertyAddress = pInfo.address;
+              patch.propertyAddress = pInfo.address;
+              updated = true;
+            }
+            if (!conv.propertyTitle && pInfo.title) {
+              conv.propertyTitle = pInfo.title;
+              patch.propertyTitle = pInfo.title;
+              updated = true;
+            }
+          }
+          if (updated && col) {
+            col.doc(conv.id).set(patch, { merge: true }).catch(() => {});
+          }
+        }
+      }
+
       const list = Array.from(convMap.values()).sort((a, b) => {
         const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
         const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
@@ -126,12 +203,39 @@ export class CommunicationService {
 
     const id = randomUUID();
     const now = new Date().toISOString();
+    let landlordName = dto.landlordName || '';
+    let propertyAddress = dto.propertyAddress || '';
+    let propertyTitle = dto.propertyTitle || '';
+
+    if (!landlordName && landlordId && this.db) {
+      try {
+        const uSnap = await this.db.collection('users').doc(landlordId).get();
+        if (uSnap.exists) {
+          const u = uSnap.data();
+          landlordName = u?.name || u?.displayName || u?.fullName || '';
+        }
+      } catch (_) {}
+    }
+
+    if ((!propertyAddress || !propertyTitle) && propertyId && this.db) {
+      try {
+        const pSnap = await this.db.collection('properties').doc(propertyId).get();
+        if (pSnap.exists) {
+          const p = pSnap.data();
+          propertyAddress = propertyAddress || p?.address || p?.title || '';
+          propertyTitle = propertyTitle || p?.title || p?.address || '';
+        }
+      } catch (_) {}
+    }
+
     const payload = {
       id,
       propertyId,
       tenantId,
       landlordId,
-      propertyTitle: dto.propertyTitle || 'Property Listing',
+      landlordName: landlordName || 'Landlord',
+      propertyTitle: propertyTitle || propertyAddress || 'Property Listing',
+      propertyAddress: propertyAddress || propertyTitle || '',
       tenantName: dto.tenantName || 'Tenant',
       createdAt: now,
       updatedAt: now,
