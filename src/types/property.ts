@@ -12,6 +12,10 @@ export interface Property {
   bedrooms: string | number;
   /** Bathrooms count — string from scraper, number from native API */
   bathrooms?: string | number;
+  /** Explicit numeric bathroom count projected by search APIs */
+  bathroom_count?: number;
+  /** Explicit numeric square footage projected by search APIs */
+  sq_ft?: number;
   propertyType: string;
   imageUrls: string[];
   coordinates?: { lat: number; lng: number };

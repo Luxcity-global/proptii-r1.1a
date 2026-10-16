@@ -282,6 +282,22 @@ export function AddPropertyWizard({
     return e;
   }
 
+  const bedroomsValue = parseInt(form.bedrooms, 10);
+  const bathroomsValue = parseInt(form.bathrooms, 10);
+  const specWarning = React.useMemo(() => {
+    if (isNaN(bedroomsValue) || isNaN(bathroomsValue)) return null;
+    if (bedroomsValue === 0 && bathroomsValue > 1) {
+      return 'Studio properties typically have 1 bathroom. Please confirm this specification is intended.';
+    }
+    if (bedroomsValue === 1 && bathroomsValue >= 3) {
+      return 'A 1-bedroom flat configured with 3 or more bathrooms is unusual. Please confirm this specification is intended.';
+    }
+    if (bedroomsValue >= 2 && bathroomsValue > bedroomsValue + 2) {
+      return `Bathroom count (${bathroomsValue}) unusually exceeds bedroom count (${bedroomsValue}). Please verify this specification.`;
+    }
+    return null;
+  }, [bedroomsValue, bathroomsValue]);
+
   function advance(fromStep: Step) {
     const validators: Partial<Record<Step, () => FieldErrors>> = { 1: v1, 2: v2 };
     const validate = validators[fromStep];
@@ -626,6 +642,15 @@ export function AddPropertyWizard({
                       className={`${INP} pl-11 ${errors.bathrooms ? INP_ERR : ''}`} />
                   </Fld>
                 </div>
+                {specWarning && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-[12px] flex items-start gap-2.5 text-amber-900 text-[12.5px] leading-relaxed">
+                    <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-amber-800">Specification Warning: </span>
+                      <span>{specWarning}</span>
+                    </div>
+                  </div>
+                )}
                 <Fld label="Square Footage (optional)" icon={Maximize2}>
                   <input type="number" min="1" value={form.squareFootage}
                     onChange={e => sf('squareFootage', e.target.value)}
@@ -847,6 +872,16 @@ export function AddPropertyWizard({
                       </div>
                     ))}
                   </div>
+
+                  {specWarning && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-[12px] flex items-start gap-2.5 text-amber-900 text-[12.5px] leading-relaxed">
+                      <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-amber-800">Specification Notice: </span>
+                        <span>{specWarning}</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Amenities */}
                   {form.amenities.length > 0 && (

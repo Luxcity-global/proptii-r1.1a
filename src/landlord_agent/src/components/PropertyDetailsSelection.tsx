@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { ArrowLeft, MapPin, PoundSterling, Bed, Bath, Home, Upload, FileText, X, Navigation, Map, Menu } from 'lucide-react';
+import { ArrowLeft, MapPin, PoundSterling, Bed, Bath, Home, Upload, FileText, X, Navigation, Map, Menu, AlertCircle } from 'lucide-react';
 import { ProgressTracker } from './ProgressTracker';
 import {
   DropdownMenu,
@@ -353,6 +353,20 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
   const rentValue = parseFloat(propertyDetails.monthlyRent);
   const bedroomsValue = parseInt(propertyDetails.bedrooms, 10);
   const bathroomsValue = parseInt(propertyDetails.bathrooms, 10);
+
+  const specWarning = React.useMemo(() => {
+    if (isNaN(bedroomsValue) || isNaN(bathroomsValue)) return null;
+    if (bedroomsValue === 0 && bathroomsValue > 1) {
+      return 'Studio properties typically have 1 bathroom. Please confirm this specification is intended.';
+    }
+    if (bedroomsValue === 1 && bathroomsValue >= 3) {
+      return 'A 1-bedroom flat configured with 3 or more bathrooms is unusual. Please confirm this specification is intended.';
+    }
+    if (bedroomsValue >= 2 && bathroomsValue > bedroomsValue + 2) {
+      return `Bathroom count (${bathroomsValue}) unusually exceeds bedroom count (${bedroomsValue}). Please verify this specification.`;
+    }
+    return null;
+  }, [bedroomsValue, bathroomsValue]);
   const isFormValid =
     propertyDetails.address?.trim() &&
     propertyDetails.monthlyRent?.trim() &&
@@ -583,8 +597,17 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
                       style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
                     />
                   </div>
-                </div>
               </div>
+
+              {specWarning && (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-amber-900 text-xs shadow-xs">
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-amber-800">Specification Warning: </span>
+                    <span>{specWarning}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Square Footage */}
               <div>

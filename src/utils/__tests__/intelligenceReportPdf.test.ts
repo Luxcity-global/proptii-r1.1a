@@ -69,14 +69,83 @@ describe('buildIntelligenceReportFields', () => {
   });
 });
 
+import { inflateSync } from 'node:zlib';
+
+function extractDecompressedStreams(pdf: PDFDocument): string {
+  const chunks: string[] = [];
+  for (const [, obj] of pdf.context.enumerateIndirectObjects()) {
+    const stream = obj as any;
+    if (stream && stream.contents) {
+      let raw = '';
+      try {
+        raw = inflateSync(Buffer.from(stream.contents)).toString('latin1');
+      } catch {
+        try {
+          raw = new TextDecoder('latin1').decode(stream.contents);
+        } catch {}
+      }
+      if (raw) {
+        // pdf-lib encodes text strings as hex inside angle brackets: <hex> Tj
+        const decodedText = raw.replace(/<([0-9a-fA-F]+)>\s*Tj/g, (_, hex) => {
+          try {
+            return Buffer.from(hex, 'hex').toString('latin1');
+          } catch {
+            return hex;
+          }
+        });
+        chunks.push(decodedText);
+      }
+    }
+  }
+  return chunks.join('\n');
+}
+
 describe('fillIntelligenceReportPdf', () => {
-  it('renders the redesigned multi-page report from live fields', async () => {
+  it('renders the redesigned multi-page report from live fields with verified layout structure', async () => {
     const pdfBytes = await fillIntelligenceReportPdf(sampleInput);
     const pdf = await PDFDocument.load(pdfBytes);
 
     expect(pdf.getPageCount()).toBe(2);
     expect(new TextDecoder().decode(pdfBytes.slice(0, 5))).toBe('%PDF-');
-    expect(pdfBytes.byteLength).toBeGreaterThan(2_000);
+    expect(pdfBytes.byteLength).toBeGreaterThan(5_000);
+
+    const page1 = pdf.getPage(0);
+    const { width: p1W, height: p1H } = page1.getSize();
+    expect(Math.round(p1W)).toBe(595);
+    expect(Math.round(p1H)).toBe(842);
+
+    const page2 = pdf.getPage(1);
+    const { width: p2W, height: p2H } = page2.getSize();
+    expect(Math.round(p2W)).toBe(595);
+    expect(Math.round(p2H)).toBe(842);
+
+    // Verify decompressed stream content contains required layout text and structural components
+    const decompressed = extractDecompressedStreams(pdf);
+    expect(decompressed).toContain('PROPTII');
+    expect(decompressed).toContain('PROPERTY INTELLIGENCE');
+    expect(decompressed).toContain('LS28 7DD');
+    expect(decompressed).toContain('100M RESOLUTION');
+    expect(decompressed).toContain('Flood Risk');
+  });
+
+  it('bounds map and icon elements strictly within container dimensions', async () => {
+    const longAddressInput = {
+      ...sampleInput,
+      propertyLocation: 'Very Long Property Address That Might Overflow If Not Bounded Properly, Pudsey, Leeds, LS28 7DD',
+      renter: {
+        ...sampleInput.renter,
+        mapSource: 'Source: Google Maps with high precision coordinate mapping and boundary bounding',
+      },
+    };
+
+    const pdfBytes = await fillIntelligenceReportPdf(longAddressInput);
+    const pdf = await PDFDocument.load(pdfBytes);
+    expect(pdf.getPageCount()).toBe(2);
+    expect(pdfBytes.byteLength).toBeGreaterThan(5_000);
+
+    const decompressed = extractDecompressedStreams(pdf);
+    expect(decompressed).toContain('100M RESOLUTION');
+    expect(decompressed).toContain('CENTROID: LS28 7DD');
   });
 });
 

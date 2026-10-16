@@ -146,6 +146,31 @@ function drawBrandMark(
   });
 }
 
+function drawIconInBox(
+  page: PDFPage,
+  path: string,
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number,
+  color: RGB,
+  scale = 0.45,
+  borderWidth = 1.5,
+) {
+  // SVG paths are authored on a 24x24 grid with center at (12, 12).
+  // pdf-lib's drawSvgPath applies translate(x, y) then scale(s, -s), which draws downwards from y.
+  // To strictly center the SVG path within box [boxX, boxY, boxW, boxH]:
+  const drawX = boxX + boxW / 2 - 12 * scale;
+  const drawY = boxY + boxH / 2 + 12 * scale;
+  page.drawSvgPath(path, {
+    x: drawX,
+    y: drawY,
+    scale,
+    borderColor: color,
+    borderWidth,
+  });
+}
+
 function drawLineIcon(
   page: PDFPage,
   path: string,
@@ -658,24 +683,32 @@ function drawWatchAlert(
     borderColor: B.alertBorder,
     borderWidth: 1,
   });
-  drawLineIcon(page, ICON.warn, MARGIN_X + 12, yTop - 28, B.alertTitle, 0.5, 1.8);
-  // warn "!" mark
+
+  const badgeX = MARGIN_X + 12;
+  const badgeY = yTop - 32;
+  const badgeSize = 20;
+
+  drawIconInBox(page, ICON.warn, badgeX, badgeY, badgeSize, badgeSize, B.alertTitle, 0.48, 1.6);
+  // warn "!" mark centered mathematically inside the warning triangle
+  const iconCenterX = badgeX + badgeSize / 2;
+  const iconCenterY = badgeY + badgeSize / 2;
   page.drawRectangle({
-    x: MARGIN_X + 22.5,
-    y: yTop - 22,
+    x: iconCenterX - 0.7,
+    y: iconCenterY - 1,
     width: 1.4,
-    height: 7,
+    height: 4.5,
     color: B.alertTitle,
   });
   page.drawCircle({
-    x: MARGIN_X + 23.2,
-    y: yTop - 25.5,
-    size: 1.1,
+    x: iconCenterX,
+    y: iconCenterY - 3.5,
+    size: 0.9,
     color: B.alertTitle,
   });
-  drawTextAt(page, fields.watchTitle.toUpperCase(), MARGIN_X + 36, yTop - 16, 8, fonts.bold, B.alertTitle);
+
+  drawTextAt(page, fields.watchTitle.toUpperCase(), MARGIN_X + 38, yTop - 16, 8, fonts.bold, B.alertTitle);
   lines.forEach((line, index) => {
-    drawTextAt(page, line, MARGIN_X + 36, yTop - 32 - index * 12, 9.5, fonts.regular, B.alertBody);
+    drawTextAt(page, line, MARGIN_X + 38, yTop - 32 - index * 12, 9.5, fonts.regular, B.alertBody);
   });
   return y - 20;
 }
@@ -688,6 +721,7 @@ function drawMapPlaceholder(
 ): number {
   const mapH = 140;
   const y = yTop - mapH;
+  // Map container
   page.drawRectangle({
     x: MARGIN_X,
     y,
@@ -697,7 +731,8 @@ function drawMapPlaceholder(
     borderColor: B.line,
     borderWidth: 1,
   });
-  // Soft grid
+
+  // Soft grid lines with clipping within container bounds
   for (let i = 1; i < 10; i += 1) {
     page.drawRectangle({
       x: MARGIN_X + i * (CONTENT_W / 10),
@@ -716,31 +751,73 @@ function drawMapPlaceholder(
       opacity: 0.5,
     });
   }
+
+  // Centroid radar rings (bounded inside map)
+  const pinX = PAGE_W / 2;
+  const pinY = y + mapH / 2 + 10;
+
   page.drawCircle({
-    x: PAGE_W / 2,
-    y: y + mapH / 2 + 8,
-    size: 8,
+    x: pinX,
+    y: pinY,
+    size: 22,
+    color: B.iceDeep,
+    opacity: 0.35,
+  });
+  page.drawCircle({
+    x: pinX,
+    y: pinY,
+    size: 13,
+    color: B.ice,
+    opacity: 0.75,
+  });
+
+  // Map Pin
+  page.drawCircle({
+    x: pinX,
+    y: pinY,
+    size: 7,
     color: B.blue,
   });
   page.drawCircle({
-    x: PAGE_W / 2,
-    y: y + mapH / 2 + 8,
+    x: pinX,
+    y: pinY,
     size: 3,
     color: B.orange,
   });
-  const caption = fitText(fonts.regular, fields.mapCaption, 9, 260);
-  const captionW = fonts.regular.widthOfTextAtSize(caption, 9) + 16;
+
+  // Pin stem linking circle to centroid base
+  page.drawLine({
+    start: { x: pinX, y: pinY - 7 },
+    end: { x: pinX, y: pinY - 14 },
+    thickness: 1.2,
+    color: B.blue,
+  });
+
+  // Map label / Caption tooltip bounded strictly within container
+  const maxCaptionW = CONTENT_W - 40;
+  const caption = fitText(fonts.regular, fields.mapCaption, 8.5, maxCaptionW - 20);
+  const captionW = Math.min(fonts.regular.widthOfTextAtSize(caption, 8.5) + 16, maxCaptionW);
+  const captionBoxX = Math.max(MARGIN_X + 10, Math.min(pinX - captionW / 2, MARGIN_X + CONTENT_W - captionW - 10));
+  const captionBoxY = pinY - 32;
+
   page.drawRectangle({
-    x: PAGE_W / 2 - captionW / 2,
-    y: y + mapH / 2 - 18,
+    x: captionBoxX,
+    y: captionBoxY,
     width: captionW,
     height: 16,
     color: B.white,
     borderColor: B.line,
     borderWidth: 0.8,
   });
-  drawTextAt(page, caption, PAGE_W / 2 - captionW / 2 + 8, y + mapH / 2 - 13, 9, fonts.regular, B.slate);
-  drawTextAt(page, fields.postcode || '', MARGIN_X + 10, y + 10, 7, fonts.bold, B.faint);
+  drawTextAt(page, caption, captionBoxX + 8, captionBoxY + 4, 8.5, fonts.regular, B.slate);
+
+  // Map corner badges (safely bounded)
+  const postcodeText = (fields.postcode || '').toUpperCase();
+  if (postcodeText) {
+    drawTextAt(page, `CENTROID: ${postcodeText}`, MARGIN_X + 12, y + 10, 7, fonts.bold, B.faint);
+  }
+
+  drawTextAt(page, '100M RESOLUTION', MARGIN_X + CONTENT_W - 84, y + 10, 7, fonts.bold, B.faint);
 
   const sourceLines = wrapText(fonts.regular, fields.mapSource, 7.5, CONTENT_W).slice(0, 2);
   sourceLines.forEach((line, index) => {
@@ -783,14 +860,17 @@ function drawIntelCards(
       borderColor: B.line,
       borderWidth: 1,
     });
+    const boxX = x + 12;
+    const boxY = y + cardH - 36;
+    const boxSize = 24;
     page.drawRectangle({
-      x: x + 12,
-      y: y + cardH - 36,
-      width: 24,
-      height: 24,
+      x: boxX,
+      y: boxY,
+      width: boxSize,
+      height: boxSize,
       color: icon.bg,
     });
-    drawLineIcon(page, icon.path, x + 16, y + cardH - 32, icon.color, 0.42, 1.5);
+    drawIconInBox(page, icon.path, boxX, boxY, boxSize, boxSize, icon.color, 0.45, 1.5);
     const tagW = fonts.bold.widthOfTextAtSize(pdfSafe(card.status.toUpperCase()), 7) + 12;
     drawTag(page, card.status, x + cardW - 12 - tagW, y + cardH - 28, fonts, card.tone);
     drawTextAt(page, fitText(fonts.bold, card.title, 10, cardW - 24), x + 12, y + cardH - 52, 10, fonts.bold, B.ink);

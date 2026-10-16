@@ -237,20 +237,41 @@ export const useSearchBackend = () => {
             if (event.type === 'location_resolved' && event.data) {
               setResolvedLocation(event.data);
             } else if (event.type === 'initial' || event.type === 'results') {
-              const incoming = (event.data as any[]).map((p) => ({
-                ...p,
-                price: cleanPropertyPrice(p.price),
-                description: p.description || p.summary || p.notes || p.overview || '',
-                imageUrls: p.imageUrls || p.images || [],
-                url: p.url || p.listingUrl,
-                latitude: typeof p.latitude === 'number' ? p.latitude : undefined,
-                longitude: typeof p.longitude === 'number' ? p.longitude : undefined,
-                coordinates:
-                  p.coordinates ??
-                  (typeof p.latitude === 'number' && typeof p.longitude === 'number'
-                    ? { lat: p.latitude, lng: p.longitude }
-                    : undefined),
-              }));
+              const incoming = (event.data as any[]).map((p) => {
+                const fullText = `${p.title || ''} ${p.description || ''} ${p.summary || ''} ${p.notes || ''}`;
+                const rawBaths = p.bathrooms ?? p.bathroom_count ?? p.bathroomCount ?? p.baths;
+                let parsedBaths = (rawBaths !== undefined && rawBaths !== null && rawBaths !== '') ? Number(rawBaths) : undefined;
+                if ((parsedBaths === undefined || isNaN(parsedBaths)) && fullText) {
+                  const m = fullText.match(/(\d+)\s*(?:bathrooms?|baths?)/i);
+                  if (m) parsedBaths = parseInt(m[1], 10);
+                }
+
+                const rawSqFt = p.squareFootage ?? p.sq_ft ?? p.sqft ?? p.square_footage ?? p.size ?? p.floorArea;
+                let parsedSqFt = rawSqFt ? String(rawSqFt) : undefined;
+                if (!parsedSqFt && fullText) {
+                  const m = fullText.match(/(\d{2,5})\s*(?:sq\s*ft|sqft|square\s*feet|ft²)/i);
+                  if (m) parsedSqFt = m[1];
+                }
+
+                return {
+                  ...p,
+                  price: cleanPropertyPrice(p.price),
+                  description: p.description || p.summary || p.notes || p.overview || '',
+                  bathrooms: parsedBaths !== undefined ? String(parsedBaths) : undefined,
+                  bathroom_count: parsedBaths !== undefined ? Number(parsedBaths) : undefined,
+                  squareFootage: parsedSqFt,
+                  sq_ft: parsedSqFt ? Number(String(parsedSqFt).replace(/[^0-9]/g, '')) : undefined,
+                  imageUrls: p.imageUrls || p.images || [],
+                  url: p.url || p.listingUrl,
+                  latitude: typeof p.latitude === 'number' ? p.latitude : undefined,
+                  longitude: typeof p.longitude === 'number' ? p.longitude : undefined,
+                  coordinates:
+                    p.coordinates ??
+                    (typeof p.latitude === 'number' && typeof p.longitude === 'number'
+                      ? { lat: p.latitude, lng: p.longitude }
+                      : undefined),
+                };
+              });
 
               allScraped = [...allScraped, ...incoming];
 

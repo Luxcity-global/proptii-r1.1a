@@ -14,6 +14,58 @@ function sanitizeFirestoreData(obj: any): any {
   return obj;
 }
 
+async function hydrateSavedPropertyItems(items: any[], db: admin.firestore.Firestore | null): Promise<any[]> {
+  if (!db || !Array.isArray(items) || items.length === 0) return items;
+  try {
+    const propIds = Array.from(new Set(items.map((i: any) => i.propertyId || i.id).filter(Boolean)));
+    const propDocs = await Promise.all(
+      propIds.map(async (pid: string) => {
+        try {
+          const doc = await db.collection('properties').doc(pid).get();
+          return doc.exists ? { id: doc.id, ...doc.data() } : null;
+        } catch {
+          return null;
+        }
+      })
+    );
+    const propMap = new Map<string, any>();
+    propDocs.forEach((p: any) => {
+      if (p && p.id) propMap.set(p.id, p);
+    });
+
+    return items.map((item: any) => {
+      const full = propMap.get(item.propertyId) || propMap.get(item.id);
+      if (full) {
+        const amenities = Array.isArray(full.amenities) ? full.amenities : (Array.isArray(item.amenities) ? item.amenities : []);
+        const kitchenFeatures = amenities.filter((a: string) => /kitchen|cooker|oven|hob|dishwasher|fridge|freezer/i.test(a));
+        const kitchenDetails = full.kitchenDetails || full.kitchenFeatures || item.kitchenDetails || (kitchenFeatures.length > 0 ? kitchenFeatures.join(', ') : 'Fully fitted kitchen with integrated appliances');
+        const desc = full.notes || full.description || item.description ||
+          `Spacious ${full.bedrooms || item.bedrooms || '1'}-bedroom ${full.propertyType || item.propertyType || 'property'} located in ${full.address || full.city || item.location || 'a prime area'}.`;
+
+        return {
+          ...item,
+          title: full.title || item.title,
+          description: desc,
+          notes: full.notes || item.notes || desc,
+          bathrooms: full.bathrooms ?? item.bathrooms ?? 1,
+          bathroom_count: full.bathrooms ?? item.bathrooms ?? 1,
+          bedrooms: full.bedrooms ?? item.bedrooms,
+          squareFootage: full.squareFootage ?? item.squareFootage,
+          sq_ft: full.squareFootage ?? item.squareFootage,
+          kitchenDetails,
+          kitchenFeatures,
+          amenities,
+          agent: full.agent || item.agent,
+        };
+      }
+      return item;
+    });
+  } catch (e) {
+    console.warn('[SavedPropertiesService] hydration warning:', e);
+    return items;
+  }
+}
+
 @Injectable()
 export class SavedPropertiesService {
   private get db(): admin.firestore.Firestore | null {
@@ -51,7 +103,8 @@ export class SavedPropertiesService {
       }
 
       const snapshot = await query.get();
-      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      items = await hydrateSavedPropertyItems(items, this.db);
 
       return {
         items,
@@ -76,6 +129,7 @@ export class SavedPropertiesService {
          
          const hasMore = limitNum ? items.length > limitNum : false;
          if (limitNum) items = items.slice(0, limitNum);
+         items = await hydrateSavedPropertyItems(items, this.db);
          
          return {
            items,

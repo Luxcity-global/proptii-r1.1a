@@ -168,6 +168,9 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
     }
   };
 
+  const bathroomCount = property.bathroom_count ?? (property.bathrooms !== undefined && property.bathrooms !== null && property.bathrooms !== '' ? Number(property.bathrooms) : undefined);
+  const sqFt = property.sq_ft ?? (property.squareFootage ? String(property.squareFootage).replace(/[^0-9]/g, '') : undefined);
+
   return (
     <div
       className={`sr-card${isHighlighted ? ' is-highlighted' : ''}`}
@@ -230,16 +233,16 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 9V19M22 9v10M2 14h20M7 9V7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v2"></path></svg>
               {property.bedrooms === 0 ? 'Studio' : property.bedrooms ? `${property.bedrooms} beds` : '— beds'}
             </span>
-            {property.bathrooms ? (
+            {bathroomCount !== undefined && !isNaN(bathroomCount) ? (
               <span>
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12h16v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-4z"></path><path d="M6 12V5a2 2 0 0 1 2-2h1"></path></svg>
-                {property.bathrooms} bath{Number(property.bathrooms) === 1 ? '' : 's'}
+                {bathroomCount} bath{Number(bathroomCount) === 1 ? '' : 's'}
               </span>
             ) : null}
-            {property.squareFootage ? (
+            {sqFt ? (
               <span>
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"></rect></svg>
-                {property.squareFootage} ft²
+                {sqFt} ft²
               </span>
             ) : null}
           </div>
@@ -2079,17 +2082,21 @@ const SearchResults = () => {
     const nextQuery = draftQuery.trim();
     if (!nextQuery) return;
     clearCache();
-    navigate(`/search?q=${encodeURIComponent(nextQuery)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
+    lastExecutedMacroSigRef.current = null;
+    const typeParam = rawSearchTypeParam ? `&type=${encodeURIComponent(rawSearchTypeParam)}` : '';
+    navigate(`/search?q=${encodeURIComponent(nextQuery)}${typeParam}`);
   };
 
   const handleApplyFilters = useCallback((nextQuery: string, matchCount: number) => {
     setDraftQuery(nextQuery);
     clearCache();
-    navigate(`/search?q=${encodeURIComponent(nextQuery)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
+    lastExecutedMacroSigRef.current = null;
+    const typeParam = rawSearchTypeParam ? `&type=${encodeURIComponent(rawSearchTypeParam)}` : '';
+    navigate(`/search?q=${encodeURIComponent(nextQuery)}${typeParam}`);
     setToastMessage(`Showing ${matchCount} ${matchCount === 1 ? 'property' : 'properties'} matching all filters`);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2600);
-  }, [clearCache, navigate, searchTypeParam]);
+  }, [clearCache, navigate, rawSearchTypeParam]);
 
   const handleSaveSearch = () => {
     if (!searchQuery.trim()) return;

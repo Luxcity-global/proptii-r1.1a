@@ -52,7 +52,8 @@ export class BillingController {
   @ApiResponse({ status: 200, description: 'Confirmation status' })
   async confirmCheckout(@Req() req: any, @Body() dto: any) {
     const userId = req.user.uid;
-    return await this.billingService.confirmCheckoutSession(userId, dto.sessionId);
+    const email = req.user.email || '';
+    return await this.billingService.confirmCheckoutSession(userId, dto.sessionId, email);
   }
 
   @Get('plans')

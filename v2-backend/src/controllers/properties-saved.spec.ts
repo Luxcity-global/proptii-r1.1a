@@ -53,9 +53,11 @@ describe('Section 3 & 10: Native Properties & Saved Properties Endpoints', () =>
         location: '42 High St, London, E1 6AN',
         bedrooms: 2,
         bathrooms: 2,
+        bathroom_count: 2,
         propertyType: 'Flat',
         description: 'Bright and spacious',
         squareFootage: undefined,
+        sq_ft: undefined,
         amenities: [],
         imageUrls: ['https://storage.proptii.co/photo1.jpg'],
         agent: {

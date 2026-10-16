@@ -54,6 +54,22 @@ describe('Section 15, 16, 17 & 18: Billing, Insights, Dashboards Endpoints', () 
       expect(service.createCheckoutSession).toHaveBeenCalledWith('u-1', 'u1@test.com', dto);
       expect(res.url).toContain('checkout.stripe.com');
     });
+
+    it('[POST /billing/confirm-checkout] confirms checkout completion and persists entitlements', async () => {
+      service.confirmCheckoutSession = vi.fn().mockResolvedValue({
+        success: true,
+        plan: 'renter_pro',
+        status: 'active',
+        hasActiveSubscription: true,
+      });
+      const req = { user: { uid: 'u-1', email: 'u1@test.com' } };
+      const dto = { sessionId: 'cs_test_123' };
+
+      const res = await controller.confirmCheckout(req, dto);
+      expect(service.confirmCheckoutSession).toHaveBeenCalledWith('u-1', 'cs_test_123', 'u1@test.com');
+      expect(res.hasActiveSubscription).toBe(true);
+      expect(res.plan).toBe('renter_pro');
+    });
   });
 
   describe('InsightsController', () => {

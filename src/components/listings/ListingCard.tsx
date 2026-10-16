@@ -254,7 +254,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
           </div>
           <div className="flex items-center">
             <Square className="w-4 h-4 mr-1" />
-            <span className="text-sm">800 sq ft</span>
+            <span className="text-sm">{(property as any).squareFootage || (property as any).sq_ft || 800} sq ft</span>
           </div>
         </div>
 

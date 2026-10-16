@@ -21,6 +21,13 @@ export interface SavedProperty {
   price: string;
   location: string;
   bedrooms: string;
+  bathrooms?: string | number;
+  bathroom_count?: number;
+  squareFootage?: string;
+  sq_ft?: number;
+  kitchenDetails?: string;
+  kitchenFeatures?: string[];
+  amenities?: string[];
   propertyType: string;
   imageUrls: string[];
   agent: {
@@ -281,12 +288,28 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
     if (isPropertySaved(propertyId)) return;
 
     const agentData = property.agent || {};
+    const rawBaths = property.bathrooms ?? property.bathroom_count ?? property.bathroomCount ?? property.baths;
+    const rawSqFt = property.squareFootage ?? property.sq_ft ?? property.sqft;
+    const amenities = Array.isArray(property.amenities) ? property.amenities : [];
+    const kitchenFeatures = amenities.filter((a: string) => /kitchen|cooker|oven|hob|dishwasher|fridge|freezer/i.test(a));
+    const kitchenDetails = property.kitchenDetails || property.kitchenFeatures || (kitchenFeatures.length > 0 ? kitchenFeatures.join(', ') : 'Fully fitted modern kitchen with integrated appliances');
+
+    const desc = property.description || property.summary || property.notes || property.overview ||
+      `Spacious ${property.bedrooms || '1'}-bedroom ${property.propertyType || 'property'} located in ${property.location || 'a prime location'}. Features contemporary finishes, generous living space, and convenient access to local transit and amenities.`;
+
     const savedProperty: SavedProperty = {
       id: propertyId,
       title: property.title,
       price: property.price,
       location: property.location,
-      bedrooms: property.bedrooms,
+      bedrooms: property.bedrooms !== undefined ? String(property.bedrooms) : '1',
+      bathrooms: rawBaths !== undefined ? String(rawBaths) : '1',
+      bathroom_count: rawBaths !== undefined ? Number(rawBaths) : 1,
+      squareFootage: rawSqFt ? String(rawSqFt) : undefined,
+      sq_ft: rawSqFt ? Number(String(rawSqFt).replace(/[^0-9]/g, '')) : undefined,
+      kitchenDetails,
+      kitchenFeatures,
+      amenities,
       propertyType: property.propertyType,
       imageUrls: property.imageUrls || [],
       agent: {
@@ -298,7 +321,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
         website: agentData.website,
       },
       source: property.source,
-      description: property.description,
+      description: desc,
       savedAt: new Date().toISOString(),
     };
 

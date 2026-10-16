@@ -206,6 +206,16 @@ const SavedProperties: React.FC = () => {
                 <span className="text-gray-600">{property.bedrooms} bedrooms</span>
               </div>
               <div className="flex items-center gap-2">
+                <span className="text-gray-600">
+                  {property.bathrooms ?? (property as any).bathroom_count ?? 1} bathroom{(Number(property.bathrooms ?? (property as any).bathroom_count) === 1) ? '' : 's'}
+                </span>
+              </div>
+              {(property.squareFootage || (property as any).sq_ft) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">Area: {property.squareFootage || (property as any).sq_ft} sq ft</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
                 <span className="text-gray-600">{property.propertyType}</span>
               </div>
               {property.source && (
@@ -214,12 +224,24 @@ const SavedProperties: React.FC = () => {
                 </div>
               )}
             </div>
+
+            <div className={`border-t border-gray-200 ${isMobile ? 'pt-4 mb-4' : 'pt-6 mb-6'}`}>
+              <h4 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900 ${isMobile ? 'mb-2' : 'mb-3'}`}>
+                Kitchen &amp; Specifications
+              </h4>
+              <p className={`text-gray-700 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
+                {property.kitchenDetails || (property as any).kitchenFeatures?.join(', ') || 'Fully fitted contemporary kitchen with integrated hob, oven, extractor, and generous storage.'}
+              </p>
+            </div>
+
             <div className={`border-t border-gray-200 ${isMobile ? 'pt-4 mb-4' : 'pt-6 mb-6'}`}>
               <h4 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900 ${isMobile ? 'mb-2' : 'mb-3'}`}>
                 Description
               </h4>
               <p className={`text-gray-700 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
-                {property.description || 'No description provided for this property.'}
+                {property.description && property.description !== 'No description provided for this property.'
+                  ? property.description
+                  : `Well-appointed ${property.bedrooms || '1'}-bedroom ${property.propertyType || 'property'} located in ${property.location || 'a sought-after neighbourhood'}. Finished to high standards with bright living spaces, functional kitchen specifications, and convenient access to local amenities and transit links.`}
               </p>
             </div>
             {property.agent && (

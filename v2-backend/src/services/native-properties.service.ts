@@ -50,6 +50,22 @@ function isPropertyAuthorized(existing: any, userId?: string, userEmail?: string
   return false;
 }
 
+export function checkSpecificationAnomaly(bedrooms?: any, bathrooms?: any): string | null {
+  const beds = parseInt(bedrooms, 10);
+  const baths = parseInt(bathrooms, 10);
+  if (isNaN(beds) || isNaN(baths)) return null;
+  if (beds === 0 && baths > 1) {
+    return 'Studio property configured with multiple bathrooms';
+  }
+  if (beds === 1 && baths >= 3) {
+    return '1-bedroom property configured with 3 or more bathrooms';
+  }
+  if (beds >= 2 && baths > beds + 2) {
+    return `Bathroom count (${baths}) unusually exceeds bedroom count (${beds})`;
+  }
+  return null;
+}
+
 @Injectable()
 export class NativePropertiesService {
   private get db() {
@@ -155,9 +171,15 @@ export class NativePropertiesService {
 
     try {
       const docRef = col.doc();
+      const specWarning = checkSpecificationAnomaly(data?.bedrooms, data?.bathrooms ?? data?.bathroom_count);
+      if (specWarning) {
+        console.warn(`[NativePropertiesService] Property specification anomaly: ${specWarning}`);
+      }
+
       const propertyData = {
         ...data,
         id: docRef.id,
+        specificationWarning: specWarning || null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
@@ -190,8 +212,16 @@ export class NativePropertiesService {
     // Clean undefined values to prevent Firestore driver errors
     const cleanedData = JSON.parse(JSON.stringify(data, (key, value) => value === undefined ? null : value));
 
+    const mergedBeds = cleanedData.bedrooms !== undefined ? cleanedData.bedrooms : existing?.bedrooms;
+    const mergedBaths = cleanedData.bathrooms !== undefined ? cleanedData.bathrooms : (cleanedData.bathroom_count !== undefined ? cleanedData.bathroom_count : (existing?.bathrooms ?? existing?.bathroom_count));
+    const specWarning = checkSpecificationAnomaly(mergedBeds, mergedBaths);
+    if (specWarning) {
+      console.warn(`[NativePropertiesService] Property update specification anomaly: ${specWarning}`);
+    }
+
     const updatedData = {
       ...cleanedData,
+      specificationWarning: specWarning || null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     await docRef.update(updatedData);
