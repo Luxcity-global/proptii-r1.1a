@@ -1208,6 +1208,21 @@
   color: #fff;
 }
 
+.sr-badge.rose {
+  background: #e11d48;
+  color: #fff;
+}
+
+.sr-badge.blue {
+  background: #2563eb;
+  color: #fff;
+}
+
+.sr-badge.amber {
+  background: #d97706;
+  color: #fff;
+}
+
 .sr-card-actions {
   position: absolute;
   top: 12px;

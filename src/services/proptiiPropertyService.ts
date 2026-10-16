@@ -64,6 +64,12 @@ function mapApiProperty(raw: any): Property {
     city: raw.city || '',
     postcode: raw.postcode || '',
     status: raw.status || 'vacant',
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+    publishedOn: raw.publishedOn || raw.createdAt,
+    modifiedOn: raw.modifiedOn,
+    modifiedReason: raw.modifiedReason,
+    addedOrReduced: raw.addedOrReduced,
   } as Property & {
     street?: string;
     city?: string;

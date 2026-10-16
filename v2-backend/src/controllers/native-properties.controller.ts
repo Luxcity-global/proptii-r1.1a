@@ -15,6 +15,26 @@ function normaliseForSearch(doc: any): Record<string, any> {
 
   const propertyType = doc.propertyType || doc.type || 'Property';
 
+  const createdAt = doc.createdAt?.toDate ? doc.createdAt.toDate().toISOString() : (typeof doc.createdAt === 'string' ? doc.createdAt : undefined);
+  const updatedAt = doc.updatedAt?.toDate ? doc.updatedAt.toDate().toISOString() : (typeof doc.updatedAt === 'string' ? doc.updatedAt : undefined);
+
+  let addedOrReduced: string | undefined = undefined;
+  let modifiedReason: string | undefined = undefined;
+  let modifiedOn: string | undefined = undefined;
+
+  if (createdAt) {
+    addedOrReduced = `Added ${new Date(createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  }
+
+  if (updatedAt && createdAt) {
+    const diffMs = Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime());
+    if (diffMs > 60000) {
+      modifiedOn = updatedAt;
+      modifiedReason = 'Listing updated';
+      addedOrReduced = `Updated ${new Date(updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+  }
+
   return {
     id: doc.id,
     source: 'native',
@@ -42,6 +62,12 @@ function normaliseForSearch(doc: any): Record<string, any> {
     city: doc.city,
     postcode: doc.postcode,
     status: doc.status || 'vacant',
+    createdAt,
+    updatedAt,
+    publishedOn: createdAt,
+    modifiedOn,
+    modifiedReason,
+    addedOrReduced,
   };
 }
 

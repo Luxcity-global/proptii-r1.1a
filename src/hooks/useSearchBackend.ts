@@ -289,6 +289,10 @@ export const useSearchBackend = () => {
                     (typeof p.latitude === 'number' && typeof p.longitude === 'number'
                       ? { lat: p.latitude, lng: p.longitude }
                       : undefined),
+                  addedOrReduced: p.addedOrReduced || p.humanised_publish_date,
+                  publishedOn: p.publishedOn || p.publish_date || p.firstVisibleDate || p.created || p.creationDate,
+                  modifiedOn: p.modifiedOn,
+                  modifiedReason: p.modifiedReason,
                 };
               });
 

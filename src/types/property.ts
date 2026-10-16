@@ -41,6 +41,10 @@ export interface Property {
   uprn?: string;
   latitude?: number;
   longitude?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  modifiedOn?: string;
+  modifiedReason?: string;
 }
 
 export interface SearchResponse {

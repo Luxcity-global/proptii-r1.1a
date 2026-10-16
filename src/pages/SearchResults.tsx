@@ -4,8 +4,10 @@ import {
   Bath,
   BedDouble,
   Bell,
+  Calendar,
   Car,
   Check,
+  Clock,
   Dumbbell,
   Home,
   Loader2,
@@ -34,15 +36,8 @@ import { FactsBadgeRow } from '../components/property/FactsBadgeRow';
 import { ProptiiModule } from '../components/property/ProptiiModule';
 import { resolveListingId } from '../utils/listingId';
 import { getPropertyDisplayTitle, getPropertyListingDescription } from '../utils/propertyDisplay';
-import {
-  hasPetFriendlyFeature,
-  hasBillsIncludedFeature,
-  hasBalconyOrGardenFeature,
-  hasParkingFeature,
-  hasStationNearbyFeature,
-  hasGymFeature,
-  hasConciergeFeature,
-} from '../utils/propertyParsers';
+import { getPropertyDateInfo } from '../utils/propertyDates';
+import { getPropertyDynamicFeatures, getKeyFeatureBadges } from '../utils/propertyFeatures';
 import Footer from '../components/Footer';
 import { SearchLoadingAnimation } from '../components/SearchLoadingAnimation';
 import { useAuth } from '../contexts/AuthContext';
@@ -143,14 +138,8 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
     /pcm|pw|rent|let/i.test(`${property.price} ${property.propertyType}`) ||
     !/sale|buy/i.test(property.propertyType || '');
   const displayTitle = getPropertyDisplayTitle(property);
-  const fullPropertyText = `${property.title || ''} ${property.description || ''} ${property.summary || ''}`;
-  const isPetFriendly = hasPetFriendlyFeature(fullPropertyText, property.amenities);
-  const isBillsIncluded = hasBillsIncludedFeature(fullPropertyText, property.amenities);
-  const hasGarden = hasBalconyOrGardenFeature(fullPropertyText);
-  const hasStation = hasStationNearbyFeature(fullPropertyText, property.amenities);
-  const hasParking = hasParkingFeature(fullPropertyText);
-  const hasGym = hasGymFeature(fullPropertyText, property.amenities);
-  const hasConcierge = hasConciergeFeature(fullPropertyText, property.amenities);
+  const dateInfo = getPropertyDateInfo(property);
+  const { visibleFeatures, overflowCount } = getKeyFeatureBadges(property, 3);
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -186,7 +175,9 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
 
         <div className="sr-card-badges">
           <span className="sr-badge brand">{isRent ? 'To Rent' : 'For Sale'}</span>
-          <span className="sr-badge emerald">{property.addedOrReduced || 'Available Now'}</span>
+          <span className={`sr-badge ${dateInfo.badgeVariant}`} title={dateInfo.modifiedLabel || dateInfo.publishedLabel}>
+            {dateInfo.badgeText}
+          </span>
         </div>
 
         <div className="sr-card-actions">
@@ -247,48 +238,26 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
             ) : null}
           </div>
 
-          {(isPetFriendly || isBillsIncluded || hasStation || hasGarden || hasParking || hasGym || hasConcierge) && (
+          {visibleFeatures.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 mb-3">
-              {isPetFriendly && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-xs">
-                  <PawPrint className="w-3 h-3 text-amber-700" aria-hidden />
-                  <span>Pet Friendly</span>
-                </span>
-              )}
-              {isBillsIncluded && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200/80 shadow-xs">
-                  <Zap className="w-3 h-3 text-blue-700" aria-hidden />
-                  <span>Bills Inc.</span>
-                </span>
-              )}
-              {hasStation && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-xs">
-                  <Train className="w-3 h-3 text-emerald-700" aria-hidden />
-                  <span>Near Station</span>
-                </span>
-              )}
-              {hasGarden && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-800 border border-teal-200/80 shadow-xs">
-                  <Trees className="w-3 h-3 text-teal-700" aria-hidden />
-                  <span>Balcony/Garden</span>
-                </span>
-              )}
-              {hasParking && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200/80 shadow-xs">
-                  <Car className="w-3 h-3 text-indigo-700" aria-hidden />
-                  <span>Parking</span>
-                </span>
-              )}
-              {hasGym && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-800 border border-purple-200/80 shadow-xs">
-                  <Dumbbell className="w-3 h-3 text-purple-700" aria-hidden />
-                  <span>Gym</span>
-                </span>
-              )}
-              {hasConcierge && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 text-orange-800 border border-orange-200/80 shadow-xs">
-                  <Bell className="w-3 h-3 text-orange-700" aria-hidden />
-                  <span>Concierge</span>
+              {visibleFeatures.map((feat) => {
+                const IconComponent = feat.Icon;
+                return (
+                  <span
+                    key={feat.id}
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border shadow-2xs ${feat.badgeClass}`}
+                  >
+                    <IconComponent className={`w-3 h-3 ${feat.iconColorClass}`} aria-hidden />
+                    <span>{feat.label}</span>
+                  </span>
+                );
+              })}
+              {overflowCount > 0 && (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200/80"
+                  title={`${overflowCount} more feature${overflowCount === 1 ? '' : 's'} available`}
+                >
+                  +{overflowCount} more
                 </span>
               )}
             </div>
@@ -438,6 +407,9 @@ function PropertyDetailsModal({
       ? Number(String(property.squareFootage).replace(/[^0-9]/g, ''))
       : undefined);
 
+  const modalDateInfo = getPropertyDateInfo(property);
+  const modalFeatures = getPropertyDynamicFeatures(property);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div
@@ -461,8 +433,19 @@ function PropertyDetailsModal({
               <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-[#136C9E] text-white shadow-md">
                 {isRent ? 'To Rent' : 'For Sale'}
               </span>
-              <span className="bg-emerald-600 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md">
-                {property.addedOrReduced || 'Available Now'}
+              <span
+                className={`px-4 py-1.5 rounded-full text-xs font-bold shadow-md text-white ${
+                  modalDateInfo.badgeVariant === 'rose'
+                    ? 'bg-rose-600'
+                    : modalDateInfo.badgeVariant === 'blue'
+                    ? 'bg-blue-600'
+                    : modalDateInfo.badgeVariant === 'amber'
+                    ? 'bg-amber-600'
+                    : 'bg-emerald-600'
+                }`}
+                title={modalDateInfo.modifiedLabel || modalDateInfo.publishedLabel}
+              >
+                {modalDateInfo.badgeText}
               </span>
             </div>
 
@@ -530,67 +513,36 @@ function PropertyDetailsModal({
             </p>
           </div>
 
-          {(() => {
-            const fullModalText = `${property.title || ''} ${property.description || ''} ${property.summary || ''}`;
-            const mPet = hasPetFriendlyFeature(fullModalText, property.amenities);
-            const mBills = hasBillsIncludedFeature(fullModalText, property.amenities);
-            const mGarden = hasBalconyOrGardenFeature(fullModalText);
-            const mStation = hasStationNearbyFeature(fullModalText, property.amenities);
-            const mParking = hasParkingFeature(fullModalText);
-            const mGym = hasGymFeature(fullModalText, property.amenities);
-            const mConcierge = hasConciergeFeature(fullModalText, property.amenities);
-
-            if (!mPet && !mBills && !mGarden && !mStation && !mParking && !mGym && !mConcierge) {
-              return null;
-            }
-
-            return (
-              <div className="flex flex-wrap items-center gap-2 mb-6">
-                {mPet && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-xs">
-                    <PawPrint className="w-3.5 h-3.5 text-amber-700" aria-hidden />
-                    <span>Pet Friendly</span>
-                  </span>
-                )}
-                {mBills && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200/80 shadow-xs">
-                    <Zap className="w-3.5 h-3.5 text-blue-700" aria-hidden />
-                    <span>Bills Included</span>
-                  </span>
-                )}
-                {mStation && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-xs">
-                    <Train className="w-3.5 h-3.5 text-emerald-700" aria-hidden />
-                    <span>Near Station</span>
-                  </span>
-                )}
-                {mGarden && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200/80 shadow-xs">
-                    <Trees className="w-3.5 h-3.5 text-teal-700" aria-hidden />
-                    <span>Balcony / Garden</span>
-                  </span>
-                )}
-                {mParking && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200/80 shadow-xs">
-                    <Car className="w-3.5 h-3.5 text-indigo-700" aria-hidden />
-                    <span>Parking</span>
-                  </span>
-                )}
-                {mGym && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-800 border border-purple-200/80 shadow-xs">
-                    <Dumbbell className="w-3.5 h-3.5 text-purple-700" aria-hidden />
-                    <span>Gym / Fitness</span>
-                  </span>
-                )}
-                {mConcierge && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-800 border border-orange-200/80 shadow-xs">
-                    <Bell className="w-3.5 h-3.5 text-orange-700" aria-hidden />
-                    <span>Concierge</span>
-                  </span>
-                )}
+          {/* Exact publication & modification status */}
+          <div className="flex flex-wrap items-center gap-2.5 text-xs text-gray-500 mb-4 pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-200/80 text-gray-700">
+              <Calendar className="w-3.5 h-3.5 text-gray-500" aria-hidden />
+              <span>{modalDateInfo.publishedLabel}</span>
+            </div>
+            {modalDateInfo.isModified && modalDateInfo.modifiedLabel && (
+              <div className="flex items-center gap-1.5 font-medium text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                <Clock className="w-3.5 h-3.5 text-amber-600" aria-hidden />
+                <span>{modalDateInfo.modifiedLabel}</span>
               </div>
-            );
-          })()}
+            )}
+          </div>
+
+          {modalFeatures.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              {modalFeatures.map((feat) => {
+                const IconComponent = feat.Icon;
+                return (
+                  <span
+                    key={feat.id}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-2xs ${feat.badgeClass}`}
+                  >
+                    <IconComponent className={`w-3.5 h-3.5 ${feat.iconColorClass}`} aria-hidden />
+                    <span>{feat.label}</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
 
           {govDataEnabled && (
             <ProptiiModule
@@ -627,7 +579,17 @@ function PropertyDetailsModal({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-xs space-y-2">
-                {featureItems.length > 0 ? (
+                {modalFeatures.length > 0 ? (
+                  modalFeatures.map((feat) => {
+                    const IconComponent = feat.Icon;
+                    return (
+                      <div key={feat.id} className="flex items-center text-gray-700 gap-2">
+                        <IconComponent className={`w-4 h-4 flex-shrink-0 ${feat.iconColorClass}`} aria-hidden />
+                        <span className="capitalize leading-relaxed font-medium">{feat.label}</span>
+                      </div>
+                    );
+                  })
+                ) : featureItems.length > 0 ? (
                   featureItems.map((item, index) => (
                     <div key={index} className="flex items-center text-gray-700 gap-2">
                       <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" aria-hidden />
@@ -672,6 +634,20 @@ function PropertyDetailsModal({
                     <Home className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
                     <span className="capitalize">
                       <strong>{property.propertyType}</strong>
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-gray-700 pt-2 border-t border-gray-200/60">
+                  <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                  <span>
+                    <strong>{modalDateInfo.publishedLabel}</strong>
+                  </span>
+                </div>
+                {modalDateInfo.isModified && modalDateInfo.modifiedLabel && (
+                  <div className="flex items-center gap-2 text-amber-800 font-medium">
+                    <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" aria-hidden />
+                    <span>
+                      <strong>{modalDateInfo.modifiedLabel}</strong>
                     </span>
                   </div>
                 )}
