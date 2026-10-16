@@ -19,7 +19,6 @@ import { EditProperty } from './components/EditProperty';
 import { PhotoUpload } from './components/PhotoUpload';
 import { Dashboard } from './components/Dashboard';
 import { PropertyDetails } from './components/PropertyDetails';
-import { DocumentManagement } from './components/DocumentManagement';
 import { PhotoManagement } from './components/PhotoManagement';
 import { MainLayout, NavigationScreen } from './components/MainLayout';
 import { PropertiesPage } from './components/PropertiesPage';
@@ -500,6 +499,7 @@ export function AppContent() {
   /** When true, DocumentsPage will auto-open its upload modal on next mount */
   const [openDocsUploadOnMount, setOpenDocsUploadOnMount] = React.useState(false);
   const [openDocsDocumentId, setOpenDocsDocumentId] = React.useState<string | undefined>(undefined);
+  const [openDocsPropertyId, setOpenDocsPropertyId] = React.useState<string | undefined>(undefined);
 
   // Fetch unassigned vault documents once the user opens the Documents tab
   const loadUnassignedDocuments = React.useCallback(async (force = false) => {
@@ -1637,6 +1637,13 @@ export function AppContent() {
     setSelectedProperty(enriched);
   };
 
+  const handleOpenDocumentsForProperty = (property: Property) => {
+    selectProperty(property);
+    setOpenDocsPropertyId(property.id);
+    loadUnassignedDocuments();
+    handleNavigation('documents');
+  };
+
   // Re-hydrate selectedProperty on refresh or properties load
   React.useEffect(() => {
     if (selectedProperty) return;
@@ -2088,8 +2095,11 @@ export function AppContent() {
               navigateToScreen('property-details');
             }}
             onManageDocuments={(property) => {
-              selectProperty(property);
-              navigateToScreen('document-management');
+              if (property) {
+                handleOpenDocumentsForProperty(property);
+              } else {
+                handleNavigation('documents');
+              }
             }}
             onManagePhotos={(property) => {
               // Photos are managed inline in the PropertyDetails Photos tab
@@ -2161,8 +2171,7 @@ export function AppContent() {
               navigateToScreen('edit-property');
             }}
             onManageDocuments={(property) => {
-              selectProperty(property);
-              navigateToScreen('document-management');
+              handleOpenDocumentsForProperty(property);
             }}
             onManagePhotos={(property) => {
               // Photos are managed inline in the PropertyDetails Photos tab
@@ -2198,10 +2207,12 @@ export function AppContent() {
             unassignedDocuments={unassignedDocuments}
             openUploadOnMount={openDocsUploadOnMount}
             openDocumentId={openDocsDocumentId}
+            initialPropertyId={openDocsPropertyId}
             onUploadModalOpened={() => {
-              // Reset both flags after DocumentsPage has consumed them
+              // Reset flags after DocumentsPage has consumed them
               setOpenDocsUploadOnMount(false);
               setOpenDocsDocumentId(undefined);
+              setOpenDocsPropertyId(undefined);
             }}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
@@ -2214,7 +2225,7 @@ export function AppContent() {
             }}
             onManageDocuments={(property) => {
               selectProperty(property);
-              navigateToScreen('document-management');
+              setOpenDocsPropertyId(property.id);
             }}
             onAddDocumentToProperty={async (propertyId, doc) => {
               addDocumentToProperty(propertyId, doc);
@@ -2740,8 +2751,11 @@ export function AppContent() {
               navigateToScreen('property-details');
             }}
             onManageDocuments={(property) => {
-              selectProperty(property);
-              navigateToScreen('document-management');
+              if (property) {
+                handleOpenDocumentsForProperty(property);
+              } else {
+                handleNavigation('documents');
+              }
             }}
             onManagePhotos={(property) => {
               // Photos are managed inline in the PropertyDetails Photos tab
@@ -3234,7 +3248,13 @@ export function AppContent() {
               setSelectedProperty(property);
               navigateToScreen('edit-property');
             }}
-            onManageDocuments={() => navigateToScreen('document-management')}
+            onManageDocuments={() => {
+              if (selectedProperty) {
+                handleOpenDocumentsForProperty(selectedProperty);
+              } else {
+                handleNavigation('documents');
+              }
+            }}
             updateProperty={updateProperty}
             onDocumentUpload={async (propertyId, doc) => {
               if (!userProfile) return;
@@ -3452,66 +3472,10 @@ export function AppContent() {
         );
 
       case 'document-management':
-        return (
-          <DocumentManagement
-            property={selectedProperty}
-            availableProperties={properties}
-            userId={resolveManagerId() || ''}
-            onBack={() => navigateToScreen('property-details')}
-            onDocumentAdd={addDocumentToProperty}
-            onDocumentDelete={async (propertyId, documentId) => {
-              const prop = properties.find(p => p.id === propertyId);
-              if (!prop) return;
-              const updatedDocs = (prop.documents || []).filter(d => d.id !== documentId);
-
-              // Also delete from landlord_documents if it exists there
-              try {
-                await documentService.deleteDocument(documentId);
-              } catch { }
-
-              await propertyService.updateProperty(propertyId, {
-                documents: updatedDocs.map(d => ({
-                  id: d.id, name: d.name, type: d.type, url: d.url,
-                  issueDate: d.issueDate instanceof Date ? d.issueDate.toISOString() : d.issueDate,
-                  expiryDate: d.expiryDate instanceof Date ? d.expiryDate.toISOString() : (d.expiryDate ?? null),
-                  status: d.status,
-                })) as any,
-              });
-              setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, documents: updatedDocs } : p));
-              if (selectedProperty?.id === propertyId) {
-                setSelectedProperty(prev => prev ? { ...prev, documents: updatedDocs } : null);
-              }
-            }}
-            onVaultDocumentDeleted={(docId) => {
-              setUnassignedDocuments(prev => prev.filter(d => d.id !== docId));
-            }}
-          />
-        );
-
       case 'document-management-vault':
-        return (
-          <DocumentManagement
-            property={null}
-            availableProperties={properties}
-            userId={resolveManagerId() || ''}
-            onBack={() => {
-              navigateToMainApp('documents');
-            }}
-            onDocumentAdd={addDocumentToProperty}
-            onVaultDocumentAdded={(doc) => {
-              setUnassignedDocuments(prev => {
-                // Only keep unassigned ones (propertyId null)
-                if (doc.propertyId) return prev;
-                const already = prev.find(d => d.id === doc.id);
-                if (already) return prev;
-                return [doc, ...prev];
-              });
-            }}
-            onVaultDocumentDeleted={(docId) => {
-              setUnassignedDocuments(prev => prev.filter(d => d.id !== docId));
-            }}
-          />
-        );
+        // Legacy document management screen replaced by modern DocumentsPage
+        navigateToMainApp('documents');
+        return null;
 
       case 'photo-management':
         // Photos are now managed inline in the PropertyDetails Photos tab.
@@ -3882,8 +3846,7 @@ export function AppContent() {
               navigateToScreen('property-details');
             }}
             onUploadDocs={(property) => {
-              selectProperty(property);
-              navigateToScreen('document-management');
+              handleOpenDocumentsForProperty(property);
             }}
             onEditDetails={(property) => {
               selectProperty(property);

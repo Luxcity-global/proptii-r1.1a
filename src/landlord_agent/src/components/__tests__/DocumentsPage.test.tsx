@@ -116,4 +116,93 @@ describe('DocumentsPage without properties', () => {
     expect(screen.getByText('Gas Safety Certificate 2026')).toBeInTheDocument();
     expect(screen.getAllByText(/Unassigned Vault/i).length).toBeGreaterThan(0);
   });
+
+  it('keeps document management in-place when filtering by all documents and clicking manage documents', () => {
+    const mockProperty = {
+      id: 'prop_1',
+      address: '10 Baker Street, London NW1 6XE',
+      rent: 2200,
+      status: 'occupied' as const,
+      images: [],
+      documents: [
+        {
+          id: 'doc_101',
+          name: 'Tenancy Agreement 2026',
+          type: 'tenancy-agreement' as const,
+          url: 'https://example.com/tenancy.pdf',
+          issueDate: new Date('2026-01-01'),
+          status: 'valid' as const,
+        },
+      ],
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+    };
+
+    const onManageDocs = vi.fn();
+
+    render(
+      <DocumentsPage
+        properties={[mockProperty as any]}
+        unassignedDocuments={[]}
+        userProfile={mockUserProfile}
+        onViewProperty={vi.fn()}
+        onManageDocuments={onManageDocs}
+      />
+    );
+
+    // 1. Switch to "All Documents" tab
+    const allDocsTab = screen.getByRole('tab', { name: /all documents/i });
+    fireEvent.click(allDocsTab);
+
+    expect(screen.getByText('Tenancy Agreement 2026')).toBeInTheDocument();
+
+    // 2. Click "Manage documents" button on the document row/card
+    const manageBtn = screen.getByTitle('Manage documents');
+    fireEvent.click(manageBtn);
+
+    // Verify it called onManageDocs with the property and stayed in-place
+    expect(onManageDocs).toHaveBeenCalledWith(mockProperty);
+    // View scope switched to By Property and filtered to this property
+    expect(screen.getByRole('tab', { name: /by property/i })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('initializes with initialPropertyId focused in By Property view', () => {
+    const mockPropertyA = {
+      id: 'prop_A',
+      address: '10 Alpha Way, London',
+      rent: 1800,
+      status: 'occupied' as const,
+      documents: [],
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+    };
+    const mockPropertyB = {
+      id: 'prop_B',
+      address: '20 Beta Road, London',
+      rent: 2500,
+      status: 'vacant' as const,
+      documents: [],
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+    };
+
+    const onModalOpened = vi.fn();
+
+    render(
+      <DocumentsPage
+        properties={[mockPropertyA as any, mockPropertyB as any]}
+        unassignedDocuments={[]}
+        initialPropertyId="prop_B"
+        onUploadModalOpened={onModalOpened}
+        userProfile={mockUserProfile}
+        onViewProperty={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('tab', { name: /by property/i })).toHaveAttribute('aria-selected', 'true');
+    const select = screen.getByRole('combobox', { name: /filter by property/i }) as HTMLSelectElement;
+    expect(select.value).toBe('prop_B');
+    expect(onModalOpened).toHaveBeenCalled();
+  });
 });
+

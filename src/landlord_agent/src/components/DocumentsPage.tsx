@@ -51,7 +51,8 @@ interface DocumentsPageProps {
   /** Unassigned vault documents (no property) — passed from App.tsx */
   unassignedDocuments?: LandlordDocument[];
   onViewProperty: (property: Property) => void;
-  onManageDocuments: (property: Property) => void;
+  onManageDocuments?: (property: Property) => void;
+  initialPropertyId?: string;
   /** Open the vault uploader (no property required) */
   onUploadToVault?: () => void;
   /** Assign an unassigned vault document to a property */
@@ -263,6 +264,7 @@ export function DocumentsPage({
   onVaultDocumentAdded,
   openUploadOnMount = false,
   openDocumentId,
+  initialPropertyId,
   onUploadModalOpened,
   onDeleteDocuments,
   onArchiveDocuments,
@@ -276,10 +278,10 @@ export function DocumentsPage({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<CategoryFilter>('all');
-  const [propertyFilter, setPropertyFilter] = useState<string>('all');
+  const [propertyFilter, setPropertyFilter] = useState<string>(initialPropertyId || 'all');
   const [tenantFilter, setTenantFilter] = useState<string>('all');
   const [viewScope, setViewScope] = useState<ViewScope>(
-    (properties && properties.length > 0) ? 'property' : 'all'
+    initialPropertyId ? 'property' : ((properties && properties.length > 0) ? 'property' : 'all')
   );
   const [displayStyle, setDisplayStyle] = useState<DisplayStyle>('grid');
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
@@ -519,7 +521,11 @@ export function DocumentsPage({
 
   const openAttachFlow = (property?: Property) => {
     const list = properties || [];
-    const target = property || (list.length === 1 ? list[0] : undefined);
+    const target =
+      property ||
+      (propertyFilter && propertyFilter !== 'all' ? list.find((p) => p.id === propertyFilter) : undefined) ||
+      (initialPropertyId ? list.find((p) => p.id === initialPropertyId) : undefined) ||
+      (list.length === 1 ? list[0] : undefined);
     setAttachForm({
       ...initialAttachForm,
       propertyId: target?.id || '',
@@ -532,6 +538,12 @@ export function DocumentsPage({
     setUploadError(null);
     setIsUploadingFile(false);
     setAttachModalOpen(true);
+  };
+
+  const handleManagePropertyDocuments = (property: Property) => {
+    setPropertyFilter(property.id);
+    setViewScope('property');
+    onManageDocuments?.(property);
   };
 
   const closeAttachModal = () => {
@@ -671,6 +683,16 @@ export function DocumentsPage({
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openDocumentId, allDocuments]);
+
+  // Auto-focus property when navigated here via an external screen or initialPropertyId
+  React.useEffect(() => {
+    if (initialPropertyId) {
+      setPropertyFilter(initialPropertyId);
+      setViewScope('property');
+      onUploadModalOpened?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPropertyId]);
 
   const handleShareDocument = async (document: DocumentWithProperty) => {
     const shareTarget = document.url?.trim() || `${document.name} · ${document.propertyAddress}`;
@@ -934,7 +956,11 @@ export function DocumentsPage({
                           type="button"
                           className="ll-docs-icon-btn"
                           title="Manage documents"
-                          onClick={() => property && onManageDocuments(property)}
+                          onClick={() => {
+                            if (property) {
+                              handleManagePropertyDocuments(property);
+                            }
+                          }}
                         >
                           <FolderOpen size={15} />
                         </button>
@@ -1091,7 +1117,11 @@ export function DocumentsPage({
                   type="button"
                   className="ll-docs-icon-btn"
                   title="Manage documents"
-                  onClick={() => property && onManageDocuments(property)}
+                  onClick={() => {
+                    if (property) {
+                      handleManagePropertyDocuments(property);
+                    }
+                  }}
                 >
                   <FolderOpen size={15} />
                 </button>
@@ -1344,7 +1374,11 @@ export function DocumentsPage({
                         type="button"
                         className="ll-docs-icon-btn"
                         title="Manage documents"
-                        onClick={() => onManageDocuments(property)}
+                        onClick={() => {
+                          setPropertyFilter(property.id);
+                          setViewScope('all');
+                          onManageDocuments?.(property);
+                        }}
                       >
                         <FolderOpen size={15} />
                       </button>
@@ -1477,7 +1511,11 @@ export function DocumentsPage({
                       type="button"
                       className="ll-docs-icon-btn"
                       title="Manage documents"
-                      onClick={() => onManageDocuments(property)}
+                      onClick={() => {
+                        setPropertyFilter(property.id);
+                        setViewScope('all');
+                        onManageDocuments?.(property);
+                      }}
                     >
                       <FolderOpen size={15} />
                     </button>
