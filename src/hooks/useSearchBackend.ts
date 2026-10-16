@@ -140,10 +140,29 @@ export const useSearchBackend = () => {
         try {
           const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
           const proptiiResults = await searchProptiiProperties(searchQuery);
-          return proptiiResults.map(property => ({
-            ...property,
-            price: cleanPropertyPrice(property.price)
-          }));
+          return proptiiResults.map(property => {
+            const fullText = `${property.title || ''} ${property.description || ''}`;
+            let parsedBaths = property.bathroom_count ?? (property.bathrooms !== undefined && property.bathrooms !== null && property.bathrooms !== '' ? Number(property.bathrooms) : undefined);
+            if ((parsedBaths === undefined || isNaN(parsedBaths) || parsedBaths === 0) && fullText) {
+              const m = fullText.match(/(\d+)\s*(?:bathrooms?|baths?)/i);
+              if (m) parsedBaths = parseInt(m[1], 10);
+            }
+
+            let parsedSqFt = property.sq_ft ?? (property.squareFootage ? Number(String(property.squareFootage).replace(/[^0-9]/g, '')) : undefined);
+            if ((parsedSqFt === undefined || isNaN(parsedSqFt) || parsedSqFt === 0) && fullText) {
+              const m = fullText.match(/(\d{2,5})\s*(?:sq\s*ft|sqft|square\s*feet|ft²)/i);
+              if (m) parsedSqFt = parseInt(m[1], 10);
+            }
+
+            return {
+              ...property,
+              price: cleanPropertyPrice(property.price),
+              bathrooms: parsedBaths !== undefined && parsedBaths > 0 ? String(parsedBaths) : undefined,
+              bathroom_count: parsedBaths !== undefined && parsedBaths > 0 ? parsedBaths : undefined,
+              squareFootage: parsedSqFt !== undefined && parsedSqFt > 0 ? String(parsedSqFt) : undefined,
+              sq_ft: parsedSqFt !== undefined && parsedSqFt > 0 ? parsedSqFt : undefined,
+            };
+          });
         } catch (e) {
           console.warn('[Search] Firestore search failed:', e);
           return [];

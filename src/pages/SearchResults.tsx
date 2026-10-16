@@ -233,16 +233,16 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, fac
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 9V19M22 9v10M2 14h20M7 9V7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v2"></path></svg>
               {property.bedrooms === 0 ? 'Studio' : property.bedrooms ? `${property.bedrooms} beds` : '— beds'}
             </span>
-            {bathroomCount !== undefined && !isNaN(bathroomCount) ? (
+            {bathroomCount !== undefined && !isNaN(bathroomCount) && bathroomCount > 0 ? (
               <span>
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12h16v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-4z"></path><path d="M6 12V5a2 2 0 0 1 2-2h1"></path></svg>
                 {bathroomCount} bath{Number(bathroomCount) === 1 ? '' : 's'}
               </span>
             ) : null}
-            {sqFt ? (
+            {sqFt && Number(sqFt) > 0 ? (
               <span>
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"></rect></svg>
-                {sqFt} ft²
+                {Number(sqFt).toLocaleString('en-GB')} ft²
               </span>
             ) : null}
           </div>
@@ -426,6 +426,17 @@ function PropertyDetailsModal({
           property.propertyType ? `Property type: ${property.propertyType}` : null,
           property.location ? `Located in ${property.location}` : null,
         ].filter(Boolean) as string[];
+
+  const drawerBaths =
+    property.bathroom_count ??
+    (property.bathrooms !== undefined && property.bathrooms !== null && property.bathrooms !== '' && property.bathrooms !== '—'
+      ? Number(property.bathrooms)
+      : undefined);
+  const drawerSqFt =
+    property.sq_ft ??
+    (property.squareFootage && property.squareFootage !== '—'
+      ? Number(String(property.squareFootage).replace(/[^0-9]/g, ''))
+      : undefined);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
@@ -640,20 +651,22 @@ function PropertyDetailsModal({
                     </strong>
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-700">
-                  <Bath className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
-                  <span>
-                    <strong>{property.bathrooms || '—'}</strong>&nbsp;Bathroom
-                    {property.bathrooms && Number(property.bathrooms) !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-700">
-                  <Square className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
-                  <span>
-                    <strong>{property.squareFootage || '—'}</strong>
-                    {property.squareFootage ? <>&nbsp;sq ft approx.</> : <>&nbsp;sq ft</>}
-                  </span>
-                </div>
+                {drawerBaths !== undefined && !isNaN(drawerBaths) && drawerBaths > 0 && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Bath className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                    <span>
+                      <strong>{drawerBaths}</strong>&nbsp;Bathroom{drawerBaths !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+                {drawerSqFt !== undefined && !isNaN(drawerSqFt) && drawerSqFt > 0 && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Square className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                    <span>
+                      <strong>{drawerSqFt.toLocaleString('en-GB')}</strong>&nbsp;sq ft approx.
+                    </span>
+                  </div>
+                )}
                 {property.propertyType && (
                   <div className="flex items-center gap-2 text-gray-700">
                     <Home className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
