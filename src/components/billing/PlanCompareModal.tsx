@@ -9,7 +9,6 @@ import {
 } from '../../config/plans';
 import {
   createCheckoutSession,
-  resolveStripePriceId,
   setPendingPlan,
 } from '../../services/billingService';
 import { markPendingStripeCheckout } from '../../utils/pricingRoutes';
@@ -224,6 +223,8 @@ const PlanCompareModal: React.FC<Props> = ({
   onExternalNavigate,
 }) => {
   const navigate = useNavigate();
+  // navigate kept for potential future use; currently navigation uses window.location.href for Stripe redirects
+  void navigate;
   const overlayRef = useRef<HTMLDivElement>(null);
   const [audience, setAudience] = useState<Audience>(
     defaultAudience ?? inferAudience(currentPlanId),
@@ -253,17 +254,6 @@ const PlanCompareModal: React.FC<Props> = ({
   const plans = getPlansForAudienceTab(audience);
 
   const handleUpgrade = async (plan: PlanConfig) => {
-    const priceId = await resolveStripePriceId(plan.id, cycle);
-    if (!priceId) {
-      const pricingPath = `/pricing?plan=${plan.id}&cycle=${cycle}`;
-      if (onExternalNavigate) {
-        onExternalNavigate(pricingPath);
-      } else {
-        navigate(pricingPath);
-      }
-      onClose();
-      return;
-    }
     setUpgrading(plan.id);
     setUpgradeError(null);
     try {
@@ -279,10 +269,7 @@ const PlanCompareModal: React.FC<Props> = ({
         trial_enabled: false,
         source: 'settings_plan_modal',
       });
-      const { checkoutUrl } = await createCheckoutSession(priceId, false, {
-        planId: plan.id,
-        cycle,
-      });
+      const { checkoutUrl } = await createCheckoutSession(plan.id, cycle, false);
       if (onExternalNavigate) {
         onExternalNavigate(checkoutUrl);
       } else {

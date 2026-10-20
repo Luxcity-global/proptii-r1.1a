@@ -8,7 +8,6 @@ import {
 } from '../../../config/plans';
 import {
   createCheckoutSession,
-  resolveStripePriceId,
   setPendingPlan,
 } from '../../../services/billingService';
 import { markPendingStripeCheckout } from '../../../utils/pricingRoutes';
@@ -231,12 +230,6 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
   const plans = getPlansForAudienceTab(audience);
 
   const handleUpgrade = async (plan: PlanConfig) => {
-    const priceId = await resolveStripePriceId(plan.id, cycle);
-    if (!priceId) {
-      openInParentApp(`/pricing?plan=${plan.id}&cycle=${cycle}`);
-      onClose();
-      return;
-    }
     setUpgrading(plan.id);
     setUpgradeError(null);
     try {
@@ -252,10 +245,7 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
         trial_enabled: false,
         source: 'landlord_settings_plan_modal',
       });
-      const { checkoutUrl } = await createCheckoutSession(priceId, false, {
-        planId: plan.id,
-        cycle,
-      });
+      const { checkoutUrl } = await createCheckoutSession(plan.id, cycle, false);
       openInParentApp(checkoutUrl);
     } catch (err) {
       setUpgradeError(

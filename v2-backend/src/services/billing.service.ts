@@ -22,6 +22,7 @@ export class BillingService {
    *  into Firestore via setPendingPlan or createCheckoutSession. */
   private static readonly VALID_SELF_SERVICE_PLAN_IDS = new Set([
     'free',
+    'explorer',
     'renter_pro',
     'buyer_pro',
     'starter',
@@ -30,6 +31,42 @@ export class BillingService {
     'independent',
     'agent_pro',
   ]);
+
+  /**
+   * Maps planId + cycle → Stripe price ID, read exclusively from server-side
+   * STRIPE_PRICE_* environment variables. Price IDs never come from the client.
+   *
+   * Set these on the Render backend service:
+   *   STRIPE_PRICE_RENTER_PRO_MONTHLY, STRIPE_PRICE_RENTER_PRO_ANNUAL
+   *   STRIPE_PRICE_BUYER_PRO_MONTHLY,  STRIPE_PRICE_BUYER_PRO_ANNUAL
+   *   STRIPE_PRICE_STARTER_MONTHLY,    STRIPE_PRICE_STARTER_ANNUAL
+   *   STRIPE_PRICE_LANDLORD_PRO_MONTHLY, STRIPE_PRICE_LANDLORD_PRO_ANNUAL
+   *   STRIPE_PRICE_ELITE_MONTHLY,      STRIPE_PRICE_ELITE_ANNUAL
+   *   STRIPE_PRICE_INDEPENDENT_MONTHLY, STRIPE_PRICE_INDEPENDENT_ANNUAL
+   *   STRIPE_PRICE_AGENT_PRO_MONTHLY,  STRIPE_PRICE_AGENT_PRO_ANNUAL
+   */
+  private getPriceId(planId: string, cycle: 'monthly' | 'annual'): string | null {
+    const key = `STRIPE_PRICE_${planId.toUpperCase()}_${cycle.toUpperCase()}`;
+    return process.env[key] || null;
+  }
+
+  /**
+   * Returns all plans with their Stripe price IDs resolved from server env vars.
+   * The frontend calls GET /billing/plans to retrieve these at checkout time
+   * instead of baking price IDs into the frontend bundle.
+   */
+  private buildPlansPriceMap() {
+    const plans = [
+      'renter_pro', 'buyer_pro',
+      'starter', 'landlord_pro', 'elite',
+      'independent', 'agent_pro',
+    ];
+    return plans.map((id) => ({
+      id,
+      stripePriceIdMonthly: this.getPriceId(id, 'monthly'),
+      stripePriceIdAnnual:  this.getPriceId(id, 'annual'),
+    }));
+  }
 
   // ─── Firebase Admin lazy getter ───────────────────────────────────────────
 
@@ -152,11 +189,22 @@ export class BillingService {
       throw new BadRequestException(`Invalid plan ID: ${planId}`);
     }
 
+    // Resolve price ID server-side from STRIPE_PRICE_* env vars.
+    // The client must NOT supply a priceId — we derive it here to prevent
+    // plan substitution attacks (paying for a cheap plan, claiming an expensive one).
+    const resolvedPriceId = this.getPriceId(planId, cycle as 'monthly' | 'annual');
+    if (!resolvedPriceId) {
+      throw new BadRequestException(
+        `No Stripe price configured for plan "${planId}" (${cycle}). ` +
+        `Set STRIPE_PRICE_${planId.toUpperCase()}_${cycle.toUpperCase()} on the backend.`,
+      );
+    }
+
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
       customer_email: email,
       client_reference_id: userId,
-      line_items: [{ price: dto.priceId, quantity: 1 }],
+      line_items: [{ price: resolvedPriceId, quantity: 1 }],
       subscription_data: dto.trialEnabled ? { trial_period_days: 30 } : {},
       metadata: { planId, cycle, userId },
       success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/billing/confirmed?session_id={CHECKOUT_SESSION_ID}`,
@@ -357,28 +405,26 @@ export class BillingService {
   // ─── getPlans ─────────────────────────────────────────────────────────────
 
   async getPlans() {
+    // Price IDs are resolved server-side from STRIPE_PRICE_* env vars.
+    // The frontend fetches this endpoint at checkout time instead of baking
+    // price IDs into the bundle (which would expose them publicly).
     return [
       {
         id: 'free',
         name: 'Explorer (Free)',
         priceMonthly: 0,
         priceAnnual: 0,
+        stripePriceIdMonthly: null,
+        stripePriceIdAnnual: null,
         features: ['Search Properties', 'Basic Referencing', 'Guest Enquiries'],
       },
-      {
-        id: 'renter_pro',
-        name: 'Renter Pro',
-        priceMonthly: 9.99,
-        priceAnnual: 99.00,
-        features: ['Priority Referencing', 'Unlimited Viewing Requests', 'Document Vault'],
-      },
-      {
-        id: 'landlord_pro',
-        name: 'Landlord Pro',
-        priceMonthly: 29.99,
-        priceAnnual: 299.00,
-        features: ['Unlimited Property Listings', 'Digital Contracts', 'Tenant Screening'],
-      },
+      ...this.buildPlansPriceMap().map((p) => ({
+        ...p,
+        name: p.id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        priceMonthly: null, // display prices come from plans.ts in the frontend
+        priceAnnual: null,
+        features: [],
+      })),
     ];
   }
 

@@ -7,8 +7,6 @@ import { usePlan } from '../../hooks/usePlan';
 import {
   createCheckoutSession,
   downgradeToFreePlan,
-  resolveStripePriceId,
-  CHECKOUT_NOT_CONFIGURED_MSG,
 } from '../../services/billingService';
 import { useAuth } from '../../contexts/AuthContext';
 import { getPlanById, type PlanId } from '../../config/plans';
@@ -39,19 +37,10 @@ const BillingActivatePage: React.FC = () => {
     e.preventDefault();
     if (!planConfig) return;
 
-    const priceId = await resolveStripePriceId(planId, cycle);
-    if (!priceId) {
-      setError(CHECKOUT_NOT_CONFIGURED_MSG);
-      return;
-    }
-
     setBusy(true);
     setError(null);
     try {
-      const { checkoutUrl } = await createCheckoutSession(priceId, false, {
-        planId,
-        cycle,
-      });
+      const { checkoutUrl } = await createCheckoutSession(planId, cycle, false);
       window.location.href = checkoutUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Checkout failed');

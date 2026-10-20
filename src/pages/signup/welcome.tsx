@@ -8,9 +8,7 @@ import { useBillingStatus } from '../../hooks/useBillingStatus';
 import { usePlan } from '../../hooks/usePlan';
 import {
   createCheckoutSession,
-  resolveStripePriceId,
   setPendingPlan,
-  CHECKOUT_NOT_CONFIGURED_MSG,
 } from '../../services/billingService';
 import { getPlanById, getDashboardForPlanId, type PlanId } from '../../config/plans';
 import {
@@ -30,7 +28,6 @@ const WelcomeContent: React.FC = () => {
   const { user } = useAuth();
   const { pendingPlan, pendingCycle, status, loading } = useBillingStatus();
   const checkoutStarted = useRef(false);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [redirectingToStripe, setRedirectingToStripe] = useState(false);
 
   const planId =
@@ -76,17 +73,6 @@ const WelcomeContent: React.FC = () => {
     const runCheckout = async () => {
       checkoutStarted.current = true;
       setRedirectingToStripe(true);
-      const priceId = await resolveStripePriceId(planId, cycle);
-      if (!priceId) {
-        // Direct free trial activation (no credit card required)
-        setRedirectingToStripe(false);
-        try {
-          await setPendingPlan(planId, cycle);
-        } catch {
-          /* best-effort */
-        }
-        return;
-      }
 
       try {
         try {
@@ -100,10 +86,7 @@ const WelcomeContent: React.FC = () => {
           cycle,
           trial_enabled: true,
         });
-        const { checkoutUrl } = await createCheckoutSession(priceId, true, {
-          planId,
-          cycle,
-        });
+        const { checkoutUrl } = await createCheckoutSession(planId, cycle, true);
         window.location.href = checkoutUrl;
       } catch (e) {
         checkoutStarted.current = false;
@@ -195,12 +178,6 @@ const WelcomeContent: React.FC = () => {
             <p style={{ fontSize: 13, color: 'var(--pr-muted)', marginTop: 24 }}>
               A confirmation has been sent to{' '}
               <strong style={{ color: 'var(--pr-navy)' }}>{user.email}</strong>.
-            </p>
-          )}
-
-          {checkoutError && (
-            <p className="pr-signup-error" style={{ marginTop: 16 }}>
-              {checkoutError}
             </p>
           )}
 

@@ -5,9 +5,7 @@ import OrderSummary from '../../components/billing/OrderSummary';
 import PaymentForm from '../../components/billing/PaymentForm';
 import {
   createCheckoutSession,
-  resolveStripePriceId,
   setPendingPlan,
-  CHECKOUT_NOT_CONFIGURED_MSG,
 } from '../../services/billingService';
 import { getPlanById, type PlanId } from '../../config/plans';
 import {
@@ -41,12 +39,6 @@ const PayNowPage: React.FC = () => {
     e.preventDefault();
     if (!plan) return;
 
-    const priceId = await resolveStripePriceId(planId, cycle);
-    if (!priceId) {
-      setError(CHECKOUT_NOT_CONFIGURED_MSG);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
@@ -61,10 +53,7 @@ const PayNowPage: React.FC = () => {
         cycle,
         trial_enabled: false,
       });
-      const { checkoutUrl } = await createCheckoutSession(priceId, false, {
-        planId,
-        cycle,
-      });
+      const { checkoutUrl } = await createCheckoutSession(planId, cycle, false);
       window.location.href = checkoutUrl;
     } catch (err) {
       setError(
