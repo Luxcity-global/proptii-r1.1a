@@ -1,0 +1,21 @@
+{
+  "project_type": "Vite/React SPA (main app + landlord sub-app at src/landlord_agent) + NestJS v2 backend",
+  "language": "TypeScript (frontend TSX + NestJS TS backend)",
+  "build_system": "npm workspaces; frontend: vite build; landlord sub-app: cd src/landlord_agent && npm install --include=dev && npm run build; backend: cd v2-backend && nest build; full: npm run build (from repo root — builds landlord sub-app, then Vite, then validates)",
+  "test_framework": "vitest (backend: cd v2-backend && npm run test); no unit tests exist for the three files being changed",
+  "build_command": "npm run build (from /home/angeli/Desktop/luxcity/proptii-r1.1a)",
+  "test_command": "npm run typecheck (from repo root, fastest check covering all frontend files)",
+  "verification_instructions": "1. Run `npm run typecheck` from repo root to catch all frontend TS errors. 2. Run `cd v2-backend && npm run build` to catch backend NestJS compile errors. 3. Run `npm run build` from repo root for a full production build.",
+  "snapshot_or_generated_files": "dist/ (produced by npm run build). Do not commit dist/.",
+  "environment_constraints": "Do not introduce new npm packages. Do not modify src/config/plans.ts, src/services/roleService.ts, or src/utils/roleIntent.ts.",
+  "contribution_requirements": "No new npm packages. Preserve existing import styles (named imports, no default re-exports added). Both modals use inline styles for colours — stay consistent, do not introduce Tailwind hex classes for new colour values.",
+  "key_patterns": "Both modals: state declared with useState<T> at top of component, useEffect resets state on open, handleUpgrade is an async function inside the component body, JSX footer is a div.px-6.py-4.border-t. billingService.ts (frontend): all functions are async named exports using fetchBillingWithApiFallback. billing.service.ts (backend): NestJS injectable service with private `this.stripe` getter and `this.db` getter; uses admin.firestore.FieldValue.serverTimestamp() for timestamps.",
+  "relevant_files": [
+    "src/components/billing/PlanCompareModal.tsx",
+    "src/landlord_agent/src/components/LandlordPlanCompareModal.tsx",
+    "v2-backend/src/services/billing.service.ts",
+    "src/services/billingService.ts",
+    "src/utils/pricingRoutes.ts"
+  ],
+  "directory_structure": "repo root: src/ (main React app), src/landlord_agent/ (standalone Vite sub-app for landlord iframe), v2-backend/ (NestJS backend), .agents/tasks/ (plan/review artifacts)"
+}

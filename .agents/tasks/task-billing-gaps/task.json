@@ -1,0 +1,7 @@
+{
+  "task_id": "task-billing-gaps",
+  "task_description": "Fix 6 billing seamless gaps: trial flow for free users, in-modal upgrade success state, trialing-user in-place upgrade, portal auto-create for users without stripeCustomerId, cancel subscription CTA in both plan modals, and landlord modal subtitle text fix.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}
