@@ -191,8 +191,8 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
 
   const upgradeDescription =
     userRole === 'agent'
-      ? 'Unlock fit checks, client management, referencing, and more with an Agent plan.'
-      : 'Unlock property management, tenant referencing, contracts, and more with a Landlord plan.';
+      ? 'View and manage your Agent plan — fit checks, client management, referencing, and more.'
+      : 'View and manage your Landlord plan — property management, tenant referencing, contracts, and more.';
 
   const openPortal = async () => {
     setPortalBusy(true);
@@ -313,7 +313,7 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
                       className="text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors hover:bg-orange-50"
                       style={{ color: '#DC5F12', borderColor: '#DC5F12', whiteSpace: 'nowrap' }}
                     >
-                      View plans
+                      Manage plan
                     </button>
                   )}
                 </div>
@@ -322,7 +322,7 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
 
             {isFreePlan ? (
               <SettingsRow
-                title="Upgrade your plan"
+                title="Manage plan"
                 description={upgradeDescription}
                 action={
                   <button
@@ -335,7 +335,7 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    View plans
+                    Manage plan
                   </button>
                 }
               />

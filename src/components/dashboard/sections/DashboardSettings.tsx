@@ -292,18 +292,18 @@ const DashboardSettings: React.FC = () => {
                   className="text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors hover:bg-orange-50"
                   style={{ color: '#DC5F12', borderColor: '#DC5F12', whiteSpace: 'nowrap' }}
                 >
-                  View plans
+                  Manage plan
                 </button>
               )}
             </div>
           }
         />
 
-        {/* Upgrade / View plans */}
+        {/* Manage plan */}
         {isFreePlan ? (
           <SettingsRow
-            title="Upgrade your plan"
-            description="Unlock referencing, contracts, smart search, and more with a Renter Pro or Agent plan."
+            title="Manage plan"
+            description="Explore plans and upgrade to unlock referencing, contracts, smart search, and more."
             action={
               <button
                 type="button"
@@ -315,7 +315,7 @@ const DashboardSettings: React.FC = () => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                View plans
+                Manage plan
               </button>
             }
           />
