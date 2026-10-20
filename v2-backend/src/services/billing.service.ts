@@ -414,17 +414,38 @@ export class BillingService {
   // ─── createPortalSession ──────────────────────────────────────────────────
 
   async createPortalSession(userId: string, email: string) {
-    if (!this.stripe) {
-      throw new BadRequestException('Stripe is not configured');
-    }
     const db = this.db;
     if (!db) {
       throw new BadRequestException('Database unavailable');
     }
     const subSnap = await db.collection('subscriptions').doc(userId).get();
-    const customerId = subSnap.data()?.stripeCustomerId;
+    let customerId: string | undefined = subSnap.data()?.stripeCustomerId;
     if (!customerId) {
-      throw new BadRequestException('No Stripe customer found for this user');
+      if (!this.stripe) {
+        throw new BadRequestException(
+          'No billing account found. Please subscribe to a plan first.',
+        );
+      }
+      const customer = await this.stripe.customers.create({
+        email,
+        metadata: { userId, source: 'portal_auto_create' },
+      });
+      customerId = customer.id;
+      await db
+        .collection('subscriptions')
+        .doc(userId)
+        .set(
+          {
+            stripeCustomerId: customerId,
+            userId,
+            email,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+    }
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
     }
     const session = await this.stripe.billingPortal.sessions.create({
       customer: customerId,
