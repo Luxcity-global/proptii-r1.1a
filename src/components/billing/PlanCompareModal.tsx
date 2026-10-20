@@ -7,12 +7,11 @@ import {
   type PlanId,
 } from '../../config/plans';
 import {
-  createCheckoutSession,
   setPendingPlan,
   upgradeSubscription,
+  cancelSubscription,
 } from '../../services/billingService';
-import { markPendingStripeCheckout } from '../../utils/pricingRoutes';
-import { trackEvent } from '../../utils/analytics';
+import { markPendingStripeCheckout, setPricingFlow } from '../../utils/pricingRoutes';
 import { usePlans } from '../../hooks/usePlans';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -187,7 +186,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
               color: plan.isDark ? '#1a2332' : '#ffffff',
             }}
           >
-            {isUpgrading ? 'Redirecting…' : 'Upgrade'}
+            {isUpgrading ? 'Redirecting…' : 'Select plan'}
           </button>
         )}
 
@@ -248,6 +247,8 @@ const PlanCompareModal: React.FC<Props> = ({
   const [cycle, setCycle] = useState<Cycle>('monthly');
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [upgradeSucceeded, setUpgradeSucceeded] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const { plans: allPlans } = usePlans();
 
   /* Reset tab when modal opens — snap to the first tab allowed for this role */
@@ -257,6 +258,7 @@ const PlanCompareModal: React.FC<Props> = ({
       const valid = TABS.find(t => t.id === preferred);
       setAudience(valid ? preferred : (TABS[0]?.id ?? 'renters'));
       setUpgradeError(null);
+      setUpgradeSucceeded(null);
     }
   }, [open, currentPlanId, defaultAudience, userRole]);
 
@@ -267,6 +269,34 @@ const PlanCompareModal: React.FC<Props> = ({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
+
+  // Only show the audience tab that matches the logged-in user's role.
+  // Tenants (and unauthenticated visitors) see Renters & Buyers only.
+  // Landlords see Landlords only. Agents see Agents only.
+  const ALL_TABS: { id: Audience; label: string }[] = [
+    { id: 'renters',   label: 'Renters & Buyers' },
+    { id: 'landlords', label: 'Landlords' },
+    { id: 'agents',    label: 'Agents' },
+  ];
+  const TABS = (() => {
+    if (userRole === 'landlord') return ALL_TABS.filter(t => t.id === 'landlords');
+    if (userRole === 'agent')    return ALL_TABS.filter(t => t.id === 'agents');
+    return ALL_TABS.filter(t => t.id === 'renters'); // tenant / null
+  })();
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    setUpgradeError(null);
+    try {
+      await cancelSubscription();
+      onUpgradeSuccess?.();
+      onClose();
+    } catch (err) {
+      setUpgradeError(err instanceof Error ? err.message : 'Cancellation failed.');
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -283,7 +313,8 @@ const PlanCompareModal: React.FC<Props> = ({
       }
 
       const hasActiveSub =
-        billingStatus?.hasStripeCustomer && billingStatus?.status === 'active';
+        billingStatus?.hasStripeCustomer &&
+        (billingStatus?.status === 'active' || billingStatus?.status === 'trialing');
 
       if (hasActiveSub) {
         const result = await upgradeSubscription(plan.id, cycle);
@@ -296,26 +327,17 @@ const PlanCompareModal: React.FC<Props> = ({
           }
           return;
         }
-        // In-place upgrade succeeded
+        // In-place upgrade succeeded — show success screen
+        setUpgradeSucceeded(plan.name);
         onUpgradeSuccess?.();
-        onClose();
         return;
       }
 
-      // No active sub — new checkout
-      markPendingStripeCheckout('pay_now');
-      trackEvent('billing_checkout_started', {
-        plan_id: plan.id,
-        cycle,
-        trial_enabled: false,
-        source: 'settings_plan_modal',
-      });
-      const { checkoutUrl } = await createCheckoutSession(plan.id, cycle, false);
-      if (onExternalNavigate) {
-        onExternalNavigate(checkoutUrl);
-      } else {
-        window.location.href = checkoutUrl;
-      }
+      // No active sub — free users get trial flow, not immediate payment
+      try { await setPendingPlan(plan.id, cycle); } catch { /* best-effort */ }
+      setPricingFlow('trial');
+      window.location.href = `/signup/welcome?plan=${plan.id}&cycle=${cycle}`;
+      return;
     } catch (err) {
       setUpgradeError(
         err instanceof Error ? err.message : 'Could not start checkout.',
@@ -324,19 +346,39 @@ const PlanCompareModal: React.FC<Props> = ({
     }
   };
 
-  // Only show the audience tab that matches the logged-in user's role.
-  // Tenants (and unauthenticated visitors) see Renters & Buyers only.
-  // Landlords see Landlords only. Agents see Agents only.
-  const ALL_TABS: { id: Audience; label: string }[] = [
-    { id: 'renters',   label: 'Renters & Buyers' },
-    { id: 'landlords', label: 'Landlords' },
-    { id: 'agents',    label: 'Agents' },
-  ];
-  const TABS = (() => {
-    if (userRole === 'landlord') return ALL_TABS.filter(t => t.id === 'landlords');
-    if (userRole === 'agent')    return ALL_TABS.filter(t => t.id === 'agents');
-    return ALL_TABS.filter(t => t.id === 'renters'); // tenant / null
-  })();
+  // GAP 2: show in-modal success screen after in-place upgrade
+  if (upgradeSucceeded) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+      >
+        <div
+          className="relative bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center p-10 gap-4"
+          style={{ width: '100%', maxWidth: 420, fontFamily: 'Archivo, sans-serif' }}
+        >
+          <div className="text-5xl">✨</div>
+          <h2 className="text-xl font-bold text-center" style={{ color: '#1a2332' }}>
+            You&apos;re all set!
+          </h2>
+          <p className="text-sm text-center" style={{ color: '#374957' }}>
+            Your plan has been upgraded to <strong>{upgradeSucceeded}</strong>.
+          </p>
+          <p className="text-xs text-center" style={{ color: '#9ca3af' }}>
+            Your billing has been updated. Changes take effect immediately.
+          </p>
+          <button
+            type="button"
+            onClick={() => { onClose(); setUpgradeSucceeded(null); }}
+            className="mt-2 px-6 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ backgroundColor: '#136C9E', color: '#ffffff' }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     /* Overlay */
@@ -379,7 +421,7 @@ const PlanCompareModal: React.FC<Props> = ({
                 Get more out of Proptii as you grow
               </h2>
               <p className="text-xs" style={{ color: '#6b7280' }}>
-                Compare plans and upgrade at any time.
+                Compare plans and manage your subscription at any time.
               </p>
             </div>
           </div>
@@ -452,6 +494,21 @@ const PlanCompareModal: React.FC<Props> = ({
           ))}
         </div>
 
+        {/* GAP 3: trial info banner */}
+        {billingStatus?.status === 'trialing' && (
+          <p
+            className="text-xs px-4 py-2 mx-6 mt-3 rounded border"
+            style={{
+              backgroundColor: '#eff6ff',
+              color: '#1d4ed8',
+              borderColor: '#bfdbfe',
+            }}
+          >
+            You are on a free trial. Upgrading now will switch your trial to the new
+            plan — no charge until your trial ends.
+          </p>
+        )}
+
         {/* Plan columns — centered, scrollable on small screens */}
         <div
           className="flex-1 overflow-y-auto"
@@ -497,6 +554,26 @@ const PlanCompareModal: React.FC<Props> = ({
               Full pricing page →
             </a>
           </p>
+          {/* GAP 5: cancel subscription CTA */}
+          {(billingStatus?.status === 'active' || billingStatus?.status === 'trialing') &&
+            billingStatus?.hasStripeCustomer && (
+              <p className="text-center mt-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="text-xs underline"
+                  style={{
+                    color: '#6b7280',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {cancelling ? 'Cancelling…' : 'Cancel subscription'}
+                </button>
+              </p>
+            )}
         </div>
       </div>
     </div>

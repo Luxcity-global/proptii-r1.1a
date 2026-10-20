@@ -1,0 +1,39 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Fix all 5 frontend billing gaps in PlanCompareModal.tsx and LandlordPlanCompareModal.tsx: (1) redirect free users to trial welcome page instead of direct checkout, (2) show in-modal success state after in-place upgrade, (3) allow trialing users to upgrade in-place + show trial info banner, (4) add cancel subscription CTA to both modal footers, (5) fix LandlordPlanCompareModal subtitle text. Independent of FEAT-002.",
+  "status": "completed",
+  "steps": [
+    "Step 1 — GAP 6 (smallest change first): In src/landlord_agent/src/components/LandlordPlanCompareModal.tsx, change subtitle text from 'Compare plans and upgrade at any time.' to 'Compare plans and manage your subscription at any time.'",
+
+    "Step 2 — GAP 1 (PlanCompareModal): Add `setPricingFlow` to the existing import from '../../utils/pricingRoutes' alongside `markPendingStripeCheckout`. In handleUpgrade(), in the 'No active sub — new checkout' branch, remove the `markPendingStripeCheckout('pay_now')`, `trackEvent(...)`, `createCheckoutSession(...)` call, and the `onExternalNavigate`/`window.location.href` redirect block. Replace entirely with: `try { await setPendingPlan(plan.id, cycle); } catch { /* best-effort */ }` then `setPricingFlow('trial');` then `window.location.href = \\`/signup/welcome?plan=${plan.id}&cycle=${cycle}\\`;` then `return;`.",
+
+    "Step 3 — GAP 1 (LandlordPlanCompareModal): Same import addition (`setPricingFlow` from '../../../utils/pricingRoutes'). In its handleUpgrade(), remove the 'No active sub' branch (markPendingStripeCheckout + trackEvent + createCheckoutSession + openInParentApp). Replace with: `try { await setPendingPlan(plan.id, cycle); } catch { /* best-effort */ }` then `setPricingFlow('trial');` then `openInParentApp(\\`/signup/welcome?plan=${plan.id}&cycle=${cycle}\\`);` then `return;`.",
+
+    "Step 4 — GAP 3 (both modals): In both files, change `const hasActiveSub = billingStatus?.hasStripeCustomer && billingStatus?.status === 'active';` to `const hasActiveSub = billingStatus?.hasStripeCustomer && (billingStatus?.status === 'active' || billingStatus?.status === 'trialing');`. Add the trial info banner JSX immediately after the audience-tab border-b div and before the plan-columns scrollable div: `{billingStatus?.status === 'trialing' && (<p className='text-xs px-4 py-2 mx-6 mt-3 rounded border' style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' }}>You are on a free trial. Upgrading now will switch your trial to the new plan — no charge until your trial ends.</p>)}`",
+
+    "Step 5 — GAP 2 (both modals): Add `const [upgradeSucceeded, setUpgradeSucceeded] = useState<string | null>(null);` alongside the other state declarations. In the existing useEffect that watches `open` and calls `setUpgradeError(null)`, also call `setUpgradeSucceeded(null)`. In handleUpgrade(), in the `hasActiveSub` block, after the `if (result.checkoutUrl) { … }` branch, change `onUpgradeSuccess?.(); onClose();` to `setUpgradeSucceeded(plan.name); onUpgradeSuccess?.();`. Before the `if (!open) return null;` early exit, insert the upgradeSucceeded success screen: a fixed overlay containing a centered white panel with sparkle emoji (✨), 'You're all set!' h2, 'Your plan has been upgraded to {upgradeSucceeded}.' p, 'Your billing has been updated. Changes take effect immediately.' small text, and a 'Done' button calling `onClose(); setUpgradeSucceeded(null);`. Apply to both modal files.",
+
+    "Step 6 — GAP 5 (PlanCompareModal): Add `cancelSubscription` to the import from '../../services/billingService'. Add `const [cancelling, setCancelling] = useState(false);`. Add handleCancel function before the TABS constant: calls `cancelSubscription()`, then `onUpgradeSuccess?.()` and `onClose()`, catches error into `setUpgradeError`. In the footer div (px-6 py-4 border-t), after the existing 'All plans include…' paragraph, add the cancel CTA paragraph: visible when `(billingStatus?.status === 'active' || billingStatus?.status === 'trialing') && billingStatus?.hasStripeCustomer`; button text is 'Cancel subscription' / 'Cancelling…' when cancelling; style: `text-xs underline, color: #6b7280, background: none, border: none, cursor: pointer`.",
+
+    "Step 7 — GAP 5 (LandlordPlanCompareModal): Add `createBillingPortalSession` to the import from '../../../services/billingService'. Add `const [cancelling, setCancelling] = useState(false);`. Add handleCancel function that calls `createBillingPortalSession()` and then `openInParentApp(portalUrl)` on success; catches error into `setUpgradeError` and resets `setCancelling(false)`. Same cancel CTA in footer as PlanCompareModal."
+  ],
+  "acceptance_criteria": [
+    "Free users clicking 'Select plan' are redirected to /signup/welcome?plan=...&cycle=... (not to a Stripe checkout URL)",
+    "setPricingFlow('trial') is called before navigation in both modals for the free-user path",
+    "After an in-place upgrade returns { upgraded: true }, the modal shows a success screen with 'You're all set!' heading and the upgraded plan name — onClose() is NOT called immediately",
+    "Clicking 'Done' on the success screen closes the modal",
+    "upgradeSucceeded resets to null when the modal is re-opened",
+    "A user with status === 'trialing' is treated as having an active sub (in-place upgrade path is taken)",
+    "The trial info banner is visible when billingStatus.status === 'trialing' and hidden otherwise",
+    "PlanCompareModal footer shows 'Cancel subscription' when user has active or trialing subscription with a Stripe customer",
+    "LandlordPlanCompareModal footer shows 'Cancel subscription' and opens the billing portal via openInParentApp",
+    "LandlordPlanCompareModal subtitle reads 'Compare plans and manage your subscription at any time.'"
+  ],
+  "verification": [
+    "Run `npm run typecheck` from /home/angeli/Desktop/luxcity/proptii-r1.1a — zero TypeScript errors",
+    "Run `npm run build` from /home/angeli/Desktop/luxcity/proptii-r1.1a — exits 0, validates build output"
+  ],
+  "blocked_reason": null,
+  "findings": "Unused imports (createCheckoutSession, trackEvent) were removed from both modal files after replacing the free-user branch — noUnusedLocals:true would have flagged them. markPendingStripeCheckout is still used in the hasActiveSub+checkoutUrl branch of both files. The typecheck run shows pre-existing errors in other project files (not in the two modified files); the full build exits 0. FEAT-002 (backend) can proceed independently."
+}
