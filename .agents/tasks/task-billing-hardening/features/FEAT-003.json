@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Implement SubscriptionGuard: create v2-backend/src/guards/subscription.guard.ts with RequiredPlan decorator and PLAN_TIERS map, register it in app.module.ts, and update the planAccess.ts comment to reference the real guard file. Depends on FEAT-001 (getBillingStatus must throw ServiceUnavailableException instead of silently returning a free/pro plan on DB errors).",
+  "status": "completed",
+  "steps": [
+    "Step 1 — Create v2-backend/src/guards/subscription.guard.ts: export REQUIRED_PLAN_KEY = 'required_plan', export RequiredPlan decorator using SetMetadata, define PLAN_TIERS Record<string,number> (free:0, explorer:0, starter:1, renter_pro:2, buyer_pro:2, independent:2, landlord_pro:3, elite:4, agent_pro:3, enterprise:5), define planMeetsTier(userPlan,requiredPlan) comparing numeric tiers. Implement SubscriptionGuard class implementing CanActivate: constructor injects Reflector and BillingService; canActivate reads required plan from reflector metadata, calls billingService.getBillingStatus(uid,email,role), checks trial expiry (trialEndsAt < now when status==='trialing' → ForbiddenException), checks status canceled/past_due/unpaid → ForbiddenException, checks planMeetsTier → ForbiddenException. Pattern: follow roles.guard.ts (uses Reflector.getAllAndOverride, same file structure). Import CanActivate, ExecutionContext, Injectable, SetMetadata, ForbiddenException from @nestjs/common. Import Reflector from @nestjs/core.",
+
+    "Step 2 — Register SubscriptionGuard in v2-backend/src/app.module.ts: add 'import { Reflector } from \"@nestjs/core\";' and 'import { SubscriptionGuard } from \"./guards/subscription.guard\";' to the imports at the top of app.module.ts. Add Reflector and SubscriptionGuard to the providers array after BillingService (BillingService must appear before SubscriptionGuard in the array since SubscriptionGuard injects it).",
+
+    "Step 3 — Update comment in src/utils/planAccess.ts: replace the JSDoc comment block (lines 1-9) with updated text referencing the real guard at v2-backend/src/guards/subscription.guard.ts and the @UseGuards(FirebaseAuthGuard, SubscriptionGuard) @RequiredPlan('renter_pro') usage pattern."
+  ],
+  "acceptance_criteria": [
+    "v2-backend/src/guards/subscription.guard.ts exists and exports SubscriptionGuard, RequiredPlan, REQUIRED_PLAN_KEY",
+    "SubscriptionGuard is listed in app.module.ts providers",
+    "Reflector is listed in app.module.ts providers",
+    "src/utils/planAccess.ts comment references v2-backend/src/guards/subscription.guard.ts",
+    "cd v2-backend && npm run build exits 0",
+    "cd v2-backend && npm test — all tests pass"
+  ],
+  "verification": [
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build — exits 0",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm test — all tests pass"
+  ],
+  "blocked_reason": null,
+  "findings": "COMPLETED. Key details for FEAT-004:\n\n1. New file: v2-backend/src/guards/subscription.guard.ts — exports REQUIRED_PLAN_KEY ('required_plan'), RequiredPlan decorator (SetMetadata wrapper), and SubscriptionGuard class implementing CanActivate.\n\n2. PLAN_TIERS map: free/explorer=0, starter=1, renter_pro/buyer_pro/independent=2, landlord_pro/agent_pro=3, elite=4, enterprise=5. planMeetsTier() compares numeric tiers.\n\n3. SubscriptionGuard.canActivate(): uses Reflector.getAllAndOverride to read @RequiredPlan metadata; calls billingService.getBillingStatus(uid, email, role); throws ForbiddenException for expired trials (status==='trialing' && trialEndsAt < now), canceled/past_due/unpaid status, and insufficient plan tier. ServiceUnavailableException from getBillingStatus propagates as-is (503).\n\n4. app.module.ts updated: added 'import { Reflector } from \"@nestjs/core\"' and 'import { SubscriptionGuard } from \"./guards/subscription.guard\"' at top; added Reflector and SubscriptionGuard to providers array after BillingService.\n\n5. src/utils/planAccess.ts JSDoc updated to reference v2-backend/src/guards/subscription.guard.ts and show the @UseGuards(FirebaseAuthGuard, SubscriptionGuard) @RequiredPlan('renter_pro') usage pattern.\n\n6. Build: nest build exits 0, TypeScript clean. Tests: 27 test files, 252 tests all pass."
+}

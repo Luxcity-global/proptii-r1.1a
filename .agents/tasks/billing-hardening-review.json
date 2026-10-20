@@ -1,0 +1,9 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    "SubscriptionGuard not yet applied to any route — guard infrastructure exists and is registered, but no endpoint uses @RequiredPlan(). API is fully open to plan-tier abuse until premium endpoints are decorated with @UseGuards(FirebaseAuthGuard, SubscriptionGuard) @RequiredPlan('renter_pro') (or appropriate tier).",
+    "setPendingPlan swallowed catch (pre-existing, out of scope) — inner try/catch {} on Firestore write was present before FEAT-001 and was not addressed. A write failure silently returns { success: true } to the client. Fix separately: remove the inner catch and let the error propagate, matching the downgradeToFree pattern.",
+    "loginAsMockUser not DEV-guarded (possible) — loginAsMockUser in AuthContext.tsx has no import.meta.env.DEV guard, only the onAuthStateChanged mock-token path does. Reachability depends on whether consuming components are tree-shaken in prod builds; not verified in this review."
+  ],
+  "reviewDoc": ".agents/tasks/task-billing-hardening/2026-10-20-121822-review.md"
+}

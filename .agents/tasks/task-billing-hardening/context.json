@@ -1,0 +1,32 @@
+{
+  "project_type": "NestJS v10 backend (v2-backend/) + React/Vite frontend (src/). Monorepo-style but not using npm workspaces — each side is independently buildable.",
+  "language": "TypeScript throughout",
+  "build_system": "Backend: NestJS CLI (nest build → dist/). Frontend: Vite 5. Backend build copies public/ and docs/ into dist/. No workspace-level build.",
+  "test_framework": "Backend: vitest run (config: v2-backend/vitest.config.ts, pattern: src/**/*.spec.ts). No frontend unit tests. Backend test command runs nest build first.",
+  "build_command": "Backend: cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build. Frontend: cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npm run build",
+  "test_command": "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm test",
+  "verification_instructions": "1. cd v2-backend && npm run build — must exit 0 (TypeScript compilation). 2. cd v2-backend && npm test — vitest runs src/**/*.spec.ts, must pass. 3. cd /repo-root && npm run build — Vite frontend build, must exit 0.",
+  "snapshot_or_generated_files": "v2-backend/dist/ is the compiled output. Never commit dist/. v2-backend/package.json is updated when npm install runs.",
+  "environment_constraints": "Stripe SDK must be installed with: cd v2-backend && npm install stripe@^16.0.0. The workspace root is /home/angeli/Desktop/luxcity/proptii-r1.1a. Always use absolute paths when changing directory. Never restart any running dev server.",
+  "contribution_requirements": "Each FEAT must leave the codebase in a buildable state. Do not push — commit locally on whatever branch is checked out. Build and test after every FEAT.",
+  "key_patterns": "1. NestJS services use 'private get db()' lazy getter pattern for Firebase Admin (see billing.service.ts lines 14-20). 2. Guards implement CanActivate, use Reflector for metadata, follow roles.guard.ts pattern. 3. Controllers use @UseGuards(FirebaseAuthGuard), @Req() req, extract userId as req.user.uid. 4. Errors thrown as NestJS exceptions (BadRequestException, ForbiddenException, ServiceUnavailableException). 5. Frontend hooks check import.meta.env.DEV before mock paths. 6. Firestore batch writes used for atomic multi-collection updates (see confirmCheckoutSession). 7. Existing spec files mock the service layer, not Firestore directly.",
+  "relevant_files": [
+    "v2-backend/src/services/billing.service.ts",
+    "v2-backend/src/controllers/billing.controller.ts",
+    "v2-backend/src/main.ts",
+    "v2-backend/src/app.module.ts",
+    "v2-backend/src/guards/firebase-auth.guard.ts",
+    "v2-backend/src/guards/roles.guard.ts",
+    "v2-backend/src/utils/complimentary-access.ts",
+    "v2-backend/package.json",
+    "v2-backend/.env.example",
+    "src/contexts/AuthContext.tsx",
+    "src/components/common/ProtectedRoute.tsx",
+    "src/hooks/useBillingStatus.ts",
+    "src/pages/signup/welcome.tsx",
+    "src/utils/complimentaryAccess.ts",
+    "src/utils/planAccess.ts",
+    "v2-backend/src/controllers/billing-insights-dashboard.spec.ts"
+  ],
+  "directory_structure": "v2-backend/src/services/ — all NestJS services. v2-backend/src/controllers/ — all controllers. v2-backend/src/guards/ — auth/role guards (firebase-auth.guard.ts, roles.guard.ts, admin.guard.ts, classifier-throttle.guard.ts, address-throttle.guard.ts). v2-backend/src/utils/ — shared backend utilities. src/ — React frontend. src/contexts/ — React context providers. src/hooks/ — custom React hooks. src/utils/ — frontend utilities. src/pages/ — page components. src/components/ — shared components. .agents/tasks/ — planning artifacts (never committed to git directly)."
+}
