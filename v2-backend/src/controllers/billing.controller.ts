@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus, Req, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BillingService } from '../services/billing.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -84,5 +84,23 @@ export class BillingController {
   async downgradeToFree(@Req() req: any) {
     const userId = req.user.uid;
     return await this.billingService.downgradeToFree(userId);
+  }
+
+  /**
+   * Stripe webhook receiver — NO FirebaseAuthGuard.
+   * Stripe calls this endpoint server-to-server with a signature header.
+   * Raw body is required for signature verification; the raw body middleware
+   * in main.ts registers express.raw() for this path before json() middleware.
+   */
+  @Post('webhook')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Stripe webhook event receiver (server-to-server, no auth)' })
+  @ApiResponse({ status: 200, description: 'Webhook received' })
+  async stripeWebhook(
+    @Req() req: any,
+    @Headers('stripe-signature') signature: string,
+  ) {
+    const rawBody: Buffer = req.rawBody ?? req.body;
+    return await this.billingService.handleWebhook(rawBody, signature);
   }
 }

@@ -338,6 +338,14 @@ async function bootstrap() {
     console.log('📖 Full API docs (Swagger UI) available at /api/docs-full');
   }
 
+  // Raw body needed for Stripe webhook signature verification.
+  // Must be registered BEFORE the json() body parser so /api/billing/webhook
+  // receives a Buffer instead of a parsed object.
+  expressApp.use(
+    '/api/billing/webhook',
+    (require('express') as typeof import('express')).raw({ type: 'application/json' }),
+  );
+
   // Set safe body size limit (5mb max) to prevent memory exhaustion DoS
   app.use(json({ limit: '5mb' }));
   app.use(urlencoded({ extended: true, limit: '5mb' }));
