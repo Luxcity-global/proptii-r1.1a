@@ -1,5 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { Reflector } from '@nestjs/core';
+import { SubscriptionGuard } from './guards/subscription.guard';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { GovDataModule } from './gov-data/gov-data.module';
@@ -170,6 +172,8 @@ function resolvePublicFolder(folder: string): string {
     GuestEnquiryService,
     ContractService,
     BillingService,
+    Reflector,
+    SubscriptionGuard,
     UserProfileService,
     AdminDashboardService,
     // Gap-fill services

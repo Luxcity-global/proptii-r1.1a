@@ -2,9 +2,10 @@
  * Maps dashboard section IDs to the minimum plan required.
  * 'free' = accessible on Explorer. Any other value = requires that plan or above.
  *
- * Rule: never rely solely on frontend gating for data security —
- * the NestJS SubscriptionGuard handles API-layer enforcement.
- * This file drives UI gating (lock icons, upgrade prompts).
+ * Rule: never rely solely on frontend gating for data security.
+ * Server-side enforcement is in: v2-backend/src/guards/subscription.guard.ts
+ * Usage: @UseGuards(FirebaseAuthGuard, SubscriptionGuard) @RequiredPlan('renter_pro')
+ * This file drives UI gating only (lock icons, upgrade prompts).
  */
 
 import type { PlanId } from '../config/plans';
