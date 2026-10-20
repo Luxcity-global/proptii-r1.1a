@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import EarlyAccessBanner from '../../components/pricing/EarlyAccessBanner';
@@ -29,6 +30,7 @@ const PricingPage: React.FC<PricingPageProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const [billing, setBilling] = useState<BillingCycle>('annual');
   const [audience, setAudience] = useState<PricingAudience>('renters');
 
@@ -42,6 +44,17 @@ const PricingPage: React.FC<PricingPageProps> = ({
       setAudience(segment);
     }
   }, [searchParams]);
+
+  // Pre-select the audience tab based on the authenticated user's role.
+  // Skipped when an explicit ?segment= param is present (that wins).
+  useEffect(() => {
+    if (searchParams.get('segment')) return;
+    if (!user?.roleResolved) return;
+    const role = user?.roles?.[0];
+    if (role === 'landlord') setAudience('landlords');
+    else if (role === 'agent') setAudience('agents');
+    else if (role === 'tenant') setAudience('renters');
+  }, [user?.roleResolved, user?.roles, searchParams]);
 
   const content = (
     <>

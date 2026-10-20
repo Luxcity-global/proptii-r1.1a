@@ -131,10 +131,6 @@ const SettingsGroup: React.FC<SettingsGroupProps> = ({ label, icon, children }) 
 const DashboardSettings: React.FC = () => {
   const { user, logout, editProfile, updateUserProfile } = useAuth();
   const navigate = useNavigate();
-  const currentRole = user?.roles?.[0] ?? null;
-  // Only landlords and agents can switch roles — tenants have no other dashboard
-  // to switch to, and ProtectedRoute would redirect them back immediately anyway.
-  const canSwitchRole = currentRole === 'landlord' || currentRole === 'agent';
 
   const {
     plan,
@@ -441,23 +437,6 @@ const DashboardSettings: React.FC = () => {
           description="Update your name, email, or password via your account provider."
           onClick={editProfile}
         />
-        {canSwitchRole && (
-          <SettingsRow
-            title="Switch to tenant view"
-            description={`Your account role is: ${currentRole}. You can browse Proptii as a tenant to search properties and book viewings.`}
-            onClick={() => navigate('/select-role')}
-            action={
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); navigate('/select-role'); }}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-blue-50"
-                style={{ color: '#136C9E', borderColor: '#136C9E' }}
-              >
-                Switch view
-              </button>
-            }
-          />
-        )}
         <SettingsRow
           title="Sign out"
           description="Sign out of your Proptii account on this device."

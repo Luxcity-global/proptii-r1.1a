@@ -1,14 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import AgentNavbar from '../components/AgentNavbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
-import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
-import landlordUserService from '../services/landlordUserService';
-import { useAuth } from '../contexts/AuthContext';
-
-type UserRole = 'landlord' | 'agent';
 
 // Add preload link for the hero image
 const heroImageUrl = '/images/hero-agent-happy-couple.jpg';
@@ -22,99 +17,24 @@ const preloadHeroImage = () => {
 
 const AgentHome = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [showRolePopup, setShowRolePopup] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('landlord');
 
   // Preload hero image when component mounts
   useEffect(() => {
     preloadHeroImage();
   }, []);
 
-  const handleRoleSelected = (role: UserRole) => {
-    setSelectedRole(role);
-    // Don't close popup immediately - let user see the role was selected
-    // Popup will close when they click "Continue" button
-  };
-
-  const handleRoleContinue = async (role: UserRole) => {
-    setSelectedRole(role);
-    setShowRolePopup(false);
-    
-    // Automatically register user if they have email
-    const userEmail = user?.email || '';
-    const userName = user?.name || '';
-    
-    if (userEmail && userName) {
-      console.log('🔄 Auto-registering user as', role, ':', userEmail);
-      
-      try {
-        // Check if already registered first
-        const checkResult = await landlordUserService.isLandlordOrAgent(userEmail);
-        
-        if (checkResult.isLandlord) {
-          console.log('✅ User already registered as', checkResult.user?.role);
-          localStorage.setItem('landlordEmail', userEmail);
-          return;
-        }
-        
-        // Auto-register
-        const result = await landlordUserService.registerLandlordUser({
-          email: userEmail,
-          name: userName,
-          role: role,
-          phone: user?.phone,
-          // companyName will be omitted if undefined
-        });
-        
-        if (result.success) {
-          console.log('✅ Auto-registered successfully:', result.userId);
-          localStorage.setItem('landlordEmail', userEmail);
-        } else {
-          console.error('❌ Auto-registration failed:', result.error);
-          // Continue anyway - user can still use the app
-        }
-      } catch (error) {
-        console.error('❌ Error during auto-registration:', error);
-        // Continue anyway - user can still use the app
-      }
-    } else {
-      console.log('⚠️ No user email/name available for auto-registration');
-    }
-  };
-
-
   const handleGoToDashboard = () => {
-    // Store the selected role in localStorage for the dashboard to use
-    localStorage.setItem('userRole', selectedRole);
-    // Navigate to the landlord dashboard
     window.location.href = '/landlord';
   };
 
   const handleAddProperty = () => {
-    // Pass selected role into landlord app
-    if (selectedRole === 'agent') {
-      localStorage.setItem('userRole', 'agent');
-    }
-    // Instruct landlord app to open property setup flow immediately
     localStorage.setItem('startScreen', 'property-setup-step1');
     window.location.href = '/landlord?start=property-setup-step1';
   };
 
   const handleSetupProfile = () => {
-    // Respect selected role for landlord-agent app
-    if (selectedRole === 'agent') {
-      localStorage.setItem('userRole', 'agent');
-    }
-    // Deep link to the company/landlord profile setup flow
     localStorage.setItem('startScreen', 'company-profile-setup');
     window.location.href = '/landlord?start=company-profile-setup';
-  };
-
-  const handleClosePopup = () => {
-    setShowRolePopup(false);
-    // Navigate back to home page
-    navigate('/');
   };
 
   return (
@@ -163,12 +83,12 @@ const AgentHome = () => {
             Streamline your property listings and reach more potential tenants.
           </p>
 
-          {/* Go to Dashboard Button */}
+          {/* CTA Button */}
           <button
-            onClick={handleGoToDashboard}
+            onClick={() => navigate('/pricing?segment=agents')}
             className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
           >
-            {selectedRole === 'landlord' ? 'Go to Landlord Dashboard' : 'Go to Agent Dashboard'}
+            View Agent Plans
           </button>
         </div>
       </section>
@@ -253,7 +173,7 @@ const AgentHome = () => {
               </button>
             </div>
 
-            {/* Setup Profile Card (role-aware) */}
+            {/* Setup Profile Card */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 md:p-10 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
               <div>
                 <div className="mb-8">
@@ -263,18 +183,16 @@ const AgentHome = () => {
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-[#374957] mb-4">{selectedRole === 'agent' ? 'Setup Company Profile' : 'Setup Landlord Profile'}</h3>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">Setup Company Profile</h3>
                 <p className="text-gray-600 mb-8">
-                  {selectedRole === 'agent'
-                    ? 'Add company details, logo, and professional\u00A0settings'
-                    : 'Add your landlord details, contact info, and optional branding'}
+                  Add company details, logo, and professional&nbsp;settings
                 </p>
               </div>
               <button
                 onClick={handleSetupProfile}
                 className="text-[#374957] hover:text-[#DC5F12] hover:border-[#DC5F12] border border-transparent rounded-full px-8 py-3 font-medium flex items-center justify-center mx-auto group transition-all"
               >
-                {selectedRole === 'agent' ? 'Setup Company' : 'Setup Landlord'}
+                Setup Company
                 <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -296,16 +214,8 @@ const AgentHome = () => {
 
       {/* Footer */}
       <Footer />
-
-      {/* Role Selection Popup */}
-      <RoleSelectionPopup 
-        isOpen={showRolePopup} 
-        onRoleSelected={handleRoleSelected}
-        onContinue={handleRoleContinue}
-        onClose={handleClosePopup}
-      />
     </div>
   );
 };
 
-export default AgentHome; 
+export default AgentHome;

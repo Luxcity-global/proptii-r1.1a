@@ -13,6 +13,9 @@ import {
 } from '../../utils/pricingRoutes';
 import { setPendingPlan } from '../../services/billingService';
 import type { BillingCycle } from '../../components/pricing/PricingBillingToggle';
+import { getPlanById } from '../../config/plans';
+import type { PlanId } from '../../config/plans';
+import { setRoleIntent } from '../../utils/roleIntent';
 
 import { trackEvent } from '../../utils/analytics';
 import '../../styles/pricing.css';
@@ -125,8 +128,18 @@ const DedicatedSignupPage: React.FC = () => {
     try {
       setBusy(true);
       setError(null);
-      // Ensure no stale role intent is present so the user goes to /select-role
-      sessionStorage.removeItem('proptii_signup_role_intent');
+      // Derive role intent from the plan selected on /pricing.
+      // This lets resolveRole() skip /select-role for plan-driven signups.
+      const selectedPlan = planId ? getPlanById(planId as PlanId) : null;
+      if (selectedPlan) {
+        const segment = selectedPlan.segment[0];
+        if (segment === 'agent')         setRoleIntent('agent');
+        else if (segment === 'landlord') setRoleIntent('landlord');
+        else                             setRoleIntent('tenant');
+      } else {
+        // No plan selected — remove stale intent so /select-role shows cleanly
+        sessionStorage.removeItem('proptii_signup_role_intent');
+      }
 
       trackEvent('signup_google_started', {
         plan_id: planId,
@@ -164,8 +177,18 @@ const DedicatedSignupPage: React.FC = () => {
       setError('Please enter a valid email address.');
       return;
     }
-    // Ensure no stale role intent is present so the user goes to /select-role
-    sessionStorage.removeItem('proptii_signup_role_intent');
+    // Derive role intent from the plan selected on /pricing.
+    // This lets resolveRole() skip /select-role for plan-driven signups.
+    const selectedPlan = planId ? getPlanById(planId as PlanId) : null;
+    if (selectedPlan) {
+      const segment = selectedPlan.segment[0];
+      if (segment === 'agent')         setRoleIntent('agent');
+      else if (segment === 'landlord') setRoleIntent('landlord');
+      else                             setRoleIntent('tenant');
+    } else {
+      // No plan selected — remove stale intent so /select-role shows cleanly
+      sessionStorage.removeItem('proptii_signup_role_intent');
+    }
     sessionStorage.setItem('pending_registration_email', trimmed);
     navigate(createAccountUrl(planId, cycle, trimmed));
   };

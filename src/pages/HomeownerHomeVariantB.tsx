@@ -1,13 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HomeownerNavbar from '../components/HomeownerNavbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
-import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
-import { useAuth } from '../contexts/AuthContext';
 import { TextAnimate } from '../components/magic-ui/text-animate';
-
-type UserRole = 'homeowner';
 
 // Add preload link for the hero image - Variant B: Signing document
 const heroImageUrl = '/images/young-caucasian-woman-smiling-while-signing-document-handed-by-middle-aged-man 1.png';
@@ -21,9 +17,6 @@ const preloadHeroImage = () => {
 
 const HomeownerHomeVariantB = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [showRolePopup, setShowRolePopup] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('homeowner');
 
   // Preload hero image when component mounts
   useEffect(() => {

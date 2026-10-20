@@ -471,45 +471,9 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
             icon={<Shield className="w-4 h-4" style={{ color: '#136C9E' }} />}
           >
             <SettingsRow
-              title="View as Tenant"
-              description="Preview the tenant portal and dashboard features without changing your account role."
-              onClick={() => { window.location.href = '/dashboard'; }}
-              action={
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.location.href = '/dashboard';
-                  }}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-orange-50"
-                  style={{ color: '#DC5F12', borderColor: '#DC5F12', whiteSpace: 'nowrap' }}
-                >
-                  View as Tenant
-                </button>
-              }
-            />
-            <SettingsRow
               title="Edit profile"
               description="Update your name, email, or password via your account provider."
               onClick={handleEditProfile}
-            />
-            <SettingsRow
-              title="Switch account role"
-              description={`Currently active role: ${userRole || 'landlord'}. Change your account role.`}
-              onClick={() => openInParentApp('/select-role')}
-              action={
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openInParentApp('/select-role');
-                  }}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-blue-50"
-                  style={{ color: '#136C9E', borderColor: '#136C9E' }}
-                >
-                  Change role
-                </button>
-              }
             />
             <SettingsRow
               title="Sign out"

@@ -15,7 +15,7 @@ const RoleSelect: React.FC = () => {
   const { user, isLoading, patchUser } = useAuth();
   const navigate = useNavigate();
   const [saving,  setSaving]  = useState(false);
-  const [hovered, setHovered] = useState<'tenant' | 'landlord' | null>(null);
+  const [hovered, setHovered] = useState<'tenant' | 'landlord' | 'agent' | null>(null);
 
   const hasExistingRole = Boolean(user?.roles && user.roles.length > 0);
 
@@ -31,11 +31,6 @@ const RoleSelect: React.FC = () => {
   const handleSelect = async (role: UserRole) => {
     if (!user || saving) return;
     
-    if (user?.roles?.includes('tenant') && (role === 'landlord' || role === 'agent')) {
-      alert('Tenant accounts cannot switch to a Landlord profile.');
-      return;
-    }
-
     setSaving(true);
 
     try {
@@ -171,13 +166,13 @@ const RoleSelect: React.FC = () => {
               ...(hovered === 'landlord' ? S.landlordCardHover : {}),
               ...(saving ? S.cardDisabled : {}),
             }}
-            aria-label="I manage properties — landlord or agent"
+            aria-label="I manage properties — landlord"
           >
             {/* Badge + CTA row */}
             <div style={S.cardTopRow}>
               <span style={{ ...S.badge, ...S.landlordBadge }}>MANAGEMENT · SCALE</span>
               <span style={{ ...S.ctaPill, ...S.landlordCta }}>
-                {saving ? 'Setting up…' : 'Landlord/Agent Dashboard →'}
+                {saving ? 'Setting up…' : 'Landlord Dashboard →'}
               </span>
             </div>
 
@@ -214,6 +209,83 @@ const RoleSelect: React.FC = () => {
                   }}
                   loading="eager"
                 />
+              </div>
+            </div>
+
+            {/* Saving overlay */}
+            {saving && (
+              <div style={S.savingOverlay}>
+                <div style={S.spinnerSmall} />
+              </div>
+            )}
+          </button>
+
+          {/* ── Divider dot ─────────────────────────────────────────── */}
+          <div style={S.dividerDot}>
+            <span style={S.dot} />
+          </div>
+
+          {/* ── Agent card ──────────────────────────────────────────── */}
+          <button
+            disabled={saving}
+            onClick={() => handleSelect('agent')}
+            onMouseEnter={() => setHovered('agent')}
+            onMouseLeave={() => setHovered(null)}
+            style={{
+              ...S.roleCard,
+              ...S.agentCard,
+              ...(hovered === 'agent' ? S.agentCardHover : {}),
+              ...(saving ? S.cardDisabled : {}),
+            }}
+            aria-label="I manage properties for multiple clients — agent"
+          >
+            {/* Badge + CTA row */}
+            <div style={S.cardTopRow}>
+              <span style={{ ...S.badge, ...S.agentBadge }}>PROFESSIONAL · AGENCY</span>
+              <span style={{ ...S.ctaPill, ...S.agentCta }}>
+                {saving ? 'Setting up…' : 'Agent Dashboard →'}
+              </span>
+            </div>
+
+            {/* Content + icon row */}
+            <div style={S.cardBody}>
+              <div style={S.cardText}>
+                <h2 style={{ ...S.cardHeading, color: '#0A1A2E' }}>
+                  I manage properties for multiple clients
+                </h2>
+                <p style={S.cardDesc}>
+                  Oversee multi-client portfolios, run fit checks, generate
+                  reports, and collaborate with your team from one hub.
+                </p>
+
+                {/* Stats */}
+                <div style={S.statsRow}>
+                  <div style={S.stat}>
+                    <span style={{ ...S.statValue, color: '#0E6B6B' }}>Multi-client</span>
+                    <span style={S.statLabel}>portfolios</span>
+                  </div>
+                  <div style={S.stat}>
+                    <span style={{ ...S.statValue, color: '#0E6B6B' }}>Agency</span>
+                    <span style={S.statLabel}>tools</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Agent / briefcase icon */}
+              <div style={{ ...S.photoWrap, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#D4EAE8' }}>
+                <svg
+                  width="64"
+                  height="64"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="7" width="20" height="14" rx="2" stroke="#0E6B6B" strokeWidth="1.8" />
+                  <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="#0E6B6B" strokeWidth="1.8" strokeLinecap="round" />
+                  <line x1="2" y1="12" x2="22" y2="12" stroke="#0E6B6B" strokeWidth="1.8" />
+                  <line x1="12" y1="12" x2="12" y2="16" stroke="#0E6B6B" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
               </div>
             </div>
 
@@ -316,6 +388,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 0,
     alignItems: 'stretch',
+    flexWrap: 'wrap' as const,
   },
 
   dividerDot: {
@@ -338,6 +411,7 @@ const S: Record<string, React.CSSProperties> = {
 
   roleCard: {
     flex: 1,
+    minWidth: 260,
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
@@ -372,6 +446,15 @@ const S: Record<string, React.CSSProperties> = {
   landlordCardHover: {
     transform: 'translateY(-3px)',
     boxShadow: '0 12px 32px rgba(154,96,0,0.18)',
+  },
+
+  // Agent card: deep teal / navy tint
+  agentCard: {
+    background: '#EDF6F6',
+  },
+  agentCardHover: {
+    transform: 'translateY(-3px)',
+    boxShadow: '0 12px 32px rgba(14,107,107,0.18)',
   },
 
   // ── Card internals ───────────────────────────────────────────────────────
@@ -416,6 +499,15 @@ const S: Record<string, React.CSSProperties> = {
   landlordCta: {
     background: '#FFEFD4',
     color: '#7A4A00',
+  },
+
+  agentBadge: {
+    background: '#A8D8D8',
+    color: '#0A1A2E',
+  },
+  agentCta: {
+    background: '#C8E8E8',
+    color: '#0A3A3A',
   },
 
   cardBody: {
