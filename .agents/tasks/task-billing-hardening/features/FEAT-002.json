@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Security hardening: guard the mock-token localStorage path in AuthContext.tsx with import.meta.env.DEV so it is dead code in production builds (FINDING 008), fix the unauthenticated /billing/confirmed rendering in ProtectedRoute.tsx to wait for auth resolution and redirect to login if unauthenticated (FINDING 007), and remove the swallowed catch block in downgradeToFree that silently returns success even on Firestore write failure (FINDING 013). These three fixes are independent of each other and of FEAT-001's Stripe work, but FEAT-001 should be completed first so that the SubscriptionGuard referenced in FEAT-003 has a correct getBillingStatus to call.",
+  "status": "completed",
+  "steps": [
+    "Step 1 — Fix mock token guard in src/contexts/AuthContext.tsx: in the onAuthStateChanged callback, find the block 'const mockToken = localStorage.getItem(\"mock_token\"); if (mockToken && mockToken.startsWith(\"mock-token-\")) {' (around line 89). Change the condition to 'if (import.meta.env.DEV && mockToken && mockToken.startsWith(\"mock-token-\")) {'. This is the only change to this file.",
+
+    "Step 2 — Fix unauthenticated /billing/confirmed in src/components/common/ProtectedRoute.tsx: locate the isStripeSuccessReturn block (lines ~63-68): 'if (!isAuthenticated && isStripeSuccessReturn) { return <>{children}</>; }'. Replace this block with: if (isStripeSuccessReturn) { if (isLoading) { return loading spinner JSX (same spinner used at top of component); } if (!isAuthenticated) { const fullPath = location.pathname + location.search; return <Navigate to={`/login?redirect=${encodeURIComponent(fullPath)}`} state={{ from: location }} replace />; } } — authenticated users fall through to normal rendering. Place this block AFTER the two existing isLoading/roleResolved spinner checks and BEFORE the existing '!isAuthenticated' redirect block.",
+
+    "Step 3 — Remove swallowed errors in v2-backend/src/services/billing.service.ts in downgradeToFree method (lines ~273-282): remove the inner try/catch entirely. Remove the 'if (col)' guard — replace it with a check that throws ServiceUnavailableException if !col. The method becomes: check col exists (throw ServiceUnavailableException if not), log the downgrade, call await col.doc(userId).set({userId, planId:'free', plan:'free', status:'active', updatedAt:admin.firestore.FieldValue.serverTimestamp()}, {merge:true}), return {success:true, planId:'free'}. Any Firestore error now propagates as an unhandled exception → NestJS returns 500 to client."
+  ],
+  "acceptance_criteria": [
+    "In src/contexts/AuthContext.tsx the mock-token localStorage check is wrapped with import.meta.env.DEV",
+    "In src/components/common/ProtectedRoute.tsx the unauthenticated isStripeSuccessReturn case shows a spinner while auth is loading and redirects to /login when auth resolves unauthenticated",
+    "In billing.service.ts downgradeToFree has no empty catch block — Firestore errors propagate",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npm run build exits 0 (Vite frontend build)",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build exits 0",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm test — all tests pass"
+  ],
+  "verification": [
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npm run build — exits 0 (Vite)",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build — exits 0",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm test — all tests pass"
+  ],
+  "blocked_reason": null,
+  "findings": "COMPLETED. Key details for FEAT-003/004:\n\n1. AuthContext.tsx: mock-token localStorage path now wrapped with `import.meta.env.DEV &&` — the mock auth branch is dead code in production Vite builds (import.meta.env.DEV evaluates to false at build time and Vite tree-shakes the entire block).\n\n2. ProtectedRoute.tsx: replaced the `if (!isAuthenticated && isStripeSuccessReturn) { return <>{children}</>; }` bypass with a proper three-branch check: (a) still loading → show spinner, (b) loaded but unauthenticated → redirect to /login with the full path (including session_id) as the redirect param, (c) authenticated → fall through to normal ProtectedRoute rendering. This closes FINDING 007.\n\n3. billing.service.ts downgradeToFree: FEAT-001 already rewrote this method correctly — no inner try/catch, throws ServiceUnavailableException when !col, logs before write, Firestore errors propagate as unhandled exceptions (FINDING 013 was already resolved by FEAT-001).\n\n4. All 27 test files, 252 tests pass. Both builds (frontend Vite, backend NestJS) exit 0."
+}

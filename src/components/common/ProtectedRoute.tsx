@@ -70,8 +70,24 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     location.pathname.startsWith('/billing/confirmed') &&
     location.search.includes('session_id=');
 
-  if (!isAuthenticated && isStripeSuccessReturn) {
-    return <>{children}</>;
+  if (isStripeSuccessReturn) {
+    if (isLoading) {
+      // Auth is still resolving — show spinner rather than redirect
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh', fontFamily: 'Archivo, sans-serif' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
+            <p style={{ color: '#666' }}>Loading...</p>
+          </div>
+        </div>
+      );
+    }
+    if (!isAuthenticated) {
+      // Auth resolved as unauthenticated — redirect to login preserving the session_id
+      const fullPath = location.pathname + location.search;
+      return <Navigate to={`/login?redirect=${encodeURIComponent(fullPath)}`} state={{ from: location }} replace />;
+    }
+    // Authenticated — fall through to normal ProtectedRoute rendering below
   }
 
   if (!isAuthenticated) {

@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!firebaseUser) {
         // Check for mock token fallback
         const mockToken = localStorage.getItem('mock_token');
-        if (mockToken && mockToken.startsWith('mock-token-')) {
+        if (import.meta.env.DEV && mockToken && mockToken.startsWith('mock-token-')) {
           const id = mockToken.replace('mock-token-', '');
           const mockUser = resolveMockTestUser(id);
           if (!cancelled) {
