@@ -3,10 +3,6 @@ import {
   fetchBillingStatus,
   type BillingStatus,
 } from '../../../services/billingService';
-import {
-  complimentaryBillingStatus,
-  isComplimentaryAccessEmail,
-} from '../../../utils/complimentaryAccess';
 
 export interface LandlordBillingOptions {
   email?: string | null;
@@ -18,7 +14,10 @@ export function useLandlordBillingStatus(
   isAuthenticated: boolean,
   options: LandlordBillingOptions = {},
 ) {
-  const { email, role } = options;
+  // email and role are not used in the refresh callback — complimentary access
+  // is now determined server-side by getBillingStatus (see FEAT-004).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { email: _email, role: _role } = options;
   const [data, setData] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,12 +28,8 @@ export function useLandlordBillingStatus(
       setLoading(false);
       return;
     }
-    if (isComplimentaryAccessEmail(email)) {
-      setData(complimentaryBillingStatus(role));
-      setError(null);
-      setLoading(false);
-      return;
-    }
+    // Complimentary-access determination is now handled server-side only.
+    // getBillingStatus returns the correct plan for @theluxcity.co.uk addresses.
     setLoading(true);
     setError(null);
     try {
@@ -46,7 +41,7 @@ export function useLandlordBillingStatus(
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, email, role]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     refresh();
