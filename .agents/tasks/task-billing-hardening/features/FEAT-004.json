@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-004",
+  "type": "fix",
+  "description": "Move complimentary-access domain control entirely server-side: remove the isComplimentaryAccessEmail shortcut from src/hooks/useBillingStatus.ts and src/pages/signup/welcome.tsx (both bypass the API and use a Vite build-time env var that can be overridden), add an audit log in the backend getBillingStatus complimentary branch, remove VITE_COMPLIMENTARY_EMAIL_DOMAINS comment lines from .env.example, and document COMPLIMENTARY_EMAIL_DOMAINS (no VITE_ prefix) in v2-backend/.env.example. Independent of FEAT-001/002/003 in terms of files touched — can be applied in any order but should come last to avoid confusion with the DB-unavailable fixes in FEAT-001.",
+  "status": "completed",
+  "steps": [
+    "Step 1 — Add audit log to backend complimentary-access branch in v2-backend/src/services/billing.service.ts: in getBillingStatus, the existing 'if (isComplimentaryAccessEmail(email))' block at line ~28 currently returns complimentaryBillingPayload without logging. Add this.logger.log(`[BillingService] Complimentary access granted to ${email}`) before the return statement. This is the only change to billing.service.ts in this FEAT.",
+
+    "Step 2 — Remove isComplimentaryAccessEmail frontend bypass from src/hooks/useBillingStatus.ts: delete the block 'if (isComplimentaryAccessEmail(user?.email)) { setData(complimentaryBillingStatus(user?.roles?.[0])); setError(null); setLoading(false); return; }' (currently around lines 44-49 in the refresh callback). After removal, check whether complimentaryBillingStatus and isComplimentaryAccessEmail imports from '../utils/complimentaryAccess' are still used by any remaining code in the file. If both are now unused, remove their import lines.",
+
+    "Step 3 — Remove isComplimentaryAccessEmail early exit from src/pages/signup/welcome.tsx: in the useEffect, find the line 'if (isComplimentaryAccessEmail(user?.email)) return;' (currently ~line 61). Delete this line — the existing check 'if (status === \"trialing\" || status === \"active\") return;' a few lines below already covers the complimentary case once the API returns the correct status. Remove the import of isComplimentaryAccessEmail from welcome.tsx if it becomes unused.",
+
+    "Step 4 — Remove VITE_COMPLIMENTARY_EMAIL_DOMAINS from .env.example: open /home/angeli/Desktop/luxcity/proptii-r1.1a/.env.example and delete lines 121-122 (the two comment lines: '# VITE_COMPLIMENTARY_EMAIL_DOMAINS=theluxcity.co.uk' and '# Backend equivalent: COMPLIMENTARY_EMAIL_DOMAINS=theluxcity.co.uk'). Also check .env, .env.development, .env.local, .env.prod, .env.production — the audit found no actual VITE_COMPLIMENTARY_EMAIL_DOMAINS values in these files (only in .env.example as comments), so only .env.example needs editing.",
+
+    "Step 5 — Document COMPLIMENTARY_EMAIL_DOMAINS in v2-backend/.env.example: add a new section after the ADMIN_EMAIL entry: '# ─── Complimentary Access ─────────────────────────────────────────────────────' followed by a descriptive comment and 'COMPLIMENTARY_EMAIL_DOMAINS=theluxcity.co.uk'. The variable is already read by v2-backend/src/utils/complimentary-access.ts — this step just documents it properly."
+  ],
+  "acceptance_criteria": [
+    "src/hooks/useBillingStatus.ts no longer has an isComplimentaryAccessEmail shortcut that bypasses the API",
+    "src/pages/signup/welcome.tsx no longer has an isComplimentaryAccessEmail early exit",
+    ".env.example does not contain VITE_COMPLIMENTARY_EMAIL_DOMAINS",
+    "v2-backend/.env.example documents COMPLIMENTARY_EMAIL_DOMAINS (no VITE_ prefix)",
+    "Backend getBillingStatus logs complimentary access grants",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npm run build exits 0 (no unused import errors from Vite/TSC)",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build exits 0",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm test — all tests pass"
+  ],
+  "verification": [
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a && npm run build — exits 0",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm run build — exits 0",
+    "cd /home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend && npm test — all tests pass"
+  ],
+  "blocked_reason": null,
+  "findings": "COMPLETED. Key details:\n\n1. Step 1 (billing.service.ts audit log): Was already present from prior work — `this.logger.log('[BillingService] Complimentary access granted to ${email}')` existed on line 69 before the return in the isComplimentaryAccessEmail branch. No change needed.\n\n2. Step 2 (useBillingStatus.ts): Removed the `if (isComplimentaryAccessEmail(user?.email))` block (lines 51-55 in original) and the two imports `complimentaryBillingStatus` and `isComplimentaryAccessEmail` from '../utils/complimentaryAccess'. Also removed `user?.email` from the useCallback dependency array since it was only used by that removed block.\n\n3. Step 3 (welcome.tsx): Removed the `import { isComplimentaryAccessEmail } from '../../utils/complimentaryAccess'` import, the comment line '// Company staff (@theluxcity.co.uk) already have full complimentary access.', the `if (isComplimentaryAccessEmail(user?.email)) return;` early exit, and `user?.email` from the useEffect dependency array. The `status === 'trialing' || status === 'active'` check below covers the complimentary case since the API now returns status:'active' for complimentary users.\n\n4. Step 4 (.env.example): Removed the entire '# ─── Complimentary full access (billing bypass) ───' section (5 lines including the VITE_COMPLIMENTARY_EMAIL_DOMAINS comment and Backend equivalent comment).\n\n5. Step 5 (v2-backend/.env.example): Added '# ─── Complimentary Access ───' section after ADMIN_EMAIL entry with full description and COMPLIMENTARY_EMAIL_DOMAINS=theluxcity.co.uk.\n\n6. All verification passed: frontend Vite build exits 0, backend nest build exits 0, 27 test files 252 tests all pass."
+}
