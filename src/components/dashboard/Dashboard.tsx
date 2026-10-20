@@ -280,7 +280,8 @@ const DashboardInner: React.FC = () => {
     location.pathname === '/dashboard/tenant-contracts' ||
     location.pathname === '/dashboard/tenant-referencing' ||
     location.pathname === '/dashboard/your-files' ||
-    location.pathname === '/dashboard/messages';
+    location.pathname === '/dashboard/messages' ||
+    location.pathname === '/dashboard/settings';
   const isTenantPreview =
     user?.role === 'landlord' ||
     user?.role === 'agent' ||

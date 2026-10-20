@@ -14,6 +14,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useAuth } from './AuthContext';
 import { consumePendingProperty } from '../utils/onboardingSession';
 import apiService from '../services/api';
+import { getTenantDemoSavedProperties, isTenantDemoSavedProperty, isTenantDemoSession } from '../data/tenantDemoData';
 
 export interface SavedProperty {
   id: string;
@@ -148,7 +149,12 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
   // ─── Fetch from Backend when authenticated ─────────────────────────────────
   const fetchProperties = useCallback(async (reset = false, currentLast: string | null = null) => {
     if (!user?.id) return;
-    
+    const demo = reset && isTenantDemoSession() ? getTenantDemoSavedProperties() : [];
+    if (demo.length > 0) {
+      setSavedProperties(demo);
+      setAllSavedIds((prev) => Array.from(new Set([...demo.map((p) => p.id), ...prev])));
+    }
+
     try {
       setIsLoading(true);
       const limit = 6;
@@ -181,7 +187,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
       const newLast = payload?.lastVisible ?? (response as any)?.lastVisible ?? null;
 
       if (reset) {
-        setSavedProperties(items);
+        setSavedProperties([...demo, ...items.filter((i: any) => !demo.some((d) => d.id === i?.id))]);
       } else if (items.length > 0) {
         setSavedProperties(prev => {
           const existingIds = new Set(prev.map(i => i.id));
@@ -348,7 +354,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
     setSavedProperties(prev => prev.filter(prop => prop.id !== propertyId));
     setAllSavedIds(prev => prev.filter(id => id !== propertyId));
 
-    if (user?.id) {
+    if (user?.id && !isTenantDemoSavedProperty(propertyId)) {
       try {
         const encodedId = encodeURIComponent(propertyId);
         await apiService.delete(`/users/me/saved-properties/${encodedId}`);

@@ -23,7 +23,9 @@ import {
   LayoutGrid,
   List,
   RotateCcw,
+  MoreHorizontal,
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import viewingService, { ViewingBooking, ViewingStats, viewingPollingCoordinator } from '../../../services/viewingService';
 import { applyRememberedApplicant, isViewingRemoved, listViewingsForLandlord, rememberApplicant, rememberViewings } from '../../../services/viewingInboxService';
 import {
@@ -46,6 +48,53 @@ import {
   mergeById,
 } from '../data/agentTestPersona';
 import '../styles/viewingsPage.css';
+
+type RowAction = {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  onSelect: () => void;
+  disabled?: boolean;
+  tone?: RowActionTone;
+};
+
+type RowActionTone = 'success' | 'accent' | 'danger' | 'neutral';
+
+const ROW_ACTION_TONES: Record<RowActionTone, string> = {
+  success: 'text-green-700 focus:bg-green-50 focus:text-green-700 [&_svg]:!text-green-600',
+  accent: 'text-[#136C9E] focus:bg-[#136C9E]/10 focus:text-[#136C9E] [&_svg]:!text-[#136C9E]',
+  danger: 'text-red-600 focus:bg-red-50 focus:text-red-700 [&_svg]:!text-red-600',
+  neutral: 'text-gray-700 focus:bg-gray-100 focus:text-gray-900',
+};
+
+function RowActionsMenu({ actions }: { actions: RowAction[] }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
+          title="Actions"
+          aria-label="Actions"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[170px] bg-white">
+        {actions.map(({ label, icon: Icon, onSelect, disabled, tone }) => (
+          <DropdownMenuItem
+            key={label}
+            disabled={disabled}
+            onSelect={onSelect}
+            className={`cursor-pointer ${ROW_ACTION_TONES[tone ?? 'neutral']}`}
+          >
+            <Icon className="mr-2 h-4 w-4" />
+            {label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function bookingForTable(booking: ViewingBooking, managerEmail?: string | null): ViewingBooking {
   const withApplicant = applyRememberedApplicant(booking) as ViewingBooking;
@@ -923,7 +972,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
 
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-[#f3f3f3] rounded-lg p-4 mt-4">
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-[#64748b]">
           Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} {itemName}
         </div>
         <div className="flex items-center gap-2">
@@ -951,7 +1000,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     variant={currentPage === page ? "default" : "outline"}
                     size="sm"
                     onClick={() => onPageChange(page)}
-                    className="min-w-[40px]"
+                    className={`min-w-[40px] ${currentPage === page ? '!bg-[#DC5F12] !text-white hover:!bg-[#c4540f]' : ''}`}
                   >
                     {page}
                   </Button>
@@ -1886,23 +1935,13 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
-                          <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition whitespace-nowrap"
-                            onClick={() => handleScheduleRequest(request)}
-                            title="Schedule viewing"
-                          >
-                            <Send className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
-                            <span className="hidden sm:inline">Schedule</span>
-                          </button>
-                          <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
-                            onClick={() => handleDeclineRequest(request)}
-                            title="Decline request"
-                          >
-                            <X className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
-                            <span className="hidden sm:inline">Decline</span>
-                          </button>
+                        <div className="col-span-2 flex items-center justify-center">
+                          <RowActionsMenu
+                            actions={[
+                              { label: 'Schedule', icon: Send, onSelect: () => handleScheduleRequest(request), tone: 'accent' },
+                              { label: 'Decline', icon: X, onSelect: () => handleDeclineRequest(request), tone: 'neutral' },
+                            ]}
+                          />
                         </div>
                       </div>
                     </div>
@@ -1982,33 +2021,14 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
-                          <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
-                            onClick={() => handleConfirmViewing(viewing)}
-                            disabled={isProcessing}
-                            title="Confirm viewing"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
-                            <span className="hidden sm:inline">Confirm</span>
-                          </button>
-                          <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50 whitespace-nowrap"
-                            onClick={() => handleOpenReschedule(viewing)}
-                            disabled={isProcessing}
-                            title="Reschedule viewing"
-                          >
-                            <Send className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
-                            <span className="hidden sm:inline">Reschedule</span>
-                          </button>
-                          <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
-                            onClick={() => handleOpenCancel(viewing)}
-                            disabled={isProcessing}
-                            title="Cancel viewing"
-                          >
-                            <X className="w-3.5 h-3.5 flex-shrink-0" />
-                          </button>
+                        <div className="col-span-2 flex items-center justify-center">
+                          <RowActionsMenu
+                            actions={[
+                              { label: 'Confirm', icon: CheckCircle, onSelect: () => handleConfirmViewing(viewing), disabled: isProcessing, tone: 'success' },
+                              { label: 'Reschedule', icon: Send, onSelect: () => handleOpenReschedule(viewing), disabled: isProcessing, tone: 'accent' },
+                              { label: 'Cancel viewing', icon: X, onSelect: () => handleOpenCancel(viewing), disabled: isProcessing, tone: 'danger' },
+                            ]}
+                          />
                         </div>
                       </div>
                     </div>
@@ -2019,12 +2039,12 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
 
                 {/* Mobile Card View */}
                 {!showAsTable && (
-                  <div className="space-y-4 p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
                     {/* Unscheduled Requests */}
                     {paginatedRequests.requests.map((request) => (
                       <div 
                         key={request.id} 
-                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(request.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                        className={`bg-white border rounded-lg p-4 flex flex-col ${selectedViewings.has(request.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -2063,7 +2083,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 pt-3 border-t">
+                        <div className="mt-auto flex items-center gap-2 pt-3 border-t">
                           <button
                             className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
                             onClick={() => handleScheduleRequest(request)}
@@ -2085,7 +2105,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     {paginatedRequests.pendingViewings.map((viewing) => (
                       <div 
                         key={viewing.id} 
-                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                        className={`bg-white border rounded-lg p-4 flex flex-col ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -2144,7 +2164,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 pt-3 border-t">
+                        <div className="mt-auto flex items-center gap-2 pt-3 border-t">
                           <button
                             className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition disabled:opacity-50"
                             onClick={() => handleConfirmViewing(viewing)}
@@ -2154,7 +2174,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                             Confirm
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-blue-300 text-sm font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-[#136C9E]/40 text-sm font-medium text-[#136C9E] hover:bg-[#136C9E]/10 transition disabled:opacity-50"
                             onClick={() => handleOpenReschedule(viewing)}
                             disabled={isProcessing}
                           >
@@ -2316,35 +2336,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
-                          {viewing.status !== 'confirmed' && (
-                            <button
-                              className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
-                              onClick={() => handleConfirmViewing(viewing)}
-                              disabled={isProcessing}
-                              title="Confirm viewing"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
-                              <span className="hidden sm:inline">Confirm</span>
-                            </button>
-                          )}
-                          <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50 whitespace-nowrap"
-                            onClick={() => handleOpenReschedule(viewing)}
-                            disabled={isProcessing}
-                            title="Reschedule viewing"
-                          >
-                            <Send className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
-                            <span className="hidden sm:inline">Reschedule</span>
-                          </button>
-                          <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
-                            onClick={() => handleOpenCancel(viewing)}
-                            disabled={isProcessing}
-                            title="Cancel viewing"
-                          >
-                            <X className="w-3.5 h-3.5 flex-shrink-0" />
-                          </button>
+                        <div className="col-span-2 flex items-center justify-center">
+                          <RowActionsMenu
+                            actions={[
+                              ...(viewing.status !== 'confirmed'
+                                ? [{ label: 'Confirm', icon: CheckCircle, onSelect: () => handleConfirmViewing(viewing), disabled: isProcessing, tone: 'success' as const }]
+                                : []),
+                              { label: 'Reschedule', icon: Send, onSelect: () => handleOpenReschedule(viewing), disabled: isProcessing, tone: 'accent' as const },
+                              { label: 'Cancel viewing', icon: X, onSelect: () => handleOpenCancel(viewing), disabled: isProcessing, tone: 'danger' as const },
+                            ]}
+                          />
                         </div>
                       </div>
                     </div>
@@ -2355,11 +2356,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
 
                 {/* Mobile Card View */}
                 {!showAsTable && (
-                  <div className="space-y-4 p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
                     {paginatedUpcomingViewings.map((viewing) => (
                       <div 
                         key={viewing.id} 
-                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                        className={`bg-white border rounded-lg p-4 flex flex-col ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -2426,7 +2427,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 pt-3 border-t">
+                        <div className="mt-auto flex items-center gap-2 pt-3 border-t">
                           {viewing.status !== 'confirmed' && (
                             <button
                               className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition disabled:opacity-50"
@@ -2438,7 +2439,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                             </button>
                           )}
                           <button
-                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-blue-300 text-sm font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-[#136C9E]/40 text-sm font-medium text-[#136C9E] hover:bg-[#136C9E]/10 transition disabled:opacity-50"
                             onClick={() => handleOpenReschedule(viewing)}
                             disabled={isProcessing}
                           >
@@ -2579,10 +2580,13 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                         </div>
 
                         {/* Notes */}
-                        <div className="col-span-2">
-                          <span className="text-xs text-gray-500 truncate">
+                        <div className="col-span-2 min-w-0">
+                          <p
+                            className="text-xs text-gray-600 leading-snug line-clamp-2 break-words"
+                            title={viewing.notes || viewing.agentNotes || undefined}
+                          >
                             {viewing.notes || viewing.agentNotes || '—'}
-                          </span>
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -2593,11 +2597,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
 
                 {/* Mobile Card View */}
                 {!showAsTable && (
-                  <div className="space-y-4 p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4">
                     {paginatedCompletedViewings.map((viewing) => (
                       <div 
                         key={viewing.id} 
-                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                        className={`bg-white border rounded-lg p-4 flex flex-col ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -2656,7 +2660,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                           </div>
                           <div>
                             <span className="text-muted-foreground">Notes:</span>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-xs text-gray-500 mt-0.5 break-words">
                               {viewing.notes || viewing.agentNotes || '—'}
                             </p>
                           </div>

@@ -7,14 +7,15 @@ import {
   Shield,
   Bell,
   Zap,
+  Sparkles,
 } from 'lucide-react';
 import type { UserProfile, UserRole } from '../App';
 import { useLandlordBillingStatus } from '../hooks/useLandlordBillingStatus';
 import { getPlanById, type PlanId } from '../../../config/plans';
 import { createBillingPortalSession } from '../../../services/billingService';
-import { useIsMobile } from './ui/use-mobile';
 import LandlordPlanCompareModal from './LandlordPlanCompareModal';
 import { requestAuthAction, openInParentApp } from '../utils/authBridge';
+import '../styles/settingsPage.css';
 
 function normalizePlanId(plan: string | null): PlanId {
   return (plan === 'free' ? 'explorer' : plan ?? 'explorer') as PlanId;
@@ -136,14 +137,17 @@ interface LandlordAgentSettingsPageProps {
   userProfile: UserProfile | null;
   userRole: UserRole;
   isAuthenticated: boolean;
+  onViewNotifications?: () => void;
+  onViewInsights?: () => void;
 }
 
 const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
   userProfile,
   userRole,
   isAuthenticated,
+  onViewNotifications,
+  onViewInsights,
 }) => {
-  const isMobile = useIsMobile();
   const pricingSegment = pricingSegmentForRole(userRole);
 
   const {
@@ -220,18 +224,42 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
   };
 
   return (
-    <div style={{ fontFamily: 'Archivo, sans-serif' }}>
-      <div className={`${isMobile ? 'px-4 pb-4' : 'px-5 lg:px-6 pb-8'} w-full max-w-6xl mx-auto`}>
-        <div className="w-full text-left mt-6 md:mt-8 mb-8">
-          <h1 className="text-2xl font-bold" style={{ color: '#1a2332' }}>
-            Settings
-          </h1>
-          <p className="text-sm mt-1" style={{ color: '#6b7280' }}>
-            Manage your account, subscription, and preferences.
-          </p>
+    <div className="ll-st">
+      <header className="ll-st-header">
+        <div className="ll-st-inner ll-st-header-inner">
+          <div className="ll-st-header-copy">
+            <h1>Settings</h1>
+            <p>Manage your account, subscription, and preferences.</p>
+          </div>
+          <div className="ll-st-header-actions">
+            {onViewNotifications ? (
+              <button
+                type="button"
+                className="ll-st-header-icon"
+                title="Notifications"
+                onClick={onViewNotifications}
+              >
+                <Bell size={18} />
+              </button>
+            ) : null}
+            {onViewInsights ? (
+              <button type="button" className="ll-st-btn-insights" onClick={onViewInsights}>
+                <span className="ll-st-insights-icon">
+                  <Sparkles size={12} />
+                </span>
+                Portfolio Insights
+              </button>
+            ) : null}
+            <button type="button" className="ll-st-btn-cta" onClick={handleEditProfile}>
+              <User size={16} />
+              Edit Profile
+            </button>
+          </div>
         </div>
+      </header>
 
-        <div className="max-w-3xl mx-auto">
+      <div className="ll-st-inner" style={{ fontFamily: 'Archivo, sans-serif' }}>
+        <div>
           <SettingsGroup
             label="Profile"
             icon={<User className="w-4 h-4" style={{ color: '#136C9E' }} />}

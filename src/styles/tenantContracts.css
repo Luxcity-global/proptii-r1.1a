@@ -340,7 +340,130 @@
 }
 
 .tn-ct-table th:last-child {
-  text-align: right;
+  text-align: center;
+  width: 96px;
+}
+
+.tn-ct-actions-cell .tn-ct-actions {
+  justify-content: center;
+}
+
+.tn-ct-more-btn {
+  width: 34px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--tn-border);
+  background: #fff;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.tn-ct-more-btn:hover,
+.tn-ct-more-btn[data-state='open'] {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.tn-ct-filter-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #136c9e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tn-ct-menu {
+  z-index: 60;
+  min-width: 180px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.tn-ct-filter-menu {
+  min-width: 230px;
+}
+
+.tn-ct-menu-label {
+  padding: 6px 10px 4px;
+  font-family: 'Archivo', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.tn-ct-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+.tn-ct-menu-item[data-highlighted] {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.tn-ct-menu-item[data-disabled] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.tn-ct-menu-item.is-accent { color: #136c9e; }
+.tn-ct-menu-item.is-accent[data-highlighted] { background: #e8f3f8; color: #0f567e; }
+.tn-ct-menu-item.is-danger { color: #e11d48; }
+.tn-ct-menu-item.is-danger[data-highlighted] { background: #fff1f2; color: #be123c; }
+
+.tn-ct-menu-item[data-state='checked'] {
+  color: #136c9e;
+}
+
+.tn-ct-menu-check {
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+  color: #136c9e;
+}
+
+.tn-ct-menu-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.tn-ct-menu-scroll {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tn-ct-menu-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: #f1f5f9;
 }
 
 .tn-ct-table tbody tr {

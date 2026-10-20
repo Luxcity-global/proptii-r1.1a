@@ -17,6 +17,7 @@ import { createBillingPortalSession } from '../../../services/billingService';
 import type { PlanId } from '../../../config/plans';
 import PlanCompareModal from '../../billing/PlanCompareModal';
 import EditProfileModal from '../../profile/EditProfileModal';
+import TenantPageHeader from '../ui/TenantPageHeader';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 
@@ -202,17 +203,15 @@ const DashboardSettings: React.FC = () => {
 
   return (
     <div style={{ fontFamily: 'Archivo, sans-serif' }}>
-      {/* Page title — left-aligned, spaced below top nav */}
-      <div className="w-full text-left mt-6 md:mt-8 mb-8">
-        <h1 className="text-2xl font-bold" style={{ color: '#1a2332' }}>
-          Settings
-        </h1>
-        <p className="text-sm mt-1" style={{ color: '#6b7280' }}>
-          Manage your account, subscription, and preferences.
-        </p>
-      </div>
+      <TenantPageHeader
+        title="Settings"
+        subtitle="Manage your account, subscription, and preferences."
+        primaryLabel="Edit Profile"
+        primaryIcon={<User className="w-4 h-4" />}
+        onPrimary={() => setShowEditProfileModal(true)}
+      />
 
-      <div className="max-w-3xl mx-auto">
+      <div className="w-full max-w-[1152px] mx-auto px-5 lg:px-10">
       {/* ── Profile ── */}
       <SettingsGroup
         label="Profile"

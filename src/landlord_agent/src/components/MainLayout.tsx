@@ -373,7 +373,8 @@ export function MainLayout({
                     currentScreen === 'messages' ||
                     currentScreen === 'inbox' ||
                     currentScreen === 'documents' ||
-                    currentScreen === 'viewings'
+                    currentScreen === 'viewings' ||
+                    currentScreen === 'settings'
                   ? '#f8fafc'
                   : currentScreen === 'contracts'
                     ? '#fbfbfe'
@@ -399,7 +400,8 @@ export function MainLayout({
             currentScreen !== 'messages' &&
             currentScreen !== 'inbox' &&
             currentScreen !== 'documents' &&
-            currentScreen !== 'viewings' && (
+            currentScreen !== 'viewings' &&
+            currentScreen !== 'settings' && (
             <div className="mt-4 md:mt-6 px-4 lg:px-6 w-full max-w-7xl mx-auto">
               <LandlordDashboardHeader
                 userProfile={userProfile}

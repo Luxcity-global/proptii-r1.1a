@@ -66,7 +66,9 @@ export const SignedContractsProvider: React.FC<{ children: React.ReactNode }> = 
   };
 
   const removeSignedContract = async (id: string): Promise<{ success: boolean; error?: string }> => {
-    return await signedContractsFirestoreService.deleteSignedContract(id);
+    const result = await signedContractsFirestoreService.deleteSignedContract(id);
+    if (result.success) setSignedContracts((prev) => prev.filter((contract) => contract.id !== id));
+    return result;
   };
 
   const getSignedContract = (id: string): SignedContractData | undefined => {

@@ -24,6 +24,27 @@ export function googleMapsEmbedViewUrl(latitude: number, longitude: number): str
   return `https://www.google.com/maps/embed/v1/view?key=${encodeURIComponent(key)}&center=${latitude},${longitude}&zoom=15`;
 }
 
+/** Static map image centred on a free-text address (geocoded by Google). */
+export function googleMapsStaticAddressUrl(
+  query: string,
+  width = 640,
+  height = 180,
+  zoom = 15,
+): string | null {
+  const key = getGoogleMapsApiKey();
+  const q = query.trim();
+  if (!key || !q) return null;
+  const params = new URLSearchParams({
+    center: q,
+    zoom: String(zoom),
+    size: `${width}x${height}`,
+    scale: '2',
+    markers: `color:0x136C9E|${q}`,
+    key,
+  });
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+}
+
 /** Static map image — one request, no nested iframe JS bundle. */
 export function googleMapsStaticImageUrl(
   latitude: number,

@@ -632,7 +632,7 @@ const Viewings: React.FC = () => {
                     }}
                     className={`${isMobile ? 'min-w-[32px] px-1.5 py-1 text-xs' : 'min-w-[40px] px-2 py-1.5 text-sm'} rounded-lg font-medium transition-colors ${
                       currentPage === page
-                        ? 'bg-orange-500 text-white'
+                        ? 'bg-[#DC5F12] hover:bg-[#BA4E0B] text-white'
                         : 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
                     }`}
                     style={{ fontFamily: 'Archivo, sans-serif' }}

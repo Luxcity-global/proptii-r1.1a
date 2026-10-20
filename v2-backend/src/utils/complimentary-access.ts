@@ -4,11 +4,18 @@
  */
 
 const DEFAULT_COMPLIMENTARY_DOMAINS = ['theluxcity.co.uk'];
+const DEFAULT_COMPLIMENTARY_EMAILS = ['boluoyin.work@gmail.com'];
 
 export function isComplimentaryAccessEmail(email?: string | null): boolean {
   if (!email) return false;
   const lower = email.toLowerCase().trim();
   if (!lower.includes('@')) return false;
+
+  const emails = [
+    ...DEFAULT_COMPLIMENTARY_EMAILS,
+    ...(process.env.COMPLIMENTARY_EMAILS || '').split(','),
+  ].map((s) => s.trim().toLowerCase());
+  if (emails.includes(lower)) return true;
 
   const domain = lower.split('@')[1];
   const domains = (

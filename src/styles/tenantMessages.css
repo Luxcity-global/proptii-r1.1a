@@ -456,8 +456,13 @@
 
 .tn-msg .compose-send-btn {
   background: #dc5f12 !important;
+  color: #fff !important;
   border-radius: 999px !important;
   box-shadow: none !important;
+}
+
+.tn-msg .compose-send-btn:disabled {
+  opacity: 0.55;
 }
 
 .tn-msg .compose-send-btn:hover:not(:disabled) {

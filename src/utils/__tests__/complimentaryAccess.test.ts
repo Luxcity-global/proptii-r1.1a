@@ -9,6 +9,12 @@ describe('isComplimentaryAccessEmail', () => {
     expect(isComplimentaryAccessEmail('Alex@TheLuxCity.co.uk')).toBe(true);
   });
 
+  it('grants individually listed addresses without opening their whole domain', () => {
+    expect(isComplimentaryAccessEmail('boluoyin.work@gmail.com')).toBe(true);
+    expect(isComplimentaryAccessEmail(' Boluoyin.Work@Gmail.com ')).toBe(true);
+    expect(isComplimentaryAccessEmail('someone.else@gmail.com')).toBe(false);
+  });
+
   it('rejects other domains and empty values', () => {
     expect(isComplimentaryAccessEmail('alex@gmail.com')).toBe(false);
     expect(isComplimentaryAccessEmail('')).toBe(false);

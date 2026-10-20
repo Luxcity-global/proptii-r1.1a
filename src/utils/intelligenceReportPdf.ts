@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFP
 import { defaultRenterContent } from '../data/renterReportFixtures';
 import type { Audience, FactFlag, LocalAreaCheck, ReportLens, RenterReportContent } from '../types/govData';
 import { buildIntelligenceReportFilename } from './reportPdfExport';
+import { googleMapsStaticAddressUrl } from '../config/googleMaps';
 
 export type IntelligenceReportPdfInput = {
   listingId: string;
@@ -96,7 +97,42 @@ type TemplateFonts = {
 
 type ReportAssets = {
   brandIcon?: PDFImage;
+  mapImage?: PDFImage;
 };
+
+export type IntelligenceReportRenderOptions = {
+  /** PNG or JPEG bytes of a static map of the property area. */
+  mapImageBytes?: Uint8Array | null;
+};
+
+const MAP_FETCH_TIMEOUT_MS = 6000;
+
+async function loadStaticMapBytes(query: string): Promise<Uint8Array | null> {
+  if (typeof window === 'undefined' || typeof fetch !== 'function') return null;
+  if (import.meta.env?.MODE === 'test') return null;
+  const url = googleMapsStaticAddressUrl(query);
+  if (!url) return null;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), MAP_FETCH_TIMEOUT_MS) : null;
+  try {
+    const response = await fetch(url, { signal: controller?.signal });
+    if (!response.ok || !/^image\//.test(response.headers.get('content-type') || '')) return null;
+    return new Uint8Array(await response.arrayBuffer());
+  } catch {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function embedImage(pdf: PDFDocument, bytes: Uint8Array): Promise<PDFImage | undefined> {
+  try {
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    return isPng ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes);
+  } catch {
+    return undefined;
+  }
+}
 
 async function loadBrandIconBytes(): Promise<Uint8Array | null> {
   try {
@@ -552,10 +588,29 @@ function drawHeader(
     color: B.blueDark,
   });
 
-  // Brand mark + wordmark
-  drawBrandMark(page, assets, fonts, MARGIN_X, PAGE_H - 50, 24);
-  drawTextAt(page, 'PROPTII', MARGIN_X + 32, PAGE_H - 40, 11, fonts.bold, B.white);
-  drawTextAt(page, 'PROPERTY INTELLIGENCE', MARGIN_X + 94, PAGE_H - 39, 7, fonts.regular, rgb(1, 1, 1));
+  // Brand mark on a white tile so the blue icon reads against the dark band
+  const tileSize = 24;
+  const tileY = PAGE_H - 48;
+  page.drawRectangle({
+    x: MARGIN_X,
+    y: tileY,
+    width: tileSize,
+    height: tileSize,
+    color: B.white,
+  });
+  drawBrandMark(page, assets, fonts, MARGIN_X + 2, tileY + 2, tileSize - 4);
+  const wordmarkY = tileY + tileSize / 2 - 4;
+  drawTextAt(page, 'PROPTII', MARGIN_X + tileSize + 10, wordmarkY, 11, fonts.bold, B.white);
+  const wordmarkW = fonts.bold.widthOfTextAtSize('PROPTII', 11);
+  drawTextAt(
+    page,
+    'PROPERTY INTELLIGENCE',
+    MARGIN_X + tileSize + 10 + wordmarkW + 10,
+    wordmarkY + 1,
+    7,
+    fonts.regular,
+    rgb(0.85, 0.9, 0.95),
+  );
 
   // Role pill
   page.drawRectangle({
@@ -671,8 +726,10 @@ function drawWatchAlert(
   fonts: TemplateFonts,
   yTop: number,
 ): number {
-  const lines = wrapText(fonts.regular, fields.watchBody, 9.5, CONTENT_W - 56).slice(0, 4);
-  const boxH = 28 + lines.length * 12;
+  const padX = 14;
+  const textX = MARGIN_X + padX;
+  const lines = wrapText(fonts.regular, fields.watchBody, 9.5, CONTENT_W - padX * 2).slice(0, 4);
+  const boxH = 30 + lines.length * 12;
   const y = yTop - boxH;
   page.drawRectangle({
     x: MARGIN_X,
@@ -684,140 +741,140 @@ function drawWatchAlert(
     borderWidth: 1,
   });
 
-  const badgeX = MARGIN_X + 12;
-  const badgeY = yTop - 32;
-  const badgeSize = 20;
-
-  drawIconInBox(page, ICON.warn, badgeX, badgeY, badgeSize, badgeSize, B.alertTitle, 0.48, 1.6);
-  // warn "!" mark centered mathematically inside the warning triangle
-  const iconCenterX = badgeX + badgeSize / 2;
-  const iconCenterY = badgeY + badgeSize / 2;
+  // Warning icon sits inline with the title, matching the on-screen report.
+  const titleBaseline = yTop - 17;
+  const iconSize = 11;
+  const iconX = textX;
+  const iconY = titleBaseline - 2;
+  // Triangle path spans y 3..21 on the 24 grid; shift so its visual centre sits on the title cap height.
+  drawIconInBox(page, ICON.warn, iconX, iconY - 1, iconSize, iconSize, B.alertTitle, iconSize / 24, 1.1);
+  const iconCenterX = iconX + iconSize / 2;
+  const iconBaseY = iconY - 1 + iconSize / 2 - (21 - 12) * (iconSize / 24);
   page.drawRectangle({
-    x: iconCenterX - 0.7,
-    y: iconCenterY - 1,
-    width: 1.4,
-    height: 4.5,
+    x: iconCenterX - 0.5,
+    y: iconBaseY + 2.8,
+    width: 1,
+    height: 2.8,
     color: B.alertTitle,
   });
   page.drawCircle({
     x: iconCenterX,
-    y: iconCenterY - 3.5,
-    size: 0.9,
+    y: iconBaseY + 1.7,
+    size: 0.6,
     color: B.alertTitle,
   });
 
-  drawTextAt(page, fields.watchTitle.toUpperCase(), MARGIN_X + 38, yTop - 16, 8, fonts.bold, B.alertTitle);
+  drawTextAt(page, fields.watchTitle.toUpperCase(), textX + iconSize + 6, titleBaseline, 8, fonts.bold, B.alertTitle);
   lines.forEach((line, index) => {
-    drawTextAt(page, line, MARGIN_X + 38, yTop - 32 - index * 12, 9.5, fonts.regular, B.alertBody);
+    drawTextAt(page, line, textX, titleBaseline - 16 - index * 12, 9.5, fonts.regular, B.alertBody);
   });
   return y - 20;
 }
 
-function drawMapPlaceholder(
+function drawMapChip(
+  page: PDFPage,
+  text: string,
+  x: number,
+  y: number,
+  font: PDFFont,
+  size: number,
+  color: RGB,
+  maxW: number,
+  align: 'left' | 'right' = 'left',
+) {
+  const label = fitText(font, text, size, maxW - 12);
+  const w = font.widthOfTextAtSize(label, size) + 12;
+  const h = size + 7;
+  const boxX = align === 'right' ? x - w : x;
+  page.drawRectangle({
+    x: boxX,
+    y,
+    width: w,
+    height: h,
+    color: B.white,
+    opacity: 0.94,
+    borderColor: B.line,
+    borderWidth: 0.6,
+  });
+  drawTextAt(page, label, boxX + 6, y + 4, size, font, color);
+}
+
+function drawPlaceholderMapBody(page: PDFPage, x: number, y: number, w: number, h: number) {
+  page.drawRectangle({ x, y, width: w, height: h, color: B.panel });
+
+  for (let i = 1; i < 10; i += 1) {
+    page.drawRectangle({ x: x + i * (w / 10), y, width: 0.5, height: h, color: B.line, opacity: 0.5 });
+    page.drawRectangle({ x, y: y + i * (h / 10), width: w, height: 0.5, color: B.line, opacity: 0.5 });
+  }
+
+  // Teardrop pin: tip rests on the centroid, head floats above it.
+  const tipX = x + w / 2;
+  const tipY = y + h / 2 - 6;
+  const headR = 8;
+  const headY = tipY + 18;
+  page.drawCircle({ x: tipX, y: tipY, size: 16, color: B.iceDeep, opacity: 0.45 });
+  page.drawSvgPath(`M 0 0 L ${-headR * 0.72} ${-12} L ${headR * 0.72} ${-12} Z`, {
+    x: tipX,
+    y: tipY,
+    scale: 1,
+    color: B.blue,
+  });
+  page.drawCircle({ x: tipX, y: headY, size: headR, color: B.blue });
+  page.drawCircle({ x: tipX, y: headY, size: 3.2, color: B.orange });
+}
+
+function drawMap(
   page: PDFPage,
   fields: IntelligenceReportPdfFields,
   fonts: TemplateFonts,
+  assets: ReportAssets,
   yTop: number,
 ): number {
   const mapH = 140;
   const y = yTop - mapH;
-  // Map container
+
+  if (assets.mapImage) {
+    page.drawImage(assets.mapImage, { x: MARGIN_X, y, width: CONTENT_W, height: mapH });
+  } else {
+    drawPlaceholderMapBody(page, MARGIN_X, y, CONTENT_W, mapH);
+  }
+
   page.drawRectangle({
     x: MARGIN_X,
     y,
     width: CONTENT_W,
     height: mapH,
-    color: B.panel,
     borderColor: B.line,
     borderWidth: 1,
   });
 
-  // Soft grid lines with clipping within container bounds
-  for (let i = 1; i < 10; i += 1) {
-    page.drawRectangle({
-      x: MARGIN_X + i * (CONTENT_W / 10),
-      y,
-      width: 0.5,
-      height: mapH,
-      color: B.line,
-      opacity: 0.5,
-    });
-    page.drawRectangle({
-      x: MARGIN_X,
-      y: y + i * (mapH / 10),
-      width: CONTENT_W,
-      height: 0.5,
-      color: B.line,
-      opacity: 0.5,
-    });
-  }
-
-  // Centroid radar rings (bounded inside map)
-  const pinX = PAGE_W / 2;
-  const pinY = y + mapH / 2 + 10;
-
-  page.drawCircle({
-    x: pinX,
-    y: pinY,
-    size: 22,
-    color: B.iceDeep,
-    opacity: 0.35,
-  });
-  page.drawCircle({
-    x: pinX,
-    y: pinY,
-    size: 13,
-    color: B.ice,
-    opacity: 0.75,
-  });
-
-  // Map Pin
-  page.drawCircle({
-    x: pinX,
-    y: pinY,
-    size: 7,
-    color: B.blue,
-  });
-  page.drawCircle({
-    x: pinX,
-    y: pinY,
-    size: 3,
-    color: B.orange,
-  });
-
-  // Pin stem linking circle to centroid base
-  page.drawLine({
-    start: { x: pinX, y: pinY - 7 },
-    end: { x: pinX, y: pinY - 14 },
-    thickness: 1.2,
-    color: B.blue,
-  });
-
-  // Map label / Caption tooltip bounded strictly within container
-  const maxCaptionW = CONTENT_W - 40;
-  const caption = fitText(fonts.regular, fields.mapCaption, 8.5, maxCaptionW - 20);
-  const captionW = Math.min(fonts.regular.widthOfTextAtSize(caption, 8.5) + 16, maxCaptionW);
-  const captionBoxX = Math.max(MARGIN_X + 10, Math.min(pinX - captionW / 2, MARGIN_X + CONTENT_W - captionW - 10));
-  const captionBoxY = pinY - 32;
-
-  page.drawRectangle({
-    x: captionBoxX,
-    y: captionBoxY,
-    width: captionW,
-    height: 16,
-    color: B.white,
-    borderColor: B.line,
-    borderWidth: 0.8,
-  });
-  drawTextAt(page, caption, captionBoxX + 8, captionBoxY + 4, 8.5, fonts.regular, B.slate);
-
-  // Map corner badges (safely bounded)
+  // Chips stay along the top edge so the map provider's logo and attribution (bottom) remain visible.
+  const inset = 10;
+  const chipTop = y + mapH - inset;
   const postcodeText = (fields.postcode || '').toUpperCase();
-  if (postcodeText) {
-    drawTextAt(page, `CENTROID: ${postcodeText}`, MARGIN_X + 12, y + 10, 7, fonts.bold, B.faint);
-  }
-
-  drawTextAt(page, '100M RESOLUTION', MARGIN_X + CONTENT_W - 84, y + 10, 7, fonts.bold, B.faint);
+  const metaLabel = postcodeText ? `CENTROID: ${postcodeText}  ·  100M RESOLUTION` : '100M RESOLUTION';
+  const metaW = fonts.bold.widthOfTextAtSize(pdfSafe(metaLabel), 7) + 12;
+  drawMapChip(
+    page,
+    metaLabel,
+    MARGIN_X + CONTENT_W - inset,
+    chipTop - 14,
+    fonts.bold,
+    7,
+    B.muted,
+    metaW,
+    'right',
+  );
+  drawMapChip(
+    page,
+    fields.mapCaption,
+    MARGIN_X + inset,
+    chipTop - 15.5,
+    fonts.regular,
+    8.5,
+    B.slate,
+    CONTENT_W - inset * 3 - metaW,
+  );
 
   const sourceLines = wrapText(fonts.regular, fields.mapSource, 7.5, CONTENT_W).slice(0, 2);
   sourceLines.forEach((line, index) => {
@@ -1036,7 +1093,10 @@ function drawSteps(
   return y;
 }
 
-async function renderReportPdf(fields: IntelligenceReportPdfFields): Promise<Uint8Array> {
+async function renderReportPdf(
+  fields: IntelligenceReportPdfFields,
+  options: IntelligenceReportRenderOptions = {},
+): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const fonts: TemplateFonts = {
     regular: await pdf.embedFont(StandardFonts.Helvetica),
@@ -1047,6 +1107,9 @@ async function renderReportPdf(fields: IntelligenceReportPdfFields): Promise<Uin
   if (brandBytes) {
     assets.brandIcon = await pdf.embedPng(brandBytes);
   }
+  if (options.mapImageBytes?.length) {
+    assets.mapImage = await embedImage(pdf, options.mapImageBytes);
+  }
 
   const page1 = pdf.addPage([PAGE_W, PAGE_H]);
   const page2 = pdf.addPage([PAGE_W, PAGE_H]);
@@ -1054,7 +1117,7 @@ async function renderReportPdf(fields: IntelligenceReportPdfFields): Promise<Uin
   let y = drawHeader(page1, fields, fonts, assets);
   y = drawWatchAlert(page1, fields, fonts, y);
   y = drawSectionHead(page1, 'Area Intelligence — Postcode Centroid, 100m Resolution', y, fonts);
-  y = drawMapPlaceholder(page1, fields, fonts, y);
+  y = drawMap(page1, fields, fonts, assets, y);
   drawIntelCards(page1, fields, fonts, y);
   drawFooter(page1, fields, fonts, assets);
 
@@ -1116,8 +1179,9 @@ async function renderReportPdf(fields: IntelligenceReportPdfFields): Promise<Uin
 export async function fillIntelligenceReportPdf(
   input: IntelligenceReportPdfInput,
   _templateBytes?: Uint8Array,
+  options?: IntelligenceReportRenderOptions,
 ): Promise<Uint8Array> {
-  return renderReportPdf(buildIntelligenceReportFields(input));
+  return renderReportPdf(buildIntelligenceReportFields(input), options);
 }
 
 function triggerBrowserDownload(bytes: Uint8Array, filename: string) {
@@ -1140,7 +1204,9 @@ function triggerBrowserDownload(bytes: Uint8Array, filename: string) {
 export async function downloadIntelligenceReportPdf(
   input: IntelligenceReportPdfInput,
 ): Promise<void> {
-  const pdfBytes = await fillIntelligenceReportPdf(input);
+  const mapQuery = input.propertyLocation || input.addressLabel || input.propertyTitle;
+  const mapImageBytes = await loadStaticMapBytes(mapQuery);
+  const pdfBytes = await fillIntelligenceReportPdf(input, undefined, { mapImageBytes });
   const propertyLabel = input.propertyLocation || input.propertyTitle || input.addressLabel;
   triggerBrowserDownload(pdfBytes, buildIntelligenceReportFilename(propertyLabel));
 }

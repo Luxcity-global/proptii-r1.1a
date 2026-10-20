@@ -3,7 +3,7 @@
  *
  * Calls go to the NestJS v2 backend (VITE_API_ENDPOINT).
  *
- * Requirements: 3.2, 6.1–6.6, 7.1, 7.4
+ * Requirements: 3.2, 6.1â€“6.6, 7.1, 7.4
  */
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
@@ -18,6 +18,18 @@ import type {
 } from '../types/messaging';
 
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
+import {
+    deleteDemoMessage,
+    editDemoMessage,
+    getDemoConversations,
+    getDemoMessages,
+    getDemoUnreadCount,
+    isDemoConversation,
+    isDemoMessage,
+    isDemoMessagingSession,
+    markDemoRead,
+    sendDemoMessage,
+} from '../data/demoMessages';
 
 // Resolve lazily at request time so env changes take effect without a hard refresh.
 // A module-level const would freeze the URL at import time.
@@ -84,7 +96,7 @@ const commApi = {
 };
 
 /**
- * Unwrap the Azure Functions / NestJS response envelope `{ data: T }` → T.
+ * Unwrap the Azure Functions / NestJS response envelope `{ data: T }` â†’ T.
  * Falls back to the raw body if the envelope is absent (future-proofing).
  */
 function unwrap<T>(body: any): T {
@@ -101,12 +113,13 @@ const communicationService = {
      * Requirements: 6.1
      */
     async getConversations(): Promise<Conversation[]> {
+        const demo = isDemoMessagingSession() ? getDemoConversations() : [];
         try {
             const { data } = await commApi.get('/conversations');
-            return unwrap<Conversation[]>(data) || [];
+            return [...demo, ...(unwrap<Conversation[]>(data) || [])];
         } catch (err) {
-            console.warn('⚠️ Communication service getConversations failed, falling back to empty list:', err);
-            return [];
+            console.warn('âš ï¸ Communication service getConversations failed, falling back to empty list:', err);
+            return demo;
         }
     },
 
@@ -126,6 +139,10 @@ const communicationService = {
      * Requirements: 6.3
      */
     async getMessages(conversationId: string, before?: string, limit = 25): Promise<{ messages: Message[]; hasMore: boolean } & Message[]> {
+        if (isDemoConversation(conversationId)) {
+            const list = before ? [] : getDemoMessages(conversationId);
+            return Object.assign([...list], { messages: list, hasMore: false });
+        }
         try {
             const params = new URLSearchParams({ limit: String(limit) });
             if (before) params.set('before', before);
@@ -151,7 +168,7 @@ const communicationService = {
             }
             return Object.assign([...list], { messages: list, hasMore });
         } catch (err) {
-            console.warn('⚠️ Communication service getMessages failed:', err);
+            console.warn('âš ï¸ Communication service getMessages failed:', err);
             return Object.assign([] as Message[], { messages: [] as Message[], hasMore: false });
         }
     },
@@ -162,6 +179,7 @@ const communicationService = {
      * Requirements: 6.4
      */
     async sendMessage(conversationId: string, dto: SendMessageDto): Promise<Message> {
+        if (isDemoConversation(conversationId)) return sendDemoMessage(conversationId, dto);
         const { data } = await commApi.post(`/conversations/${conversationId}/messages`, dto);
         return unwrap<Message>(data);
     },
@@ -171,6 +189,7 @@ const communicationService = {
      * PATCH /api/communication/messages/{id}/body
      */
     async editMessage(messageId: string, body: string): Promise<Message> {
+        if (isDemoMessage(messageId)) return editDemoMessage(messageId, body);
         const { data } = await commApi.patch(`/messages/${messageId}/body`, { body });
         return unwrap<Message>(data);
     },
@@ -180,6 +199,7 @@ const communicationService = {
      * DELETE /api/communication/messages/{id}
      */
     async deleteMessage(messageId: string): Promise<Message> {
+        if (isDemoMessage(messageId)) return deleteDemoMessage(messageId);
         const { data } = await commApi.delete(`/messages/${messageId}`);
         return unwrap<Message>(data);
     },
@@ -190,6 +210,10 @@ const communicationService = {
      * Requirements: 6.5
      */
     async markRead(messageId: string, conversationId: string): Promise<void> {
+        if (isDemoConversation(conversationId)) {
+            markDemoRead(messageId);
+            return;
+        }
         try {
             await commApi.patch(
                 `/messages/${messageId}/read`,
@@ -197,7 +221,7 @@ const communicationService = {
                 { params: { conversationId } },
             );
         } catch (err) {
-            console.warn('⚠️ Communication service markRead failed:', err);
+            console.warn('âš ï¸ Communication service markRead failed:', err);
         }
     },
 
@@ -207,24 +231,25 @@ const communicationService = {
      * Requirements: 6.6
      */
     async getUnreadCount(): Promise<number> {
+        const demo = isDemoMessagingSession() ? getDemoUnreadCount() : 0;
         try {
             const { data } = await commApi.get('/conversations/unread-count');
             const result = unwrap<{ unreadCount: number } | number>(data);
             if (typeof result === 'number') {
-                return result;
+                return demo + result;
             }
             if (result !== null && typeof result === 'object') {
                 if (typeof (result as any).unreadCount === 'number') {
-                    return (result as { unreadCount: number }).unreadCount;
+                    return demo + (result as { unreadCount: number }).unreadCount;
                 }
                 if (typeof (result as any).count === 'number') {
-                    return (result as { count: number }).count;
+                    return demo + (result as { count: number }).count;
                 }
             }
-            return 0;
+            return demo;
         } catch (err) {
-            console.warn('⚠️ Communication service getUnreadCount failed, falling back to 0:', err);
-            return 0;
+            console.warn('âš ï¸ Communication service getUnreadCount failed, falling back to 0:', err);
+            return demo;
         }
     },
 
@@ -234,7 +259,7 @@ const communicationService = {
      * Requirements: 7.1
      *
      * Files go to POST /api/storage/upload (v2-backend) instead of directly to Firebase Storage.
-     * The backend signs the upload with the Admin SDK — no client-side Firebase SDK needed.
+     * The backend signs the upload with the Admin SDK â€” no client-side Firebase SDK needed.
      */
     async uploadAttachment(file: File, conversationId: string): Promise<MessageAttachment> {
         const extensionMimeMap: Record<string, string> = {
@@ -297,9 +322,10 @@ const communicationService = {
      * POST /api/communication/conversations/{id}/typing
      */
     async sendTyping(conversationId: string): Promise<void> {
+        if (isDemoConversation(conversationId)) return;
         try {
             await commApi.post(`/conversations/${conversationId}/typing`, {});
-        } catch (_e) { /* non-fatal — typing indicators are best-effort */ }
+        } catch (_e) { /* non-fatal â€” typing indicators are best-effort */ }
     },
 
     /**

@@ -2734,6 +2734,8 @@ export function AppContent() {
             userProfile={userProfile}
             userRole={userRole}
             isAuthenticated={isAuthenticated}
+            onViewNotifications={() => handleNavigation('messages')}
+            onViewInsights={() => handleNavigation('insights')}
           />
         );
 

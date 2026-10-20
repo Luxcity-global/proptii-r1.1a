@@ -2,6 +2,13 @@ import apiService from './api';
 import sseService from './sseService';
 import landlordUserService from './landlordUserService';
 import { publishViewingCopy, rememberViewings, rememberApplicant, applyRememberedApplicant, forgetViewing, hasStoredViewing, isViewingRemoved } from './viewingInboxService';
+import {
+  getTenantDemoViewings,
+  isTenantDemoSession,
+  isTenantDemoViewing,
+  removeTenantDemoViewing,
+  updateTenantDemoViewing,
+} from '../data/tenantDemoData';
 
 const CLOSED_VIEWING_STATUSES = new Set(['confirmed', 'completed', 'cancelled', 'rescheduled']);
 
@@ -169,23 +176,33 @@ export class ViewingPollingCoordinator {
 
     const serial = ++this.requestSerial;
     const promise = (async () => {
+      const demo = isTenantDemoSession() ? getTenantDemoViewings() : [];
       try {
         const response = await apiService.get('/viewing-requests');
         const payload = Array.isArray(response) ? response : (response?.data || []);
         const rows = Array.isArray(payload) ? payload : (payload?.data || []);
-        const items = (Array.isArray(rows) ? rows : [])
+        const live = (Array.isArray(rows) ? rows : [])
           .map(normalizeViewingItem)
           .filter((item) => item?.id && item.deleted !== true && !isViewingRemoved(item.id));
+        const items = [...demo, ...live];
         if (serial !== this.requestSerial) return items;
         this.cachedData = items;
         this.lastFetchTime = Date.now();
-        rememberViewings(items);
-        items.forEach((item) => {
+        rememberViewings(live);
+        live.forEach((item) => {
           publishViewingCopy(item).catch(() => {});
         });
         this.notifyAll(items);
         return items;
       } catch (err: any) {
+        if (demo.length > 0) {
+          if (serial === this.requestSerial) {
+            this.cachedData = demo;
+            this.lastFetchTime = Date.now();
+            this.notifyAll(demo);
+          }
+          return demo;
+        }
         if (serial !== this.requestSerial) throw err;
         const error = err instanceof Error ? err : new Error(err?.message || 'Unknown error');
         this.notifyError(error);
@@ -491,6 +508,11 @@ class ViewingService {
       viewingDetails?: ViewingBooking['viewingDetails'];
     }
   ): Promise<{ success: boolean; error?: string }> {
+    if (isTenantDemoViewing(bookingId)) {
+      updateTenantDemoViewing(bookingId, status, updates?.viewingDetails);
+      viewingPollingCoordinator.applyLocalUpdate(bookingId, { status, viewingDetails: updates?.viewingDetails });
+      return { success: true };
+    }
     try {
       const payload: any = { status };
       if (notes) payload.notes = notes;
@@ -532,6 +554,11 @@ class ViewingService {
   }
 
   async deleteViewingBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
+    if (isTenantDemoViewing(bookingId)) {
+      removeTenantDemoViewing(bookingId);
+      viewingPollingCoordinator.removeCached(bookingId);
+      return { success: true };
+    }
     const storedLocally = hasStoredViewing(bookingId);
     try {
       await apiService.delete(`/viewing-requests/${bookingId}`);

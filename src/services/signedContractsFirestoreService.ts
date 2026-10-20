@@ -1,5 +1,12 @@
 import apiService from './api';
 import sseService from './sseService';
+import {
+  getTenantDemoContract,
+  getTenantDemoContracts,
+  isTenantDemoContract,
+  isTenantDemoSession,
+  removeTenantDemoContract,
+} from '../data/tenantDemoData';
 
 const logDev = (...args: any[]) => {
   if (import.meta.env.DEV) {
@@ -68,6 +75,7 @@ class SignedContractsFirestoreService {
   }
 
   async getUserSignedContracts(userId: string): Promise<{ success: boolean; contracts?: SignedContractData[]; error?: string }> {
+    const demo = isTenantDemoSession() ? getTenantDemoContracts() : [];
     try {
       const response = await apiService.get(`/contracts`);
       const body = response?.data ?? response;
@@ -83,13 +91,18 @@ class SignedContractsFirestoreService {
         createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
         updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
       }));
-      return { success: true, contracts };
+      return { success: true, contracts: [...demo, ...contracts] };
     } catch (error: any) {
+      if (demo.length > 0) return { success: true, contracts: demo };
       return { success: false, error: error.message };
     }
   }
 
   async getSignedContractById(contractId: string): Promise<{ success: boolean; contract?: SignedContractData; error?: string }> {
+    if (isTenantDemoContract(contractId)) {
+      const contract = getTenantDemoContract(contractId);
+      return contract ? { success: true, contract } : { success: false, error: 'Contract not found' };
+    }
     try {
       const response = await apiService.get(`/contracts/${contractId}`);
       const body = response?.data ?? response;
@@ -125,6 +138,10 @@ class SignedContractsFirestoreService {
   }
 
   async deleteSignedContract(contractId: string): Promise<{ success: boolean; error?: string }> {
+    if (isTenantDemoContract(contractId)) {
+      removeTenantDemoContract(contractId);
+      return { success: true };
+    }
     try {
       await apiService.delete(`/contracts/${contractId}`);
       return { success: true };

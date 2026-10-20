@@ -534,11 +534,50 @@
   border-bottom: 1px solid rgba(226, 232, 240, 0.8);
 }
 
+.tn-vw-table td {
+  padding: 14px 20px;
+  vertical-align: middle;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
+}
+
+.tn-vw-table tbody tr:last-child td { border-bottom: none; }
+.tn-vw-table tbody tr:hover td { background: #f8fafc; }
+
+.tn-vw-table td:first-child {
+  white-space: normal;
+  min-width: 220px;
+  max-width: 320px;
+  line-height: 1.4;
+}
+
+.tn-vw-table td:first-child strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.tn-vw-table td:first-child div {
+  max-width: 300px;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tn-vw-table .tn-vw-actions {
   margin-top: 0;
   padding-top: 0;
   border-top: none;
   min-width: 200px;
+}
+
+.tn-vw-table .tn-vw-actions button {
+  flex: 0 0 auto;
+  min-width: 96px;
+  padding: 7px 14px;
+  white-space: nowrap;
 }
 
 .tn-vw-cal {

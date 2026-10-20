@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FileText, Download, Eye, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Search, Filter, Star, Trash2, Upload } from 'lucide-react';
+import { FileText, Download, Eye, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Search, Filter, Star, Trash2, Upload, MoreHorizontal, Check } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 
 import { useAuth } from '../../../contexts/AuthContext';
 import TenantPageHeader from '../ui/TenantPageHeader';
-import BookViewingModal from '../../viewings/BookViewingModal';
+import RequestViewingModal, { RequestViewingProperty } from '../../viewings/RequestViewingModal';
+import { propertySelectionService } from '../../../services/propertySelectionService';
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
 import PlanUpgradeWall from '../PlanUpgradeWall';
@@ -15,6 +17,14 @@ import '../../../styles/tenantContracts.css';
 import '../../../styles/tenantModals.css';
 
 type ContractTab = 'all' | 'signed' | 'pending' | 'drafts';
+type DateFilter = 'all' | '30' | '90' | '365';
+
+const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
+  { value: 'all', label: 'Any time' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '90', label: 'Last 3 months' },
+  { value: '365', label: 'Last 12 months' },
+];
 
 function agentInitials(name?: string | null): string {
   const parts = (name || 'Agent').trim().split(/\s+/).filter(Boolean);
@@ -38,6 +48,7 @@ const TenantContracts: React.FC = () => {
     setIsContractModalOpen(true);
   }, [signContractId]);
   const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
+  const [viewingProperties, setViewingProperties] = useState<RequestViewingProperty[]>([]);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [issueTemplate, setIssueTemplate] = useState('Standard Assured Shorthold Tenancy (AST) — 12 Months');
   const [issueProperty, setIssueProperty] = useState('');
@@ -49,6 +60,8 @@ const TenantContracts: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ContractTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortNewestFirst, setSortNewestFirst] = useState(true);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [partyFilter, setPartyFilter] = useState<string>('all');
   const ITEMS_PER_PAGE = 10;
 
   const displaySignedContracts = useMemo(() => {
@@ -72,6 +85,16 @@ const TenantContracts: React.FC = () => {
     });
   }, [signedContracts]);
 
+  const counterparties = useMemo(
+    () =>
+      Array.from(
+        new Set(displaySignedContracts.map((c) => c.agentName).filter((name): name is string => Boolean(name))),
+      ).sort((a, b) => a.localeCompare(b)),
+    [displaySignedContracts],
+  );
+
+  const activeFilterCount = (dateFilter !== 'all' ? 1 : 0) + (partyFilter !== 'all' ? 1 : 0);
+
   const contractStats = {
     total: displaySignedContracts.length,
     signed: displaySignedContracts.filter((c) => c.status === 'signed' || !c.status).length,
@@ -93,6 +116,18 @@ const TenantContracts: React.FC = () => {
       list = list.filter((contract) => contract.status === 'draft');
     } else if (activeTab === 'signed') {
       list = list.filter((contract) => contract.status === 'signed' || !contract.status);
+    }
+
+    if (partyFilter !== 'all') {
+      list = list.filter((contract) => contract.agentName === partyFilter);
+    }
+
+    if (dateFilter !== 'all') {
+      const cutoff = Date.now() - Number(dateFilter) * 24 * 60 * 60 * 1000;
+      list = list.filter((contract) => {
+        const time = contract.signedDate ? new Date(contract.signedDate).getTime() : NaN;
+        return !Number.isNaN(time) && time >= cutoff;
+      });
     }
 
     if (query) {
@@ -118,7 +153,7 @@ const TenantContracts: React.FC = () => {
       const bTime = b.signedDate ? new Date(b.signedDate).getTime() : 0;
       return sortNewestFirst ? bTime - aTime : aTime - bTime;
     });
-  }, [displaySignedContracts, activeTab, searchQuery, sortNewestFirst]);
+  }, [displaySignedContracts, activeTab, searchQuery, sortNewestFirst, partyFilter, dateFilter]);
 
   const currentContracts = filteredContracts;
 
@@ -131,7 +166,33 @@ const TenantContracts: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [currentContracts.length, activeTab, searchQuery]);
+  }, [currentContracts.length, activeTab, searchQuery, partyFilter, dateFilter]);
+
+  useEffect(() => {
+    if (!isBookViewingOpen || !user?.id) return;
+    let active = true;
+    propertySelectionService
+      .getUserPropertySelections(user.id)
+      .then((result) => {
+        if (!active || !result.success || !result.selections) return;
+        setViewingProperties(
+          result.selections
+            .map((selection) => ({
+              id: selection.propertyId,
+              street: selection.property?.location?.street || selection.property?.address || selection.property?.title,
+              town: selection.property?.location?.town,
+              city: selection.property?.location?.city,
+              postcode: selection.property?.location?.postcode,
+              agent: selection.property?.agent,
+            }))
+            .filter((property): property is RequestViewingProperty => Boolean(property.street)),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isBookViewingOpen, user?.id]);
 
   if (!canAccessSection('tenant-contracts', plan, status)) {
     return (
@@ -288,6 +349,37 @@ const TenantContracts: React.FC = () => {
     </>
   );
 
+  const renderActionsMenu = (contract: any) => (
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger asChild>
+        <button type="button" className="tn-ct-more-btn" aria-label="Contract actions" title="Actions">
+          <MoreHorizontal className="w-4 h-4" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content align="end" sideOffset={6} className="tn-ct-menu">
+          <DropdownMenu.Item className="tn-ct-menu-item is-accent" onSelect={() => void handleViewContract(contract)}>
+            <Eye className="w-4 h-4" />
+            View PDF
+          </DropdownMenu.Item>
+          <DropdownMenu.Item className="tn-ct-menu-item" onSelect={() => void handleDownloadContract(contract)}>
+            <Download className="w-4 h-4" />
+            Download
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator className="tn-ct-menu-sep" />
+          <DropdownMenu.Item
+            className="tn-ct-menu-item is-danger"
+            disabled={!contract.id}
+            onSelect={() => contract.id && void handleDeleteContract(String(contract.id))}
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+
   const contractsHeader = (
     <TenantPageHeader
       title="Contracts"
@@ -299,10 +391,14 @@ const TenantContracts: React.FC = () => {
   );
 
   const viewingModal = (
-    <BookViewingModal
+    <RequestViewingModal
       open={isBookViewingOpen}
       onClose={() => setIsBookViewingOpen(false)}
-      onSubmissionComplete={() => setIsBookViewingOpen(false)}
+      userId={user?.id}
+      applicantName={user?.name || [user?.givenName, user?.familyName].filter(Boolean).join(' ')}
+      applicantEmail={user?.email}
+      applicantPhone={user?.phone}
+      properties={viewingProperties}
     />
   );
 
@@ -391,15 +487,75 @@ const TenantContracts: React.FC = () => {
               placeholder="Search Contracts..."
             />
           </div>
-          <button
-            type="button"
-            className={`tn-ct-ghost${searchQuery ? ' is-active' : ''}`}
-            onClick={() => setSearchQuery('')}
-            title="Clear search"
-          >
-            <Filter className="w-3.5 h-3.5" />
-            Filter
-          </button>
+          <DropdownMenu.Root modal={false}>
+            <DropdownMenu.Trigger asChild>
+              <button
+                type="button"
+                className={`tn-ct-ghost${activeFilterCount > 0 ? ' is-active' : ''}`}
+                title="Filter contracts"
+              >
+                <Filter className="w-3.5 h-3.5" />
+                Filter
+                {activeFilterCount > 0 && <span className="tn-ct-filter-count">{activeFilterCount}</span>}
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={6} className="tn-ct-menu tn-ct-filter-menu">
+                <DropdownMenu.Label className="tn-ct-menu-label">Date</DropdownMenu.Label>
+                <DropdownMenu.RadioGroup value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
+                  {DATE_FILTER_OPTIONS.map((option) => (
+                    <DropdownMenu.RadioItem
+                      key={option.value}
+                      value={option.value}
+                      className="tn-ct-menu-item"
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      <span className="tn-ct-menu-check">
+                        <DropdownMenu.ItemIndicator><Check className="w-3.5 h-3.5" /></DropdownMenu.ItemIndicator>
+                      </span>
+                      {option.label}
+                    </DropdownMenu.RadioItem>
+                  ))}
+                </DropdownMenu.RadioGroup>
+
+                {counterparties.length > 0 && (
+                  <>
+                    <DropdownMenu.Separator className="tn-ct-menu-sep" />
+                    <DropdownMenu.Label className="tn-ct-menu-label">Counterparty / Agent</DropdownMenu.Label>
+                    <div className="tn-ct-menu-scroll">
+                      <DropdownMenu.RadioGroup value={partyFilter} onValueChange={setPartyFilter}>
+                        {['all', ...counterparties].map((party) => (
+                          <DropdownMenu.RadioItem
+                            key={party}
+                            value={party}
+                            className="tn-ct-menu-item"
+                            onSelect={(e) => e.preventDefault()}
+                          >
+                            <span className="tn-ct-menu-check">
+                              <DropdownMenu.ItemIndicator><Check className="w-3.5 h-3.5" /></DropdownMenu.ItemIndicator>
+                            </span>
+                            <span className="tn-ct-menu-text">{party === 'all' ? 'Everyone' : party}</span>
+                          </DropdownMenu.RadioItem>
+                        ))}
+                      </DropdownMenu.RadioGroup>
+                    </div>
+                  </>
+                )}
+
+                <DropdownMenu.Separator className="tn-ct-menu-sep" />
+                <DropdownMenu.Item
+                  className="tn-ct-menu-item is-accent"
+                  disabled={activeFilterCount === 0}
+                  onSelect={() => {
+                    setDateFilter('all');
+                    setPartyFilter('all');
+                  }}
+                >
+                  Clear filters
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
           <button
             type="button"
             className={`tn-ct-ghost${!sortNewestFirst ? ' is-active' : ''}`}
@@ -421,11 +577,11 @@ const TenantContracts: React.FC = () => {
           <p>
             {activeTab === 'pending' || activeTab === 'drafts'
               ? 'There are no contracts in this view yet. Signed agreements will appear under All and Signed.'
-              : searchQuery
-                ? 'No contracts match your search. Try a different name, agent, or email.'
+              : searchQuery || activeFilterCount > 0
+                ? 'No contracts match your search or filters. Try a different name, agent, or date range.'
                 : 'Once you generate or receive an agreement, it will appear here. Track e-signatures, download PDF copies, and receive automated renewal reminders.'}
           </p>
-          {!searchQuery && activeTab !== 'pending' && activeTab !== 'drafts' && (
+          {!searchQuery && activeFilterCount === 0 && activeTab !== 'pending' && activeTab !== 'drafts' && (
             <>
               <div className="tn-ct-steps">
                 <span className="tn-ct-step"><span className="tn-ct-step-num">1</span>Select Template</span>
@@ -491,8 +647,8 @@ const TenantContracts: React.FC = () => {
                     </td>
                     <td className="tn-ct-date">{formatDate(getContractDate(contract))}</td>
                     <td className="tn-ct-date">N/A</td>
-                    <td>
-                      <div className="tn-ct-actions">{renderActions(contract)}</div>
+                    <td className="tn-ct-actions-cell">
+                      <div className="tn-ct-actions">{renderActionsMenu(contract)}</div>
                     </td>
                   </tr>
                 ))}

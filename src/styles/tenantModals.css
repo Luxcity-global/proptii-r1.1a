@@ -270,6 +270,14 @@
   color: #0f172a;
 }
 
+.tn-modal-party input[type="radio"] {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 0;
+  margin: 0;
+  accent-color: #dc5f12;
+}
+
 .tn-modal-party label:hover { background: #f8fafc; }
 .tn-modal-party label.is-on { border-color: #dc5f12; background: #fff7ed; }
 
