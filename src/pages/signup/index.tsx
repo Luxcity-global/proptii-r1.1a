@@ -16,6 +16,20 @@ import type { BillingCycle } from '../../components/pricing/PricingBillingToggle
 import { getPlanById } from '../../config/plans';
 import type { PlanId } from '../../config/plans';
 import { setRoleIntent } from '../../utils/roleIntent';
+import type { RoleIntentValue } from '../../utils/roleIntent';
+
+/**
+ * Maps a plan segment string to a RoleIntentValue.
+ * Covers all segments currently defined in plans.ts.
+ * Returns null for unrecognised segments so callers can decide how to handle.
+ */
+function planSegmentToRoleIntent(segment: string | undefined): RoleIntentValue | null {
+  if (segment === 'agent')         return 'agent';
+  if (segment === 'landlord')      return 'landlord';
+  if (segment === 'renter')        return 'tenant';
+  if (segment === 'buyer')         return 'tenant';
+  return null;
+}
 
 import { trackEvent } from '../../utils/analytics';
 import '../../styles/pricing.css';
@@ -133,9 +147,14 @@ const DedicatedSignupPage: React.FC = () => {
       const selectedPlan = planId ? getPlanById(planId as PlanId) : null;
       if (selectedPlan) {
         const segment = selectedPlan.segment[0];
-        if (segment === 'agent')         setRoleIntent('agent');
-        else if (segment === 'landlord') setRoleIntent('landlord');
-        else                             setRoleIntent('tenant');
+        const roleIntent = planSegmentToRoleIntent(segment);
+        if (roleIntent) {
+          setRoleIntent(roleIntent);
+        } else {
+          // Unrecognised segment — fall back to tenant and warn
+          console.warn(`[signup] Unrecognised plan segment "${segment}" — defaulting to tenant`);
+          setRoleIntent('tenant');
+        }
       } else {
         // No plan selected — remove stale intent so /select-role shows cleanly
         sessionStorage.removeItem('proptii_signup_role_intent');
@@ -182,9 +201,14 @@ const DedicatedSignupPage: React.FC = () => {
     const selectedPlan = planId ? getPlanById(planId as PlanId) : null;
     if (selectedPlan) {
       const segment = selectedPlan.segment[0];
-      if (segment === 'agent')         setRoleIntent('agent');
-      else if (segment === 'landlord') setRoleIntent('landlord');
-      else                             setRoleIntent('tenant');
+      const roleIntent = planSegmentToRoleIntent(segment);
+      if (roleIntent) {
+        setRoleIntent(roleIntent);
+      } else {
+        // Unrecognised segment — fall back to tenant and warn
+        console.warn(`[signup] Unrecognised plan segment "${segment}" — defaulting to tenant`);
+        setRoleIntent('tenant');
+      }
     } else {
       // No plan selected — remove stale intent so /select-role shows cleanly
       sessionStorage.removeItem('proptii_signup_role_intent');

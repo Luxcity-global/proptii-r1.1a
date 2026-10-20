@@ -5,10 +5,11 @@ import { setRole } from '../services/roleService';
 import type { UserRole } from '../services/roleService';
 
 /**
- * RoleSelect — shown to authenticated users with no role assigned yet,
- * and to landlords/agents switching to tenant view from Settings.
+ * RoleSelect — shown to authenticated users with no role assigned yet.
+ * Once a role is selected, the user is routed to the appropriate dashboard
+ * and the page is skipped on subsequent visits (role already resolved).
  *
- * Design: centred card on a soft gradient background, two side-by-side
+ * Design: centred card on a soft gradient background, three side-by-side
  * role panels following the Proptii brand reference.
  */
 const RoleSelect: React.FC = () => {

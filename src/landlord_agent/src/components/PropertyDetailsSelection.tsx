@@ -597,6 +597,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
                       style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
                     />
                   </div>
+                </div>
               </div>
 
               {specWarning && (
