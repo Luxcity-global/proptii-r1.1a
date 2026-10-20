@@ -13,6 +13,212 @@ import {
   isComplimentaryAccessEmail,
 } from '../utils/complimentary-access';
 
+// ─── Module-level plans cache (survives hot-reload within the same process) ───
+let _plansCache: any[] | null = null;
+let _plansCacheTime = 0;
+
+// ─── Static plan catalogue (metadata only — no live prices) ──────────────────
+
+const PLANS_CATALOGUE = [
+  {
+    id: 'explorer',
+    name: 'Explorer',
+    segment: ['renter', 'buyer'],
+    features: [
+      { label: 'Property search', included: true },
+      { label: 'Save up to 5 properties', included: true },
+      { label: 'Basic viewing requests', included: true },
+      { label: 'AI fit score', included: false },
+      { label: 'Unlimited saved properties', included: false },
+      { label: 'Priority viewing slots', included: false },
+      { label: 'Referencing toolkit', included: false },
+    ],
+    isPopular: false,
+    isDark: false,
+    isContactSales: false,
+    isFree: true,
+    fitChecksQuota: null as number | null,
+    fitChecksOverageRate: null as number | null,
+    fallbackMonthlyPrice: 0 as number | null,
+    fallbackAnnualPrice: null as number | null,
+  },
+  {
+    id: 'renter_pro',
+    name: 'Renter Pro',
+    segment: ['renter'],
+    features: [
+      { label: 'Everything in Explorer', included: true },
+      { label: 'Unlimited saved properties', included: true },
+      { label: 'AI fit score & match report', included: true },
+      { label: 'Priority viewing slots', included: true },
+      { label: 'Referencing toolkit', included: true },
+      { label: 'Move-in checklist', included: true },
+      { label: 'Document storage (5 GB)', included: true },
+    ],
+    isPopular: true,
+    isDark: false,
+    isContactSales: false,
+    isFree: false,
+    fitChecksQuota: null as number | null,
+    fitChecksOverageRate: null as number | null,
+    fallbackMonthlyPrice: 12 as number | null,
+    fallbackAnnualPrice: 99 as number | null,
+  },
+  {
+    id: 'buyer_pro',
+    name: 'Buyer Pro',
+    segment: ['buyer'],
+    features: [
+      { label: 'Everything in Renter Pro', included: true },
+      { label: 'Mortgage readiness score', included: true },
+      { label: 'Solicitor recommendations', included: true },
+      { label: 'Survey & valuation tracker', included: true },
+      { label: 'Buyer journey timeline', included: true },
+      { label: 'Document storage (20 GB)', included: true },
+      { label: 'Priority support', included: true },
+    ],
+    isPopular: false,
+    isDark: false,
+    isContactSales: false,
+    isFree: false,
+    fitChecksQuota: null as number | null,
+    fitChecksOverageRate: null as number | null,
+    fallbackMonthlyPrice: 19 as number | null,
+    fallbackAnnualPrice: 159 as number | null,
+  },
+  {
+    id: 'starter',
+    name: 'Starter',
+    segment: ['landlord'],
+    features: [
+      { label: 'Up to 2 properties', included: true },
+      { label: 'Tenant referencing (basic)', included: true },
+      { label: 'Digital contracts', included: true },
+      { label: 'Viewing management', included: true },
+      { label: 'Compliance reminders', included: false },
+      { label: 'Maintenance tracker', included: false },
+      { label: 'Financial dashboard', included: false },
+    ],
+    isPopular: false,
+    isDark: false,
+    isContactSales: false,
+    isFree: false,
+    fitChecksQuota: null as number | null,
+    fitChecksOverageRate: null as number | null,
+    fallbackMonthlyPrice: 29 as number | null,
+    fallbackAnnualPrice: 249 as number | null,
+  },
+  {
+    id: 'landlord_pro',
+    name: 'Landlord Pro',
+    segment: ['landlord'],
+    features: [
+      { label: 'Everything in Starter', included: true },
+      { label: 'Up to 10 properties', included: true },
+      { label: 'Advanced tenant referencing', included: true },
+      { label: 'Compliance reminders', included: true },
+      { label: 'Maintenance tracker', included: true },
+      { label: 'Financial dashboard', included: true },
+      { label: 'Priority support', included: true },
+    ],
+    isPopular: true,
+    isDark: false,
+    isContactSales: false,
+    isFree: false,
+    fitChecksQuota: null as number | null,
+    fitChecksOverageRate: null as number | null,
+    fallbackMonthlyPrice: 49 as number | null,
+    fallbackAnnualPrice: 399 as number | null,
+  },
+  {
+    id: 'elite',
+    name: 'Elite',
+    segment: ['landlord'],
+    features: [
+      { label: 'Everything in Landlord Pro', included: true },
+      { label: 'Unlimited properties', included: true },
+      { label: 'Dedicated account manager', included: true },
+      { label: 'Custom lease templates', included: true },
+      { label: 'Bulk referencing', included: true },
+      { label: 'API access', included: true },
+      { label: '24/7 priority support', included: true },
+    ],
+    isPopular: false,
+    isDark: true,
+    isContactSales: false,
+    isFree: false,
+    fitChecksQuota: null as number | null,
+    fitChecksOverageRate: null as number | null,
+    fallbackMonthlyPrice: 99 as number | null,
+    fallbackAnnualPrice: 799 as number | null,
+  },
+  {
+    id: 'independent',
+    name: 'Independent',
+    segment: ['agent'],
+    features: [
+      { label: 'Up to 50 listings', included: true },
+      { label: '20 fit checks / month', included: true, note: '£4 per check above quota' },
+      { label: 'Tenant referencing', included: true },
+      { label: 'Digital contracts', included: true },
+      { label: 'Viewing management', included: true },
+      { label: 'Bulk operations', included: false },
+      { label: 'API access', included: false },
+    ],
+    isPopular: false,
+    isDark: false,
+    isContactSales: false,
+    isFree: false,
+    fitChecksQuota: 20 as number | null,
+    fitChecksOverageRate: 4 as number | null,
+    fallbackMonthlyPrice: 79 as number | null,
+    fallbackAnnualPrice: 750 as number | null,
+  },
+  {
+    id: 'agent_pro',
+    name: 'Agent Pro',
+    segment: ['agent'],
+    features: [
+      { label: 'Unlimited listings', included: true },
+      { label: '100 fit checks / month', included: true, note: '£3 per check above quota' },
+      { label: 'Advanced tenant referencing', included: true },
+      { label: 'Bulk operations', included: true },
+      { label: 'Team seats (up to 5)', included: true },
+      { label: 'Analytics dashboard', included: true },
+      { label: 'Priority support', included: true },
+    ],
+    isPopular: true,
+    isDark: false,
+    isContactSales: false,
+    isFree: false,
+    fitChecksQuota: 100 as number | null,
+    fitChecksOverageRate: 3 as number | null,
+    fallbackMonthlyPrice: 149 as number | null,
+    fallbackAnnualPrice: 1430 as number | null,
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    segment: ['agent'],
+    features: [
+      { label: 'Everything in Agent Pro', included: true },
+      { label: 'Unlimited team seats', included: true },
+      { label: 'Dedicated account manager', included: true },
+      { label: 'Custom integrations', included: true },
+      { label: 'SLA support', included: true },
+      { label: 'Bespoke pricing', included: true },
+    ],
+    isPopular: false,
+    isDark: false,
+    isContactSales: true,
+    isFree: false,
+    fitChecksQuota: null as number | null,
+    fitChecksOverageRate: null as number | null,
+    fallbackMonthlyPrice: null as number | null,
+    fallbackAnnualPrice: null as number | null,
+  },
+];
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -50,23 +256,6 @@ export class BillingService {
     return process.env[key] || null;
   }
 
-  /**
-   * Returns all plans with their Stripe price IDs resolved from server env vars.
-   * The frontend calls GET /billing/plans to retrieve these at checkout time
-   * instead of baking price IDs into the frontend bundle.
-   */
-  private buildPlansPriceMap() {
-    const plans = [
-      'renter_pro', 'buyer_pro',
-      'starter', 'landlord_pro', 'elite',
-      'independent', 'agent_pro',
-    ];
-    return plans.map((id) => ({
-      id,
-      stripePriceIdMonthly: this.getPriceId(id, 'monthly'),
-      stripePriceIdAnnual:  this.getPriceId(id, 'annual'),
-    }));
-  }
 
   // ─── Firebase Admin lazy getter ───────────────────────────────────────────
 
@@ -205,7 +394,10 @@ export class BillingService {
       customer_email: email,
       client_reference_id: userId,
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
-      subscription_data: dto.trialEnabled ? { trial_period_days: 30 } : {},
+      subscription_data: {
+        ...(dto.trialEnabled ? { trial_period_days: 30 } : {}),
+        metadata: { userId, planId, cycle },
+      },
       metadata: { planId, cycle, userId },
       success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/billing/confirmed?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/pricing`,
@@ -217,9 +409,23 @@ export class BillingService {
   // ─── createPortalSession ──────────────────────────────────────────────────
 
   async createPortalSession(userId: string, email: string) {
-    return {
-      portalUrl: '/dashboard/settings',
-    };
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe is not configured');
+    }
+    const db = this.db;
+    if (!db) {
+      throw new BadRequestException('Database unavailable');
+    }
+    const subSnap = await db.collection('subscriptions').doc(userId).get();
+    const customerId = subSnap.data()?.stripeCustomerId;
+    if (!customerId) {
+      throw new BadRequestException('No Stripe customer found for this user');
+    }
+    const session = await this.stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/settings`,
+    });
+    return { portalUrl: session.url };
   }
 
   // ─── confirmCheckoutSession ───────────────────────────────────────────────
@@ -405,27 +611,210 @@ export class BillingService {
   // ─── getPlans ─────────────────────────────────────────────────────────────
 
   async getPlans() {
-    // Price IDs are resolved server-side from STRIPE_PRICE_* env vars.
-    // The frontend fetches this endpoint at checkout time instead of baking
-    // price IDs into the bundle (which would expose them publicly).
-    return [
-      {
-        id: 'free',
-        name: 'Explorer (Free)',
-        priceMonthly: 0,
-        priceAnnual: 0,
-        stripePriceIdMonthly: null,
-        stripePriceIdAnnual: null,
-        features: ['Search Properties', 'Basic Referencing', 'Guest Enquiries'],
-      },
-      ...this.buildPlansPriceMap().map((p) => ({
-        ...p,
-        name: p.id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-        priceMonthly: null, // display prices come from plans.ts in the frontend
-        priceAnnual: null,
-        features: [],
-      })),
-    ];
+    // 5-minute in-memory cache to avoid hammering Stripe on every page load
+    if (_plansCache && Date.now() - _plansCacheTime < 5 * 60 * 1000) {
+      return _plansCache;
+    }
+
+    const buildStaticPlans = () =>
+      PLANS_CATALOGUE.map((cat) => {
+        const monthlyPrice = cat.fallbackMonthlyPrice ?? 0;
+        const annualTotal = cat.fallbackAnnualPrice ?? 0;
+        const annualPrice = cat.isFree || cat.isContactSales
+          ? 0
+          : Math.round(annualTotal / 12 * 100) / 100;
+        const annualSaving = cat.isFree || cat.isContactSales
+          ? null
+          : 'save £' + Math.round(monthlyPrice * 12 - annualTotal);
+        return {
+          id: cat.id,
+          name: cat.name,
+          segment: cat.segment,
+          monthlyPrice,
+          annualPrice,
+          annualTotal,
+          annualSaving,
+          stripePriceIdMonthly: cat.isFree || cat.isContactSales ? null : this.getPriceId(cat.id, 'monthly'),
+          stripePriceIdAnnual: cat.isFree || cat.isContactSales ? null : this.getPriceId(cat.id, 'annual'),
+          features: cat.features,
+          isPopular: cat.isPopular,
+          isDark: cat.isDark,
+          isContactSales: cat.isContactSales,
+          isFree: cat.isFree,
+          fitChecksQuota: cat.fitChecksQuota,
+          fitChecksOverageRate: cat.fitChecksOverageRate,
+        };
+      });
+
+    if (!this.stripe) {
+      const result = buildStaticPlans();
+      _plansCache = result;
+      _plansCacheTime = Date.now();
+      return result;
+    }
+
+    try {
+      const priceList = await this.stripe.prices.list({
+        active: true,
+        expand: ['data.product'],
+        limit: 100,
+      });
+
+      // Build a map: planId → { monthly?, annual?, monthlyPriceId?, annualPriceId? }
+      const priceMap: Record<string, {
+        monthly?: number;
+        annual?: number;
+        monthlyPriceId?: string;
+        annualPriceId?: string;
+      }> = {};
+
+      for (const price of priceList.data) {
+        const product = price.product;
+        // Type-guard: must be an expanded product object (not a string or deleted product)
+        if (
+          typeof product !== 'object' ||
+          product === null ||
+          'deleted' in product
+        ) {
+          continue;
+        }
+
+        const planId = (product as Stripe.Product).metadata?.proptii_plan_id;
+        if (!planId) continue;
+
+        const cycle: 'monthly' | 'annual' =
+          (price.metadata?.cycle as 'monthly' | 'annual') ??
+          (price.recurring?.interval === 'year' ? 'annual' : 'monthly');
+
+        // Amounts are in pence — divide by 100
+        const amount = Math.round((price.unit_amount ?? 0) / 100 * 100) / 100;
+
+        if (!priceMap[planId]) priceMap[planId] = {};
+        if (cycle === 'monthly') {
+          priceMap[planId].monthly = amount;
+          priceMap[planId].monthlyPriceId = price.id;
+        } else {
+          priceMap[planId].annual = amount;
+          priceMap[planId].annualPriceId = price.id;
+        }
+      }
+
+      const result = PLANS_CATALOGUE.map((cat) => {
+        const live = priceMap[cat.id];
+        const fallbackMonthly = cat.fallbackMonthlyPrice ?? 0;
+        const fallbackAnnual = cat.fallbackAnnualPrice ?? 0;
+
+        const monthlyPrice = cat.isFree || cat.isContactSales
+          ? 0
+          : (live?.monthly ?? fallbackMonthly);
+        const annualTotal = cat.isFree || cat.isContactSales
+          ? 0
+          : (live?.annual ?? fallbackAnnual);
+        const annualPrice = cat.isFree || cat.isContactSales
+          ? 0
+          : Math.round(annualTotal / 12 * 100) / 100;
+        const annualSaving = cat.isFree || cat.isContactSales
+          ? null
+          : 'save £' + Math.round(monthlyPrice * 12 - annualTotal);
+
+        return {
+          id: cat.id,
+          name: cat.name,
+          segment: cat.segment,
+          monthlyPrice,
+          annualPrice,
+          annualTotal,
+          annualSaving,
+          stripePriceIdMonthly: live?.monthlyPriceId ?? (cat.isFree || cat.isContactSales ? null : this.getPriceId(cat.id, 'monthly')),
+          stripePriceIdAnnual: live?.annualPriceId ?? (cat.isFree || cat.isContactSales ? null : this.getPriceId(cat.id, 'annual')),
+          features: cat.features,
+          isPopular: cat.isPopular,
+          isDark: cat.isDark,
+          isContactSales: cat.isContactSales,
+          isFree: cat.isFree,
+          fitChecksQuota: cat.fitChecksQuota,
+          fitChecksOverageRate: cat.fitChecksOverageRate,
+        };
+      });
+
+      _plansCache = result;
+      _plansCacheTime = Date.now();
+      return result;
+    } catch (err: any) {
+      this.logger.error(`[BillingService] getPlans() Stripe call failed: ${err?.message ?? err}. Falling back to static data.`);
+      const result = buildStaticPlans();
+      _plansCache = result;
+      _plansCacheTime = Date.now();
+      return result;
+    }
+  }
+
+
+  // ─── upgradeSubscription ──────────────────────────────────────────────────
+
+  async upgradeSubscription(
+    userId: string,
+    email: string,
+    planId: string,
+    cycle: 'monthly' | 'annual',
+  ): Promise<{ upgraded: true } | { checkoutUrl: string }> {
+    if (!BillingService.VALID_SELF_SERVICE_PLAN_IDS.has(planId as any)) {
+      throw new BadRequestException('Invalid plan');
+    }
+    const priceId = this.getPriceId(planId, cycle);
+    if (!priceId) throw new BadRequestException('Price not configured for this plan/cycle');
+
+    const subSnap = await this.db!.collection('subscriptions').doc(userId).get();
+    const subData = subSnap.data();
+    const stripeSubscriptionId = subData?.stripeSubscriptionId;
+    const status = subData?.status;
+
+    if (stripeSubscriptionId && (status === 'active' || status === 'trialing')) {
+      try {
+        const sub = await this.stripe!.subscriptions.retrieve(stripeSubscriptionId);
+        const itemId = sub.items.data[0]?.id;
+        if (!itemId) throw new Error('No subscription item found');
+        await this.stripe!.subscriptions.update(stripeSubscriptionId, {
+          items: [{ id: itemId, price: priceId }],
+          proration_behavior: 'create_prorations',
+        });
+        await this.db!.collection('subscriptions').doc(userId).set(
+          { planId, cycle, updatedAt: new Date().toISOString() },
+          { merge: true },
+        );
+        return { upgraded: true };
+      } catch (err: any) {
+        throw new BadRequestException(err?.message ?? 'Upgrade failed');
+      }
+    }
+
+    // No active subscription — fall back to checkout
+    const result = await this.createCheckoutSession(userId, email, { planId, cycle, trialEnabled: false });
+    return { checkoutUrl: result.checkoutUrl };
+  }
+
+  // ─── cancelSubscription ───────────────────────────────────────────────────
+
+  async cancelSubscription(userId: string): Promise<{ success: true; cancelAtPeriodEnd: true }> {
+    const subSnap = await this.db!.collection('subscriptions').doc(userId).get();
+    const subData = subSnap.data();
+    const stripeSubscriptionId = subData?.stripeSubscriptionId;
+
+    if (!stripeSubscriptionId || !this.stripe) {
+      throw new BadRequestException('No active subscription found');
+    }
+    try {
+      await this.stripe.subscriptions.update(stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      });
+      await this.db!.collection('subscriptions').doc(userId).set(
+        { cancelAtPeriodEnd: true, updatedAt: new Date().toISOString() },
+        { merge: true },
+      );
+      return { success: true, cancelAtPeriodEnd: true };
+    } catch (err: any) {
+      throw new BadRequestException(err?.message ?? 'Cancellation failed');
+    }
   }
 
   // ─── setPendingPlan ───────────────────────────────────────────────────────

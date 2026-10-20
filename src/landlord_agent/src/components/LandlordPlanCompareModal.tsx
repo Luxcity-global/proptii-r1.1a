@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Check, Minus, Zap } from 'lucide-react';
 import {
-  getPlansForAudienceTab,
   getDisplayPrice,
   type PlanConfig,
   type PlanId,
@@ -14,6 +13,7 @@ import {
 import { markPendingStripeCheckout } from '../../../utils/pricingRoutes';
 import { trackEvent } from '../../../utils/analytics';
 import { openInParentApp } from '../utils/authBridge';
+import { usePlans } from '../../../hooks/usePlans';
 
 type Audience = 'renters' | 'landlords' | 'agents';
 type Cycle = 'monthly' | 'annual';
@@ -41,6 +41,12 @@ function formatPrice(amount: number | null): string {
   if (amount === null) return 'Custom';
   if (amount === 0) return 'Free';
   return `£${amount}`;
+}
+
+function filterByAudience(all: PlanConfig[], audience: Audience): PlanConfig[] {
+  if (audience === 'renters') return all.filter(p => p.segment.includes('renter') || p.segment.includes('buyer'));
+  if (audience === 'landlords') return all.filter(p => p.segment.includes('landlord'));
+  return all.filter(p => p.segment.includes('agent'));
 }
 
 interface PlanCardProps {
@@ -217,6 +223,7 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
   const [cycle, setCycle] = useState<Cycle>('monthly');
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const { plans: allPlans } = usePlans();
 
   useEffect(() => {
     if (open) {
@@ -234,7 +241,7 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
 
   if (!open) return null;
 
-  const plans = getPlansForAudienceTab(audience);
+  const plans = filterByAudience(allPlans, audience);
 
   const handleUpgrade = async (plan: PlanConfig) => {
     setUpgrading(plan.id);
@@ -252,6 +259,7 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
       if (hasActiveSub) {
         const result = await upgradeSubscription(plan.id, cycle);
         if (result.checkoutUrl) {
+          markPendingStripeCheckout('pay_now');
           openInParentApp(result.checkoutUrl);
           return;
         }

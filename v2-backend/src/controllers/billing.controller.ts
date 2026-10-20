@@ -103,4 +103,27 @@ export class BillingController {
     const rawBody: Buffer = req.rawBody ?? req.body;
     return await this.billingService.handleWebhook(rawBody, signature);
   }
+
+  @Post('upgrade')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Upgrade/change subscription plan without new checkout' })
+  async upgradeSubscription(@Req() req: any, @Body() dto: any) {
+    return await this.billingService.upgradeSubscription(
+      req.user.uid,
+      req.user.email || '',
+      dto.planId,
+      dto.cycle,
+    );
+  }
+
+  @Post('cancel')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel subscription at period end' })
+  async cancelSubscription(@Req() req: any) {
+    return await this.billingService.cancelSubscription(req.user.uid);
+  }
 }

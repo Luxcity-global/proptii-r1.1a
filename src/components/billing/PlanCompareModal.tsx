@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Check, Minus, Zap } from 'lucide-react';
 import {
-  getPlansForAudienceTab,
   getDisplayPrice,
   type PlanConfig,
   type PlanId,
@@ -14,6 +13,7 @@ import {
 } from '../../services/billingService';
 import { markPendingStripeCheckout } from '../../utils/pricingRoutes';
 import { trackEvent } from '../../utils/analytics';
+import { usePlans } from '../../hooks/usePlans';
 
 /* ─────────────────────── types ─────────────────────── */
 
@@ -49,6 +49,12 @@ function formatPrice(amount: number | null): string {
   if (amount === null) return 'Custom';
   if (amount === 0) return 'Free';
   return `£${amount}`;
+}
+
+function filterByAudience(all: PlanConfig[], audience: Audience): PlanConfig[] {
+  if (audience === 'renters') return all.filter(p => p.segment.includes('renter') || p.segment.includes('buyer'));
+  if (audience === 'landlords') return all.filter(p => p.segment.includes('landlord'));
+  return all.filter(p => p.segment.includes('agent'));
 }
 
 /* ─────────────────── PlanCard ─────────────────────── */
@@ -239,6 +245,7 @@ const PlanCompareModal: React.FC<Props> = ({
   const [cycle, setCycle] = useState<Cycle>('monthly');
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const { plans: allPlans } = usePlans();
 
   /* Reset tab when modal opens */
   useEffect(() => {
@@ -258,7 +265,7 @@ const PlanCompareModal: React.FC<Props> = ({
 
   if (!open) return null;
 
-  const plans = getPlansForAudienceTab(audience);
+  const plans = filterByAudience(allPlans, audience);
 
   const handleUpgrade = async (plan: PlanConfig) => {
     setUpgrading(plan.id);
