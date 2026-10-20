@@ -1,0 +1,7 @@
+{
+  "task_id": "task-billing-hardening",
+  "task_description": "Harden the Proptii billing system: replace the mock Stripe integration with a real one, add a webhook handler, fix all critical security fallbacks, add a SubscriptionGuard, and move complimentary-access domain checks server-side.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}
