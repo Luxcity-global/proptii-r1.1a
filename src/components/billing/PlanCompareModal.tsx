@@ -14,6 +14,7 @@ import {
 import { markPendingStripeCheckout } from '../../utils/pricingRoutes';
 import { trackEvent } from '../../utils/analytics';
 import { usePlans } from '../../hooks/usePlans';
+import { useAuth } from '../../contexts/AuthContext';
 
 /* ─────────────────────── types ─────────────────────── */
 
@@ -238,6 +239,8 @@ const PlanCompareModal: React.FC<Props> = ({
   const navigate = useNavigate();
   // navigate kept for potential future use; currently navigation uses window.location.href for Stripe redirects
   void navigate;
+  const { user } = useAuth();
+  const userRole = user?.roles?.[0] ?? null;
   const overlayRef = useRef<HTMLDivElement>(null);
   const [audience, setAudience] = useState<Audience>(
     defaultAudience ?? inferAudience(currentPlanId),
@@ -247,13 +250,15 @@ const PlanCompareModal: React.FC<Props> = ({
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const { plans: allPlans } = usePlans();
 
-  /* Reset tab when modal opens */
+  /* Reset tab when modal opens — snap to the first tab allowed for this role */
   useEffect(() => {
     if (open) {
-      setAudience(defaultAudience ?? inferAudience(currentPlanId));
+      const preferred = defaultAudience ?? inferAudience(currentPlanId);
+      const valid = TABS.find(t => t.id === preferred);
+      setAudience(valid ? preferred : (TABS[0]?.id ?? 'renters'));
       setUpgradeError(null);
     }
-  }, [open, currentPlanId, defaultAudience]);
+  }, [open, currentPlanId, defaultAudience, userRole]);
 
   /* Close on Escape */
   useEffect(() => {
@@ -319,11 +324,19 @@ const PlanCompareModal: React.FC<Props> = ({
     }
   };
 
-  const TABS: { id: Audience; label: string }[] = [
-    { id: 'renters', label: 'Renters & Buyers' },
+  // Only show the audience tab that matches the logged-in user's role.
+  // Tenants (and unauthenticated visitors) see Renters & Buyers only.
+  // Landlords see Landlords only. Agents see Agents only.
+  const ALL_TABS: { id: Audience; label: string }[] = [
+    { id: 'renters',   label: 'Renters & Buyers' },
     { id: 'landlords', label: 'Landlords' },
-    { id: 'agents', label: 'Agents' },
+    { id: 'agents',    label: 'Agents' },
   ];
+  const TABS = (() => {
+    if (userRole === 'landlord') return ALL_TABS.filter(t => t.id === 'landlords');
+    if (userRole === 'agent')    return ALL_TABS.filter(t => t.id === 'agents');
+    return ALL_TABS.filter(t => t.id === 'renters'); // tenant / null
+  })();
 
   return (
     /* Overlay */

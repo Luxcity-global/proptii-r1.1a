@@ -14,6 +14,7 @@ import { markPendingStripeCheckout } from '../../../utils/pricingRoutes';
 import { trackEvent } from '../../../utils/analytics';
 import { openInParentApp } from '../utils/authBridge';
 import { usePlans } from '../../../hooks/usePlans';
+import { useAuth } from '../../../contexts/AuthContext';
 
 type Audience = 'renters' | 'landlords' | 'agents';
 type Cycle = 'monthly' | 'annual';
@@ -216,6 +217,8 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
   billingStatus,
   onUpgradeSuccess,
 }) => {
+  const { user } = useAuth();
+  const userRole = user?.roles?.[0] ?? null;
   const overlayRef = useRef<HTMLDivElement>(null);
   const [audience, setAudience] = useState<Audience>(
     defaultAudience ?? inferAudience(currentPlanId),
@@ -227,10 +230,12 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (open) {
-      setAudience(defaultAudience ?? inferAudience(currentPlanId));
+      const preferred = defaultAudience ?? inferAudience(currentPlanId);
+      const valid = TABS.find(t => t.id === preferred);
+      setAudience(valid ? preferred : (TABS[0]?.id ?? 'landlords'));
       setUpgradeError(null);
     }
-  }, [open, currentPlanId, defaultAudience]);
+  }, [open, currentPlanId, defaultAudience, userRole]);
 
   useEffect(() => {
     if (!open) return;
@@ -287,11 +292,18 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
     }
   };
 
-  const TABS: { id: Audience; label: string }[] = [
-    { id: 'renters', label: 'Renters & Buyers' },
+  // Only show the audience tab that matches the logged-in user's role.
+  // Landlords see Landlords only. Agents see Agents only.
+  // Falls back to Landlords for any unrecognised role (this modal is landlord-side only).
+  const ALL_TABS: { id: Audience; label: string }[] = [
+    { id: 'renters',   label: 'Renters & Buyers' },
     { id: 'landlords', label: 'Landlords' },
-    { id: 'agents', label: 'Agents' },
+    { id: 'agents',    label: 'Agents' },
   ];
+  const TABS = (() => {
+    if (userRole === 'agent') return ALL_TABS.filter(t => t.id === 'agents');
+    return ALL_TABS.filter(t => t.id === 'landlords'); // landlord / null
+  })();
 
   return (
     <div

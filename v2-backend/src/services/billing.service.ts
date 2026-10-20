@@ -393,6 +393,11 @@ export class BillingService {
       mode: 'subscription',
       customer_email: email,
       client_reference_id: userId,
+      // automatic_tax calculates applicable tax based on the customer's billing
+      // address collected at checkout. Required when Stripe Managed Payments is
+      // enabled on the account (which requires every product to either have a
+      // tax_code set OR have automatic_tax enabled at the session level).
+      automatic_tax: { enabled: true },
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
       subscription_data: {
         ...(dto.trialEnabled ? { trial_period_days: 30 } : {}),
