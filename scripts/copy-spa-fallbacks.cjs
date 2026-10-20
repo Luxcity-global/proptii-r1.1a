@@ -22,6 +22,7 @@ const SPA_ROUTE_DIRS = [
   'signup/create-account',
   'pricing',
   'pricing/confirmed',
+  'select-role',
   'login',
   'dashboard',
   'dashboard/tenant-referencing',
