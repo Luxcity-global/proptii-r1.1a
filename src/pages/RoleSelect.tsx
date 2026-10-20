@@ -55,7 +55,11 @@ const RoleSelect: React.FC = () => {
     setSaving(false);
   };
 
-  if (isLoading || (user && !user.roleResolved) || hasExistingRole) {
+  // Show spinner while auth is loading or role hasn't resolved yet.
+  // Users with an existing role are handled by the redirect effect above —
+  // including hasExistingRole here would show a spinner instead of letting
+  // the effect redirect, causing a visible flash.
+  if (isLoading || (user && !user.roleResolved)) {
     return (
       <div style={S.loadingPage}>
         <div style={S.loadingSpinner} />

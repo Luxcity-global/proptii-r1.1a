@@ -225,6 +225,8 @@ export const App: React.FC = () => {
                 <Route path="/Homeowner/variant-b" element={<HomeownerHome />} />
                 <Route path="/homeowner/dashboard" element={<HomeownerDashboard />} />
                 <Route path="/Homeowner/dashboard" element={<HomeownerDashboard />} />
+                {/* Agent marketing landing page */}
+                <Route path="/agent-home" element={<AgentHome />} />
                 <Route path="/public-worker" element={<PublicWorkerHome />} />
                 <Route path="/Public-worker" element={<PublicWorkerHome />} />
                 <Route path="/landlord-demo" element={<LandlordDemo />} />

@@ -4,7 +4,6 @@ import type { PlanConfig } from '../../config/plans';
 import { getDisplayPrice } from '../../config/plans';
 import type { BillingCycle } from './PricingBillingToggle';
 import {
-  createAccountUrl,
   ENTERPRISE_MAILTO,
   payNowUrl,
   signupUrl,
@@ -61,7 +60,9 @@ const PricingPlanCard: React.FC<Props> = ({
       return;
     }
     if (plan.isFree) {
-      navigate(createAccountUrl(plan.id));
+      // Free plan (Explorer): route through /signup so role intent is set
+      // and the post-auth redirect goes straight to /dashboard (no Stripe).
+      navigate(signupUrl(plan.id, billing));
       return;
     }
     navigate(signupUrl(plan.id, billing));

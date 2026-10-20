@@ -20,7 +20,16 @@ import type { RoleIntentValue } from '../../utils/roleIntent';
 
 /**
  * Maps a plan segment string to a RoleIntentValue.
- * Covers all segments currently defined in plans.ts.
+ * Covers all segments currently defined in plans.ts:
+ *   - 'agent'    → 'agent'
+ *   - 'landlord' → 'landlord'
+ *   - 'renter'   → 'tenant'  (includes Explorer plan whose segment[0] is 'renter')
+ *   - 'buyer'    → 'tenant'
+ *
+ * Note: Explorer (isFree, segment=['renter','buyer']) maps segment[0]='renter' → 'tenant'.
+ * This is correct — Explorer users skip /select-role and go directly to /dashboard
+ * (the post-auth redirect checks plan.isFree before calling welcomeUrl).
+ *
  * Returns null for unrecognised segments so callers can decide how to handle.
  */
 function planSegmentToRoleIntent(segment: string | undefined): RoleIntentValue | null {
@@ -42,8 +51,11 @@ const DedicatedSignupPage: React.FC = () => {
 
   const isFromCampaign = searchParams.get('from') === 'campaign';
 
-  // Resolve plan
-  const planId = searchParams.get('plan') || 'starter';
+  // Resolve plan — null when no explicit ?plan= param so role intent is not
+  // incorrectly inferred (e.g. 'starter' default would inject a landlord intent
+  // for users who typed /signup directly and should reach /select-role instead).
+  const planParam = searchParams.get('plan');
+  const planId = planParam ?? 'starter'; // keep 'starter' only for display/setPendingPlan fallback
   const cycle = (searchParams.get('cycle') as BillingCycle) || 'monthly';
   const plan = usePlan(planId);
 
@@ -115,6 +127,11 @@ const DedicatedSignupPage: React.FC = () => {
     if (isFromCampaign || hasExplicitPlan) {
       hasHandledAuthRedirect.current = true;
       const goWelcome = async () => {
+        // Free plans (Explorer) skip Stripe/welcome entirely — go straight to dashboard
+        if (plan?.isFree) {
+          navigate('/dashboard', { replace: true });
+          return;
+        }
         try {
           await setPendingPlan(planId, cycle);
         } catch {
@@ -142,21 +159,20 @@ const DedicatedSignupPage: React.FC = () => {
     try {
       setBusy(true);
       setError(null);
-      // Derive role intent from the plan selected on /pricing.
-      // This lets resolveRole() skip /select-role for plan-driven signups.
-      const selectedPlan = planId ? getPlanById(planId as PlanId) : null;
+      // Derive role intent ONLY when the user arrived via an explicit ?plan= param.
+      // Without a plan, clear any stale intent so /select-role shows all 3 cards.
+      const selectedPlan = planParam ? getPlanById(planId as PlanId) : null;
       if (selectedPlan) {
         const segment = selectedPlan.segment[0];
         const roleIntent = planSegmentToRoleIntent(segment);
         if (roleIntent) {
           setRoleIntent(roleIntent);
         } else {
-          // Unrecognised segment — fall back to tenant and warn
           console.warn(`[signup] Unrecognised plan segment "${segment}" — defaulting to tenant`);
           setRoleIntent('tenant');
         }
       } else {
-        // No plan selected — remove stale intent so /select-role shows cleanly
+        // No explicit plan — remove stale intent so /select-role shows cleanly
         sessionStorage.removeItem('proptii_signup_role_intent');
       }
 
@@ -196,21 +212,20 @@ const DedicatedSignupPage: React.FC = () => {
       setError('Please enter a valid email address.');
       return;
     }
-    // Derive role intent from the plan selected on /pricing.
-    // This lets resolveRole() skip /select-role for plan-driven signups.
-    const selectedPlan = planId ? getPlanById(planId as PlanId) : null;
+    // Derive role intent ONLY when the user arrived via an explicit ?plan= param.
+    // Without a plan, clear any stale intent so /select-role shows all 3 cards.
+    const selectedPlan = planParam ? getPlanById(planId as PlanId) : null;
     if (selectedPlan) {
       const segment = selectedPlan.segment[0];
       const roleIntent = planSegmentToRoleIntent(segment);
       if (roleIntent) {
         setRoleIntent(roleIntent);
       } else {
-        // Unrecognised segment — fall back to tenant and warn
         console.warn(`[signup] Unrecognised plan segment "${segment}" — defaulting to tenant`);
         setRoleIntent('tenant');
       }
     } else {
-      // No plan selected — remove stale intent so /select-role shows cleanly
+      // No explicit plan — remove stale intent so /select-role shows cleanly
       sessionStorage.removeItem('proptii_signup_role_intent');
     }
     sessionStorage.setItem('pending_registration_email', trimmed);

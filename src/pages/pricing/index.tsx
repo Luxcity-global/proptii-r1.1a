@@ -47,6 +47,8 @@ const PricingPage: React.FC<PricingPageProps> = ({
 
   // Pre-select the audience tab based on the authenticated user's role.
   // Skipped when an explicit ?segment= param is present (that wins).
+  // Uses user?.roles?.[0] (a primitive string) in the dep array rather than
+  // user?.roles (an array ref) to ensure the effect re-runs when the role changes.
   useEffect(() => {
     if (searchParams.get('segment')) return;
     if (!user?.roleResolved) return;
@@ -54,7 +56,7 @@ const PricingPage: React.FC<PricingPageProps> = ({
     if (role === 'landlord') setAudience('landlords');
     else if (role === 'agent') setAudience('agents');
     else if (role === 'tenant') setAudience('renters');
-  }, [user?.roleResolved, user?.roles, searchParams]);
+  }, [user?.roleResolved, user?.roles?.[0], searchParams]);
 
   const content = (
     <>
