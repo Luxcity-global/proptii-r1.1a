@@ -389,15 +389,17 @@ export class BillingService {
       );
     }
 
+    // Determine if we're in live mode by checking the secret key prefix.
+    // automatic_tax requires a registered head-office address in Stripe Tax settings
+    // which is only configured on the live account. In test mode we skip it to avoid
+    // the "must have a valid head office address" error from Stripe.
+    const isLiveMode = (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_live_');
+
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
       customer_email: email,
       client_reference_id: userId,
-      // automatic_tax calculates applicable tax based on the customer's billing
-      // address collected at checkout. Required when Stripe Managed Payments is
-      // enabled on the account (which requires every product to either have a
-      // tax_code set OR have automatic_tax enabled at the session level).
-      automatic_tax: { enabled: true },
+      ...(isLiveMode ? { automatic_tax: { enabled: true } } : {}),
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
       subscription_data: {
         ...(dto.trialEnabled ? { trial_period_days: 30 } : {}),
