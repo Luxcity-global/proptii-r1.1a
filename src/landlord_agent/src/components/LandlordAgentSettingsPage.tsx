@@ -525,6 +525,8 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
           onClose={() => setShowPlansModal(false)}
           currentPlanId={displayPlanId}
           defaultAudience={pricingSegment}
+          billingStatus={{ hasStripeCustomer, status }}
+          onUpgradeSuccess={refresh}
         />
       )}
     </div>

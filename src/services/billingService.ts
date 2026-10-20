@@ -183,6 +183,43 @@ export async function createBillingPortalSession(): Promise<{ portalUrl: string 
   return response.json();
 }
 
+/** Upgrade/change subscription for a user who already has an active Stripe subscription.
+ *  Returns { upgraded: true } on in-place upgrade, or { checkoutUrl } if a new checkout is needed. */
+export async function upgradeSubscription(
+  planId: string,
+  cycle: 'monthly' | 'annual',
+): Promise<{ upgraded?: boolean; checkoutUrl?: string }> {
+  const headers = await authHeaders();
+  const { response } = await fetchBillingWithApiFallback('/billing/upgrade', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ planId, cycle }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let msg = text;
+    try { const b = JSON.parse(text) as { message?: string }; if (b.message) msg = b.message; } catch {}
+    throw new Error(msg || 'Upgrade failed');
+  }
+  return response.json();
+}
+
+/** Set a subscription to cancel at the end of the current billing period. */
+export async function cancelSubscription(): Promise<{ success: boolean; cancelAtPeriodEnd: boolean }> {
+  const headers = await authHeaders();
+  const { response } = await fetchBillingWithApiFallback('/billing/cancel', {
+    method: 'POST',
+    headers,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let msg = text;
+    try { const b = JSON.parse(text) as { message?: string }; if (b.message) msg = b.message; } catch {}
+    throw new Error(msg || 'Cancellation failed');
+  }
+  return response.json();
+}
+
 /** S3-14 — Downgrade to Explorer (free) after trial ends. */
 export async function downgradeToFreePlan(
   dashboard: BillingDashboard = 'consumer',

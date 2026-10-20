@@ -1,14 +1,12 @@
 import { useMemo } from 'react';
-import {
-  getPlanById,
-  type PlanConfig,
-  type PlanId,
-} from '../config/plans';
+import { usePlans } from './usePlans';
+import type { PlanConfig, PlanId } from '../config/plans';
 
-/** Returns typed plan config for a plan ID (S2-09). */
+/** Returns live plan config for a plan ID (prices from Stripe via usePlans). */
 export function usePlan(planId: PlanId | string | null | undefined): PlanConfig | undefined {
+  const { plans } = usePlans();
   return useMemo(() => {
     if (!planId) return undefined;
-    return getPlanById(planId as PlanId);
-  }, [planId]);
+    return plans.find((p) => p.id === planId);
+  }, [planId, plans]);
 }

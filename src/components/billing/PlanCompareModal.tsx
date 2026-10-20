@@ -10,6 +10,7 @@ import {
 import {
   createCheckoutSession,
   setPendingPlan,
+  upgradeSubscription,
 } from '../../services/billingService';
 import { markPendingStripeCheckout } from '../../utils/pricingRoutes';
 import { trackEvent } from '../../utils/analytics';
@@ -28,6 +29,10 @@ interface Props {
   defaultAudience?: Audience;
   /** When set (e.g. landlord iframe), navigation opens in parent/top window */
   onExternalNavigate?: (url: string) => void;
+  /** Pass the user's current billing status to enable in-place upgrades */
+  billingStatus?: { hasStripeCustomer: boolean; status: string | null } | null;
+  /** Called after a successful in-place upgrade so the parent can refresh billing */
+  onUpgradeSuccess?: () => void;
 }
 
 /* ─────────────────── helpers ─────────────────────── */
@@ -221,6 +226,8 @@ const PlanCompareModal: React.FC<Props> = ({
   currentPlanId,
   defaultAudience,
   onExternalNavigate,
+  billingStatus,
+  onUpgradeSuccess,
 }) => {
   const navigate = useNavigate();
   // navigate kept for potential future use; currently navigation uses window.location.href for Stripe redirects
@@ -262,6 +269,28 @@ const PlanCompareModal: React.FC<Props> = ({
       } catch {
         /* best-effort */
       }
+
+      const hasActiveSub =
+        billingStatus?.hasStripeCustomer && billingStatus?.status === 'active';
+
+      if (hasActiveSub) {
+        const result = await upgradeSubscription(plan.id, cycle);
+        if (result.checkoutUrl) {
+          markPendingStripeCheckout('pay_now');
+          if (onExternalNavigate) {
+            onExternalNavigate(result.checkoutUrl);
+          } else {
+            window.location.href = result.checkoutUrl;
+          }
+          return;
+        }
+        // In-place upgrade succeeded
+        onUpgradeSuccess?.();
+        onClose();
+        return;
+      }
+
+      // No active sub — new checkout
       markPendingStripeCheckout('pay_now');
       trackEvent('billing_checkout_started', {
         plan_id: plan.id,

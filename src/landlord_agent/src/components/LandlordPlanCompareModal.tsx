@@ -9,6 +9,7 @@ import {
 import {
   createCheckoutSession,
   setPendingPlan,
+  upgradeSubscription,
 } from '../../../services/billingService';
 import { markPendingStripeCheckout } from '../../../utils/pricingRoutes';
 import { trackEvent } from '../../../utils/analytics';
@@ -22,6 +23,10 @@ interface Props {
   onClose: () => void;
   currentPlanId: PlanId | string | null;
   defaultAudience?: Audience;
+  /** Pass the user's current billing status to enable in-place upgrades */
+  billingStatus?: { hasStripeCustomer: boolean; status: string | null } | null;
+  /** Called after a successful in-place upgrade so the parent can refresh billing */
+  onUpgradeSuccess?: () => void;
 }
 
 function inferAudience(planId: PlanId | string | null): Audience {
@@ -202,6 +207,8 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
   onClose,
   currentPlanId,
   defaultAudience,
+  billingStatus,
+  onUpgradeSuccess,
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [audience, setAudience] = useState<Audience>(
@@ -238,6 +245,23 @@ const LandlordPlanCompareModal: React.FC<Props> = ({
       } catch {
         /* best-effort */
       }
+
+      const hasActiveSub =
+        billingStatus?.hasStripeCustomer && billingStatus?.status === 'active';
+
+      if (hasActiveSub) {
+        const result = await upgradeSubscription(plan.id, cycle);
+        if (result.checkoutUrl) {
+          openInParentApp(result.checkoutUrl);
+          return;
+        }
+        // In-place upgrade succeeded
+        onUpgradeSuccess?.();
+        onClose();
+        return;
+      }
+
+      // No active sub — new checkout
       markPendingStripeCheckout('pay_now');
       trackEvent('billing_checkout_started', {
         plan_id: plan.id,

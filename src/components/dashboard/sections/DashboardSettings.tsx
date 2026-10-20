@@ -482,6 +482,8 @@ const DashboardSettings: React.FC = () => {
         open={showPlansModal}
         onClose={() => setShowPlansModal(false)}
         currentPlanId={plan as PlanId | null}
+        billingStatus={{ hasStripeCustomer, status }}
+        onUpgradeSuccess={refresh}
       />
 
       {/* Profile Edit Modal */}
