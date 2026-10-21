@@ -66,7 +66,7 @@ const PricingPayNow: React.FC = () => {
         <div className="pr-blob pr-blob-2" />
       </div>
 
-      <Navbar hideServiceLinks />
+      <Navbar hideServiceLinks theme="light" />
 
       <main className="pr-content flex-1">
         <div className="pr-flow-wrap pr-fade-in">

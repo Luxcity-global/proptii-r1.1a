@@ -25,6 +25,7 @@ const SPA_ROUTE_DIRS = [
   'select-role',
   'login',
   'dashboard',
+  'dashboard/settings',
   'dashboard/tenant-referencing',
   'admin',
   'admin/leads',

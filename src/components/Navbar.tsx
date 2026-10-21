@@ -6,9 +6,10 @@ import { UserCircle, ChevronDown, Settings, LogOut, Menu, X, LayoutDashboard } f
 interface NavbarProps {
   isAgent?: boolean;
   hideServiceLinks?: boolean;
+  theme?: 'light' | 'dark' | 'auto';
 }
 
-const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = false }) => {
+const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = false, theme = 'auto' }) => {
   const { isAuthenticated, user, login, logout, editProfile, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,6 +20,53 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
 
   const pathname = location.pathname;
   const isLandlordUser = isAgent || (isAuthenticated && (user?.roles?.includes('landlord') || user?.roles?.includes('agent')));
+
+  const isLight =
+    theme === 'light' ||
+    (theme !== 'dark' && (
+      pathname.startsWith('/pricing') ||
+      pathname.startsWith('/billing') ||
+      pathname.startsWith('/account')
+    ));
+
+  // Compute 2-letter initials for polished avatar fallback
+  const getInitials = (name?: string, email?: string): string => {
+    if (name && name.trim()) {
+      const parts = name.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      }
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    if (email) {
+      return email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
+  // Render high-quality user avatar (photo if available, vibrant initial badge otherwise)
+  const renderAvatar = (size: 'sm' | 'md' = 'sm') => {
+    const isSm = size === 'sm';
+    const sizeClasses = isSm ? 'w-7 h-7 text-[11px]' : 'w-10 h-10 text-sm';
+    if (user?.photoURL) {
+      return (
+        <img
+          src={user.photoURL}
+          alt={user.name || 'User'}
+          className={`${sizeClasses} rounded-full object-cover ring-2 ring-[#F15A22]/30 shadow-xs flex-shrink-0`}
+        />
+      );
+    }
+    return (
+      <div
+        className={`${sizeClasses} rounded-full bg-gradient-to-tr from-[#E8622A] via-[#F15A22] to-[#FF8A50] text-white flex items-center justify-center font-bold tracking-wider shadow-xs ring-2 ${
+          isLight ? 'ring-white/90' : 'ring-white/30'
+        } flex-shrink-0`}
+      >
+        {getInitials(user?.name, user?.email)}
+      </div>
+    );
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -45,24 +93,6 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
       setLoginError(null);
     }
   }, [isAuthenticated]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (isDropdownOpen && !target.closest('.user-dropdown')) {
-        setIsDropdownOpen(false);
-      }
-      if (isMobileMenuOpen && !target.closest('.mobile-menu') && !target.closest('.mobile-menu-button')) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isDropdownOpen, isMobileMenuOpen]);
 
   const handleLogin = () => {
     let redirectUrl = '/login';
@@ -129,7 +159,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     className={({ isActive }) =>
                       isActive
                         ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
-                        : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                        : isLight
+                          ? 'text-[#14385C]/80 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                          : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
                     }
                   >
                     List Property
@@ -139,7 +171,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     className={({ isActive }) =>
                       isActive
                         ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
-                        : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                        : isLight
+                          ? 'text-[#14385C]/80 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                          : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
                     }
                   >
                     Book Viewing
@@ -150,7 +184,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     className={({ isActive }) =>
                       isActive
                         ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
-                        : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                        : isLight
+                          ? 'text-[#14385C]/80 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                          : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
                     }
                   >
                     Contracts
@@ -163,7 +199,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     className={({ isActive }) =>
                       isActive && pathname === '/'
                         ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
-                        : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                        : isLight
+                          ? 'text-[#14385C]/80 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                          : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
                     }
                   >
                     Search Properties
@@ -173,7 +211,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     className={({ isActive }) =>
                       isActive
                         ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
-                        : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                        : isLight
+                          ? 'text-[#14385C]/80 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                          : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
                     }
                   >
                     Book Viewing
@@ -183,7 +223,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     className={({ isActive }) =>
                       isActive
                         ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
-                        : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                        : isLight
+                          ? 'text-[#14385C]/80 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                          : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
                     }
                   >
                     Referencing
@@ -193,7 +235,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     className={({ isActive }) =>
                       isActive
                         ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
-                        : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                        : isLight
+                          ? 'text-[#14385C]/80 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
+                          : 'text-white/90 hover:text-[#F15A22] text-sm tracking-wide transition-colors'
                     }
                   >
                     Contracts
@@ -207,8 +251,10 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                   to={dashboardRoute}
                   className={({ isActive }) =>
                     isActive
-                      ? 'flex items-center gap-1.5 text-[#F15A22] font-bold text-sm tracking-wide px-3 py-1.5 rounded-full bg-white/10 border border-white/20 transition-colors'
-                      : 'flex items-center gap-1.5 text-white hover:text-[#F15A22] text-sm tracking-wide px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all'
+                      ? 'flex items-center gap-1.5 text-[#F15A22] font-bold text-sm tracking-wide px-3 py-1.5 rounded-full bg-[#F15A22]/10 border border-[#F15A22]/20 transition-colors'
+                      : isLight
+                        ? 'flex items-center gap-1.5 text-[#14385C] hover:text-[#F15A22] text-sm tracking-wide px-3 py-1.5 rounded-full bg-[#14385C]/5 border border-[#14385C]/10 hover:bg-[#14385C]/10 transition-all'
+                        : 'flex items-center gap-1.5 text-white hover:text-[#F15A22] text-sm tracking-wide px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all'
                   }
                 >
                   <LayoutDashboard className="w-3.5 h-3.5" />
@@ -224,31 +270,61 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
               <div className="relative user-dropdown">
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center space-x-2 text-white hover:text-white/90 focus:outline-none px-3 py-2 rounded-full bg-white/10 border border-white/15 backdrop-blur-sm transition-all"
+                  className={`flex items-center space-x-2.5 focus:outline-none pl-1.5 pr-3.5 py-1.5 rounded-full transition-all group ${
+                    isLight
+                      ? 'bg-white/90 hover:bg-white text-[#14385C] hover:text-[#0E2B47] border border-[#14385C]/15 hover:border-[#14385C]/30 shadow-xs hover:shadow-sm backdrop-blur-md'
+                      : 'bg-white/10 hover:bg-white/15 text-white hover:text-white/95 border border-white/20 hover:border-white/30 backdrop-blur-md'
+                  }`}
+                  aria-label="User menu"
+                  aria-expanded={isDropdownOpen}
                 >
-                  <UserCircle className="w-5 h-5 text-[#F15A22]" />
-                  <span className="font-medium text-sm">{user?.name || 'User'}</span>
-                  <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+                  {renderAvatar('sm')}
+                  <span className="font-semibold text-sm max-w-[130px] truncate tracking-tight">
+                    {user?.name || user?.givenName || 'User'}
+                  </span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                      isDropdownOpen ? 'rotate-180' : ''
+                    } ${
+                      isLight
+                        ? 'text-[#14385C]/60 group-hover:text-[#14385C]'
+                        : 'text-white/70 group-hover:text-white'
+                    }`}
+                  />
                 </button>
 
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl py-1.5 z-50 border border-gray-100 overflow-hidden">
-                    <button
-                      onClick={handleGoToDashboard}
-                      className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left font-medium transition-colors"
-                    >
-                      <LayoutDashboard className="w-4 h-4 mr-2.5 text-[#136C9E]" />
-                      Dashboard
-                    </button>
-                    <button
-                      onClick={handleEditProfile}
-                      disabled={isLoading}
-                      className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left font-medium transition-colors disabled:opacity-50"
-                    >
-                      <Settings className="w-4 h-4 mr-2.5 text-gray-500" />
-                      {isLoading ? 'Loading...' : 'Edit Profile'}
-                    </button>
+                  <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl py-1.5 z-50 border border-gray-100 overflow-hidden ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center space-x-3">
+                      {renderAvatar('md')}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-gray-900 truncate">
+                          {user?.name || user?.givenName || 'User'}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="py-1">
+                      <button
+                        onClick={handleGoToDashboard}
+                        className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left font-medium transition-colors"
+                      >
+                        <LayoutDashboard className="w-4 h-4 mr-2.5 text-[#136C9E]" />
+                        Dashboard
+                      </button>
+                      <button
+                        onClick={handleEditProfile}
+                        disabled={isLoading}
+                        className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left font-medium transition-colors disabled:opacity-50"
+                      >
+                        <Settings className="w-4 h-4 mr-2.5 text-gray-500" />
+                        {isLoading ? 'Loading...' : 'Edit Profile'}
+                      </button>
+                    </div>
+
                     <div className="h-px bg-gray-100 my-1" />
+
                     <button
                       onClick={handleLogout}
                       className="flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full text-left font-medium transition-colors"
@@ -269,12 +345,16 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                 {/* Secondary CTA: Sign In */}
                 <button
                   onClick={handleLogin}
-                  className="text-white/90 hover:text-white px-4 py-2 rounded-full font-medium text-sm transition-all hover:bg-white/10 flex items-center"
+                  className={`px-4 py-2 rounded-full font-medium text-sm transition-all flex items-center ${
+                    isLight
+                      ? 'text-[#14385C] hover:text-[#0E2B47] hover:bg-[#14385C]/5'
+                      : 'text-white/90 hover:text-white hover:bg-white/10'
+                  }`}
                   disabled={isLoading || loginInProgress}
                 >
                   {isLoading || loginInProgress ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -302,31 +382,48 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
               <div className="relative user-dropdown">
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="text-white focus:outline-none p-1.5 rounded-full bg-white/10"
+                  className={`focus:outline-none p-1 rounded-full transition-all ${
+                    isLight
+                      ? 'bg-white/80 border border-[#14385C]/15 shadow-xs'
+                      : 'bg-white/10 border border-white/20'
+                  }`}
+                  aria-label="User menu"
                 >
-                  <UserCircle className="w-6 h-6 text-[#F15A22]" />
+                  {renderAvatar('sm')}
                 </button>
 
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl py-1.5 z-50 border border-gray-100">
-                    <button
-                      onClick={handleGoToDashboard}
-                      className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left"
-                    >
-                      <LayoutDashboard className="w-4 h-4 mr-2.5 text-[#136C9E]" />
-                      Dashboard
-                    </button>
-                    <button
-                      onClick={handleEditProfile}
-                      disabled={isLoading}
-                      className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left disabled:opacity-50"
-                    >
-                      <Settings className="w-4 h-4 mr-2.5 text-gray-500" />
-                      {isLoading ? 'Loading...' : 'Edit Profile'}
-                    </button>
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl py-1.5 z-50 border border-gray-100 overflow-hidden ring-1 ring-black/5">
+                    <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center space-x-3">
+                      {renderAvatar('md')}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-gray-900 truncate">
+                          {user?.name || user?.givenName || 'User'}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                      </div>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        onClick={handleGoToDashboard}
+                        className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left font-medium transition-colors"
+                      >
+                        <LayoutDashboard className="w-4 h-4 mr-2.5 text-[#136C9E]" />
+                        Dashboard
+                      </button>
+                      <button
+                        onClick={handleEditProfile}
+                        disabled={isLoading}
+                        className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left font-medium transition-colors disabled:opacity-50"
+                      >
+                        <Settings className="w-4 h-4 mr-2.5 text-gray-500" />
+                        {isLoading ? 'Loading...' : 'Edit Profile'}
+                      </button>
+                    </div>
+                    <div className="h-px bg-gray-100 my-1" />
                     <button
                       onClick={handleLogout}
-                      className="flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full text-left"
+                      className="flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full text-left font-medium transition-colors"
                     >
                       <LogOut className="w-4 h-4 mr-2.5 text-red-500" />
                       Sign Out
@@ -338,9 +435,14 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="mobile-menu-button text-white focus:outline-none p-1.5 rounded-lg hover:bg-white/10"
+              className={`mobile-menu-button focus:outline-none p-2 rounded-xl transition-all ${
+                isLight
+                  ? 'text-[#14385C] bg-white/80 border border-[#14385C]/15 hover:bg-white shadow-xs'
+                  : 'text-white bg-white/10 hover:bg-white/15'
+              }`}
+              aria-label="Toggle navigation menu"
             >
-              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>

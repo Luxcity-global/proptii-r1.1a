@@ -75,7 +75,7 @@ const AccountSettingsPage: React.FC = () => {
 
   return (
     <div className="pr-page min-h-screen flex flex-col">
-      <Navbar hideServiceLinks />
+      <Navbar hideServiceLinks theme="light" />
 
       <main className="pr-content flex-1" style={{ paddingTop: 76 }}>
         <div className="pr-flow-wrap pr-fade-in" style={{ maxWidth: 560 }}>

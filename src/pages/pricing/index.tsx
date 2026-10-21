@@ -71,7 +71,7 @@ const PricingPage: React.FC<PricingPageProps> = ({
           filter: dimmed ? 'blur(1px)' : 'none',
         }}
       >
-        {!hideShell && <Navbar hideServiceLinks />}
+        {!hideShell && <Navbar hideServiceLinks theme="light" />}
         <div style={{ paddingTop: hideShell ? 0 : '76px' }}>
           <section className="pr-hero pr-fade-in">
             <h1>

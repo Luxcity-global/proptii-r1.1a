@@ -19,6 +19,7 @@ export interface User {
   familyName?: string;
   name?: string;
   phone?: string;
+  photoURL?: string;
   roles: string[];
   roleResolved: boolean;
 }
@@ -152,6 +153,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           givenName: name.split(' ')[0],
           familyName: name.split(' ').slice(1).join(' '),
           phone,
+          photoURL: firebaseUser.photoURL || undefined,
           roles: [],
           roleResolved: false,
         });
