@@ -23,11 +23,11 @@ services:
       - key: VITE_APP_URL
         value: https://proptii-frontend-pweq.onrender.com
       - key: VITE_API_URL
-        value: https://proptii-v2-backend.onrender.com/api
+        value: https://proptii-v2-backend-stable-v3.onrender.com/api
       - key: VITE_API_BASE_URL
-        value: https://proptii-v2-backend.onrender.com/api
+        value: https://proptii-v2-backend-stable-v3.onrender.com/api
       - key: VITE_NEST_API_ENDPOINT
-        value: https://proptii-v2-backend.onrender.com
+        value: https://proptii-v2-backend-stable-v3.onrender.com
       - key: VITE_SEARCH_BACKEND_URL
         value: https://proptii-listings-api.onrender.com
       - key: VITE_USE_REMOTE_API
