@@ -135,6 +135,9 @@ export default defineConfig(({ mode = 'development' }) => {
       },
     ],
     server: {
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+      },
       proxy: {
         '/api/search-backend': {
           target: viteSearchBackendUrl || 'https://proptii-r1-1a-q95f.onrender.com',

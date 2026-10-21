@@ -7,6 +7,10 @@ services:
     branch: feature/search
     buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: ./dist
+    headers:
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin-allow-popups
     routes:
       - type: rewrite
         source: /*
