@@ -2,12 +2,22 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   updateProfile,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
+
+// Safari (and all iOS browsers) block cross-origin storage in popups due to ITP.
+// signInWithPopup silently fails because firebaseapp.com != app domain → IndexedDB
+// write is dropped. signInWithRedirect uses a full-page navigation and avoids this.
+const isSafari = (): boolean => {
+  const ua = navigator.userAgent;
+  return /Safari/.test(ua) && !/Chrome/.test(ua) && !/Chromium/.test(ua);
+};
 import { auth } from '../config/firebaseConfig';
 import SessionManager from '../services/SessionManager';
 import { notifyAuthReady } from '../services/authReady';
@@ -92,6 +102,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Primary: Pure Firebase Auth observer
   useEffect(() => {
     let cancelled = false;
+
+    // On Safari, signInWithRedirect causes a full-page navigation to Google then
+    // back to this page. onAuthStateChanged handles the success case automatically,
+    // but errors during the redirect return are only surfaced via getRedirectResult.
+    getRedirectResult(auth).catch((err) => {
+      if (cancelled) return;
+      // auth/cancelled-popup-request and auth/popup-closed-by-user are user actions, not errors
+      const ignoredCodes = ['auth/cancelled-popup-request', 'auth/popup-closed-by-user'];
+      if (!ignoredCodes.includes(err?.code)) {
+        console.error('[Auth] Redirect sign-in failed:', err);
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: false } }));
+      }
+    });
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (!firebaseUser) {
@@ -227,10 +250,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (): Promise<void> => {
     try {
-
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
+      if (isSafari()) {
+        // Safari: use redirect flow to avoid ITP killing cross-origin popup storage
+        await signInWithRedirect(auth, provider);
+        // Page will navigate away — no code runs after this on Safari
+      } else {
+        await signInWithPopup(auth, provider);
+      }
     } catch (err) {
       console.error('[Auth] Login failed:', err);
       window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: false } }));
