@@ -7,7 +7,7 @@ import type {
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
 /** Backend staging base URL from Renter Report handover (Aug 2026). */
-export const REPORT_BACKEND_STAGING_URL = 'https://proptii-r1-1a-1-hcw6.onrender.com';
+export const REPORT_BACKEND_STAGING_URL = 'https://proptii-v2-backend.onrender.com';
 
 export function resolveReportBackendOrigin(): string {
   const resolved = getResolvedApiBaseUrl();
