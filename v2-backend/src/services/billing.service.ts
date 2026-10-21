@@ -290,17 +290,15 @@ export class BillingService {
   // ─── getBillingStatus ─────────────────────────────────────────────────────
 
   async getBillingStatus(userId: string, email?: string, role?: string) {
-    if (isComplimentaryAccessEmail(email)) {
-      this.logger.log(`[BillingService] Complimentary access granted to ${email}`);
-      return complimentaryBillingPayload(role);
-    }
-
     const db = this.db;
     if (!db) {
       this.logger.error('[BillingService] Firebase Admin is not initialised — refusing to serve billing status');
       throw new ServiceUnavailableException('Billing service temporarily unavailable');
     }
 
+    // Check Firestore FIRST — if the user has an active paid subscription, always return it
+    // regardless of whether they are on a complimentary domain. This ensures staff who
+    // also pay for a plan see their real subscription, not the complimentary bypass.
     try {
       const col = db.collection('subscriptions');
       let doc = await col.doc(userId).get();
@@ -311,6 +309,13 @@ export class BillingService {
         if (!mailSnap.empty) {
           data = mailSnap.docs[0].data();
         }
+      }
+
+      // If there is a real paid subscription in Firestore, return it — skip complimentary bypass
+      const hasPaidSub = data && data.planId && data.planId !== 'free' && data.planId !== 'explorer' && data.status === 'active';
+      if (!hasPaidSub && isComplimentaryAccessEmail(email)) {
+        this.logger.log(`[BillingService] Complimentary access granted to ${email} (no paid subscription found)`);
+        return complimentaryBillingPayload(role);
       }
 
       // Check users collection as fallback for entitlement
