@@ -14,7 +14,7 @@ const rawProdEnvUrl =
   (import.meta as any)?.env?.VITE_API_BASE_URL?.trim?.() ||
   (import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.() ||
   (import.meta as any)?.env?.VITE_API_ENDPOINT?.trim?.() ||
-  (typeof window !== 'undefined' ? window.location.origin : 'https://proptii-r1-1a-1-hcw6.onrender.com');
+  (typeof window !== 'undefined' ? window.location.origin : '');
 
 export const CANONICAL_PROD_API_BASE_URL = ensureApiPathPrefix(rawProdEnvUrl);
 

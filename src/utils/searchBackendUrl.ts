@@ -3,7 +3,7 @@ export const PROD_SEARCH_BACKEND_URL = (
   (import.meta as any)?.env?.VITE_SEARCH_BACKEND_URL ||
   (import.meta as any)?.env?.VITE_SEARCH_API_URL ||
   (import.meta as any)?.env?.VITE_SEARCH_URL ||
-  'https://proptii-listings-api.onrender.com'
+  ''
 ).trim().replace(/\/$/, '');
 
 const LOCAL_SEARCH_BACKEND_URL = (
@@ -70,6 +70,5 @@ export const resolveSearchBackendUrl = (): string => {
     return LOCAL_SEARCH_BACKEND_URL;
   }
 
-  // Default to live Render search service so scraping works seamlessly in all environments
-  return PROD_SEARCH_BACKEND_URL;
+  return PROD_SEARCH_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 };

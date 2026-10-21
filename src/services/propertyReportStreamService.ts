@@ -6,15 +6,20 @@ import type {
 } from '../types/streamingReport';
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
-/** Backend staging base URL from Renter Report handover (Aug 2026). */
-export const REPORT_BACKEND_STAGING_URL = 'https://proptii-v2-backend-stable-v3.onrender.com';
+/** Base origin for property report stream, read directly from environment or resolved API base URL. */
+export const REPORT_BACKEND_STAGING_URL = (
+  import.meta.env.VITE_NEST_API_ENDPOINT ||
+  import.meta.env.VITE_API_ENDPOINT ||
+  (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/i, '') : '') ||
+  ''
+).trim().replace(/\/$/, '');
 
 export function resolveReportBackendOrigin(): string {
   const resolved = getResolvedApiBaseUrl();
   if (resolved) {
     return resolved.replace(/\/api\/?$/i, '').replace(/\/$/, '');
   }
-  return REPORT_BACKEND_STAGING_URL;
+  return REPORT_BACKEND_STAGING_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 }
 
 export function buildReportStreamUrl(): string {

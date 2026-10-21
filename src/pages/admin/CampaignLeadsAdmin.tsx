@@ -52,7 +52,7 @@ export const CampaignLeadsAdmin: React.FC = () => {
     if (envUrl && !/localhost|127\.0\.0\.1/i.test(envUrl)) {
       return envUrl;
     }
-    return 'https://proptii-r1-1a-1-hcw6.onrender.com';
+    return envUrl || (typeof window !== 'undefined' ? window.location.origin : '');
   }, []);
 
   // Check admin authorization with the server using the verified Firebase token
