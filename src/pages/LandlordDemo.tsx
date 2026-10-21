@@ -23,6 +23,10 @@ const LandlordDemoInner: React.FC = () => {
   // Start the 30-second polling loop for conversations and unread count
   useMessagingPoller();
 
+  useEffect(() => {
+    document.title = 'Landlord Portal | Proptii';
+  }, []);
+
   // Auto-open sign-in modal when redirected here with ?signin=1
   useEffect(() => {
     const params = new URLSearchParams(search);

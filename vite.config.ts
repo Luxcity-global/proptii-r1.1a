@@ -119,10 +119,10 @@ export default defineConfig(({ mode = 'development' }) => {
                 return next();
               }
 
-              // Rewrite /landlord/<path> (no dot = not an asset) to the main index.html.
-              // Exclude /landlord-app/ (the iframe build) and /landlord/index.html itself.
+              // Rewrite /landlord, /landlord/, and /landlord/<path> (no dot = not an asset) to the main index.html.
+              // Exclude /landlord-app/ (legacy iframe build) and asset files.
               if (
-                url.startsWith('/landlord/') &&
+                (pathname === '/landlord' || pathname === '/landlord/' || url.startsWith('/landlord/')) &&
                 !url.startsWith('/landlord-app/') &&
                 !url.includes('.')
               ) {

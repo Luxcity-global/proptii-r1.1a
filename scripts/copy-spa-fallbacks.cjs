@@ -3,8 +3,9 @@
  * links, and hard refreshes work on static hosts that only serve real files.
  *
  * Render serves public/404.html for any path that is not a file, and it does
- * not apply _redirects. Do not replace dist/landlord/index.html — that file is
- * the standalone landlord app.
+ * not apply _redirects. Ensuring dist/landlord/index.html is the SPA shell
+ * allows hard refreshes on /landlord to boot the unified React SPA with full
+ * AuthProvider context instead of a broken standalone bundle.
  */
 const fs = require('fs');
 const path = require('path');
@@ -34,6 +35,8 @@ const SPA_ROUTE_DIRS = [
   'claim-referencing',
   'referencing',
   'referencing/invite',
+  'landlord',
+  'landlord-demo',
   'landlord/dashboard',
   'landlord/properties',
   'landlord/documents',
