@@ -49,6 +49,16 @@ const RoleSelect: React.FC = () => {
     // Patch in-memory user BEFORE navigating so ProtectedRoute sees the new role
     patchUser({ roles: [role], roleResolved: true });
 
+    // If user is completing the signup onboarding flow, route to pricing for their chosen role
+    const isFromSignup = sessionStorage.getItem('signup_flow_active') === 'true';
+    if (isFromSignup) {
+      sessionStorage.removeItem('signup_flow_active');
+      const segment = role === 'landlord' ? 'landlords' : role === 'agent' ? 'agents' : 'renters';
+      navigate(`/pricing?segment=${segment}`, { replace: true });
+      setSaving(false);
+      return;
+    }
+
     navigate(role === 'landlord' || role === 'agent' ? '/landlord' : '/dashboard', {
       replace: true,
     });

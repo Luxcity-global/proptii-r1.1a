@@ -23,12 +23,22 @@ function opensTenantPassport(path: string): boolean {
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, login, isAuthenticated, isLoading } = useAuth();
+  const { user, login, loginWithEmail, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     sessionStorage.removeItem('redirect_in_progress');
     sessionStorage.removeItem('last_redirect_path');
   }, []);
+  const [email, setEmail] = useState(() => {
+    return (
+      new URLSearchParams(location.search).get('email') ||
+      sessionStorage.getItem('pending_registration_email') ||
+      ''
+    );
+  });
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [autoLoginTriggered, setAutoLoginTriggered] = useState(false);
   const hasRedirectedRef = useRef(false);
@@ -114,18 +124,10 @@ export const LoginPage: React.FC = () => {
     }
   }, []);
 
-  // Listen for auth state changes (for MSAL popup login) as a backup
-  // The main redirect is handled by the useEffect above that watches isAuthenticated
+  // Listen for auth state changes as a backup
   useEffect(() => {
     const handleAuthStateChange = () => {
-      // Clear the auto-login flag when auth completes
       sessionStorage.removeItem('autoLoginAttempted');
-      
-      // Small delay to allow auth context to update
-      setTimeout(() => {
-        // The isAuthenticated useEffect above will handle the redirect
-        // This is just a backup trigger
-      }, 100);
     };
 
     window.addEventListener('auth-state-changed', handleAuthStateChange);
@@ -134,18 +136,52 @@ export const LoginPage: React.FC = () => {
     };
   }, []);
 
-  const handleLogin = async () => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password) {
+      setError('Please enter your email and password.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      trackEvent('login_started', {
+        provider: 'email',
+        redirect_to: from,
+      });
+      await loginWithEmail(email.trim(), password);
+    } catch (err: any) {
+      const code = err?.code;
+      if (
+        code === 'auth/invalid-credential' ||
+        code === 'auth/user-not-found' ||
+        code === 'auth/wrong-password'
+      ) {
+        setError('Invalid email or password. Please try again.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please try again later.');
+      } else {
+        setError(err?.message || 'Login failed. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
     try {
       setError('');
+      setSubmitting(true);
       trackEvent('login_started', {
+        provider: 'google',
         redirect_to: from,
         has_redirect_param: new URLSearchParams(location.search).has('redirect'),
       });
       await login();
-      // Note: MSAL popup login will trigger auth-state-changed event
-      // The useEffect above will handle the redirect
     } catch (error: any) {
-      setError(error?.message || 'Login failed. Please try again.');
+      setError(error?.message || 'Google login was cancelled or failed.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -155,13 +191,13 @@ export const LoginPage: React.FC = () => {
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-[#136C9E]/10 blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-[#E65D24]/10 blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md p-8 m-4 relative z-10 bg-white/70 backdrop-blur-xl rounded-3xl shadow-[0_8px_40px_rgb(0,0,0,0.08)] border border-white">
-        <div className="text-center mb-10">
-          <div className="mx-auto flex items-center justify-center mb-6">
-            <img src="/images/proptii-logo.png" alt="Proptii Logo" className="h-12 w-auto object-contain" />
+      <div className="w-full max-w-md p-8 m-4 relative z-10 bg-white/80 backdrop-blur-xl rounded-3xl shadow-[0_8px_40px_rgb(0,0,0,0.08)] border border-white">
+        <div className="text-center mb-8">
+          <div className="mx-auto flex items-center justify-center mb-5">
+            <img src="/images/proptii-logo.png" alt="Proptii Logo" className="h-10 w-auto object-contain" />
           </div>
           <h1 className="text-3xl font-archive font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-500 font-nunito">Sign in to continue to your dashboard</p>
+          <p className="text-gray-500 font-nunito text-sm">Sign in to continue to your dashboard</p>
         </div>
 
         {error && (
@@ -170,12 +206,79 @@ export const LoginPage: React.FC = () => {
           </Alert>
         )}
 
+        {/* Email + Password Form */}
+        <form onSubmit={handleEmailLogin} className="space-y-4 mb-6">
+          <div>
+            <label htmlFor="login-email" className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
+              Email Address
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g. alex@example.com"
+              disabled={submitting}
+              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all disabled:opacity-50"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="login-password" className="block text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-xs text-[#136C9E] hover:underline"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              disabled={submitting}
+              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all disabled:opacity-50"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full py-3.5 px-5 bg-[#DC5F12] hover:bg-[#E65D24] text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+          >
+            {submitting ? 'Signing in...' : 'Sign In →'}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="relative my-6 text-center">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200" />
+          </div>
+          <span className="relative bg-white px-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+            Or
+          </span>
+        </div>
+
+        {/* Google Login Button */}
         <div className="space-y-4">
           <button
-            onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 text-gray-700 px-4 py-3.5 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-200 transition-all duration-300 shadow-sm hover:shadow active:scale-[0.98]"
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={submitting}
+            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-200 transition-all duration-200 shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 text-sm"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24">
+            <svg width="18" height="18" viewBox="0 0 24 24">
               <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
               <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
               <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c0-.4 0-.8 0-1.4z" />

@@ -56,14 +56,16 @@ export function signupUrl(planId: string, cycle: BillingCycle = 'annual'): strin
 }
 
 export function createAccountUrl(
-  planId: string,
+  planId?: string | null,
   cycle?: BillingCycle,
   email?: string,
 ): string {
-  const params = new URLSearchParams({ plan: planId });
-  if (cycle) params.set('cycle', cycle);
+  const params = new URLSearchParams();
+  if (planId) params.set('plan', planId);
+  if (cycle && planId) params.set('cycle', cycle);
   if (email) params.set('email', email);
-  return `/signup/create-account?${params.toString()}`;
+  const q = params.toString();
+  return `/signup/create-account${q ? `?${q}` : ''}`;
 }
 
 export function welcomeUrl(planId: string, cycle: BillingCycle = 'annual'): string {

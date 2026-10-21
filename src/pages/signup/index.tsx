@@ -146,9 +146,15 @@ const DedicatedSignupPage: React.FC = () => {
 
     // Direct role-based dashboard landing
     hasHandledAuthRedirect.current = true;
+    const hasRole = user?.roles && user.roles.length > 0;
+    if (!hasRole) {
+      navigate('/select-role', { replace: true });
+      return;
+    }
+
     const isLandlordOrAgent =
-      user?.roles?.includes('landlord') ||
-      user?.roles?.includes('agent');
+      user.roles.includes('landlord') ||
+      user.roles.includes('agent');
 
     const targetDashboard = isLandlordOrAgent ? '/landlord' : '/dashboard';
     navigate(targetDashboard, { replace: true });
@@ -174,6 +180,7 @@ const DedicatedSignupPage: React.FC = () => {
       } else {
         // No explicit plan — remove stale intent so /select-role shows cleanly
         sessionStorage.removeItem('proptii_signup_role_intent');
+        sessionStorage.setItem('signup_flow_active', 'true');
       }
 
       trackEvent('signup_google_started', {
@@ -229,7 +236,8 @@ const DedicatedSignupPage: React.FC = () => {
       sessionStorage.removeItem('proptii_signup_role_intent');
     }
     sessionStorage.setItem('pending_registration_email', trimmed);
-    navigate(createAccountUrl(planId, cycle, trimmed));
+    sessionStorage.setItem('signup_flow_active', 'true');
+    navigate(createAccountUrl(planParam, cycle, trimmed));
   };
 
   return (

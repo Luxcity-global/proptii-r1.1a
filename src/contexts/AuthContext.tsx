@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, updateProfile } from 'firebase/auth';
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  updateProfile,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import SessionManager from '../services/SessionManager';
 import { notifyAuthReady } from '../services/authReady';
@@ -30,6 +38,8 @@ interface AuthContextType {
   isLoading: boolean;
   userRole: 'tenant' | 'landlord' | 'agent' | null;
   login: () => Promise<void>;
+  signupWithEmail: (email: string, password: string, name?: string) => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
   loginAsMockUser: (id: string, role: string) => void;
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
@@ -228,6 +238,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const signupWithEmail = async (email: string, password: string, name?: string): Promise<void> => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      if (name && name.trim()) {
+        try {
+          await updateProfile(userCredential.user, { displayName: name.trim() });
+        } catch (profileErr) {
+          console.warn('[Auth] Failed to set display name on signup:', profileErr);
+        }
+      }
+    } catch (err) {
+      console.error('[Auth] Signup with email failed:', err);
+      window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: false } }));
+      throw err;
+    }
+  };
+
+  const loginWithEmail = async (email: string, password: string): Promise<void> => {
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+    } catch (err) {
+      console.error('[Auth] Email login failed:', err);
+      window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: false } }));
+      throw err;
+    }
+  };
+
   const logout = async (): Promise<void> => {
     sessionManager.updateActivity('interaction', 'User logout');
     setIsAuthenticated(false);
@@ -321,6 +358,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         userRole,
         login,
+        signupWithEmail,
+        loginWithEmail,
         loginAsMockUser,
         logout,
         editProfile,

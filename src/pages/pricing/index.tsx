@@ -88,6 +88,30 @@ const PricingPage: React.FC<PricingPageProps> = ({
 
             <PricingBillingToggle billing={billing} onChange={setBilling} />
             <PricingAudienceTabs audience={audience} onChange={setAudience} />
+
+            {user && (
+              <div style={{ marginTop: '14px', textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isLandlordOrAgent = user?.roles?.includes('landlord') || user?.roles?.includes('agent');
+                    navigate(isLandlordOrAgent ? '/landlord' : '/dashboard');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#DC5F12',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '3px',
+                  }}
+                >
+                  Continue to your dashboard without a paid plan →
+                </button>
+              </div>
+            )}
           </section>
 
           <section className="pr-pricing-section">
