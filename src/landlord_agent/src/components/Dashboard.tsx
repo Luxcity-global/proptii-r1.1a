@@ -542,7 +542,7 @@ export function Dashboard({
           viewingService.getViewingBookingsByEmail(email),
           listViewingsForLandlord({
             email,
-            propertyTitles: properties.map((property) => property.address).filter(Boolean),
+            propertyTitles: properties.filter((p) => !isPropertyArchived(p)).map((property) => property.address).filter(Boolean),
           }),
         ]);
         const byId = new Map<string, any>();
@@ -796,7 +796,7 @@ export function Dashboard({
 
   const hasRevenue = totalRent > 0 || revenueSeries.some((r) => r.revenue > 0);
   const hasOccupancy = occupiedProperties > 0;
-  const firstProperty = properties[0];
+  const firstProperty = properties.find((p) => !isPropertyArchived(p));
   const handleUploadDocument = () => {
     if (onViewDocuments) onViewDocuments();
     else if (firstProperty) onManageDocuments(firstProperty);

@@ -22,9 +22,12 @@ import {
   AlertCircle,
   Loader2,
   Info,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import type { Property } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
 import axios from 'axios';
 import { trackEvent } from '../../../utils/analytics';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
@@ -162,6 +165,9 @@ export function InviteTenant({
   const [errors, setErrors] = useState<{ email?: string; propertyId?: string; general?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [generatedInviteLink, setGeneratedInviteLink] = useState('');
+  const [emailDeliveryWarning, setEmailDeliveryWarning] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Pre-fill email if it arrives late (e.g. parent re-renders)
   useEffect(() => {
@@ -219,9 +225,13 @@ export function InviteTenant({
         ? `${resolvedLandlordName} invited you to join as a tenant — ${selectedProperty.address}`
         : `You've been invited to join as a tenant — ${selectedProperty.address}`;
 
-      // 3. Send the email (with one retry on network errors)
+      setGeneratedInviteLink(inviteLink);
+
+      // 3. Send the email (with graceful fallback if email service has config/auth issues)
       const API_BASE = PRIMARY_API_BASE_URL.replace(/\/api$/, '');
-      let lastErr: any = null;
+      let emailDispatched = false;
+      let emailErrorDetail = '';
+
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           const res = await axios.post(
@@ -235,20 +245,24 @@ export function InviteTenant({
           if (res.data && res.data.success === false) {
             throw new Error(res.data.error || 'Email service rejected the request');
           }
+          emailDispatched = true;
+          trackEvent('landlord_invite_tenant_sent', { property_address: selectedProperty.address });
           break; // success
         } catch (e: any) {
-          lastErr = e;
           const retryable =
             axios.isAxiosError(e) &&
             (!e.response || ['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET'].includes(e.code ?? ''));
-          if (!retryable || attempt === 2) throw e;
-          await new Promise((r) => setTimeout(r, 2000));
+          if (retryable && attempt === 1) {
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          emailErrorDetail = e?.response?.data?.message || e?.message || 'Email delivery failed';
+          console.warn('[InviteTenant] Automated email dispatch warning:', emailErrorDetail);
+          break;
         }
       }
 
-      trackEvent('landlord_invite_tenant_sent', { property_address: selectedProperty.address });
-
-      // 3. Create a pending tenant record so the invitee appears in the Clients
+      // 4. Create a pending tenant record so the invitee appears in the Clients
       //    list immediately under status "pending" rather than being invisible
       //    until they complete onboarding.
       try {
@@ -278,18 +292,22 @@ export function InviteTenant({
         }
       } catch (tErr) {
         console.warn('[InviteTenant] Could not create pending tenant record:', tErr);
-        // Non-fatal — the invite was sent and recorded; tenant record is best-effort
       }
 
-      setSent(true);
-      // Auto-navigate after 3 s
-      setTimeout(() => onSuccess(), 3000);
+      if (emailDispatched) {
+        setSent(true);
+        setTimeout(() => onSuccess(), 3000);
+      } else {
+        setEmailDeliveryWarning(
+          emailErrorDetail || 'Automated email dispatch failed. You can copy the direct link below to share with your tenant.'
+        );
+        setSent(true);
+      }
     } catch (err: any) {
-      let msg = 'Failed to send invitation. Please try again.';
+      let msg = 'Failed to create invitation. Please try again.';
       if (axios.isAxiosError(err)) {
-        if (err.code === 'ECONNREFUSED') msg = 'Cannot reach the email server. Is the backend running?';
+        if (err.code === 'ECONNREFUSED') msg = 'Cannot reach the server. Is the backend running?';
         else if (err.code === 'ETIMEDOUT') msg = 'Request timed out. Check your connection and try again.';
-        else if (err.response?.status === 500) msg = 'Server error. Check the email service configuration.';
         else if (err.response?.data?.message) msg = err.response.data.message;
         else if (err.message) msg = err.message;
       } else if (err instanceof Error) {
@@ -309,16 +327,56 @@ export function InviteTenant({
         className="min-h-screen flex items-center justify-center px-4"
         style={{ backgroundColor: '#F8FAFC', fontFamily: 'Archivo, sans-serif' }}
       >
-        <div className="text-center space-y-5 max-w-sm w-full">
-          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-            <CheckCircle className="w-10 h-10 text-green-500" />
+        <div className="text-center space-y-5 max-w-md w-full">
+          <div className={`w-20 h-20 rounded-full ${emailDeliveryWarning ? 'bg-amber-100' : 'bg-green-100'} flex items-center justify-center mx-auto`}>
+            {emailDeliveryWarning ? (
+              <AlertCircle className="w-10 h-10 text-amber-600" />
+            ) : (
+              <CheckCircle className="w-10 h-10 text-green-500" />
+            )}
           </div>
           <h2 className="text-2xl font-bold" style={{ color: '#136C9E' }}>
-            Invitation sent!
+            {emailDeliveryWarning ? 'Invitation Created!' : 'Invitation sent!'}
           </h2>
           <p className="text-gray-600 text-sm">
-            An invitation email has been sent to <strong>{email}</strong>.
+            {emailDeliveryWarning ? (
+              <>Invitation for <strong>{email}</strong> was created successfully.</>
+            ) : (
+              <>An invitation email has been sent to <strong>{email}</strong>.</>
+            )}
           </p>
+
+          {emailDeliveryWarning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-900 font-semibold">Email Delivery Notice</p>
+              </div>
+              <p className="text-xs text-amber-800">
+                Automated email delivery encountered an issue ({emailDeliveryWarning}). You can copy the direct invitation link below to send to your tenant via WhatsApp, SMS, or email:
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={generatedInviteLink}
+                  className="text-xs flex-1 p-2 border border-amber-300 rounded bg-white text-gray-700 select-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedInviteLink);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2500);
+                  }}
+                  className="px-3 py-2 bg-[#136C9E] text-white text-xs font-semibold rounded hover:bg-[#0f547c] flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedLink ? 'Copied!' : 'Copy Link'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Clear explanation of what happens next */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left space-y-2">
@@ -339,7 +397,17 @@ export function InviteTenant({
             </ul>
           </div>
 
-          <p className="text-xs text-gray-400">Returning to your dashboard in 3 seconds…</p>
+          {emailDeliveryWarning ? (
+            <button
+              type="button"
+              onClick={onSuccess}
+              className="w-full py-2.5 px-4 bg-[#136C9E] hover:bg-[#0f547c] text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
+            >
+              Done & Return to Clients
+            </button>
+          ) : (
+            <p className="text-xs text-gray-400">Returning to your dashboard in 3 seconds…</p>
+          )}
         </div>
       </div>
     );
@@ -433,7 +501,7 @@ export function InviteTenant({
                 <SelectValue placeholder="Select a property" />
               </SelectTrigger>
               <SelectContent>
-                {properties.map((p) => (
+                {properties.filter((p) => !isPropertyArchived(p)).map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.address}
                   </SelectItem>

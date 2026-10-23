@@ -363,7 +363,9 @@ export const useSearchBackend = () => {
       
       // Provide user-friendly error messages
       let userFriendlyError = errorMessage;
-      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('ERR_CONNECTION_REFUSED')) {
+      if (errorMessage.includes('ERR_BLOCKED_BY_CLIENT') || errorMessage.toLowerCase().includes('blocked')) {
+        userFriendlyError = 'Search connection was blocked by your browser (e.g. Brave Shields or an ad-blocker). Please allow connections or disable shields for this site to search listings.';
+      } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('ERR_CONNECTION_REFUSED')) {
         userFriendlyError = 'Network connection issue. Please ensure the search service is running.';
       } else if (errorMessage.includes('timeout')) {
         userFriendlyError = 'Search timed out. Please try again.';

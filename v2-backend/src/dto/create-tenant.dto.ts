@@ -29,4 +29,49 @@ export class CreateTenantDto {
   @ApiPropertyOptional() @IsOptional() @IsString() jobTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() annualIncome?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() employmentType?: string;
+
+  @ApiPropertyOptional({ example: 75, description: 'Default risk score' })
+  @IsOptional()
+  @IsNumber()
+  defaultRiskScore?: number;
+
+  @ApiPropertyOptional({ example: 'user_123', description: 'Owner User ID' })
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @ApiPropertyOptional({ example: 'landlord_123' })
+  @IsOptional()
+  @IsString()
+  landlordId?: string;
+
+  @ApiPropertyOptional({ example: 'agent_123' })
+  @IsOptional()
+  @IsString()
+  agentId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  avatar?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  lastPaymentDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  overdueAmount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  paymentIntervalDays?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  id?: string;
 }

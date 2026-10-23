@@ -14,6 +14,7 @@ import {
   Image, Layers, Star,
 } from 'lucide-react';
 import type { Property } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -248,8 +249,8 @@ export function PropertyEnrichmentQueue({
 }: PropertyEnrichmentQueueProps) {
   const [filter, setFilter] = useState<'all' | 'needs-attention' | 'complete'>('all');
 
-  // Only show properties that were part of this import
-  const importedProperties = properties.filter(p => importedPropertyIds.includes(p.id));
+  // Only show properties that were part of this import and not archived
+  const importedProperties = properties.filter(p => !isPropertyArchived(p) && importedPropertyIds.includes(p.id));
 
   const complete       = importedProperties.filter(p => completionPct(p) >= 80);
   const needsAttention = importedProperties.filter(p => completionPct(p) < 80);

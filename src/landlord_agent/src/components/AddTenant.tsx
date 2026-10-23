@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ExistingTenancyWarning } from './ExistingTenancyWarning';
 import { otherPropertyForPerson } from '../services/otherPropertyForPerson';
 import type { Property, Tenant, UserProfile } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -274,6 +275,11 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
 
   // track which steps are done for the stepper badges
   const [done, setDone] = useState<Record<'step1'|'step2'|'step3', boolean>>({ step1:false, step2:false, step3:false });
+
+  const activeProperties = React.useMemo(
+    () => (properties || []).filter((p) => !isPropertyArchived(p)),
+    [properties]
+  );
 
   // Auto-fill rent from property
   useEffect(() => {
@@ -740,7 +746,7 @@ export function AddTenant({ properties, existingTenants, onSave, onBack, onBulkI
                   <SelectValue placeholder="Select a property"/>
                 </SelectTrigger>
                 <SelectContent>
-                  {properties.map(p=><SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
+                  {activeProperties.map(p=><SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

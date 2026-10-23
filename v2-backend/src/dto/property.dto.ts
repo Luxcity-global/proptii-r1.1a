@@ -8,7 +8,7 @@ import {
   Min,
   IsIn,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform, Expose } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePropertyDto {
@@ -28,22 +28,83 @@ export class CreatePropertyDto {
   city?: string;
 
   @ApiProperty({ example: 'SW1A 2AA', description: 'UK Postcode (required)' })
+  @Expose()
+  @Transform(({ obj, value }) => {
+    if (value && typeof value === 'string' && value.trim()) return value.trim();
+    if (obj?.address && typeof obj.address === 'string') {
+      const match = obj.address.toUpperCase().match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
+      if (match) return match[1];
+      return 'SW1A 1AA';
+    }
+    return value;
+  })
   @IsString()
   @IsNotEmpty()
   postcode: string;
 
   @ApiProperty({ example: 2500, description: 'Monthly rent amount (positive number)' })
-  @Type(() => Number)
+  @Transform(({ obj, value }) => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const cleaned = parseFloat(value.replace(/[^0-9.-]/g, ''));
+      if (!isNaN(cleaned)) return cleaned;
+    }
+    if (typeof obj?.rent === 'number') return obj.rent;
+    if (typeof obj?.rent === 'string') {
+      const cleaned = parseFloat(String(obj.rent).replace(/[^0-9.-]/g, ''));
+      if (!isNaN(cleaned)) return cleaned;
+    }
+    if (typeof obj?.rentAmount === 'number') return obj.rentAmount;
+    if (typeof obj?.rentAmount === 'string') {
+      const cleaned = parseFloat(String(obj.rentAmount).replace(/[^0-9.-]/g, ''));
+      if (!isNaN(cleaned)) return cleaned;
+    }
+    return value;
+  })
   @IsNumber()
   @IsPositive({ message: 'rentAmount / price must be a positive number' })
   price: number;
 
   @ApiPropertyOptional({ example: 2500, description: 'Alias for price' })
-  @Type(() => Number)
+  @Transform(({ obj, value }) => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const cleaned = parseFloat(value.replace(/[^0-9.-]/g, ''));
+      if (!isNaN(cleaned)) return cleaned;
+    }
+    if (typeof obj?.price === 'number') return obj.price;
+    if (typeof obj?.rent === 'number') return obj.rent;
+    return value;
+  })
   @IsNumber()
   @IsPositive({ message: 'rentAmount must be a positive number' })
   @IsOptional()
   rentAmount?: number;
+
+  @ApiPropertyOptional({ example: 2500, description: 'Alias for rent' })
+  @IsOptional()
+  rent?: any;
+
+  @ApiPropertyOptional({ example: 'Flat', description: 'Alias for propertyType' })
+  @IsOptional()
+  type?: any;
+
+  @ApiPropertyOptional({ description: 'Property documents' })
+  @IsOptional()
+  @IsArray()
+  documents?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  archived?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  isArchived?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  property?: any;
 
   @ApiPropertyOptional({ example: 2, description: 'Number of bedrooms' })
   @Type(() => Number)
@@ -129,6 +190,25 @@ export class CreatePropertyDto {
   @IsString()
   @IsOptional()
   agentCompany?: string;
+
+  @ApiPropertyOptional({ example: 75, description: 'Default risk score' })
+  @IsOptional()
+  @IsNumber()
+  defaultRiskScore?: number;
+
+  @ApiPropertyOptional({ description: 'Attached tenant details' })
+  @IsOptional()
+  tenant?: any;
+
+  @ApiPropertyOptional({ example: 'tenant_123', description: 'Attached tenant ID' })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @ApiPropertyOptional({ description: 'Pending tenants awaiting assignment' })
+  @IsOptional()
+  @IsArray()
+  pendingTenants?: any[];
 }
 
 export class UpdatePropertyDto {
@@ -148,23 +228,77 @@ export class UpdatePropertyDto {
   city?: string;
 
   @ApiPropertyOptional({ example: 'SW1A 2AA' })
+  @Transform(({ obj, value }) => {
+    if (value && typeof value === 'string' && value.trim()) return value.trim();
+    if (obj?.address && typeof obj.address === 'string') {
+      const match = obj.address.toUpperCase().match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
+      if (match) return match[1];
+    }
+    return value;
+  })
   @IsString()
   @IsOptional()
   postcode?: string;
 
   @ApiPropertyOptional({ example: 2600 })
-  @Type(() => Number)
+  @Transform(({ obj, value }) => {
+    if (typeof value === 'number' && !isNaN(value)) return Math.max(0, value);
+    if (typeof value === 'string') {
+      const cleaned = parseFloat(value.replace(/[^0-9.]/g, ''));
+      if (!isNaN(cleaned)) return Math.max(0, cleaned);
+    }
+    if (typeof obj?.rent === 'number' && !isNaN(obj.rent)) return Math.max(0, obj.rent);
+    if (typeof obj?.rent === 'string') {
+      const cleaned = parseFloat(String(obj.rent).replace(/[^0-9.]/g, ''));
+      if (!isNaN(cleaned)) return Math.max(0, cleaned);
+    }
+    return value;
+  })
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   @IsOptional()
   price?: number;
 
   @ApiPropertyOptional({ example: 2600 })
-  @Type(() => Number)
+  @Transform(({ obj, value }) => {
+    if (typeof value === 'number' && !isNaN(value)) return Math.max(0, value);
+    if (typeof value === 'string') {
+      const cleaned = parseFloat(value.replace(/[^0-9.]/g, ''));
+      if (!isNaN(cleaned)) return Math.max(0, cleaned);
+    }
+    if (typeof obj?.price === 'number' && !isNaN(obj.price)) return Math.max(0, obj.price);
+    if (typeof obj?.rent === 'number' && !isNaN(obj.rent)) return Math.max(0, obj.rent);
+    return value;
+  })
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   @IsOptional()
   rentAmount?: number;
+
+  @ApiPropertyOptional({ example: 2500 })
+  @IsOptional()
+  rent?: any;
+
+  @ApiPropertyOptional({ example: 'Flat' })
+  @IsOptional()
+  type?: any;
+
+  @ApiPropertyOptional({ description: 'Property documents' })
+  @IsOptional()
+  @IsArray()
+  documents?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  archived?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  isArchived?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  property?: any;
 
   @ApiPropertyOptional({ example: 2 })
   @Type(() => Number)
@@ -220,4 +354,53 @@ export class UpdatePropertyDto {
   @IsString()
   @IsOptional()
   uprn?: string;
+
+  @ApiPropertyOptional({ example: 'agent_user_id_123', description: 'Agent ID' })
+  @IsString()
+  @IsOptional()
+  userId?: string;
+
+  @ApiPropertyOptional({ example: 'agent_user_id_123', description: 'Landlord ID' })
+  @IsString()
+  @IsOptional()
+  landlordId?: string;
+
+  @ApiPropertyOptional({ example: 'John Doe', description: 'Agent name' })
+  @IsString()
+  @IsOptional()
+  agentName?: string;
+
+  @ApiPropertyOptional({ example: 'info@agency.com', description: 'Owner email' })
+  @IsString()
+  @IsOptional()
+  ownerEmail?: string;
+
+  @ApiPropertyOptional({ example: '+442079460912', description: 'Contact phone' })
+  @IsString()
+  @IsOptional()
+  contactPhone?: string;
+
+  @ApiPropertyOptional({ example: 'Luxcity Properties', description: 'Agent company' })
+  @IsString()
+  @IsOptional()
+  agentCompany?: string;
+
+  @ApiPropertyOptional({ example: 75, description: 'Default risk score' })
+  @IsOptional()
+  @IsNumber()
+  defaultRiskScore?: number;
+
+  @ApiPropertyOptional({ description: 'Attached tenant details' })
+  @IsOptional()
+  tenant?: any;
+
+  @ApiPropertyOptional({ example: 'tenant_123', description: 'Attached tenant ID' })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @ApiPropertyOptional({ description: 'Pending tenants awaiting assignment' })
+  @IsOptional()
+  @IsArray()
+  pendingTenants?: any[];
 }

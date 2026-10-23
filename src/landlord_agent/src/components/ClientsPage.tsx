@@ -39,7 +39,7 @@ import { useTenants } from '../hooks/useTenants';
 import { clientListingKey, clientListings } from '../services/clientListings';
 import { invitationService, PendingInvitation } from '../services/invitationService';
 import { tenantService } from '../services/tenantService';
-import { countPortfolio } from '../utils/portfolioStats';
+import { countPortfolio, isPropertyArchived } from '../utils/portfolioStats';
 import '../styles/clientsPage.css';
 
 interface ClientsPageProps {
@@ -267,10 +267,14 @@ export function ClientsPage({
   });
 
   const { landlords: liveLandlords, isLoading: isLandlordsLoading, refresh: refreshLandlords } = useLandlords();
-  const showLandlordTab = userRole === 'agent';
+  const activeProperties = useMemo(
+    () => (properties || []).filter((p) => !isPropertyArchived(p)),
+    [properties]
+  );
+
   const clientRows = useMemo(
-    () => clientListings(tenants || [], properties || []),
-    [tenants, properties],
+    () => clientListings(tenants || [], activeProperties),
+    [tenants, activeProperties],
   );
 
   useEffect(() => {
@@ -383,7 +387,7 @@ export function ClientsPage({
 
   const propertyOptions = useMemo(() => {
     const names = new Set<string>();
-    (properties || []).forEach((p) => {
+    activeProperties.forEach((p) => {
       const name = propertyParts(p.address || '').property;
       if (name && name !== '—') names.add(name);
     });
@@ -392,7 +396,7 @@ export function ClientsPage({
       if (name && name !== '—') names.add(name);
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [properties, tenants]);
+  }, [activeProperties, tenants]);
 
   const filteredAndSortedTenants = useMemo(() => {
     const now = new Date();
@@ -570,7 +574,7 @@ export function ClientsPage({
 
   const tenantKpis = useMemo(() => {
     const list = tenants || [];
-    const props = properties || [];
+    const props = activeProperties;
     const activeTenants = list.filter((t) => t.status === 'active' || t.status === 'pending').length;
     const portfolio = countPortfolio(props, list);
     const occupiedCount = portfolio.occupied;
@@ -617,7 +621,7 @@ export function ClientsPage({
       overdueBarPct,
       avgDaysLate,
     };
-  }, [tenants, properties, arrearsAlerts]);
+  }, [tenants, activeProperties, arrearsAlerts]);
 
   const landlordKpis = useMemo(() => {
     const list = liveLandlords || [];
@@ -750,13 +754,13 @@ export function ClientsPage({
                 </div>
                 <div className="ll-cl-seg-bar">
                   {tenantKpis.occupiedCount > 0 && (
-                    <div className="ll-cl-seg-fill occ" style={{ width: `${(tenantKpis.occupiedCount / Math.max(properties.length, 1)) * 100}%` }} />
+                    <div className="ll-cl-seg-fill occ" style={{ width: `${(tenantKpis.occupiedCount / Math.max(activeProperties.length, 1)) * 100}%` }} />
                   )}
                   {tenantKpis.renovatingCount > 0 && (
-                    <div className="ll-cl-seg-fill ren" style={{ width: `${(tenantKpis.renovatingCount / Math.max(properties.length, 1)) * 100}%` }} />
+                    <div className="ll-cl-seg-fill ren" style={{ width: `${(tenantKpis.renovatingCount / Math.max(activeProperties.length, 1)) * 100}%` }} />
                   )}
                   {tenantKpis.vacantCount > 0 && (
-                    <div className="ll-cl-seg-fill vac" style={{ width: `${(tenantKpis.vacantCount / Math.max(properties.length, 1)) * 100}%` }} />
+                    <div className="ll-cl-seg-fill vac" style={{ width: `${(tenantKpis.vacantCount / Math.max(activeProperties.length, 1)) * 100}%` }} />
                   )}
                 </div>
               </div>

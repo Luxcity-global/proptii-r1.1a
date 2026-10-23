@@ -39,6 +39,8 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useIsMobile } from './ui/use-mobile';
 import { Property, PropertyDocument, UserProfile } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
+import { isPropertyDeleted } from '../utils/deletedProperties';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
@@ -311,8 +313,12 @@ export function DocumentsPage({
     window.setTimeout(() => setIsRefreshing(false), 700);
   };
 
+  const activeProperties = useMemo(() => {
+    return (properties || []).filter((p) => !isPropertyArchived(p) && !isPropertyDeleted(p.id, p.address));
+  }, [properties]);
+
   const allDocuments = useMemo<DocumentWithProperty[]>(() => {
-    const propDocs: DocumentWithProperty[] = (properties || []).flatMap((property) =>
+    const propDocs: DocumentWithProperty[] = activeProperties.flatMap((property) =>
       (property.documents || []).map((document) => ({
         ...document,
         propertyAddress: property.address,
@@ -322,30 +328,37 @@ export function DocumentsPage({
       })),
     );
 
-    const unassignedMapped: DocumentWithProperty[] = (unassignedDocuments || []).map((doc) => ({
-      id: doc.id,
-      name: doc.name,
-      type: (doc.type as any) || 'other',
-      url: doc.url,
-      issueDate: doc.issueDate instanceof Date ? doc.issueDate : new Date(doc.issueDate as any),
-      expiryDate: doc.expiryDate ? (doc.expiryDate instanceof Date ? doc.expiryDate : new Date(doc.expiryDate as any)) : undefined,
-      status: doc.status || 'valid',
-      propertyAddress: 'Unassigned (Vault)',
-      propertyId: '',
-      tenantName: null,
-      isUnassigned: true,
-    }));
+    const unassignedMapped: DocumentWithProperty[] = (unassignedDocuments || [])
+      .filter((doc) => {
+        if (!doc.propertyId) return true;
+        if (isPropertyDeleted(doc.propertyId)) return false;
+        if ((properties || []).some((p) => p.id === doc.propertyId && isPropertyArchived(p))) return false;
+        return true;
+      })
+      .map((doc) => ({
+        id: doc.id,
+        name: doc.name,
+        type: (doc.type as any) || 'other',
+        url: doc.url,
+        issueDate: doc.issueDate instanceof Date ? doc.issueDate : new Date(doc.issueDate as any),
+        expiryDate: doc.expiryDate ? (doc.expiryDate instanceof Date ? doc.expiryDate : new Date(doc.expiryDate as any)) : undefined,
+        status: doc.status || 'valid',
+        propertyAddress: 'Unassigned (Vault)',
+        propertyId: '',
+        tenantName: null,
+        isUnassigned: true,
+      }));
 
     return [...propDocs, ...unassignedMapped];
-  }, [properties, unassignedDocuments]);
+  }, [activeProperties, unassignedDocuments, properties]);
 
   const tenantOptions = useMemo(() => {
     const names = new Set<string>();
-    (properties || []).forEach((p) => {
+    activeProperties.forEach((p) => {
       if (p.tenant?.name) names.add(p.tenant.name);
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [properties]);
+  }, [activeProperties]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<CategoryFilter, number> = {
@@ -410,15 +423,15 @@ export function DocumentsPage({
       propertyFilter === 'all' &&
       tenantFilter === 'all';
 
-    if (filtersIdle) return properties || [];
+    if (filtersIdle) return activeProperties;
 
-    return (properties || []).filter((p) => {
+    return activeProperties.filter((p) => {
       if (propertyFilter !== 'all' && p.id !== propertyFilter) return false;
       if (tenantFilter !== 'all' && p.tenant?.name !== tenantFilter) return false;
       return ids.has(p.id);
     });
   }, [
-    properties,
+    activeProperties,
     filteredDocuments,
     searchTerm,
     statusFilter,
@@ -485,9 +498,9 @@ export function DocumentsPage({
     const expired = allDocuments.filter((doc) => doc.status === 'expired').length;
     const expiringSoon = allDocuments.filter((doc) => doc.status === 'expiring-soon').length;
     const valid = allDocuments.filter((doc) => doc.status === 'valid').length;
-    const propertiesDocumented = (properties || []).filter((p) => (p.documents || []).length > 0)
+    const propertiesDocumented = activeProperties.filter((p) => (p.documents || []).length > 0)
       .length;
-    const tenantsTracked = (properties || []).filter((p) => p.tenant).length;
+    const tenantsTracked = activeProperties.filter((p) => p.tenant).length;
     const actionsNeeded = expired + expiringSoon;
     const compliancePct =
       total > 0 ? Math.round((valid / total) * 100) : propertiesDocumented > 0 ? 100 : 0;
@@ -502,7 +515,7 @@ export function DocumentsPage({
       actionsNeeded,
       compliancePct,
     };
-  }, [allDocuments, properties]);
+  }, [allDocuments, activeProperties]);
 
   const hasActiveFilters =
     Boolean(searchTerm) ||
@@ -520,7 +533,7 @@ export function DocumentsPage({
   };
 
   const openAttachFlow = (property?: Property) => {
-    const list = properties || [];
+    const list = activeProperties;
     const target =
       property ||
       (propertyFilter && propertyFilter !== 'all' ? list.find((p) => p.id === propertyFilter) : undefined) ||
@@ -635,7 +648,7 @@ export function DocumentsPage({
 
   const openAssignModal = (doc: DocumentWithProperty) => {
     setAssignModalDoc(doc);
-    setAssignTargetPropertyId((properties && properties[0]?.id) || '');
+    setAssignTargetPropertyId((activeProperties && activeProperties[0]?.id) || '');
   };
 
   const closeAssignModal = () => {
@@ -1690,11 +1703,35 @@ export function DocumentsPage({
         )}
 
         {documentStats.expiringSoon > 0 && (
-          <div className="ll-docs-alert is-warn" role="status">
-            <Clock size={16} />
-            <div>
-              <strong>{documentStats.expiringSoon} documents are expiring soon</strong> and should be
-              renewed.
+          <div
+            className="ll-docs-alert is-warn cursor-pointer hover:bg-amber-100/70 transition-colors"
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              setTypeFilter('all');
+              setStatusFilter('expiring-soon');
+              setPropertyFilter('all');
+              setTenantFilter('all');
+              setSearchTerm('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setTypeFilter('all');
+                setStatusFilter('expiring-soon');
+                setPropertyFilter('all');
+                setTenantFilter('all');
+                setSearchTerm('');
+              }
+            }}
+          >
+            <Clock size={16} className="shrink-0 text-amber-700" />
+            <div className="flex-1 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <strong>{documentStats.expiringSoon} document{documentStats.expiringSoon > 1 ? 's are' : ' is'} expiring soon</strong> and should be renewed.
+              </div>
+              <span className="text-xs font-bold text-amber-900 underline hover:text-amber-950">
+                View expiring documents →
+              </span>
             </div>
           </div>
         )}
@@ -1782,9 +1819,9 @@ export function DocumentsPage({
               aria-label="Filter by property"
             >
               <option value="all">
-                All Properties ({(properties || []).length} Properties)
+                All Properties ({activeProperties.length} Properties)
               </option>
-              {(properties || []).map((p) => (
+              {activeProperties.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.address}
                 </option>
@@ -1808,7 +1845,13 @@ export function DocumentsPage({
             <select
               className="ll-docs-select"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                const nextStatus = e.target.value as StatusFilter;
+                setStatusFilter(nextStatus);
+                if (nextStatus === 'expiring-soon' || nextStatus === 'expired') {
+                  setTypeFilter('all');
+                }
+              }}
               aria-label="Filter by status"
             >
               <option value="all">All Audit Statuses</option>
@@ -1845,11 +1888,31 @@ export function DocumentsPage({
               <Search size={22} />
             </div>
             <h3>No matching documents found</h3>
-            <p>
-              No documents match your active property, tenant, or category filters. Try clearing your
-              filters or attach a new file.
-            </p>
+            {statusFilter === 'expiring-soon' && documentStats.expiringSoon > 0 ? (
+              <p>
+                No expiring documents found in the current category/filter selection. You have {documentStats.expiringSoon} expiring document{documentStats.expiringSoon > 1 ? 's' : ''} in your portfolio.
+              </p>
+            ) : (
+              <p>
+                No documents match your active property, tenant, or category filters. Try clearing your
+                filters or attach a new file.
+              </p>
+            )}
             <div className="ll-docs-empty-actions">
+              {statusFilter === 'expiring-soon' && documentStats.expiringSoon > 0 && typeFilter !== 'all' && (
+                <button
+                  type="button"
+                  className="ll-docs-ghost-btn font-semibold text-[#136C9E] border-[#136C9E]"
+                  onClick={() => {
+                    setTypeFilter('all');
+                    setPropertyFilter('all');
+                    setTenantFilter('all');
+                    setSearchTerm('');
+                  }}
+                >
+                  View All Expiring Documents ({documentStats.expiringSoon})
+                </button>
+              )}
               <button type="button" className="ll-docs-ghost-btn" onClick={resetFilters}>
                 Reset Filters
               </button>
@@ -2044,7 +2107,7 @@ export function DocumentsPage({
                   <select
                     value={attachForm.propertyId}
                     onChange={(e) => {
-                      const nextProperty = (properties || []).find((p) => p.id === e.target.value);
+                      const nextProperty = activeProperties.find((p) => p.id === e.target.value);
                       setAttachForm((prev) => ({
                         ...prev,
                         propertyId: e.target.value,
@@ -2053,13 +2116,13 @@ export function DocumentsPage({
                     }}
                   >
                     <option value="">Don't assign to a property yet (Save to Vault)</option>
-                    {(properties || []).map((property) => (
+                    {activeProperties.map((property) => (
                       <option key={property.id} value={property.id}>
                         {property.address}
                       </option>
                     ))}
                   </select>
-                  {(!properties || properties.length === 0) && (
+                  {(!activeProperties || activeProperties.length === 0) && (
                     <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>
                       No properties added yet. This document will be saved to your vault so you can assign it later.
                     </p>
@@ -2570,7 +2633,7 @@ export function DocumentsPage({
                 >
                   Select Target Property
                 </label>
-                {(properties && properties.length > 0) ? (
+                {(activeProperties && activeProperties.length > 0) ? (
                   <select
                     className="ll-docs-select"
                     style={{ width: '100%', height: 40 }}
@@ -2579,7 +2642,7 @@ export function DocumentsPage({
                     required
                   >
                     <option value="" disabled>Choose property...</option>
-                    {properties.map((p) => (
+                    {activeProperties.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.address}
                       </option>
@@ -2624,7 +2687,7 @@ export function DocumentsPage({
                 <button
                   type="submit"
                   className="ll-docs-btn-attach"
-                  disabled={isAssigning || !assignTargetPropertyId || (properties || []).length === 0}
+                  disabled={isAssigning || !assignTargetPropertyId || activeProperties.length === 0}
                 >
                   {isAssigning ? 'Assigning...' : 'Confirm Assignment'}
                 </button>

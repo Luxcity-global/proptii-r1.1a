@@ -56,6 +56,8 @@ import { trackEvent } from '../../utils/analytics';
 import { useTenants } from './hooks/useTenants';
 import { isPropertyArchived } from './utils/portfolioStats';
 import { recordDeletedTenant } from './utils/deletedTenants';
+import { recordDeletedProperty, isPropertyDeleted } from './utils/deletedProperties';
+import { recordArchivedProperty, recordUnarchivedProperty } from './utils/archivedProperties';
 
 function LandlordMessagingPoller() {
   useMessagingPoller();
@@ -1165,11 +1167,12 @@ export function AppContent() {
           ...(currentUserId ? { userId: currentUserId } : {}),
           ...(userEmail ? { email: userEmail } : {}),
         });
+        const activeFetched = fetchedProperties.filter(p => !isPropertyDeleted(p.id, p.address));
         if (!cancelled) {
           setProperties(
             isAgentTestAccount(currentUserId, userEmail)
-              ? mergeAgentDemoProperties(getAgentDummyProperties(), fetchedProperties)
-              : fetchedProperties
+              ? mergeAgentDemoProperties(getAgentDummyProperties(), activeFetched)
+              : activeFetched
           );
         }
       } catch (error) {
@@ -1177,7 +1180,7 @@ export function AppContent() {
         if (!cancelled) {
           setProperties(
             isAgentTestAccount(currentUserId, userEmail)
-              ? getAgentDummyProperties()
+              ? getAgentDummyProperties().filter(p => !isPropertyDeleted(p.id, p.address))
               : []
           );
         }
@@ -1501,7 +1504,7 @@ export function AppContent() {
     const bedrooms = parseInt(syncedSetupData.propertyDetails.bedrooms) || 1;
     const bathrooms = parseInt(syncedSetupData.propertyDetails.bathrooms);
     const squareFootage = parseInt(syncedSetupData.propertyDetails.squareFootage);
-    const rent = parseInt(syncedSetupData.propertyDetails.monthlyRent) || 0;
+    const rent = Math.max(0, parseFloat(String(syncedSetupData.propertyDetails.monthlyRent || '').replace(/[^0-9.]/g, '')) || 0);
     const preservedStatus = syncedSetupData.status || 'vacant';
 
     const newProperty: Property = {
@@ -1869,8 +1872,12 @@ export function AppContent() {
 
   const deleteProperty = async (property: Property) => {
     try {
-      await propertyService.deleteProperty(property.id);
+      recordDeletedProperty(property.id, property.address);
+      await propertyService.deleteProperty(property.id).catch((err) => {
+        console.warn('Backend property deletion warning:', err);
+      });
       setProperties(prev => prev.filter(p => p.id !== property.id));
+      setUnassignedDocuments(prev => prev.filter(d => (d as any).propertyId !== property.id));
       if (selectedProperty?.id === property.id) {
         setSelectedProperty(null);
       }
@@ -1888,6 +1895,12 @@ export function AppContent() {
         ? ((property.tenant || (property as any).tenantId) ? 'occupied' : 'vacant')
         : 'archived';
       const isArchived = !isCurrentlyArchived;
+
+      if (isArchived) {
+        recordArchivedProperty(property.id, property.address);
+      } else {
+        recordUnarchivedProperty(property.id, property.address);
+      }
 
       await propertyService.updateProperty(property.id, {
         status: nextStatus as any,
@@ -2212,8 +2225,8 @@ export function AppContent() {
             onBulkImportProperties={() => navigateToScreen('bulk-import-property')}
             onBulkAssignTenants={() => navigateToScreen('bulk-assign')}
             onEnrichProperties={() => {
-              // Standalone enrichment — show all properties
-              importedPropertyIdsRef.current = properties.map(p => p.id);
+              // Standalone enrichment — show active properties
+              importedPropertyIdsRef.current = properties.filter(p => !isPropertyArchived(p)).map(p => p.id);
               enrichmentSourceRef.current = 'direct';
               navigateToScreen('property-enrichment-queue');
             }}
@@ -2565,7 +2578,7 @@ export function AppContent() {
         return (
           <ClientsPage
             userId={resolveManagerId()}
-            propertyIds={properties.map(p => p.id)}
+            propertyIds={properties.filter(p => !isPropertyArchived(p)).map(p => p.id)}
             properties={properties}
             arrearsAlerts={arrearsAlerts}
             userRole={userRole}
@@ -2990,7 +3003,7 @@ export function AppContent() {
                 const bedrooms = parseInt(syncedSetupData.propertyDetails.bedrooms) || 1;
                 const bathrooms = parseInt(syncedSetupData.propertyDetails.bathrooms);
                 const squareFootage = parseInt(syncedSetupData.propertyDetails.squareFootage);
-                const rent = parseInt(syncedSetupData.propertyDetails.monthlyRent) || 0;
+                const rent = Math.max(0, parseFloat(String(syncedSetupData.propertyDetails.monthlyRent || '').replace(/[^0-9.]/g, '')) || 0);
 
                 const preservedStatus = syncedSetupData.status
                   || (isEditing && selectedProperty ? selectedProperty.status : undefined)

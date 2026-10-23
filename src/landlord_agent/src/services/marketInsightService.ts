@@ -126,12 +126,8 @@ class MarketInsightService {
       
       const { response } = await fetchWithApiFallback('/govuk-rss');
       let xmlText = '';
-      if (response.ok) {
+      if (response && response.ok) {
         xmlText = await response.text();
-      } else {
-        const PROXY_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.gov.uk/search/news-and-communications.atom')}`;
-        const corsRes = await fetch(PROXY_URL);
-        if (corsRes.ok) xmlText = await corsRes.text();
       }
 
       if (!xmlText || xmlText.length < 100) return 0;

@@ -111,6 +111,12 @@ function mapFromApi(data: any): Property {
     } as unknown as Property;
 }
 
+function extractUkPostcode(address?: string): string {
+    if (!address) return '';
+    const match = address.toUpperCase().match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
+    return match ? match[1] : '';
+}
+
 function mapToApi(property: Omit<Property, 'id' | 'createdAt' | 'tenant'>): Record<string, any> {
     const photos = (property.photos ?? []).map(p => ({
         id: p.id,
@@ -120,15 +126,24 @@ function mapToApi(property: Omit<Property, 'id' | 'createdAt' | 'tenant'>): Reco
         ...(p.room ? { room: p.room } : {}),
     }));
 
+    const rawRent = Math.max(0, typeof property.rent === 'number'
+        ? property.rent
+        : parseFloat(String(property.rent || '0').replace(/[^0-9.]/g, '')) || 0);
+
+    const parsedPostcode = (property as any).postcode || extractUkPostcode(property.address) || 'SW1A 1AA';
+
     return {
-        title: property.address,    // use address as title if no dedicated title field
+        title: property.address || 'Property Listing',
         address: property.address,
-        price: property.rent ? `£${property.rent.toLocaleString('en-GB')} pcm` : '£0 pcm',
-        rent: property.rent,
-        bedrooms: property.bedrooms,
-        bathrooms: property.bathrooms,
+        postcode: parsedPostcode,
+        price: rawRent,
+        rentAmount: rawRent,
+        rent: rawRent,
+        bedrooms: Number(property.bedrooms) || 0,
+        bathrooms: property.bathrooms !== undefined ? Number(property.bathrooms) : undefined,
         squareFootage: property.squareFootage,
-        type: property.type,
+        propertyType: property.type || 'Flat',
+        type: property.type || 'Flat',
         amenities: property.amenities ?? [],
         notes: property.notes ?? '',
         photos,
@@ -143,6 +158,7 @@ function mapToApi(property: Omit<Property, 'id' | 'createdAt' | 'tenant'>): Reco
 // ---------------------------------------------------------------------------
 // CRUD
 // ---------------------------------------------------------------------------
+
 class PropertyService {
     async createProperty(
         propertyData: Omit<Property, 'id' | 'createdAt' | 'tenant'>,
@@ -199,10 +215,25 @@ class PropertyService {
         updates: Partial<Omit<Property, 'id' | 'createdAt' | 'tenant'>>
     ): Promise<void> {
         const headers = await authHeaders();
+        const cleanPayload: Record<string, any> = { ...updates };
+        if (cleanPayload.rent !== undefined) {
+            const rawRent = Math.max(0, typeof cleanPayload.rent === 'number'
+                ? cleanPayload.rent
+                : parseFloat(String(cleanPayload.rent || '0').replace(/[^0-9.]/g, '')) || 0);
+            cleanPayload.rent = rawRent;
+            cleanPayload.price = rawRent;
+            cleanPayload.rentAmount = rawRent;
+        }
+        if (cleanPayload.address && !cleanPayload.postcode) {
+            cleanPayload.postcode = extractUkPostcode(cleanPayload.address) || 'SW1A 1AA';
+        }
+        if (cleanPayload.type && !cleanPayload.propertyType) {
+            cleanPayload.propertyType = cleanPayload.type;
+        }
         const res = await fetch(`${API_BASE}/api/native-properties/${encodeURIComponent(propertyId)}`, {
             method: 'PUT',
             headers,
-            body: JSON.stringify(updates),
+            body: JSON.stringify(cleanPayload),
         });
         if (!res.ok) {
             const errText = await res.text().catch(() => '');

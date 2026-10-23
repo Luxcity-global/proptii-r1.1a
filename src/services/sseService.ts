@@ -12,6 +12,8 @@ export interface SseMessagePayload {
 
 type SseListener = (event: SseMessagePayload) => void;
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+
 class SseService {
   private sources: Map<string, EventSource> = new Map();
   private listeners: Map<string, Set<SseListener>> = new Map();
@@ -19,9 +21,45 @@ class SseService {
   private reconnectAttempts: Map<string, number> = new Map();
   private isConnecting: Map<string, boolean> = new Map();
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth-session-expired', () => {
+        this.disconnectAll();
+      });
+
+      window.addEventListener('auth-login-success', () => {
+        this.reconnectActiveChannels();
+      });
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'auth_token' && e.newValue) {
+          this.reconnectActiveChannels();
+        } else if (e.key === 'auth_token' && !e.newValue) {
+          this.disconnectAll();
+        }
+      });
+    }
+  }
+
+  /**
+   * Reconnect any channels that have active listeners once authentication becomes valid.
+   */
+  public reconnectActiveChannels(): void {
+    const activeChannels = new Set<string>();
+    for (const eventType of this.listeners.keys()) {
+      const channel = this.resolveChannelForEventType(eventType);
+      activeChannels.add(channel);
+    }
+
+    activeChannels.forEach(channel => {
+      this.reconnectAttempts.set(channel, 0);
+      void this.ensureConnected(channel);
+    });
+  }
+
   /**
    * Register a listener for one or more event types.
-   * Automatically connects to the appropriate SSE channel if not already connected.
+   * Automatically connects to the appropriate SSE channel if not already connected and authenticated.
    */
   on(eventTypes: string | string[], listener: SseListener): () => void {
     const types = Array.isArray(eventTypes) ? eventTypes : [eventTypes];
@@ -34,7 +72,7 @@ class SseService {
 
       // Auto-connect to appropriate channel based on event prefix/domain
       const channel = this.resolveChannelForEventType(type);
-      this.ensureConnected(channel);
+      void this.ensureConnected(channel);
     });
 
     return () => {
@@ -54,8 +92,8 @@ class SseService {
 
   /**
    * Connect to an SSE channel (e.g. 'viewing-requests', 'contracts', 'communication', 'alerts')
-   * Uses a short-lived SSE ticket (exchanged via POST /communication/sse-ticket) so the
-   * Bearer token is never exposed in the URL or server access logs.
+   * Requires a valid, non-expired authentication token.
+   * Uses an opaque SSE ticket for the communication channel where supported.
    */
   async ensureConnected(channel: string): Promise<EventSource | null> {
     if (this.sources.has(channel)) {
@@ -70,41 +108,50 @@ class SseService {
       return null;
     }
 
+    // Pre-flight auth check: do NOT open an SSE connection without a valid token.
+    // This prevents 401 Unauthorized errors and infinite reconnect loops before login.
+    let token: string | null = null;
+    try {
+      token = await getAccessTokenForApiRequest();
+    } catch {
+      token = null;
+    }
+
+    if (!token) {
+      // User is not authenticated yet — defer connection until login
+      return null;
+    }
+
     this.isConnecting.set(channel, true);
 
     try {
       const baseUrl = getResolvedApiBaseUrl().replace(/\/$/, '');
       let sseUrl: string;
 
-      // For the communication channel, exchange the Bearer token for a short-lived
-      // opaque ticket so the token never appears in URLs / server logs.
+      // For communication, exchange the Bearer token for a short-lived opaque ticket
       if (channel === 'communication') {
+        let ticket: string | null = null;
         try {
-          const token = await getAccessTokenForApiRequest();
           const ticketRes = await fetch(`${baseUrl}/communication/sse-ticket`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              Authorization: `Bearer ${token}`,
             },
           });
           if (ticketRes.ok) {
-            const { ticket } = await ticketRes.json();
-            sseUrl = `${baseUrl}/${channel}/events?ticket=${encodeURIComponent(ticket)}`;
-          } else {
-            // Ticket exchange failed — fall back to legacy token-in-URL
-            const fallbackToken = await getAccessTokenForApiRequest().catch(() => null);
-            sseUrl = `${baseUrl}/${channel}/events${fallbackToken ? `?token=${encodeURIComponent(fallbackToken)}` : ''}`;
+            const data = await ticketRes.json();
+            ticket = data.ticket;
           }
         } catch {
-          // Network error — fall back to legacy
-          const fallbackToken = await getAccessTokenForApiRequest().catch(() => null);
-          sseUrl = `${baseUrl}/${channel}/events${fallbackToken ? `?token=${encodeURIComponent(fallbackToken)}` : ''}`;
+          // Fall back to token-in-url
         }
+
+        sseUrl = ticket
+          ? `${baseUrl}/${channel}/events?ticket=${encodeURIComponent(ticket)}`
+          : `${baseUrl}/${channel}/events?token=${encodeURIComponent(token)}`;
       } else {
-        // Other channels: legacy token-in-URL (can be migrated similarly later)
-        const token = await getAccessTokenForApiRequest().catch(() => null);
-        sseUrl = `${baseUrl}/${channel}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+        sseUrl = `${baseUrl}/${channel}/events?token=${encodeURIComponent(token)}`;
       }
 
       const source = new EventSource(sseUrl);
@@ -118,14 +165,10 @@ class SseService {
         }
       };
 
-      // NestJS @Sse sets MessageEvent.type, producing named SSE events (event: message_new\ndata: ...).
-      // EventSource.onmessage ONLY fires for unnamed events — named events are silently dropped.
-      // Register addEventListener for every named event type the backend emits.
+      // Register addEventListener for every named event type
       const handleRawEvent = (eventType: string) => (msgEvent: MessageEvent) => {
         try {
           const raw = typeof msgEvent.data === 'string' ? JSON.parse(msgEvent.data) : msgEvent.data;
-          // raw is the full AppServerEvent: { type, userId, data: <inner payload>, timestamp }
-          // Normalise to SseMessagePayload with the inner payload as .data
           const payload: SseMessagePayload = {
             type: eventType,
             userId: raw?.userId,
@@ -147,7 +190,7 @@ class SseService {
       ];
       namedEventTypes.forEach(type => source.addEventListener(type, handleRawEvent(type)));
 
-      // Fallback for any unnamed events
+      // Fallback for unnamed events
       source.onmessage = (event) => {
         try {
           const parsed: SseMessagePayload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
@@ -178,12 +221,23 @@ class SseService {
     if (this.reconnectTimers.has(channel)) return;
 
     const attempts = this.reconnectAttempts.get(channel) || 0;
-    const delay = Math.min(1000 * Math.pow(2, attempts), 5000); // Exponential backoff capped at 5s
+    if (attempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.warn(`[SSE:${channel}] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Pausing retries until auth or network state changes.`);
+      return;
+    }
+
+    const delay = Math.min(1000 * Math.pow(2, attempts), 15000); // 1s, 2s, 4s, 8s, 15s
     this.reconnectAttempts.set(channel, attempts + 1);
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       this.reconnectTimers.delete(channel);
-      this.ensureConnected(channel);
+      // Verify that user is authenticated before retrying
+      const token = await getAccessTokenForApiRequest().catch(() => null);
+      if (token) {
+        void this.ensureConnected(channel);
+      } else {
+        console.debug(`[SSE:${channel}] Reconnect postponed: no active auth token.`);
+      }
     }, delay);
 
     this.reconnectTimers.set(channel, timer);

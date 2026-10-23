@@ -16,13 +16,14 @@ interface UseClassifyQueryResult {
   isClassifying: boolean;
 }
 
-/**
- * Debounced classify call. Independent of scrape/search — pills can render first.
- */
-export function useClassifyQuery({
-  enabled,
-  query,
-}: UseClassifyQueryOptions): UseClassifyQueryResult {
+export function useClassifyQuery(
+  optionsOrQuery: string | UseClassifyQueryOptions,
+): UseClassifyQueryResult {
+  const options: UseClassifyQueryOptions =
+    typeof optionsOrQuery === 'string'
+      ? { enabled: Boolean(optionsOrQuery.trim().length >= 2), query: optionsOrQuery }
+      : (optionsOrQuery || { enabled: false, query: '' });
+  const { enabled, query } = options;
   const [classification, setClassification] = useState<ClassifyResponse | null>(null);
   const [isClassifying, setIsClassifying] = useState(false);
   const requestIdRef = useRef(0);

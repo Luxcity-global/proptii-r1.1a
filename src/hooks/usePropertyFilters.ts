@@ -29,7 +29,7 @@ import {
  * meaning the predicate should actively drop non-matching results.
  */
 function isHardConstraint(source: FilterSource | undefined): boolean {
-  return source === 'user' || source === 'url';
+  return source === 'user' || source === 'url' || source === 'ai' || source === undefined;
 }
 
 /**
@@ -65,7 +65,7 @@ export const INITIAL_FILTER_STATE: PropertyFilterState = {
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function usePropertyFilters(
-  properties: Property[],
+  properties: Property[] = [],
   classifiedEntities?: ClassifyEntities | null,
 ) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -438,12 +438,12 @@ export function usePropertyFilters(
     if (filters.sortBy !== 'recommended') active++;
 
     return {
-      total: properties.length,
+      total: (properties || []).length,
       filtered: filteredProperties.length,
       hasActiveFilters: active > 0,
       activeFilterCount: active,
     };
-  }, [properties.length, filteredProperties.length, filters]);
+  }, [(properties || []).length, filteredProperties.length, filters]);
 
   // ─── Granular user actions — always mark source as 'user' ─────────────────
 
@@ -675,5 +675,6 @@ export function usePropertyFilters(
     removeFilter,
     promoteAiFilter,
     isPetRelaxed,
+    setInitialProperties: () => {},
   };
 }

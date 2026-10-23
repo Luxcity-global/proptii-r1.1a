@@ -73,6 +73,11 @@ const SearchResults: React.FC = () => {
     clearCache,
   } = useSearchBackend();
 
+  const { classification, isClassifying } = useClassifyQuery({
+    enabled: Boolean(searchQuery.trim().length >= 2),
+    query: searchQuery,
+  });
+
   const {
     filters,
     setPriceRange,
@@ -87,16 +92,9 @@ const SearchResults: React.FC = () => {
     removeFilter,
     filteredProperties,
     counts: filterCounts,
-    setInitialProperties,
-  } = usePropertyFilters();
-
-  const { classification, isClassifying } = useClassifyQuery(searchQuery);
+  } = usePropertyFilters(results, classification?.entities);
 
   const [showMap, setShowMap] = useState(false);
-
-  useEffect(() => {
-    setInitialProperties(results);
-  }, [results, setInitialProperties]);
 
   const uprnList = useMemo(
     () => (govDataEnabled ? results.map((p) => p.uprn).filter(Boolean) as string[] : []),

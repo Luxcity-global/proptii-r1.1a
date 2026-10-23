@@ -351,10 +351,12 @@ export function PropertiesPage({
 
   const locations = useMemo(() => {
     const set = new Set<string>();
-    (properties || []).forEach((p) => {
-      const city = cityFromAddress(p.address);
-      if (city) set.add(city);
-    });
+    (properties || [])
+      .filter((p) => !isPropertyArchived(p))
+      .forEach((p) => {
+        const city = cityFromAddress(p.address);
+        if (city) set.add(city);
+      });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [properties]);
 

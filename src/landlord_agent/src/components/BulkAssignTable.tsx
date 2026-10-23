@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import type { Tenant, Property } from '../App';
 import { tenantService } from '../services/tenantService';
 import { propertyService } from '../services/propertyService';
+import { isPropertyArchived } from '../utils/portfolioStats';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ export function BulkAssignTable({ tenants, properties, onBack, onComplete }: Bul
 
   // Vacant properties
   const vacantProperties = useMemo(() =>
-    properties.filter(p => p.status === 'vacant' && !p.tenantId),
+    properties.filter(p => !isPropertyArchived(p) && p.status === 'vacant' && !p.tenantId),
     [properties]
   );
 

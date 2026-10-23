@@ -362,10 +362,25 @@ export class NativePropertiesService {
     await docRef.update(updatedData);
 
     const landlordId = existing?.landlordId || existing?.userId || userId;
-    if (landlordId && rentDiff !== 0) {
-      await this.updateLandlordPortfolioSummary(landlordId, {
-        monthlyRent: rentDiff,
-      });
+    if (landlordId) {
+      const wasArchived = existing?.status === 'archived' || existing?.archived === true || existing?.isArchived === true;
+      const isNowArchived = updatedData?.status === 'archived' || updatedData?.archived === true || updatedData?.isArchived === true;
+
+      if (!wasArchived && isNowArchived) {
+        await this.updateLandlordPortfolioSummary(landlordId, {
+          properties: -1,
+          monthlyRent: oldRent > 0 ? -oldRent : 0,
+        });
+      } else if (wasArchived && !isNowArchived) {
+        await this.updateLandlordPortfolioSummary(landlordId, {
+          properties: 1,
+          monthlyRent: newRent > 0 ? newRent : 0,
+        });
+      } else if (!isNowArchived && rentDiff !== 0) {
+        await this.updateLandlordPortfolioSummary(landlordId, {
+          monthlyRent: rentDiff,
+        });
+      }
     }
 
     return { id, ...existing, ...updatedData };
@@ -401,7 +416,7 @@ export class NativePropertiesService {
       });
     }
 
-    // If documents were assigned to this property in landlord_documents, unassign them
+    // If documents were assigned to this property in landlord_documents, permanently remove them
     try {
       const db = this.db;
       if (db) {
@@ -409,12 +424,14 @@ export class NativePropertiesService {
         if (!snap.empty) {
           const batch = db.batch();
           snap.docs.forEach(d => {
-            batch.update(d.ref, { propertyId: null, updatedAt: new Date().toISOString() });
+            batch.delete(d.ref);
           });
           await batch.commit();
         }
       }
-    } catch {}
+    } catch (docCleanupErr: any) {
+      console.warn(`[NativePropertiesService] Could not clean up documents for property ${id}:`, docCleanupErr?.message);
+    }
 
     return { success: true };
   }

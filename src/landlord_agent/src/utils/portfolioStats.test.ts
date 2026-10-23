@@ -50,6 +50,23 @@ describe('portfolioStats', () => {
     expect(isPropertyArchived(null)).toBe(false);
   });
 
+  it('immediately recognizes archived properties from local storage cache', async () => {
+    const { recordArchivedProperty, recordUnarchivedProperty } = await import('./archivedProperties');
+    const property = { id: 'prop-xyz', address: '123 Baker Street', status: 'occupied', rent: 1500 };
+
+    expect(isPropertyArchived(property)).toBe(false);
+
+    recordArchivedProperty('prop-xyz', '123 Baker Street');
+    expect(isPropertyArchived(property)).toBe(true);
+
+    // Matches even if id is different but address matches
+    expect(isPropertyArchived({ id: 'prop-diff', address: '123 Baker Street' })).toBe(true);
+
+    // Unarchive restores it
+    recordUnarchivedProperty('prop-xyz', '123 Baker Street');
+    expect(isPropertyArchived(property)).toBe(false);
+  });
+
   it('treats property with deleted tenant as vacant/not occupied', () => {
     recordDeletedTenant('tenant-deleted-1', 'deleted@example.com');
 

@@ -534,40 +534,31 @@ export function AddPropertyWizard({
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'url(/images/pti_home_background.png) center/cover no-repeat', fontFamily: 'Nunito Sans,sans-serif' }}>
       {/* Navbar */}
-      <header className="h-[68px] px-6 flex items-center justify-between sticky top-0 z-50"
+      <header className="h-[68px] px-6 sm:px-8 md:px-12 sticky top-0 z-50 flex items-center justify-center"
         style={{ backdropFilter: 'blur(12px)', background: 'rgba(255,255,255,0.80)', borderBottom: '1px solid rgba(226,232,240,0.65)' }}>
-        <div className="flex items-center gap-4">
-          <button type="button" onClick={onBack}
-            className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all">
-            <ArrowLeft size={16} strokeWidth={2.5} />
-          </button>
-          <nav className="hidden sm:flex items-center gap-2 text-[13px] text-[#64748b]">
-            <span className="text-[#94a3b8] text-[11px]">/</span>
-            <span className="font-bold text-[#1e293b]" style={{ fontFamily: 'Archivo,sans-serif' }}>
-              {isEditing ? 'Edit Property' : 'Add New Property'}
-            </span>
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[12px] text-[#64748b] font-medium" style={{ fontFamily: 'Archivo,sans-serif' }}>
-            Step {step} of 5
-          </span>
-          {!isEditing && onSaveDraft && (
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={savingDraft || isSavingDraft}
-              className="hidden sm:flex text-[12.5px] font-semibold text-[#136C9E] hover:underline disabled:opacity-50 transition-all"
-              style={{ fontFamily: 'Archivo,sans-serif' }}
-            >
-              {(savingDraft || isSavingDraft) ? 'Saving…' : 'Save as Draft'}
+        <div className="w-full max-w-[1060px] flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button type="button" onClick={onBack}
+              className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all">
+              <ArrowLeft size={16} strokeWidth={2.5} />
             </button>
-          )}
-          <button type="button" onClick={onBack}
-            className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
-            title="Cancel">
-            ✕
-          </button>
+            <nav className="hidden sm:flex items-center gap-2 text-[13px] text-[#64748b]">
+              <span className="text-[#94a3b8] text-[11px]">/</span>
+              <span className="font-bold text-[#1e293b]" style={{ fontFamily: 'Archivo,sans-serif' }}>
+                {isEditing ? 'Edit Property' : 'Add New Property'}
+              </span>
+            </nav>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[12px] text-[#64748b] font-medium" style={{ fontFamily: 'Archivo,sans-serif' }}>
+              Step {step} of 5
+            </span>
+            <button type="button" onClick={onBack}
+              className="w-9 h-9 rounded-full border border-[#e2e8f0] bg-white flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] transition-all"
+              title="Cancel">
+              ✕
+            </button>
+          </div>
         </div>
       </header>
 
@@ -576,20 +567,34 @@ export function AddPropertyWizard({
         <div className="flex items-start justify-center gap-9 w-full max-w-[1060px]">
 
           {/* Sidebar stepper */}
-          <aside className="hidden md:block w-[280px] shrink-0 sticky top-[88px]"
-            style={{ background: 'white', borderRadius: 28, boxShadow: '0 20px 45px -12px rgba(19,108,158,0.08),0 4px 16px -2px rgba(0,0,0,0.04)', padding: '24px 16px' }}>
-            <div className="px-3 pb-4 mb-3" style={{ borderBottom: '1px solid #f1f5f9' }}>
-              <p className="text-[15px] font-bold text-[#1e293b]" style={{ fontFamily: 'Archivo,sans-serif' }}>
-                {isEditing ? 'Edit Property' : 'Add Property'}
-              </p>
-              <p className="text-[12px] text-[#64748b] mt-0.5">5 steps to list your property</p>
-            </div>
-            <div className="flex flex-col gap-2">
-              {STEPS.map(s => (
-                <StepItem key={s.step} s={s} current={step === s.step} done={done[s.step]} onClick={() => goTo(s.step)} />
-              ))}
-            </div>
-          </aside>
+          <div className="hidden md:flex flex-col w-[280px] shrink-0 sticky top-[88px] gap-3.5">
+            <aside
+              style={{ background: 'white', borderRadius: 28, boxShadow: '0 20px 45px -12px rgba(19,108,158,0.08),0 4px 16px -2px rgba(0,0,0,0.04)', padding: '24px 16px' }}>
+              <div className="px-3 pb-4 mb-3" style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <p className="text-[15px] font-bold text-[#1e293b]" style={{ fontFamily: 'Archivo,sans-serif' }}>
+                  {isEditing ? 'Edit Property' : 'Add Property'}
+                </p>
+                <p className="text-[12px] text-[#64748b] mt-0.5">5 steps to list your property</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {STEPS.map(s => (
+                  <StepItem key={s.step} s={s} current={step === s.step} done={done[s.step]} onClick={() => goTo(s.step)} />
+                ))}
+              </div>
+            </aside>
+
+            {!isEditing && onSaveDraft && (
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={savingDraft || isSavingDraft}
+                className="w-full py-2.5 px-4 rounded-2xl border-2 border-[#136C9E] text-[#136C9E] bg-white hover:bg-[#136C9E]/5 active:scale-[0.99] font-bold text-[13.5px] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                style={{ fontFamily: 'Archivo,sans-serif' }}
+              >
+                {(savingDraft || isSavingDraft) ? 'Saving…' : 'Save as Draft'}
+              </button>
+            )}
+          </div>
 
           {/* Form card */}
           <section style={{

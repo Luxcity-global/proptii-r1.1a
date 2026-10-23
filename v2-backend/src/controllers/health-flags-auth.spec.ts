@@ -134,4 +134,31 @@ describe('Section 1 & 2: Health, Runtime Flags & Auth Endpoints', () => {
       );
     });
   });
+
+  describe('GovUkRssController (/govuk-rss)', () => {
+    let rssController: any;
+
+    beforeEach(async () => {
+      const { GovUkRssController } = await import('./govuk-rss.controller');
+      rssController = new GovUkRssController();
+    });
+
+    it('[GET /govuk-rss] returns atom XML with proper content-type', async () => {
+      const mockRes: any = {
+        setHeader: vi.fn(),
+        send: vi.fn().mockImplementation((data) => data),
+        status: vi.fn().mockReturnThis(),
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: vi.fn().mockResolvedValue('<?xml version="1.0"?><feed><title>Test Feed</title></feed>'),
+      } as any);
+
+      await rssController.getGovUkFeed(mockRes);
+
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'application/atom+xml; charset=utf-8');
+      expect(mockRes.send).toHaveBeenCalledWith(expect.stringContaining('<feed>'));
+    });
+  });
 });

@@ -5,6 +5,7 @@ import { LandlordsController } from '../../controllers/landlords.controller';
 import { TenantsController } from '../../controllers/tenants.controller';
 import { TenantDashboardController } from '../../controllers/tenant-dashboard.controller';
 import { InsightsController } from '../../controllers/insights.controller';
+import { GovUkRssController } from '../../controllers/govuk-rss.controller';
 import { SheetsController } from '../../controllers/sheets.controller';
 
 import { AdminDashboardService } from '../../services/admin-dashboard.service';
@@ -25,6 +26,7 @@ import { LeadsModule } from '../../leads/leads.module';
     TenantsController,
     TenantDashboardController,
     InsightsController,
+    GovUkRssController,
     SheetsController,
   ],
   providers: [

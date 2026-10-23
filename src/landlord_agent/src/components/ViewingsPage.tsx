@@ -41,6 +41,7 @@ import { Card } from './ui/card';
 import { trackEvent } from '../../../utils/analytics';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { Property, UserProfile } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
 import {
   getAgentDummyViewingRequests,
   getAgentDummyViewings,
@@ -308,7 +309,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const [calendarWeekStart, setCalendarWeekStart] = useState<Date>(() => startOfWeekMonday(new Date()));
   
   const ITEMS_PER_PAGE = 10;
-  const ownedAddresses = (properties || []).map((property) => property.address).filter(Boolean).join('\n');
+  const activeProperties = useMemo(() => (properties || []).filter((p) => !isPropertyArchived(p)), [properties]);
+  const ownedAddresses = activeProperties.map((property) => property.address).filter(Boolean).join('\n');
 
   useEffect(() => {
     let unsubscribeBookings: (() => void) | undefined;
@@ -992,7 +994,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       }
 
       if (scheduleForm.tenantEmail) {
-        await emailService.sendEmail({
+        const emailResult = await emailService.sendEmail({
           to: scheduleForm.tenantEmail,
           subject: `Viewing Scheduled - ${selectedRequest.property.street}`,
           formData: {
@@ -1010,6 +1012,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           attachments: [],
           emailType: 'viewing-confirmed'
         });
+        if (!emailResult.success) {
+          setFeedback({
+            type: 'error',
+            message: `Viewing scheduled, but email to ${scheduleForm.tenantEmail} did not send: ${emailResult.error || 'Unknown error'}`
+          });
+          setIsScheduleModalOpen(false);
+          setSelectedRequest(null);
+          setScheduleForm(initialScheduleForm);
+          return;
+        }
       }
 
       trackEvent('landlord_viewing_scheduled');
@@ -1054,7 +1066,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       const tenantEmail = viewing.viewingDetails?.userDetails?.email;
       if (tenantEmail) {
         try {
-          await emailService.sendEmail({
+          const emailResult = await emailService.sendEmail({
             to: tenantEmail,
             subject: `Viewing Confirmed - ${viewing.property.street}`,
             formData: {
@@ -1072,8 +1084,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             attachments: [],
             emailType: 'viewing-user'
           });
-        } catch (emailError) {
+          if (!emailResult.success) {
+            setFeedback({
+              type: 'error',
+              message: `Viewing confirmed, but email to ${tenantEmail} did not send: ${emailResult.error || 'Unknown error'}`
+            });
+            return;
+          }
+        } catch (emailError: any) {
           console.error('Viewing was confirmed, but the tenant email failed:', emailError);
+          setFeedback({
+            type: 'error',
+            message: `Viewing confirmed, but email to ${tenantEmail} did not send: ${emailError?.message || 'Unknown error'}`
+          });
+          return;
         }
       }
 
@@ -1107,7 +1131,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
     propertyId?: string,
     slot?: { date?: string; time?: string },
   ) => {
-    const list = properties || [];
+    const list = activeProperties;
     setRequestForm({
       ...initialRequestForm,
       propertyId: propertyId || list[0]?.id || '',
@@ -1118,7 +1142,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   };
 
   const handleRequestViewingSubmit = async () => {
-    const property = (properties || []).find((p) => p.id === requestForm.propertyId);
+    const property = activeProperties.find((p) => p.id === requestForm.propertyId);
     if (!property) {
       setFeedback({ type: 'error', message: 'Please select a property for the viewing.' });
       return;
@@ -1213,6 +1237,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
           let emailSent = false;
+          let emailErrorMsg = '';
           try {
             const emailResult = await emailService.sendEmail({
               to: applicantEmail,
@@ -1242,14 +1267,19 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               emailType: 'viewing-user',
             });
             emailSent = emailResult.success;
-            if (emailSent) emailedAddress = applicantEmail;
-          } catch (emailError) {
+            if (emailSent) {
+              emailedAddress = applicantEmail;
+            } else if (emailResult.error) {
+              emailErrorMsg = emailResult.error;
+            }
+          } catch (emailError: any) {
             console.error('Viewing email was not sent:', emailError);
+            emailErrorMsg = emailError?.message || String(emailError);
           }
           if (!emailSent) {
             setFeedback({
               type: 'error',
-              message: `Viewing scheduled, but the email to ${applicantEmail} did not send.`,
+              message: `Viewing scheduled, but the email to ${applicantEmail} did not send: ${emailErrorMsg || 'Unknown error'}`,
             });
             setIsRequestModalOpen(false);
             setRequestForm(initialRequestForm);
@@ -1334,7 +1364,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           emailType: 'viewing-reschedule'
         });
         if (!emailResult.success) {
-          setFeedback({ type: 'error', message: 'The viewing was rescheduled, but the email to the tenant did not send.' });
+          setFeedback({ type: 'error', message: `The viewing was rescheduled, but the email to the tenant did not send: ${emailResult.error || 'Unknown error'}` });
           setIsRescheduleModalOpen(false);
           setSelectedViewing(null);
           setRescheduleForm(initialRescheduleForm);
@@ -1376,7 +1406,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       trackEvent('landlord_viewing_cancelled');
       const tenantEmail = selectedViewing.viewingDetails?.userDetails?.email;
       if (tenantEmail) {
-        await emailService.sendEmail({
+        const emailResult = await emailService.sendEmail({
           to: tenantEmail,
           subject: `Viewing Cancelled - ${selectedViewing.property.street}`,
           formData: {
@@ -1397,6 +1427,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           attachments: [],
           emailType: 'viewing-cancel'
         });
+        if (!emailResult.success) {
+          setFeedback({
+            type: 'error',
+            message: `Viewing cancelled, but email to tenant did not send: ${emailResult.error || 'Unknown error'}`
+          });
+          setIsCancelModalOpen(false);
+          setSelectedViewing(null);
+          setCancelMessage('');
+          return;
+        }
       }
 
       setFeedback({ type: 'success', message: 'Viewing cancelled and tenant notified.' });
@@ -1591,7 +1631,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               type="button"
               className="ll-vw-btn-cta"
               onClick={() => handleOpenRequestModal()}
-              disabled={(properties || []).length === 0}
+              disabled={activeProperties.length === 0}
             >
               <Eye size={16} />
               Request Viewing
@@ -2134,7 +2174,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     ? 'Try adjusting your search filters'
                     : 'Scheduled viewings will appear here once you confirm requests.'}
                 </p>
-                {!filterQuery && (properties || []).length > 0 && (
+                {!filterQuery && activeProperties.length > 0 && (
                   <button
                     type="button"
                     className="ll-vw-btn-cta"
@@ -2837,7 +2877,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   <option value="" disabled>
                     Choose a property
                   </option>
-                  {(properties || []).map((property) => (
+                  {activeProperties.map((property) => (
                     <option key={property.id} value={property.id}>
                       {propertyStreet(property.address)} — {property.address} (£
                       {property.rent.toLocaleString()}/mo)
@@ -3133,8 +3173,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             <div className="ll-vw-modal-body">
               <div className="ll-vw-insights-banner">
                 <strong>
-                  {(properties || [])[0]
-                    ? `${propertyStreet((properties || [])[0].address)} is generating elevated inquiry volume`
+                  {activeProperties[0]
+                    ? `${propertyStreet(activeProperties[0].address)} is generating elevated inquiry volume`
                     : 'Viewing demand is tracking above baseline'}
                 </strong>{' '}
                 this month, with {incomingRequests.length} open request

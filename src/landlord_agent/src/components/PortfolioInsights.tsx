@@ -20,7 +20,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { MarketInsight, Property, Tenant, UserProfile } from '../App';
-import { countPortfolio } from '../utils/portfolioStats';
+import { countPortfolio, isPropertyArchived } from '../utils/portfolioStats';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -143,28 +143,33 @@ function PortfolioInsightsContent({
   const occupancy = analyticsData?.occupancy;
   const tenants = analyticsData?.tenants;
 
-  const portfolio = countPortfolio(properties, portfolioTenants);
+  const activeProperties = useMemo(
+    () => (properties || []).filter((p) => !isPropertyArchived(p)),
+    [properties]
+  );
+
+  const portfolio = countPortfolio(activeProperties, portfolioTenants);
   const occupiedCount = portfolio.occupied;
   const vacantCount = portfolio.vacant;
   const renovatingCount = portfolio.renovating;
-  const propertyRentTotal = properties.reduce((sum, p) => sum + (p.rent || 0), 0);
+  const propertyRentTotal = activeProperties.reduce((sum, p) => sum + (p.rent || 0), 0);
 
-  const monthlyRevenue = analyticsData?.summary?.monthlyRent ?? (properties.length > 0 ? portfolio.monthlyRent : (revenue?.totalMonthly || 0));
-  const vacantUnits = analyticsData?.summary?.vacantProperties ?? (properties.length > 0 ? vacantCount : (occupancy?.vacantUnits ?? vacantCount));
-  const occupancyRate = analyticsData?.summary?.occupancyRate ?? (properties.length > 0 ? portfolio.occupancyPct : (occupancy?.rate || 0));
+  const monthlyRevenue = analyticsData?.summary?.monthlyRent ?? (activeProperties.length > 0 ? portfolio.monthlyRent : (revenue?.totalMonthly || 0));
+  const vacantUnits = analyticsData?.summary?.vacantProperties ?? (activeProperties.length > 0 ? vacantCount : (occupancy?.vacantUnits ?? vacantCount));
+  const occupancyRate = analyticsData?.summary?.occupancyRate ?? (activeProperties.length > 0 ? portfolio.occupancyPct : (occupancy?.rate || 0));
   const activeTenants = analyticsData?.summary?.tenantsCount ?? (portfolioTenants
     ? portfolioTenants.filter((tenant) => tenant.status === 'active' || tenant.status === 'pending').length
     : (tenants?.totalActive || occupiedCount));
   const netIncome = monthlyRevenue - Math.round(monthlyRevenue * 0.2);
   const outstandingRent = revenue?.outstandingRent || 0;
   const avgRent = analyticsData?.summary?.averageRent ?? (
-    properties.length > 0
-      ? Math.round(propertyRentTotal / properties.length)
+    activeProperties.length > 0
+      ? Math.round(propertyRentTotal / activeProperties.length)
       : revenue?.avgRentPerUnit || 0);
 
   const yieldRows = useMemo(() => {
-    if (properties.length === 0) return [];
-    return properties.slice(0, 5).map((p) => {
+    if (activeProperties.length === 0) return [];
+    return activeProperties.slice(0, 5).map((p) => {
       const annualRent = (p.rent || 0) * 12;
       const estimatedValue = (p as { estimatedValue?: number }).estimatedValue || 200000;
       const yieldPct = estimatedValue > 0 ? parseFloat(((annualRent / estimatedValue) * 100).toFixed(1)) : 0;
@@ -173,7 +178,7 @@ function PortfolioInsightsContent({
         value: yieldPct,
       };
     });
-  }, [properties]);
+  }, [activeProperties]);
 
   const revenueTrendData = revenue?.revenueTrendData || [];
   const chartData = useMemo(() => {
@@ -214,7 +219,7 @@ function PortfolioInsightsContent({
   const revenueByProperty =
     rawRevenueByProp.length > 0
       ? rawRevenueByProp
-      : properties.slice(0, 5).map((p) => ({
+      : activeProperties.slice(0, 5).map((p) => ({
           name: p.address.split(',')[0].trim(),
           label: p.address.split(',')[0].trim(),
           value: p.rent || 0,
@@ -462,7 +467,7 @@ function PortfolioInsightsContent({
             <article className="ll-an-stat">
               <p className="ll-an-stat-label">Occupancy rate</p>
               <p className="ll-an-stat-value">{occupancyRate}%</p>
-              <p className="ll-an-stat-sub">{occupiedCount} / {properties.length} units</p>
+              <p className="ll-an-stat-sub">{occupiedCount} / {activeProperties.length} units</p>
             </article>
             <article className="ll-an-stat">
               <p className="ll-an-stat-label">Vacant units</p>
@@ -581,7 +586,7 @@ function PortfolioInsightsContent({
                   <div className="ll-an-kpi-label">Occupancy rate</div>
                   <div className="ll-an-kpi-value">{occupancyRate}%</div>
                   <div className="ll-an-kpi-sub">
-                    {occupiedCount}/{properties.length} units active
+                    {occupiedCount}/{activeProperties.length} units active
                   </div>
                 </div>
               </article>

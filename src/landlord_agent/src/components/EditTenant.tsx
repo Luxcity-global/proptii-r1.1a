@@ -33,6 +33,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ExistingTenancyWarning } from './ExistingTenancyWarning';
 import type { Property, Tenant, UserProfile } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -423,7 +424,7 @@ export function EditTenant({ tenant, properties, userProfile, onSave, onBack }: 
                       <SelectValue placeholder="Select a property" />
                     </SelectTrigger>
                     <SelectContent>
-                      {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
+                      {properties.filter(p => !isPropertyArchived(p) || p.id === form.propertyId).map(p => <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>

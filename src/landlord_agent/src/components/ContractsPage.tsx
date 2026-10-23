@@ -33,6 +33,7 @@ import { fetchContractPdfFile } from '../../../services/contractPdf';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { getLandlordTwoDummyContracts, isLandlordTwoTestAccount } from '../data/landlordTwoDummyContracts';
 import { getAgentDummyContracts, isAgentTestAccount } from '../data/agentTestPersona';
+import { isPropertyArchived } from '../utils/portfolioStats';
 import { Property, UserProfile } from '../App';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { renderProptiiEmail } from '../../../utils/proptiiEmailLayout';
@@ -317,7 +318,7 @@ export function ContractsPage({
       const name = propertyParts(c.propertyAddress).property;
       if (name && name !== '—') set.add(name);
     });
-    (properties || []).forEach((p) => {
+    (properties || []).filter((p) => !isPropertyArchived(p)).forEach((p) => {
       const name = propertyParts(p.address || '').property;
       if (name && name !== '—') set.add(name);
     });
