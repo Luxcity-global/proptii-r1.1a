@@ -31,6 +31,15 @@ export class NotificationSchedulerService {
    */
   @Cron('0 * * * *')
   async checkUnreadReminders(): Promise<void> {
+    const isExplicitlyDisabled =
+      process.env.DISABLE_UNREAD_REMINDERS === 'true' ||
+      process.env.ENABLE_UNREAD_REMINDERS === 'false';
+
+    if (isExplicitlyDisabled) {
+      this.logger.log('[scheduler] Unread message reminders are disabled by configuration');
+      return;
+    }
+
     const db = this.db;
     if (!db) {
       this.logger.warn('[scheduler] Firestore unavailable — skipping unread reminder check');
@@ -56,13 +65,36 @@ export class NotificationSchedulerService {
       this.logger.log(`[scheduler] Checking ${convMap.size} conversation(s) with unread messages`);
 
       const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+      const MAX_REMINDERS = 2; // Cap reminders to 2 per unread thread to avoid spamming
+      const MAX_UNREAD_AGE_MS = 7 * 24 * 60 * 60 * 1000; // Stop reminders for messages older than 7 days
 
       for (const [, doc] of convMap) {
         try {
           const conv = doc.data();
           if (conv.isDeleted === true) continue;
 
-          // Determine if the 24-hour threshold has been crossed since the last reminder
+          // 1. Cap: Do not spam indefinitely; stop after MAX_REMINDERS
+          const reminderCount: number = typeof conv.reminderCount === 'number' ? conv.reminderCount : 0;
+          if (reminderCount >= MAX_REMINDERS) {
+            this.logger.debug(
+              `[scheduler] Skipping conversation ${doc.id} — reached max reminders (${reminderCount}/${MAX_REMINDERS})`,
+            );
+            continue;
+          }
+
+          // 2. Cutoff: Do not send reminder for stale conversations older than 7 days
+          const lastActivity = conv.lastMessageAt || conv.updatedAt || conv.createdAt;
+          if (lastActivity) {
+            const ageMs = Date.now() - new Date(lastActivity).getTime();
+            if (!isNaN(ageMs) && ageMs > MAX_UNREAD_AGE_MS) {
+              this.logger.debug(
+                `[scheduler] Skipping conversation ${doc.id} — unread messages exceed 7 days cutoff`,
+              );
+              continue;
+            }
+          }
+
+          // 3. Determine if the 24-hour threshold has been crossed since the last reminder
           const lastNotifiedAt: string | null = conv.lastNotifiedAt ?? null;
           const needsReminder =
             !lastNotifiedAt ||
@@ -106,10 +138,13 @@ export class NotificationSchedulerService {
             }
           }
 
-          // Update lastNotifiedAt after at least one reminder was sent
+          // Update lastNotifiedAt and increment reminderCount after at least one reminder was sent
           if (notified) {
             await conversationsCol.doc(doc.id).set(
-              { lastNotifiedAt: new Date().toISOString() },
+              {
+                lastNotifiedAt: new Date().toISOString(),
+                reminderCount: admin.firestore.FieldValue.increment(1),
+              },
               { merge: true },
             );
           }

@@ -436,6 +436,7 @@ export class CommunicationService {
               lastMessageAt: timestamp,
               lastMessagePreview: (message.body || '').substring(0, 80),
               [recipientField]: admin.firestore.FieldValue.increment(1),
+              reminderCount: 0,
             },
             { merge: true }
           );
