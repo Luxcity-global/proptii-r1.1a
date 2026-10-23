@@ -267,6 +267,7 @@ export function ClientsPage({
   });
 
   const { landlords: liveLandlords, isLoading: isLandlordsLoading, refresh: refreshLandlords } = useLandlords();
+  const showLandlordTab = userRole === 'agent';
   const activeProperties = useMemo(
     () => (properties || []).filter((p) => !isPropertyArchived(p)),
     [properties]
@@ -1533,7 +1534,7 @@ export function ClientsPage({
       </div>
 
       {/* ── Single Tenant Deletion Dialog ────────────────────────────────────── */}
-      <Dialog open={!!tenantToDelete} onOpenChange={(open) => !open && setTenantToDelete(null)}>
+      <Dialog open={!!tenantToDelete} onOpenChange={(open: boolean) => !open && setTenantToDelete(null)}>
         <DialogContent className="rounded-[20px] max-w-md">
           <DialogHeader>
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
@@ -1578,7 +1579,7 @@ export function ClientsPage({
       </Dialog>
 
       {/* ── Single Landlord Deletion Dialog ──────────────────────────────────── */}
-      <Dialog open={!!landlordToDelete} onOpenChange={(open) => !open && setLandlordToDelete(null)}>
+      <Dialog open={!!landlordToDelete} onOpenChange={(open: boolean) => !open && setLandlordToDelete(null)}>
         <DialogContent className="rounded-[20px] max-w-md">
           <DialogHeader>
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
