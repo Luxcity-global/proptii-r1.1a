@@ -11,18 +11,12 @@ importers:
       '@azure-rest/ai-inference':
         specifier: 1.0.0-beta.6
         version: 1.0.0-beta.6
-      '@azure/arm-cdn':
-        specifier: ^7.0.1
-        version: 7.0.1
       '@azure/arm-frontdoor':
         specifier: ^5.3.1
         version: 5.3.1
       '@azure/core-auth':
         specifier: ^1.11.0
         version: 1.11.0
-      '@azure/cosmos':
-        specifier: ^4.10.0
-        version: 4.10.0
       '@azure/identity':
         specifier: ^4.13.1
         version: 4.13.1
@@ -164,9 +158,6 @@ importers:
       '@stripe/stripe-js':
         specifier: ^9.13.0
         version: 9.13.0
-      '@types/docusign-esign':
-        specifier: ^5.19.9
-        version: 5.19.9
       '@types/jsonwebtoken':
         specifier: ^9.0.10
         version: 9.0.10
@@ -200,9 +191,6 @@ importers:
       dayjs:
         specifier: ^1.11.21
         version: 1.11.23
-      docusign-esign:
-        specifier: ^8.7.0
-        version: 8.7.0
       docx:
         specifier: ^9.7.1
         version: 9.7.1
@@ -212,12 +200,6 @@ importers:
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@18.3.1)
-      express:
-        specifier: ^5.2.1
-        version: 5.2.1
-      express-async-handler:
-        specifier: ^1.2.0
-        version: 1.2.0
       firebase:
         specifier: ^12.16.0
         version: 12.17.1
@@ -254,9 +236,6 @@ importers:
       mammoth:
         specifier: ^1.12.1
         version: 1.12.1
-      multer:
-        specifier: ^2.2.0
-        version: 2.2.0
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -266,9 +245,6 @@ importers:
       node-forge:
         specifier: ^1.4.0
         version: 1.4.0
-      nodemailer:
-        specifier: ^7.0.13
-        version: 7.0.13
       openai:
         specifier: ^4.104.0
         version: 4.104.0(ws@8.21.3)(zod@3.25.76)
@@ -299,18 +275,12 @@ importers:
       react-hook-form:
         specifier: ^7.85.0
         version: 7.85.0(react@18.3.1)
-      react-hot-toast:
-        specifier: ^2.6.0
-        version: 2.6.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-resizable-panels:
         specifier: ^2.1.9
         version: 2.1.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-router-dom:
         specifier: ^6.30.4
         version: 6.30.6(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react-signature-canvas:
-        specifier: 1.1.0-alpha.2
-        version: 1.1.0-alpha.2(@types/prop-types@15.7.15)(@types/react@18.3.31)(prop-types@15.8.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       recharts:
         specifier: ^2.15.4
         version: 2.15.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -323,9 +293,6 @@ importers:
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      stripe:
-        specifier: ^22.4.0
-        version: 22.5.0(@types/node@25.9.5)
       swiper:
         specifier: ^12.2.0
         version: 12.2.0
@@ -648,10 +615,6 @@ packages:
     resolution: {integrity: sha512-rL0lJqh1E8HLXNgjIw8cRyGAV/v+m6p1xRu/8OhsnmN8XHhwkyYJkAoGM+zrew96v7jZYPmVfy7pv7v4Iccfsg==}
     engines: {node: '>=20.0.0'}
 
-  '@azure/abort-controller@1.1.0':
-    resolution: {integrity: sha512-TrRLIoSQVzfAJX9H1JeFjzAoDGcoK1IYX1UImfceTZpsyYfWr09Ss1aHW1y5TrrR3iq6RZLBwJ3E24uwPhwahw==}
-    engines: {node: '>=12.0.0'}
-
   '@azure/abort-controller@2.1.2':
     resolution: {integrity: sha512-nBrLsEWm4J2u5LpAPjxADTlq3trDgVZZXHNKabeXZtpq3d3AbN/KGO82R87rdDz5/lYB024rtEf10/q0urNgsA==}
     engines: {node: '>=18.0.0'}
@@ -659,10 +622,6 @@ packages:
   '@azure/arm-appservice@16.0.0':
     resolution: {integrity: sha512-oJBb1kpI6okJouyGKBqA9Kp1Em6CutdqbI+Q74pQz7ssv6zBoxIC9BCg15jvHOdK14JE16lbuf3nGqUZ6AyNbw==}
     engines: {node: '>=18.0.0'}
-
-  '@azure/arm-cdn@7.0.1':
-    resolution: {integrity: sha512-z466zGaci9wXe/i9LNItnwN+9fzwdFMy61vXRSEuZKPOPbDm8Cr2zED34mXdLgwo/oQQsFDBuazt1lNeRMoI2A==}
-    engines: {node: '>=12.0.0'}
 
   '@azure/arm-frontdoor@5.3.1':
     resolution: {integrity: sha512-4XwnG1Z+0sG1zZGnAna8TbXzvhdplN7m+lnZf6aQA5WBe7glENLluESaaclanYrz9U8vOluM6qgRG2FuC6FWuQ==}
@@ -700,20 +659,8 @@ packages:
     resolution: {integrity: sha512-XPArKLzsvl0Hf0CaGyKHUyVgF7oDnhKoP85Xv6M4StF/1AhfORhZudHtOyf2s+FcbuQ9dPRAjB8J2KvRRMUK2A==}
     engines: {node: '>=20.0.0'}
 
-  '@azure/cosmos@4.10.0':
-    resolution: {integrity: sha512-SP2UpmR5x1wuoo9EAzCP5Nb8x3BCoQEI8ll9+dkC3x//ozE8Mwg6rY1gEmE1u9Yp/1xCD6lq9FXglFqbEzZ38w==}
-    engines: {node: '>=22.0.0'}
-
   '@azure/identity@4.13.1':
     resolution: {integrity: sha512-5C/2WD5Vb1lHnZS16dNQRPMjN6oV/Upba+C9nBIs15PmOi6A3ZGs4Lr2u60zw4S04gi+u3cEXiqTVP7M4Pz3kw==}
-    engines: {node: '>=20.0.0'}
-
-  '@azure/keyvault-common@2.1.0':
-    resolution: {integrity: sha512-aCDidWuKY06LWQ4x7/8TIXK6iRqTaRWRL3t7T+LC+j1b07HtoIsOxP/tU90G4jCSBn5TAyUTCtA4MS/y5Hudaw==}
-    engines: {node: '>=20.0.0'}
-
-  '@azure/keyvault-keys@4.10.2':
-    resolution: {integrity: sha512-VmUSLbXRAbSzDD8grXHGPaknYs0SKr3yuf6U+d4XMpX4XuVYskNqbTTwXce0zR1LyxfTZm9rWEBcvs3vdYwCmQ==}
     engines: {node: '>=20.0.0'}
 
   '@azure/logger@1.3.0':
@@ -982,9 +929,6 @@ packages:
     peerDependenciesMeta:
       date-fns:
         optional: true
-
-  '@devhigley/parse-proxy@1.0.3':
-    resolution: {integrity: sha512-ozRQ9CgWF4JXNNae1zUEpb2fbqH61oxtZz2sdR7a0ci5mi9pSP3EvoU7g4idZYi+CXP32gsvH7kTYZJCGW3DKQ==}
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -3739,9 +3683,6 @@ packages:
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
-  '@types/docusign-esign@5.19.9':
-    resolution: {integrity: sha512-AZNfmxucaY5IGU0j3LH/3A9iFbdY39+wlUnmGfeN0AihCspNC1H08xlQ8j8th5Rl2y9TsgDXcrmKF1ncYVGYWw==}
-
   '@types/eslint-scope@3.7.7':
     resolution: {integrity: sha512-MzMFlSLBqNF2gcHWO0G1vP/YQyfvrxZ0bF+u7mzUdZ1/xK4A4sru+nraZz5i3iEIk1l1uyicaDVTB4QbbEkAYg==}
 
@@ -3888,9 +3829,6 @@ packages:
 
   '@types/serve-static@2.2.0':
     resolution: {integrity: sha512-8mam4H1NHLtu7nmtalF7eyBH14QyOASmcxHhSfEoRyr0nP/YdoesEtU+uSRvMe96TW/HPTtkoKqQLl53N7UXMQ==}
-
-  '@types/signature_pad@2.3.6':
-    resolution: {integrity: sha512-v3j92gCQJoxomHhd+yaG4Vsf8tRS/XbzWKqDv85UsqjMGy4zhokuwKe4b6vhbgncKkh+thF+gpz6+fypTtnFqQ==}
 
   '@types/stack-utils@2.0.3':
     resolution: {integrity: sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==}
@@ -4466,10 +4404,6 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  base64url@3.0.1:
-    resolution: {integrity: sha512-ir1UPr3dkwexU7FdV8qBBbNDRUhMmIekYMFZfi+C/sLNnRESKPl23nB9b2pltqfOQNnGzsDdId90AEtG5tCx4A==}
-    engines: {node: '>=6.0.0'}
-
   baseline-browser-mapping@2.11.15:
     resolution: {integrity: sha512-FwMjJJ7HnyZpWe+oWxegG0fezZyBZUagI5LZEoO3GCbtbKNwRfMH9Ue5d5v01PNePBy1QSfPSDTTeVL0Hb9EzA==}
     engines: {node: '>=6.0.0'}
@@ -4870,9 +4804,6 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
-  csv-stringify@1.1.2:
-    resolution: {integrity: sha512-3NmNhhd+AkYs5YtM1GEh01VR6PKj6qch2ayfQaltx5xpcAdThjnbbI5eT8CzRVpXfGKAxnmrSYLsNl/4f3eWiw==}
-
   d3-array@3.2.4:
     resolution: {integrity: sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg==}
     engines: {node: '>=12'}
@@ -5067,10 +4998,6 @@ packages:
 
   dlv@1.1.3:
     resolution: {integrity: sha512-+HlytyjlPKnIG8XuRG8WvmBP8xs8P71y+SKKS6ZXWoEgLuePxtDoUEiH7WkdePWrQ5JBpE6aoVqfZfJUQkjXwA==}
-
-  docusign-esign@8.7.0:
-    resolution: {integrity: sha512-1ZMn3z2knn/iYI4CR6ZCr2qYjJj1xEbGm7IudS6VN8QAxmMI1h1sUaBKCGzffAJeBUOTMYhTlSxM84WMeF/cHw==}
-    engines: {node: '>=2.2.1'}
 
   docx@9.7.1:
     resolution: {integrity: sha512-ilXFf9Moz47ABjFpDiA5s1w9lpb4EFSp7+5iiJSbfyYDM+bpZdAgLlSr7fW4aXhVe/E+F6QCv0EvRVFEd5CsWg==}
@@ -5355,9 +5282,6 @@ packages:
   expect@30.5.0:
     resolution: {integrity: sha512-8fiMWcEjPU7B9nErC4FtFcCzf2tC6I75Qf7m8wzBAWC2taZmcno3yAFEjIQL34SwoGZNgPf63UDiJLyh4SMPaw==}
     engines: {node: ^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0}
-
-  express-async-handler@1.2.0:
-    resolution: {integrity: sha512-rCSVtPXRmQSW8rmik/AIb2P0op6l7r1fMW538yyvTMltCO4xQEWMmobfrIxN2V1/mVrgxB8Az3reYF6yUZw37w==}
 
   express@4.22.1:
     resolution: {integrity: sha512-F2X8g9P1X7uCPZMA3MVf9wcTqlyNp7IhH5qPCI0izhaOIYXaW9L535tGA3qmjRzpH+bZczqq7hVKxTR4NWnu+g==}
@@ -5689,11 +5613,6 @@ packages:
     resolution: {integrity: sha512-jgcs2vKir9hFogGhXIfs0ODhJTfIrbECCehg38tqFgHm8zqXx7kAJyCYAFK4jTjx71AxrkFtkJBawbAxYUPX9A==}
     engines: {node: '>=14'}
     deprecated: The gm module has been sunset. Please migrate to an alternative. https://github.com/aheckmann/gm?tab=readme-ov-file#2025-02-24-this-project-is-not-maintained
-
-  goober@2.1.19:
-    resolution: {integrity: sha512-U7veizMqxyKlM58+Z5j2ngJBH/r9siDmxpvNxSw0PylF6WQvrASJEZrxh1hidRBJc2jqoBVSyOban5u8m+6Rxg==}
-    peerDependencies:
-      csstype: ^3.0.10
 
   google-auth-library@10.5.0:
     resolution: {integrity: sha512-7ABviyMOlX5hIVD60YOfHw4/CxOfBhyduaYB+wbFWCWoni4N7SLcV46hrVRktuBbZjFC9ONyqamZITN7q3n32w==}
@@ -6411,10 +6330,6 @@ packages:
   lodash.clonedeep@4.5.0:
     resolution: {integrity: sha512-H5ZhCF25riFd9uB5UCkVKo61m3S/xZk1x4wA6yp/L3RFP6Z/eHH1ymQcGLo7J3GMPfm0V/7m1tryHuGVxpqEBQ==}
 
-  lodash.get@4.4.2:
-    resolution: {integrity: sha512-z+Uw/vLuy6gQe8cfaFWD7p0wVv8fJl3mbzXh33RS+0oW2wvUqiRXiQ69gLWSLpgB5/6sU+r6BlQR0MBILadqTQ==}
-    deprecated: This package is deprecated. Use the optional chaining (?.) operator instead.
-
   lodash.includes@4.3.0:
     resolution: {integrity: sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w==}
 
@@ -6718,10 +6633,6 @@ packages:
     resolution: {integrity: sha512-u7f2xaZ/UG8oLXHvtF/oWTRvT44p9ecwBBqTwgJVq0+4BW1g8OW01TyMEGWBHbyMOYVHXslaut7qEQ1meATXgw==}
     engines: {node: '>= 10.16.0'}
 
-  multer@2.2.0:
-    resolution: {integrity: sha512-6rdyFg2kLrMh9Jee7/BMPuV9lEAd7lLW2YUpF9/YxR7njyoUwwQ0ZPh3TaIY50Sw6vlyD2HW3wGOkTS4P79xrQ==}
-    engines: {node: '>= 10.16.0'}
-
   mute-stream@0.0.8:
     resolution: {integrity: sha512-nnbWWOkoWyUsTjKrhgD0dcz22mdkSnpYqbEjIm2nhwhuxlSkpywJmBo8h0ZqJdkp73mb90SssHkN4rsRaBAfAA==}
 
@@ -6813,10 +6724,6 @@ packages:
     resolution: {integrity: sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==}
     engines: {node: '>=6.0.0'}
 
-  nodemailer@7.0.13:
-    resolution: {integrity: sha512-PNDFSJdP+KFgdsG3ZzMXCgquO7I6McjY2vlqILjtJd0hy8wEvtugS9xKRF2NWlPNGxvLCXlTNIae4serI7dinw==}
-    engines: {node: '>=6.0.0'}
-
   nodemailer@8.0.11:
     resolution: {integrity: sha512-nrO/pDAUKl+wXX+lx16tDLbnm0fW6sK/x8mgohaCpg+CdCEl482bD4tCuAZk2DyliruiNTIZxRCoWkDqJEnAiA==}
     engines: {node: '>=6.0.0'}
@@ -6839,9 +6746,6 @@ packages:
 
   nwsapi@2.2.24:
     resolution: {integrity: sha512-7YRhZ3jS45LwmSCT4b2sVFHt/WuovaktDU07QrtOBY2PXskss5a9jfmR9jptyumwXST+rFjrmppMY1KT/yn35A==}
-
-  oauth@0.10.2:
-    resolution: {integrity: sha512-JtFnB+8nxDEXgNyniwz573xxbKSOu3R8D40xQKqcjwJ2CDkYqUDI53o6IuzDJBx60Z8VKCm271+t8iFjakrl8Q==}
 
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
@@ -6966,14 +6870,6 @@ packages:
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
-
-  passport-oauth2@1.8.0:
-    resolution: {integrity: sha512-cjsQbOrXIDE4P8nNb3FQRCCmJJ/utnFKEz2NX209f7KOHPoX18gF7gBzBbLLsj2/je4KrgiwLLGjf0lm9rtTBA==}
-    engines: {node: '>= 0.4.0'}
-
-  passport-strategy@1.0.0:
-    resolution: {integrity: sha512-CB97UUvDKJde2V0KDWWB3lyf6PC3FaZP7YxZ2G8OAtn9p4HI9j9JLP9qjOGZFvyl8uwNT8qM+hGnz/n16NI7oA==}
-    engines: {node: '>= 0.4.0'}
 
   path-exists@4.0.0:
     resolution: {integrity: sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w==}
@@ -7170,9 +7066,6 @@ packages:
     resolution: {integrity: sha512-mzNzBErpHwM0zpmWS7ExOv62yhQhvd546nUuFqVR0dmnJB59tfrw9sjDF0DJknwsr59OXP0buwJ7PaKguczHSg==}
     engines: {node: ^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0}
 
-  priorityqueuejs@2.0.0:
-    resolution: {integrity: sha512-19BMarhgpq3x4ccvVi8k2QpJZcymo/iFUcrhPd4V96kYGovOdTsWwy7fxChYi4QY+m2EnGBWSX9Buakz+tWNQQ==}
-
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
 
@@ -7292,13 +7185,6 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
 
-  react-hot-toast@2.6.0:
-    resolution: {integrity: sha512-bH+2EBMZ4sdyou/DPrfgIouFpcRLCJ+HoCA32UoAYHn6T3Ur5yfcDCeSr5mwldl6pFOsiocmrXMuoCJ1vV8bWg==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      react: '>=16'
-      react-dom: '>=16'
-
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
@@ -7353,20 +7239,6 @@ packages:
     engines: {node: '>=14.0.0'}
     peerDependencies:
       react: '>=16.8'
-
-  react-signature-canvas@1.1.0-alpha.2:
-    resolution: {integrity: sha512-tKUNk3Gmh04Ug4K8p5g8Is08BFUKvbXxi0PyetQ/f8OgCBzcx4vqNf9+OArY/TdNdfHtswXQNRwZD6tyELjkjQ==}
-    peerDependencies:
-      '@types/prop-types': ^15.7.3
-      '@types/react': 0.14 - 19
-      prop-types: ^15.5.8
-      react: 0.14 - 19
-      react-dom: 0.14 - 19
-    peerDependenciesMeta:
-      '@types/prop-types':
-        optional: true
-      '@types/react':
-        optional: true
 
   react-smooth@4.0.4:
     resolution: {integrity: sha512-gnGKTpYwqL0Iii09gHobNolvX4Kiq4PKx6eWBCYYix+8cdw+cGo3do906l1NBPKkSWx1DghC1dlWG9L2uGd61Q==}
@@ -7593,10 +7465,6 @@ packages:
     resolution: {integrity: sha512-eflK8wEtyOE6+hsaRVPxvUKYCpRgzLqDTb8krvAsRIwOGlHoSgYLgBXoubGgLd2fT41/OUYdb48v4k4WWHQurA==}
     engines: {node: '>= 10.13.0'}
 
-  semaphore@1.1.0:
-    resolution: {integrity: sha512-O4OZEaNtkMd/K0i6js9SL+gqy0ZCBMgUvlSqHKi4IBdjhe7wB8pwztUk1BbZ1fmrvpwFrPbHzqd2w5pTcJH6LA==}
-    engines: {node: '>=0.8.0'}
-
   semver@5.7.2:
     resolution: {integrity: sha512-cBznnQ9KjJqU67B52RMC65CMarK2600WFnbkcaiwWq3xy/5haFJlshgnpjovMVJ+Hff49d8GEn0b87C5pDQ10g==}
     hasBin: true
@@ -7695,9 +7563,6 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
-
-  signature_pad@2.3.2:
-    resolution: {integrity: sha512-peYXLxOsIY6MES2TrRLDiNg2T++8gGbpP2yaC+6Ohtxr+a2dzoaqWosWDY9sWqTAAk6E/TyQO+LJw9zQwyu5kA==}
 
   signature_pad@5.1.4:
     resolution: {integrity: sha512-q0wO5a+U+AWPVcVmiNXz7FY4Ad1QiE8wto/3Yn41WVqepoVVYMvkb1CTokaWPUUAHWDLLabH3/acODeWM9jCrg==}
@@ -7853,15 +7718,6 @@ packages:
   stripe@16.12.0:
     resolution: {integrity: sha512-H7eFVLDxeTNNSn4JTRfL2//LzCbDrMSZ+2q1c7CanVWgK2qIW5TwS+0V7N9KcKZZNpYh/uCqK0PyZh/2UsaAtQ==}
     engines: {node: '>=12.*'}
-
-  stripe@22.5.0:
-    resolution: {integrity: sha512-QVwMwriC0bbySx6R4dpsvJ0W//GojC1kwWVS6rPSoVqDUIZX4Hy3TaUrd2AZeXEAaKbfWIjQjvo3vKAReHZ0vQ==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@types/node': '>=18'
-    peerDependenciesMeta:
-      '@types/node':
-        optional: true
 
   strnum@1.1.2:
     resolution: {integrity: sha512-vrN+B7DBIoTTZjnPNewwhx6cBA/H+IS7rfW68n7XxC1y7uoiGQBxaKzqucGUgavX15dJgiGztLJ8vxuEzwqBdA==}
@@ -8081,9 +7937,6 @@ packages:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
     hasBin: true
 
-  trim-canvas@0.1.2:
-    resolution: {integrity: sha512-nd4Ga3iLFV94mdhW9JFMLpQbHUyCQuhFOD71PEAt1NjtMD5wbZctzhX8c3agHNybMR5zXD1XTGoIEWk995E6pQ==}
-
   triple-beam@1.4.1:
     resolution: {integrity: sha512-aZbgViZrg1QNcG+LULa7nhZpJTZSLm/mXnHXnbAbjmN5aSa0y7V+wvv6+4WaBtpISJzThKy+PIPxc1Nq1EJ9mg==}
     engines: {node: '>= 14.0.0'}
@@ -8289,9 +8142,6 @@ packages:
     resolution: {integrity: sha512-v3Xu+yuwBXisp6QYTcH4UbH+xYJXqnq2m/LtQVWKWzYc1iehYnLixoQDN9FH6/j9/oybfd6W9Ghwkl8+UMKTKQ==}
     engines: {node: '>=0.8.0'}
     hasBin: true
-
-  uid2@0.0.4:
-    resolution: {integrity: sha512-IevTus0SbGwQzYh3+fRsAMTVVPOoIVufzacXcHPmdlle1jUpq7BRL+mw3dgeLanvGZdwwbWhRV6XrcFNdBmjWA==}
 
   uid@2.0.2:
     resolution: {integrity: sha512-u3xV3X7uzvi5b1MncmZo3i2Aw222Zk1keqLA1YkHldREkAhAqi65wuPfe7lHx8H/Wzy+8CE7S7uS3jekIM5s8g==}
@@ -8784,10 +8634,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/abort-controller@1.1.0':
-    dependencies:
-      tslib: 2.8.1
-
   '@azure/abort-controller@2.1.2':
     dependencies:
       tslib: 2.8.1
@@ -8795,18 +8641,6 @@ snapshots:
   '@azure/arm-appservice@16.0.0':
     dependencies:
       '@azure/abort-controller': 2.1.2
-      '@azure/core-auth': 1.11.0
-      '@azure/core-client': 1.10.2
-      '@azure/core-lro': 2.7.2
-      '@azure/core-paging': 1.6.2
-      '@azure/core-rest-pipeline': 1.24.0
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
-  '@azure/arm-cdn@7.0.1':
-    dependencies:
-      '@azure/abort-controller': 1.1.0
       '@azure/core-auth': 1.11.0
       '@azure/core-client': 1.10.2
       '@azure/core-lro': 2.7.2
@@ -8897,22 +8731,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/cosmos@4.10.0':
-    dependencies:
-      '@azure/abort-controller': 2.1.2
-      '@azure/core-auth': 1.11.0
-      '@azure/core-rest-pipeline': 1.24.0
-      '@azure/core-tracing': 1.3.1
-      '@azure/core-util': 1.13.1
-      '@azure/keyvault-keys': 4.10.2
-      '@azure/logger': 1.3.0
-      fast-json-stable-stringify: 2.1.0
-      priorityqueuejs: 2.0.0
-      semaphore: 1.1.0
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
   '@azure/identity@4.13.1':
     dependencies:
       '@azure/abort-controller': 2.1.2
@@ -8925,35 +8743,6 @@ snapshots:
       '@azure/msal-browser': 5.19.0
       '@azure/msal-node': 5.6.0
       open: 10.2.0
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
-  '@azure/keyvault-common@2.1.0':
-    dependencies:
-      '@azure-rest/core-client': 2.7.0
-      '@azure/abort-controller': 2.1.2
-      '@azure/core-auth': 1.11.0
-      '@azure/core-rest-pipeline': 1.24.0
-      '@azure/core-tracing': 1.3.1
-      '@azure/core-util': 1.13.1
-      '@azure/logger': 1.3.0
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
-  '@azure/keyvault-keys@4.10.2':
-    dependencies:
-      '@azure-rest/core-client': 2.7.0
-      '@azure/abort-controller': 2.1.2
-      '@azure/core-auth': 1.11.0
-      '@azure/core-lro': 2.7.2
-      '@azure/core-paging': 1.6.2
-      '@azure/core-rest-pipeline': 1.24.0
-      '@azure/core-tracing': 1.3.1
-      '@azure/core-util': 1.13.1
-      '@azure/keyvault-common': 2.1.0
-      '@azure/logger': 1.3.0
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -9284,8 +9073,6 @@ snapshots:
       '@date-io/core': 3.2.0
     optionalDependencies:
       date-fns: 3.6.0
-
-  '@devhigley/parse-proxy@1.0.3': {}
 
   '@emnapi/core@1.10.0':
     dependencies:
@@ -12297,10 +12084,6 @@ snapshots:
 
   '@types/deep-eql@4.0.2': {}
 
-  '@types/docusign-esign@5.19.9':
-    dependencies:
-      '@types/node': 25.9.5
-
   '@types/eslint-scope@3.7.7':
     dependencies:
       '@types/eslint': 9.6.1
@@ -12490,8 +12273,6 @@ snapshots:
     dependencies:
       '@types/http-errors': 2.0.5
       '@types/node': 25.9.5
-
-  '@types/signature_pad@2.3.6': {}
 
   '@types/stack-utils@2.0.3': {}
 
@@ -13134,8 +12915,6 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  base64url@3.0.1: {}
-
   baseline-browser-mapping@2.11.15: {}
 
   before-after-hook@3.0.2: {}
@@ -13587,10 +13366,6 @@ snapshots:
 
   csstype@3.2.3: {}
 
-  csv-stringify@1.1.2:
-    dependencies:
-      lodash.get: 4.4.2
-
   d3-array@3.2.4:
     dependencies:
       internmap: 2.0.3
@@ -13751,18 +13526,6 @@ snapshots:
   dingbat-to-unicode@1.0.1: {}
 
   dlv@1.1.3: {}
-
-  docusign-esign@8.7.0:
-    dependencies:
-      '@devhigley/parse-proxy': 1.0.3
-      axios: 1.19.0
-      csv-stringify: 1.1.2
-      jsonwebtoken: 9.0.3
-      passport-oauth2: 1.8.0
-      safe-buffer: 5.2.1
-    transitivePeerDependencies:
-      - debug
-      - supports-color
 
   docx@9.7.1:
     dependencies:
@@ -14108,8 +13871,6 @@ snapshots:
       jest-message-util: 30.5.0
       jest-mock: 30.5.0
       jest-util: 30.5.0
-
-  express-async-handler@1.2.0: {}
 
   express@4.22.1:
     dependencies:
@@ -14616,10 +14377,6 @@ snapshots:
       debug: 3.2.7
     transitivePeerDependencies:
       - supports-color
-
-  goober@2.1.19(csstype@3.2.3):
-    dependencies:
-      csstype: 3.2.3
 
   google-auth-library@10.5.0:
     dependencies:
@@ -15683,8 +15440,6 @@ snapshots:
 
   lodash.clonedeep@4.5.0: {}
 
-  lodash.get@4.4.2: {}
-
   lodash.includes@4.3.0: {}
 
   lodash.isboolean@3.0.3: {}
@@ -15963,13 +15718,6 @@ snapshots:
       type-is: 1.6.18
       xtend: 4.0.2
 
-  multer@2.2.0:
-    dependencies:
-      append-field: 1.0.0
-      busboy: 1.6.0
-      concat-stream: 2.0.0
-      type-is: 1.6.18
-
   mute-stream@0.0.8: {}
 
   mute-stream@1.0.0: {}
@@ -16032,8 +15780,6 @@ snapshots:
 
   nodemailer@6.10.1: {}
 
-  nodemailer@7.0.13: {}
-
   nodemailer@8.0.11: {}
 
   nodemon@3.1.14:
@@ -16060,8 +15806,6 @@ snapshots:
       boolbase: 1.0.0
 
   nwsapi@2.2.24: {}
-
-  oauth@0.10.2: {}
 
   object-assign@4.1.1: {}
 
@@ -16208,16 +15952,6 @@ snapshots:
       entities: 6.0.1
 
   parseurl@1.3.3: {}
-
-  passport-oauth2@1.8.0:
-    dependencies:
-      base64url: 3.0.1
-      oauth: 0.10.2
-      passport-strategy: 1.0.0
-      uid2: 0.0.4
-      utils-merge: 1.0.1
-
-  passport-strategy@1.0.0: {}
 
   path-exists@4.0.0: {}
 
@@ -16379,8 +16113,6 @@ snapshots:
       '@jest/schemas': 30.5.0
       ansi-styles: 5.2.0
 
-  priorityqueuejs@2.0.0: {}
-
   process-nextick-args@2.0.1: {}
 
   prop-types@15.8.1:
@@ -16526,13 +16258,6 @@ snapshots:
     dependencies:
       react: 18.3.1
 
-  react-hot-toast@2.6.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
-    dependencies:
-      csstype: 3.2.3
-      goober: 2.1.19(csstype@3.2.3)
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-
   react-is@16.13.1: {}
 
   react-is@17.0.2: {}
@@ -16578,19 +16303,6 @@ snapshots:
     dependencies:
       '@remix-run/router': 1.23.4
       react: 18.3.1
-
-  react-signature-canvas@1.1.0-alpha.2(@types/prop-types@15.7.15)(@types/react@18.3.31)(prop-types@15.8.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
-    dependencies:
-      '@babel/runtime': 7.29.7
-      '@types/signature_pad': 2.3.6
-      prop-types: 15.8.1
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-      signature_pad: 2.3.2
-      trim-canvas: 0.1.2
-    optionalDependencies:
-      '@types/prop-types': 15.7.15
-      '@types/react': 18.3.31
 
   react-smooth@4.0.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
@@ -16859,8 +16571,6 @@ snapshots:
       ajv-formats: 2.1.1(ajv@8.20.0)
       ajv-keywords: 5.1.0(ajv@8.20.0)
 
-  semaphore@1.1.0: {}
-
   semver@5.7.2: {}
 
   semver@6.3.1: {}
@@ -17019,8 +16729,6 @@ snapshots:
 
   signal-exit@4.1.0: {}
 
-  signature_pad@2.3.2: {}
-
   signature_pad@5.1.4: {}
 
   simple-swizzle@0.2.4:
@@ -17157,10 +16865,6 @@ snapshots:
     dependencies:
       '@types/node': 25.9.5
       qs: 6.15.3
-
-  stripe@22.5.0(@types/node@25.9.5):
-    optionalDependencies:
-      '@types/node': 25.9.5
 
   strnum@1.1.2:
     optional: true
@@ -17360,8 +17064,6 @@ snapshots:
       punycode: 2.3.1
 
   tree-kill@1.2.2: {}
-
-  trim-canvas@0.1.2: {}
 
   triple-beam@1.4.1: {}
 
@@ -17570,8 +17272,6 @@ snapshots:
 
   uglify-js@3.19.3:
     optional: true
-
-  uid2@0.0.4: {}
 
   uid@2.0.2:
     dependencies:
