@@ -28,7 +28,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 import { uploadToFirebaseStorage } from '../services/storageService';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const API = getResolvedApiBaseUrl();
 

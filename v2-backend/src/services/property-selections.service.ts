@@ -51,29 +51,27 @@ export class PropertySelectionsService {
     return { success: true, id: docId, ...payload };
   }
 
-  async updateSelectionStatus(selectionId: string, status: string, notes?: string) {
+  async updateSelectionStatus(selectionId: string, userId: string, status: string, notes?: string) {
     const col = this.col;
+    if (!col) throw new Error('Database unavailable');
+    const doc = await col.doc(selectionId).get();
+    if (!doc.exists || doc.data()?.userId !== userId) {
+      throw new Error('Selection not found or unauthorized');
+    }
     const update: any = { status, updatedAt: new Date().toISOString() };
     if (notes) update.notes = notes;
-    if (col) {
-      try {
-        await col.doc(selectionId).set(update, { merge: true });
-      } catch (err: any) {
-        this.logger.warn(`updateSelectionStatus error: ${err?.message || err}`);
-      }
-    }
+    await col.doc(selectionId).set(update, { merge: true });
     return { success: true };
   }
 
-  async deleteSelection(selectionId: string) {
+  async deleteSelection(selectionId: string, userId: string) {
     const col = this.col;
-    if (col) {
-      try {
-        await col.doc(selectionId).delete();
-      } catch (err: any) {
-        this.logger.warn(`deleteSelection error: ${err?.message || err}`);
-      }
+    if (!col) throw new Error('Database unavailable');
+    const doc = await col.doc(selectionId).get();
+    if (!doc.exists || doc.data()?.userId !== userId) {
+      throw new Error('Selection not found or unauthorized');
     }
+    await col.doc(selectionId).delete();
     return { success: true };
   }
 

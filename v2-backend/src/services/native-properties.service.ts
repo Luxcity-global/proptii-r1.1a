@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, Optional } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { UprnMatchService } from '../gov-data/services/uprn-match.service';
+import { getRedisClient } from '../utils/redis-client';
 
 function isPropertyAuthorized(existing: any, userId?: string, userEmail?: string): boolean {
   if (!existing) return false;
@@ -66,8 +68,19 @@ export function checkSpecificationAnomaly(bedrooms?: any, bathrooms?: any): stri
   return null;
 }
 
+export interface PaginatedSearchOptions {
+  query?: string;
+  limit?: number;
+  status?: string;
+  cursor?: string;
+}
+
 @Injectable()
 export class NativePropertiesService {
+  constructor(
+    @Optional() private readonly uprnMatchService?: UprnMatchService,
+  ) {}
+
   private get db() {
     if (!admin.apps.length) return null;
     try {
@@ -82,17 +95,86 @@ export class NativePropertiesService {
     return db ? db.collection('properties') : null;
   }
 
-  async searchPublic(query = '', limit = 50) {
-    const col = this.collection;
-    if (!col) return [];
+  /**
+   * Updates portfolio_summary document for the landlord with FieldValue.increment()
+   * Pre-aggregates property count and total monthly rent (Task p4-9)
+   */
+  private async updateLandlordPortfolioSummary(
+    landlordId: string,
+    deltas: { properties?: number; monthlyRent?: number; occupied?: number },
+  ) {
+    const db = this.db;
+    if (!db || !landlordId) return;
 
     try {
-      const snapshot = await col.limit(limit).get();
+      const summaryRef = db.collection('portfolio_summary').doc(landlordId);
+      const updatePayload: Record<string, any> = {
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (deltas.properties !== undefined) {
+        updatePayload.totalProperties = admin.firestore.FieldValue.increment(deltas.properties);
+      }
+      if (deltas.monthlyRent !== undefined) {
+        updatePayload.monthlyRent = admin.firestore.FieldValue.increment(deltas.monthlyRent);
+      }
+      if (deltas.occupied !== undefined) {
+        updatePayload.occupiedProperties = admin.firestore.FieldValue.increment(deltas.occupied);
+      }
+
+      await summaryRef.set(updatePayload, { merge: true });
+
+      // Invalidate Redis portfolio summary cache
+      const redis = getRedisClient();
+      if (redis) {
+        await redis.del(`insights:portfolio:${landlordId}`);
+      }
+    } catch (err: any) {
+      console.warn(`[NativePropertiesService] portfolio_summary pre-aggregation error: ${err?.message || err}`);
+    }
+  }
+
+  /**
+   * Indexed property search with cursor pagination (Task p4-5)
+   */
+  async searchPublicPaginated(options: PaginatedSearchOptions) {
+    const col = this.collection;
+    if (!col) return { results: [], nextCursor: null, total: 0 };
+
+    const limitNum = Math.min(Math.max(options.limit || 50, 1), 200);
+
+    try {
+      let queryRef: admin.firestore.Query = col;
+
+      if (options.status) {
+        queryRef = queryRef.where('status', '==', options.status);
+      }
+
+      // Order by createdAt descending for deterministic cursor pagination
+      queryRef = queryRef.orderBy('createdAt', 'desc');
+
+      if (options.cursor) {
+        const cursorDoc = await col.doc(options.cursor).get();
+        if (cursorDoc.exists) {
+          queryRef = queryRef.startAfter(cursorDoc);
+        }
+      }
+
+      queryRef = queryRef.limit(limitNum + 1);
+
+      const snapshot = await queryRef.get();
       let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      if (query) {
-        const q = query.toLowerCase();
-        docs = docs.filter((d: any) => 
+      let nextCursor: string | null = null;
+      if (docs.length > limitNum) {
+        const lastItem = docs[limitNum - 1];
+        nextCursor = lastItem.id;
+        docs = docs.slice(0, limitNum);
+      }
+
+      if (options.query) {
+        const q = options.query.toLowerCase().trim();
+        docs = docs.filter((d: any) =>
           (d.title && d.title.toLowerCase().includes(q)) ||
           (d.address && d.address.toLowerCase().includes(q)) ||
           (d.city && d.city.toLowerCase().includes(q)) ||
@@ -100,11 +182,19 @@ export class NativePropertiesService {
         );
       }
 
-      return docs;
+      return { results: docs, nextCursor, total: docs.length };
     } catch (err: any) {
-      console.warn('[NativePropertiesService] Firestore search error:', err?.message || err);
-      return [];
+      console.warn('[NativePropertiesService] Firestore searchPublicPaginated fallback:', err?.message || err);
+      // Fallback to basic query if composite index is pending
+      const fallbackSnapshot = await col.limit(limitNum).get();
+      let fallbackDocs = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return { results: fallbackDocs, nextCursor: null, total: fallbackDocs.length };
     }
+  }
+
+  async searchPublic(query = '', limit = 50) {
+    const res = await this.searchPublicPaginated({ query, limit });
+    return res.results;
   }
 
   async findAllByUser(userId?: string, email?: string) {
@@ -113,19 +203,18 @@ export class NativePropertiesService {
 
     try {
       const docMap = new Map<string, any>();
-      const uid = (userId || '').trim();
-      const mail = (email || '').trim().toLowerCase();
 
-      if (uid) {
-        const [snap1, snap2] = await Promise.all([
-          col.where('userId', '==', uid).get().catch(() => ({ docs: [] })),
-          col.where('landlordId', '==', uid).get().catch(() => ({ docs: [] })),
+      if (userId) {
+        const [s1, s2] = await Promise.all([
+          col.where('userId', '==', userId).get().catch(() => ({ docs: [] })),
+          col.where('landlordId', '==', userId).get().catch(() => ({ docs: [] })),
         ]);
-        snap1.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        snap2.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        s1.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        s2.docs.forEach((doc: any) => docMap.set(doc.id, { id: doc.id, ...doc.data() }));
       }
 
-      if (mail) {
+      if (email) {
+        const mail = email.toLowerCase().trim();
         const [s3, s4, s5, s6, s7] = await Promise.all([
           col.where('ownerEmail', '==', mail).get().catch(() => ({ docs: [] })),
           col.where('landlordEmail', '==', mail).get().catch(() => ({ docs: [] })),
@@ -176,15 +265,49 @@ export class NativePropertiesService {
         console.warn(`[NativePropertiesService] Property specification anomaly: ${specWarning}`);
       }
 
+      // ── Task p4-8: Store resolved UPRN on property document at creation ──────
+      let resolvedUprn = data?.uprn || null;
+      if (!resolvedUprn && this.uprnMatchService && data?.postcode) {
+        try {
+          const matchResult = await this.uprnMatchService.match({
+            paon: data?.address || '',
+            saon: '',
+            street: data?.address || '',
+            postcode: data?.postcode || '',
+          });
+          if (matchResult && matchResult.uprn) {
+            resolvedUprn = matchResult.uprn;
+            console.log(`[NativePropertiesService] Resolved UPRN ${resolvedUprn} for address "${data?.address}, ${data?.postcode}"`);
+          }
+        } catch (uprnErr: any) {
+          console.warn(`[NativePropertiesService] UPRN resolution non-fatal warning: ${uprnErr?.message}`);
+        }
+      }
+
+      const rentAmount = Number(data?.rentAmount || data?.price || 0);
+
       const propertyData = {
         ...data,
         id: docRef.id,
+        uprn: resolvedUprn,
+        price: rentAmount || data?.price,
+        rentAmount: rentAmount || data?.price,
         specificationWarning: specWarning || null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
       await docRef.set(propertyData);
       console.log(`[NativePropertiesService] Successfully saved property ${docRef.id} to Firestore.`);
+
+      // ── Task p4-9: Pre-aggregate landlord financials with FieldValue.increment() ──
+      const landlordId = data.landlordId || data.userId;
+      if (landlordId) {
+        await this.updateLandlordPortfolioSummary(landlordId, {
+          properties: 1,
+          monthlyRent: rentAmount > 0 ? rentAmount : 0,
+        });
+      }
+
       return propertyData;
     } catch (err: any) {
       console.error('[NativePropertiesService] Failed to save property to Firestore:', err);
@@ -231,7 +354,20 @@ export class NativePropertiesService {
       updatedData.tenant = null;
     }
 
+    // Adjust rent delta if price changed
+    const oldRent = Number(existing?.price || existing?.rentAmount || 0);
+    const newRent = Number(cleanedData?.price || cleanedData?.rentAmount || oldRent);
+    const rentDiff = newRent - oldRent;
+
     await docRef.update(updatedData);
+
+    const landlordId = existing?.landlordId || existing?.userId || userId;
+    if (landlordId && rentDiff !== 0) {
+      await this.updateLandlordPortfolioSummary(landlordId, {
+        monthlyRent: rentDiff,
+      });
+    }
+
     return { id, ...existing, ...updatedData };
   }
 
@@ -252,7 +388,18 @@ export class NativePropertiesService {
       throw new NotFoundException('Property not found or unauthorized');
     }
 
+    const rentAmount = Number(existing?.price || existing?.rentAmount || 0);
+    const landlordId = existing?.landlordId || existing?.userId || userId;
+
     await docRef.delete();
+
+    // ── Task p4-9: Decrement portfolio summary on property deletion ──────────
+    if (landlordId) {
+      await this.updateLandlordPortfolioSummary(landlordId, {
+        properties: -1,
+        monthlyRent: rentAmount > 0 ? -rentAmount : 0,
+      });
+    }
 
     // If documents were assigned to this property in landlord_documents, unassign them
     try {
@@ -272,4 +419,3 @@ export class NativePropertiesService {
     return { success: true };
   }
 }
-

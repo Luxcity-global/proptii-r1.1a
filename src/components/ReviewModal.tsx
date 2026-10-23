@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Star } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface ReviewModalProps {
   isOpen: boolean;

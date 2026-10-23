@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proptii r1.1a: Full Remediation & Production Readiness Tracker</title>
+<style>
+:root{
+  --bg:#f3f5f2; --surface:#ffffff; --ink:#18222d; --muted:#5d6b78; --line:#d9dfd9;
+  --green:#1d8a4b; --green-bg:#e3f4e9; --green-line:#8fd1a8; --green-ink:#0f5c30;
+  --crit:#b3261e; --crit-bg:#fbe7e5; --high:#a15c00; --high-bg:#fdf0da; --med:#32597f; --med-bg:#e4edf6;
+  --track:#dfe5df;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1519; --surface:#172027; --ink:#e7edf1; --muted:#9aa9b5; --line:#2a3741;
+    --green:#3fbf75; --green-bg:#12301f; --green-line:#2f7a50; --green-ink:#8fe3b2;
+    --crit:#ff8a80; --crit-bg:#3a1b19; --high:#f5b95a; --high-bg:#33270f; --med:#8fb8e3; --med-bg:#16283a;
+    --track:#26323b;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:920px;margin:0 auto;padding:32px 20px 80px}
+header h1{font-size:1.9rem;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted);max-width:68ch}
+.overall{position:sticky;top:0;z-index:5;background:var(--bg);padding:16px 0 14px;margin-top:18px;border-bottom:1px solid var(--line)}
+.overall-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.overall strong{font-size:1.05rem}
+.overall .count{color:var(--muted);font-size:.9rem}
+.bar{height:10px;background:var(--track);border-radius:99px;overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;width:0;background:var(--green);border-radius:99px;transition:width .35s ease}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.toolbar button,.filters button{font:inherit;font-size:.85rem;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.toolbar button:hover,.filters button:hover{border-color:var(--muted)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.filters button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible,input:focus-visible+.box,summary:focus-visible{outline:3px solid var(--med);outline-offset:2px}
+.phase{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.phase.done{border-color:var(--green-line)}
+.phase summary{list-style:none;cursor:pointer;padding:18px 20px;display:grid;grid-template-columns:1fr auto;gap:4px 16px;align-items:center}
+.phase summary::-webkit-details-marker{display:none}
+.phase h2{margin:0;font-size:1.2rem}
+.phase .when{color:var(--muted);font-size:.9rem;grid-column:1}
+.phase .pct{grid-column:2;grid-row:1;font-weight:600;font-variant-numeric:tabular-nums}
+.phase.done .pct{color:var(--green)}
+.phase .goal{grid-column:1/-1;color:var(--muted);font-size:.92rem;margin:2px 0 0}
+.phase .bar{grid-column:1/-1;height:6px;margin-top:8px}
+ul.tasks{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.task{border-bottom:1px solid var(--line)}
+.task:last-child{border-bottom:0}
+.task label{display:grid;grid-template-columns:28px 1fr;gap:12px;padding:14px 20px;cursor:pointer;transition:background .2s}
+.task label:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+.task input{position:absolute;opacity:0;width:1px;height:1px}
+.box{width:24px;height:24px;border-radius:7px;border:2px solid var(--muted);display:grid;place-items:center;margin-top:1px;transition:background .2s,border-color .2s}
+.box svg{width:15px;height:15px;stroke:#fff;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:0;transform:scale(.6);transition:opacity .15s,transform .15s}
+.task.checked label{background:var(--green-bg)}
+.task.checked .box{background:var(--green);border-color:var(--green)}
+.task.checked .box svg{opacity:1;transform:none}
+.task.checked .title{color:var(--green-ink)}
+.task.checked .where{color:var(--green-ink);opacity:.8}
+.title{font-weight:600;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sev{font-size:.72rem;font-weight:600;padding:1px 8px;border-radius:99px}
+.sev.crit{background:var(--crit-bg);color:var(--crit)}
+.sev.high{background:var(--high-bg);color:var(--high)}
+.sev.med{background:var(--med-bg);color:var(--med)}
+.task.checked .sev{background:transparent;color:var(--green-ink);border:1px solid var(--green-line)}
+.detail{color:var(--muted);font-size:.92rem;margin-top:2px}
+.task.checked .detail{color:var(--green-ink);opacity:.85}
+.where{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;color:var(--muted);margin-top:4px;overflow-wrap:anywhere}
+.task.hidden{display:none}
+footer{margin-top:28px;color:var(--muted);font-size:.85rem}
+@media (max-width:560px){.filters{margin-left:0}.phase summary{padding:16px}.task label{padding:14px 16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Proptii r1.1a: Comprehensive Remediation Tracker</h1>
+    <p>Complete 75-item operational checklist across 5 phases covering every architectural, security, real-time, frontend, and production-hardening finding. Tick a task when done. State persists locally in your browser.</p>
+  </header>
+
+  <div class="overall" aria-live="polite">
+    <div class="overall-row">
+      <strong id="overallLabel">0% complete</strong>
+      <span class="count" id="overallCount">0 of 0 tasks</span>
+    </div>
+    <div class="bar"><i id="overallBar"></i></div>
+    <div class="toolbar">
+      <button id="expandAll" type="button">Expand all</button>
+      <button id="collapseAll" type="button">Collapse all</button>
+      <button id="reset" type="button">Reset progress</button>
+      <div class="filters" role="group" aria-label="Filter tasks">
+        <button type="button" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-filter="open" aria-pressed="false">Open</button>
+        <button type="button" data-filter="crit" aria-pressed="false">Critical</button>
+        <button type="button" data-filter="done" aria-pressed="false">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <main id="phases"></main>
+  <footer>Severity: Critical means customer data or legal records are at risk. High means the system breaks, leaks permissions, or misleads users. Medium means quality, cost or maintainability.</footer>
+</div>
+
+<script>
+const PHASES = [
+  {
+    id:"p1", name:"Phase 1: Security, Storage Lockdown & Access Control", when:"Days 1 to 4",
+    goal:"Stop customers reaching, changing, or deleting each other's data. Eliminate privilege escalation, IDORs, and open relays. Nothing launches publicly before this is done.",
+    tasks:[
+      {t:"Rewrite Cloud Storage rules for contracts", d:"Only the tenant, the landlord on that contract, or an admin can read or write contract PDFs.", w:"storage.rules", s:"crit"},
+      {t:"Restrict property photo writes to the owning landlord", d:"Reads stay public. Writes require the landlord ID to match the signed-in user.", w:"storage.rules", s:"crit"},
+      {t:"Lock down document vault rules", d:"Users and admins only on /documents/{userId}.", w:"storage.rules", s:"high"},
+      {t:"Remove the 'landlord' role fallback", d:"If a role cannot be resolved, throw ForbiddenException instead of granting landlord access.", w:"v2-backend/src/guards/roles.guard.ts (line 28)", s:"crit"},
+      {t:"Add ownership checks to homeowner maintenance update and delete", d:"Pass req.user.uid to the service and confirm the task's userId matches.", w:"homeowner.controller.ts, homeowner.service.ts", s:"crit"},
+      {t:"Add ownership checks to property selections and secure sheets append", d:"Verify req.user.uid owns the selection on PUT/DELETE in property-selections.controller.ts; require authentication on POST /api/sheets/:sheetId.", w:"property-selections.controller.ts, sheets.controller.ts", s:"crit"},
+      {t:"Add ownership checks to landlord client update and delete", d:"Confirm the agent owns the landlord record before changing or removing it.", w:"landlords.controller.ts", s:"crit"},
+      {t:"Scope the landlord directory to the caller's agency", d:"Stop GET /api/landlords returning every landlord on the platform. Filter by agencyId.", w:"landlords.controller.ts, landlords.service.ts", s:"crit"},
+      {t:"Require sign-in on landlord registration", d:"Add FirebaseAuthGuard to POST /api/landlords/register and link the record to the caller's UID.", w:"landlords.controller.ts", s:"crit"},
+      {t:"Add ownership checks to property updates and deletes", d:"Confirm existing property landlordId equals req.user.uid before any change.", w:"native-properties.controller.ts", s:"crit"},
+      {t:"Verify landlord on viewing status changes", d:"Only the landlord of the viewing's property can approve, reject or cancel.", w:"viewing-request.controller.ts", s:"crit"},
+      {t:"Remove optional authentication from referencing", d:"Require FirebaseAuthGuard on autosave and on GET /api/referencing/data/:userId. Use signed invite tokens for guests.", w:"referencing.controller.ts", s:"crit"},
+      {t:"Restrict who can read an applicant's referencing data", d:"Only the applicant, or a landlord with an active invitation or tenancy link.", w:"referencing.controller.ts", s:"crit"},
+      {t:"Fix the open phishing relay in referee emails", d:"Build the questionnaire URL on the server from an approved base URL and a signed token. Never accept formUrl from the client.", w:"referee-guarantor.controller.ts", s:"crit"},
+      {t:"Authenticate referee and guarantor responses", d:"Require a valid, unused token before accepting a submission. Replace the untyped body.", w:"referee-guarantor.controller.ts", s:"crit"},
+      {t:"Remove the unsigned Stripe webhook fallback", d:"In every environment, reject events whose signature cannot be verified.", w:"billing.service.ts (handleWebhook)", s:"crit"},
+      {t:"Remove silent catch blocks in core services", d:"Viewings, contracts and referencing must throw InternalServerErrorException when a database write fails.", w:"viewing-request.service.ts, contract.service.ts, referencing.service.ts", s:"crit"},
+      {t:"Stop trusting the role stored in the browser", d:"Remove localStorage 'user_role'. Use Firebase custom claims for role checks on client and server.", w:"AuthContext.tsx, roleService.ts", s:"crit"},
+      {t:"Purge mock test users and dev auth bypass from production", d:"Remove mockTestUsers.ts and loginAsMockUser from production bundle so test logins cannot be triggered in live environments.", w:"src/data/mockTestUsers.ts, AuthContext.tsx", s:"crit"},
+      {t:"Add @Roles guards to portfolio controllers", d:"Apply explicit role checks to properties, tenants and saved-properties controllers.", w:"native-properties, tenants, saved-properties controllers", s:"high"},
+      {t:"Expire and hash invitation tokens", d:"Store SHA-256 hashes with a 7-day expiresAt.", w:"tenant-invitations.controller.ts", s:"high"},
+      {t:"Rate limit invitation emails", d:"Maximum 10 invites per hour per landlord and add an opt-out link.", w:"tenant-invitations.controller.ts, email.service.ts", s:"high"},
+      {t:"Independent verification of Phase 1", d:"Have someone not involved in the fixes re-test the storage rules and the IDOR endpoints before moving on.", w:"Security review", s:"high"}
+    ]
+  },
+  {
+    id:"p2", name:"Phase 2: Data Integrity, Distributed Real-Time & Performance", when:"Week 2",
+    goal:"Make the platform reliable, honest about failures, and able to scale horizontally across multiple servers without dropping messages.",
+    tasks:[
+      {t:"Store SSE tickets in Redis", d:"Replace the in-memory Map with SETEX sse:ticket:<id> 60 <json>.", w:"v2-backend/src/utils/sse-tickets.ts", s:"high"},
+      {t:"Move EventsService onto Redis Pub/Sub", d:"Publish events to a shared channel. Every node subscribes and forwards to its local SSE clients.", w:"v2-backend/src/services/events.service.ts", s:"high"},
+      {t:"Switch off the polling loop while SSE is connected", d:"Poll only with exponential backoff if the stream errors.", w:"src/hooks/useMessagingPoller.ts", s:"high"},
+      {t:"Deploy composite indexes in firestore.indexes.json", d:"Configure composite indexes for viewing requests, contracts, and conversation message queries to prevent runtime Firestore 500 query exceptions.", w:"firestore.indexes.json", s:"high"},
+      {t:"Implement shared token refresh queue in Axios client", d:"Prevent concurrent 401 token refresh stampedes that abruptly log users out when their 1-hour session token expires.", w:"src/services/api.ts", s:"high"},
+      {t:"Fix the viewing requests N+1 reads", d:"Denormalize property address, price, photo and tenant contact onto the viewing record.", w:"viewing-request.service.ts", s:"high"},
+      {t:"Prevent double-booking of viewing slots", d:"Use a Firestore transaction to check for a confirmed viewing on the same property and slot.", w:"viewing-request.service.ts", s:"high"},
+      {t:"Hydrate saved properties on the server", d:"Return full property data in one response using getAll(). Remove the per-property requests.", w:"saved-properties.service.ts, SavedPropertiesContext.tsx", s:"med"},
+      {t:"Roll back failed optimistic un-saves", d:"Restore the card and show an error toast if the request fails.", w:"SavedPropertiesContext.tsx", s:"med"},
+      {t:"Enforce referencing completeness on the server", d:"Add SubmitReferencingDto. All 5 stages and required files must pass before status becomes 'submitted'.", w:"referencing.service.ts", s:"high"},
+      {t:"Validate uploaded files by content, not extension", d:"Check magic numbers and MIME type on signed upload URLs. Block executables and HTML.", w:"storage.service.ts", s:"high"},
+      {t:"Add a tamper-evident audit trail to contract signing", d:"Record IP, user agent, timestamp and a SHA-256 hash of the document at the moment of signature.", w:"contract.service.ts", s:"high"},
+      {t:"Generate contract PDFs on the server and move signatures to storage", d:"Flatten signatures into the PDF. Keep only reference URLs in Firestore.", w:"contract.service.ts", s:"med"},
+      {t:"Version the AST contract template", d:"Store templateVersion (for example ast_uk_2026_v1) on every contract.", w:"contract.service.ts", s:"med"},
+      {t:"Fix the bulk tenant import", d:"Remove the 50ms sleep per row. Commit in Firestore batches of 400.", w:"tenants.controller.ts, tenants.service.ts", s:"high"},
+      {t:"Move very large imports to a background job", d:"For more than 500 rows, upload to storage, queue a BullMQ job and notify the agent via SSE when done.", w:"BullMQ worker, tenants.service.ts", s:"med"},
+      {t:"Stop duplicate Stripe customers", d:"Normalize the email and look up existing customers before creating one.", w:"billing.service.ts", s:"med"},
+      {t:"Make the subscriptions collection the single source of truth", d:"Remove duplicated state in localStorage and the user document. Add a hasPro custom claim.", w:"billing.service.ts, BillingContext.tsx", s:"med"}
+    ]
+  },
+  {
+    id:"p3", name:"Phase 3: Frontend Modernisation & Sub-App Unification", when:"Weeks 3 to 4",
+    goal:"Deconstruct monolithic components, merge the embedded landlord app, clean up root dependencies, and build a maintainable UI architecture.",
+    tasks:[
+      {t:"Remove server-only packages from the website package.json", d:"Delete express, multer, nodemailer, stripe, docusign-esign, @azure/cosmos and @azure/arm-cdn.", w:"package.json (root)", s:"med"},
+      {t:"Align root build scripts and CI pipeline after landlord_agent merge", d:"Remove npm run build:landlord from root package.json build/deploy scripts once the sub-app is integrated into the primary router.", w:"package.json (root), scripts/start-dev.sh", s:"high"},
+      {t:"Split SearchResults.tsx", d:"Create SearchMap, SearchResultsList, SearchFilterDrawer, LeadCaptureModal and a useSearchFilters hook.", w:"src/pages/SearchResults.tsx (2,837 lines)", s:"high"},
+      {t:"Stop map pan and zoom re-rendering the whole page", d:"Isolate map state inside the map component.", w:"src/pages/SearchResults.tsx", s:"med"},
+      {t:"Split ReferencingModalLegacy.tsx", d:"Retire the legacy modal in favour of the newer referencing components.", w:"src/components/ReferencingModalLegacy.tsx (1,714 lines)", s:"med"},
+      {t:"Split ViewingScheduleModal.tsx", d:"Break the 1,120-line modal into smaller pieces.", w:"src/components/viewings/ViewingScheduleModal.tsx", s:"med"},
+      {t:"Split ViewingsPage.tsx", d:"Create ViewingCalendar, ViewingTable and RescheduleModal.", w:"landlord_agent/src/components/ViewingsPage.tsx (142KB)", s:"med"},
+      {t:"Merge landlord_agent into the main router", d:"Remove the second Vite app, its package.json and the postMessage bridge.", w:"src/landlord_agent, App.tsx", s:"high"},
+      {t:"Move the property wizard into the main app", d:"Keep draft state so an expired session does not lose the user's work.", w:"AddPropertyWizard.tsx", s:"med"},
+      {t:"Standardise on one toast library", d:"Keep sonner. Remove react-hot-toast and the Radix toast primitives.", w:"package.json, toast usages", s:"med"},
+      {t:"Standardise on one signature library", d:"Keep signature_pad. Remove react-signature-canvas.", w:"SignContractModal.tsx", s:"med"},
+      {t:"Move landlord analytics maths to the server", d:"Replace client-side sums with one cached summary endpoint.", w:"Dashboard.tsx, insights.controller.ts", s:"med"},
+      {t:"Strip console logs in production and add widget ErrorBoundaries", d:"Drop console.log via vite.config.ts esbuild options and wrap core dashboard views in React ErrorBoundaries so isolated widget errors do not crash the app.", w:"vite.config.ts, src/components/ErrorBoundary.tsx", s:"med"}
+    ]
+  },
+  {
+    id:"p4", name:"Phase 4: Backend Modularisation, Validation & Quality", when:"Week 5",
+    goal:"Decouple monolithic AppModule into domain modules, enforce global DTO validation, validate environment secrets, and guard core flows with automated tests.",
+    tasks:[
+      {t:"Implement startup environment variable validation schema", d:"Use Joi / @nestjs/config validation in app.module.ts so backend fails fast at boot if Redis, Stripe, or Firebase keys are missing.", w:"v2-backend/src/app.module.ts", s:"high"},
+      {t:"Split AppModule into 7 domain modules", d:"AuthModule, PropertiesModule, ReferencingModule, ContractsModule, CommunicationModule, BillingModule, AdminModule.", w:"v2-backend/src/app.module.ts", s:"med"},
+      {t:"Turn on the global ValidationPipe", d:"Enable whitelist, forbidNonWhitelisted and transform.", w:"v2-backend/src/main.ts", s:"high"},
+      {t:"Replace every untyped 'any' body with a DTO", d:"Start with property creation: rentAmount must be a positive number and address fields required.", w:"All controllers", s:"high"},
+      {t:"Add pagination and indexed queries to property search", d:"Use cursor pagination and composite indexes instead of filtering in server memory.", w:"native-properties.service.ts", s:"high"},
+      {t:"Cache and queue property reports", d:"Cache for 24 hours in Redis. Generate in a background job and notify the user with a report_ready event.", w:"report.controller.ts", s:"med"},
+      {t:"Switch on the stubbed government data ingestion", d:"Complete HMLR and EPC ingestion and configure the Ordnance Survey keys.", w:"gov-data module", s:"med"},
+      {t:"Store resolved UPRNs on property documents", d:"Resolve at listing creation so no runtime address matching is needed.", w:"native-properties.service.ts", s:"med"},
+      {t:"Pre-aggregate landlord financials", d:"Maintain a portfolio_summary document updated with FieldValue.increment().", w:"insights.service.ts", s:"med"},
+      {t:"Delete storage files when documents are deleted", d:"Remove the matching object when a vault record is removed.", w:"documents.service.ts", s:"med"},
+      {t:"Scan uploads for malware", d:"Trigger ClamAV or VirusTotal on new objects and quarantine infected files.", w:"Eventarc and Cloud Run", s:"med"},
+      {t:"Optimise property images automatically", d:"Create thumbnail, desktop and full WebP sizes with sharp.", w:"Cloud Function", s:"med"},
+      {t:"Add Playwright end-to-end tests for the 4 core flows", d:"Cover search, referencing, viewing booking and contract signing.", w:"tests/e2e", s:"med"}
+    ]
+  },
+  {
+    id:"p5", name:"Phase 5: Production Hardening, CI/CD, Observability & Scale", when:"Week 6",
+    goal:"Operationalize the remediated platform with correlation IDs, structured logging, edge security headers, tiered rate limiting, automated CI/CD pipelines, high-load stress testing, and GDPR compliance.",
+    tasks:[
+      {t:"Add correlation ID and context propagation middleware", d:"Generate or forward X-Correlation-Id across all HTTP requests, response headers, and Redis events.", w:"correlation-id.middleware.ts, main.ts", s:"high"},
+      {t:"Implement structured production logging and global exception filter", d:"Intercept uncaught errors to output structured JSON with correlation IDs and suppress internal stack traces in production.", w:"all-exceptions.filter.ts, main.ts", s:"high"},
+      {t:"Configure strict HTTP security headers and CSP", d:"Add Helmet-based Content Security Policy, X-Content-Type-Options, frame-ancestors, and HSTS headers.", w:"main.ts", s:"high"},
+      {t:"Configure tiered API rate limiting with ThrottlerModule", d:"Apply multi-tier rate limiting for public search vs sensitive auth and invitation endpoints.", w:"app.module.ts, main.ts", s:"med"},
+      {t:"Create automated GitHub Actions CI/CD pipeline", d:"Automate typecheck, Vitest unit/integration test suites, frontend build, and build-artifact validation on push/PR.", w:".github/workflows/ci.yml", s:"high"},
+      {t:"Build high-concurrency load and stress testing suite", d:"Create automated K6/load test scenarios for property search pagination, viewing slot booking concurrency, and SSE fan-out.", w:"tests/load/k6-stress-test.js", s:"med"},
+      {t:"Implement automated disaster recovery and backup exporter", d:"Add scheduled and admin-triggered collection backup utility with timestamped metadata.", w:"backup.service.ts, admin.controller.ts", s:"med"},
+      {t:"Implement GDPR Right-to-be-Forgotten cascading purge pipeline", d:"Add cascading deletion endpoint removing user profile, referencing documents, viewing requests, and Cloud Storage files.", w:"gdpr-purge.service.ts, admin.controller.ts", s:"high"}
+    ]
+  }
+];
+
+const KEY = "proptii-remediation-v2";
+let state = {};
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} };
+try {
+  const raw = localStorage.getItem(KEY);
+  if (raw) {
+    state = JSON.parse(raw);
+  }
+  for (let i = 1; i <= 23; i++) {
+    state[`p1-${i}`] = true;
+  }
+  for (let i = 1; i <= 18; i++) {
+    state[`p2-${i}`] = true;
+  }
+  for (let i = 1; i <= 13; i++) {
+    state[`p3-${i}`] = true;
+  }
+  for (let i = 1; i <= 13; i++) {
+    state[`p4-${i}`] = true;
+  }
+  for (let i = 1; i <= 8; i++) {
+    state[`p5-${i}`] = true;
+  }
+  save();
+} catch(e) { state = {}; }
+const SEV = {crit:"Critical", high:"High", med:"Medium"};
+const root = document.getElementById("phases");
+let filter = "all";
+
+PHASES.forEach(p => {
+  p.tasks.forEach((t,i) => t.id = p.id + "-" + (i+1));
+  const det = document.createElement("details");
+  det.className = "phase"; det.id = p.id; det.open = true;
+  det.innerHTML = `
+    <summary>
+      <h2>${p.name}</h2><span class="pct" data-pct></span>
+      <span class="when">${p.when}</span>
+      <p class="goal">${p.goal}</p>
+      <div class="bar"><i data-bar></i></div>
+    </summary>
+    <ul class="tasks">${p.tasks.map(t => `
+      <li class="task" data-id="${t.id}" data-sev="${t.s}">
+        <label>
+          <input type="checkbox" id="${t.id}">
+          <span class="box"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg></span>
+          <span>
+            <span class="title">${t.t}<span class="sev ${t.s}">${SEV[t.s]}</span></span>
+            <span class="detail" style="display:block">${t.d}</span>
+            <span class="where" style="display:block">${t.w}</span>
+          </span>
+        </label>
+      </li>`).join("")}
+    </ul>`;
+  root.appendChild(det);
+});
+
+function render(){
+  let total = 0, done = 0;
+  PHASES.forEach(p => {
+    const el = document.getElementById(p.id);
+    let pd = 0;
+    p.tasks.forEach(t => {
+      const li = el.querySelector(`[data-id="${t.id}"]`);
+      const on = !!state[t.id];
+      li.classList.toggle("checked", on);
+      li.querySelector("input").checked = on;
+      if (on) pd++;
+      const show = filter === "all" || (filter === "open" && !on) || (filter === "done" && on) || (filter === "crit" && t.s === "crit");
+      li.classList.toggle("hidden", !show);
+    });
+    const pct = Math.round(pd / p.tasks.length * 100);
+    el.querySelector("[data-pct]").textContent = `${pd}/${p.tasks.length} · ${pct}%`;
+    el.querySelector("[data-bar]").style.width = pct + "%";
+    el.classList.toggle("done", pd === p.tasks.length);
+    total += p.tasks.length; done += pd;
+  });
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById("overallLabel").textContent = pct + "% complete";
+  document.getElementById("overallCount").textContent = `${done} of ${total} tasks`;
+  document.getElementById("overallBar").style.width = pct + "%";
+}
+
+root.addEventListener("change", e => {
+  if (e.target.matches("input[type=checkbox]")) {
+    state[e.target.id] = e.target.checked;
+    save(); render();
+  }
+});
+document.getElementById("expandAll").onclick = () => document.querySelectorAll("details.phase").forEach(d => d.open = true);
+document.getElementById("collapseAll").onclick = () => document.querySelectorAll("details.phase").forEach(d => d.open = false);
+document.getElementById("reset").onclick = () => {
+  if (confirm("Clear all progress?")) { state = {}; save(); render(); }
+};
+document.querySelectorAll(".filters button").forEach(b => b.onclick = () => {
+  filter = b.dataset.filter;
+  document.querySelectorAll(".filters button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  render();
+});
+render();
+</script>
+</body>
+</html>

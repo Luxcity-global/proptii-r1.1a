@@ -308,6 +308,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginAsMockUser = (id: string, role: string) => {
+    if (import.meta.env.PROD) {
+      console.error('[Auth] Mock login is disabled in production environments.');
+      return;
+    }
     const mockUser = resolveMockTestUser(id);
     const resolvedRole = mockUser.role || role;
     localStorage.setItem('mock_token', `mock-token-${id}`);

@@ -29,6 +29,9 @@ class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
       const err = this.state.error;
       // Derive the best available message — covers Error objects, strings thrown directly,
       // and non-Error objects (e.g. MSAL BrowserConfigurationAuthError with no .message).

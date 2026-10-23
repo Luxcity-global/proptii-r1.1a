@@ -63,17 +63,44 @@ describe('Section 7: Landlords & Clients Landlords Endpoints', () => {
     expect(res.name).toBe('John Doe');
   });
 
-  it('[PUT /clients/landlords/:id] updates landlord details', async () => {
+  it('[GET /landlords] scopes landlord directory to calling agency UID when role is agent', async () => {
+    service.getAllLandlords.mockResolvedValue([
+      { id: 'll-agent-1', agencyId: 'agency-99' },
+    ]);
+    const agentReq = { user: { uid: 'agency-99', role: 'agent' } };
+    const res = await controller.getAllLandlords(agentReq);
+    expect(service.getAllLandlords).toHaveBeenCalledWith('agency-99');
+    expect(res).toHaveLength(1);
+  });
+
+  it('[POST /landlords/register] links landlord profile to authenticated caller UID and email', async () => {
+    service.registerLandlord.mockResolvedValue({ success: true, id: 'll-new' });
+    const authReq = { user: { uid: 'auth-user-123', email: 'registered@proptii.co' } };
+    const body = { name: 'New Landlord' };
+
+    const res = await controller.registerLandlord(body, authReq);
+    expect(service.registerLandlord).toHaveBeenCalledWith({
+      name: 'New Landlord',
+      uid: 'auth-user-123',
+      userId: 'auth-user-123',
+      email: 'registered@proptii.co',
+    });
+    expect(res.id).toBe('ll-new');
+  });
+
+  it('[PUT /clients/landlords/:id] updates landlord details with authenticated callerUid', async () => {
     service.updateLandlord.mockResolvedValue({ success: true });
-    const res = await controller.updateClientLandlord('ll-1', { phone: '07123456789' });
-    expect(service.updateLandlord).toHaveBeenCalledWith('ll-1', { phone: '07123456789' });
+    const authReq = { user: { uid: 'agent-owner-1', role: 'agent' } };
+    const res = await controller.updateClientLandlord('ll-1', { phone: '07123456789' }, authReq);
+    expect(service.updateLandlord).toHaveBeenCalledWith('ll-1', 'agent-owner-1', { phone: '07123456789' });
     expect(res.success).toBe(true);
   });
 
-  it('[DELETE /clients/landlords/:id] deletes landlord record', async () => {
+  it('[DELETE /clients/landlords/:id] deletes landlord record with authenticated callerUid', async () => {
     service.deleteLandlord.mockResolvedValue({ success: true });
-    const res = await controller.deleteClientLandlord('ll-1');
-    expect(service.deleteLandlord).toHaveBeenCalledWith('ll-1');
+    const authReq = { user: { uid: 'agent-owner-1', role: 'agent' } };
+    const res = await controller.deleteClientLandlord('ll-1', authReq);
+    expect(service.deleteLandlord).toHaveBeenCalledWith('ll-1', 'agent-owner-1');
     expect(res.success).toBe(true);
   });
 });

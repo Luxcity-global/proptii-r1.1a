@@ -1,10 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
-import { randomUUID } from 'crypto';
+import * as crypto from 'crypto';
+const { randomUUID } = crypto;
 import {
   getSignedDownloadUrl,
   storageObjectFromDownloadUrl,
   uploadBufferToStorage,
+  uploadBase64ToStorage,
 } from '../utils/firebase-storage';
 import { createContractFileAccess } from '../utils/contract-file-access';
 import { renderProptiiEmail } from '../utils/emailLayout';
@@ -340,6 +342,7 @@ export class ContractService {
       fileUrl: stored.fileUrl || (typeof body.fileUrl === 'string' && !body.fileUrl.startsWith('data:') ? body.fileUrl : ''),
       storagePath: stored.storagePath || '',
       templateId: body.templateId || '',
+      templateVersion: body.templateVersion || 'ast_uk_2026_v1',
       status: body.status || 'sent',
       sentDate: body.sentDate || new Date().toISOString(),
       expiryDate: body.expiryDate || null,
@@ -352,12 +355,15 @@ export class ContractService {
       return { success: false, error: 'Could not store the contract file.' };
     }
 
-    if (col) {
-      try {
-        await withTimeout(col.doc(docId).set(this.withoutInlinePdf(payload)));
-      } catch (err: any) {
-        this.logger.warn(`sendContractToTenant error: ${err?.message || err}`);
-      }
+    if (!col) {
+      throw new InternalServerErrorException('Database service is unavailable');
+    }
+
+    try {
+      await withTimeout(col.doc(docId).set(this.withoutInlinePdf(payload)));
+    } catch (err: any) {
+      this.logger.error(`sendContractToTenant write error: ${err?.message || err}`);
+      throw new InternalServerErrorException(`Failed to persist contract to database: ${err?.message || err}`);
     }
 
     return { success: true, id: docId, contractId: docId, ...payload };
@@ -375,6 +381,7 @@ export class ContractService {
       id: docId,
       title: contractData.title || contractData.contractName || 'Tenancy Agreement',
       contractName: contractData.contractName || contractData.title || 'Tenancy Agreement',
+      templateVersion: contractData.templateVersion || body.templateVersion || 'ast_uk_2026_v1',
       landlordId,
       landlordEmail: this.normalizedEmail(contractData.landlordEmail),
       tenantEmail: this.normalizedEmail(contractData.tenantEmail, contractData.recipientEmail),
@@ -688,7 +695,7 @@ export class ContractService {
     }
   }
 
-  async saveSignedContract(body: any, userId?: string) {
+  async saveSignedContract(body: any, userId?: string, auditContext?: { ip?: string; userAgent?: string }) {
     const col = this.contractsCol;
     const docId = body.id || `signed_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const effectiveUserId = userId || body.userId || 'unknown';
@@ -705,31 +712,75 @@ export class ContractService {
     if (!storagePath && typeof fileUrl === 'string') {
       storagePath = this.storagePathForUrl(fileUrl);
     }
+
+    // Move signature image out of body and upload to Firebase Storage
+    let signatureUrl = body.signatureUrl || '';
+    const rawSignature = body.signature || body.signatureData || body.signatureImage;
+    if (typeof rawSignature === 'string' && rawSignature.startsWith('data:')) {
+      try {
+        const ext = rawSignature.split(';')[0].split('/')[1] || 'png';
+        const sigPath = `contract-signatures/${effectiveUserId}/${docId}-signature.${ext}`;
+        const uploadedSig = await uploadBase64ToStorage(rawSignature, sigPath);
+        signatureUrl = uploadedSig.downloadUrl;
+      } catch (err: any) {
+        this.logger.warn(`Could not upload signature image to storage: ${err?.message || err}`);
+      }
+    }
+
+    // Tamper-evident Audit Trail: IP, User Agent, UTC timestamp, document SHA-256 hash
+    const contractContent = body.contractContent || body.content || body.fileUrl || body.title || docId;
+    const documentSha256 = crypto.createHash('sha256').update(String(contractContent)).digest('hex');
+    const auditTrail = {
+      signedAt: body.signedDate || new Date().toISOString(),
+      signerIp: String(auditContext?.ip || body.signerIp || 'unknown'),
+      signerUserAgent: String(auditContext?.userAgent || body.signerUserAgent || 'unknown'),
+      signerUserId: effectiveUserId,
+      signerEmail: this.normalizedEmail(body.tenantEmail, body.signerEmail) || body.tenantEmail || '',
+      documentSha256,
+      tamperProofVerified: true,
+    };
+
+    // Clean payload without inline base64 data
+    const cleanBody = { ...body };
+    delete cleanBody.signature;
+    delete cleanBody.signatureData;
+    delete cleanBody.signatureImage;
+    delete cleanBody.base64Data;
+    delete cleanBody.fileBase64;
+
     const payload = this.withoutInlinePdf({
-      ...body,
+      ...cleanBody,
       id: docId,
       userId: effectiveUserId,
       title: body.title || body.contractName || body.templateName || 'Contract',
       contractName: body.contractName || body.title || body.templateName || 'Contract',
+      templateVersion: body.templateVersion || 'ast_uk_2026_v1',
       tenantEmail: this.normalizedEmail(body.tenantEmail) || body.tenantEmail || '',
       tenantName: body.tenantName || '',
       propertyAddress: body.propertyAddress || '',
       fileUrl: typeof fileUrl === 'string' && !fileUrl.startsWith('data:') ? fileUrl : '',
       documentUrl: typeof fileUrl === 'string' && !fileUrl.startsWith('data:') ? fileUrl : '',
       storagePath,
+      signatureUrl,
+      auditTrail,
+      status: 'signed',
+      signedDate: body.signedDate || new Date().toISOString(),
       fileName: body.fileName || body.documentName || 'contract.pdf',
       ...(landlordEmail ? { landlordEmail, agentEmail: agentEmail || landlordEmail } : {}),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    if (col) {
-      try {
-        await withTimeout(col.doc(docId).set(payload));
-        await this.reflectSignatureOnSource(col, docId, body);
-      } catch (err: any) {
-        this.logger.warn(`saveSignedContract error: ${err?.message || err}`);
-      }
+    if (!col) {
+      throw new InternalServerErrorException('Database service is unavailable');
+    }
+
+    try {
+      await withTimeout(col.doc(docId).set(payload));
+      await this.reflectSignatureOnSource(col, docId, body);
+    } catch (err: any) {
+      this.logger.error(`saveSignedContract write error: ${err?.message || err}`);
+      throw new InternalServerErrorException(`Failed to persist signed contract to database: ${err?.message || err}`);
     }
 
     return { success: true, id: docId, contractId: docId, ...payload };

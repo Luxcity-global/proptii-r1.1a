@@ -1,104 +1,147 @@
 /**
- * useMessagingPoller — SSE-driven real-time messaging hook with tab-aware fallback polling.
+ * useMessagingPoller — SSE-driven real-time messaging hook with fallback polling.
  *
- * Listens to Server-Sent Events ('message_new', 'message_read') for instant inbox updates.
- * Also runs a background safety poll every 60s while the browser tab is visible.
+ * When SSE is connected, polling is switched off entirely to save resources.
+ * If the SSE stream errors or disconnects, an exponential backoff safety poll activates
+ * (starting at 15s, backing off to 60s) until SSE reconnects.
  *
  * Must be called inside a component that is a descendant of MessagingProvider.
  */
 
-import { useEffect, useContext } from 'react';
+import { useEffect, useContext, useRef } from 'react';
 import { MessagingContext } from '../contexts/MessagingContext';
 import communicationService from '../services/communicationService';
 import sseService from '../services/sseService';
 import { useAuth } from '../contexts/AuthContext';
 
-const DEFAULT_INTERVAL_MS = 15_000; // 15s for active tab — fast enough to catch missed SSE events
+const BASE_INTERVAL_MS = 15_000;
+const MAX_INTERVAL_MS = 60_000;
 
-export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): void {
-    const { _setConversations, _setUnreadCount, _setOnlineUsers } = useContext(MessagingContext);
-    const { user } = useAuth();
+export function useMessagingPoller(initialIntervalMs: number = BASE_INTERVAL_MS): void {
+  const { _setConversations, _setUnreadCount, _setOnlineUsers } = useContext(MessagingContext);
+  const { user } = useAuth();
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backoffRef = useRef<number>(initialIntervalMs);
 
-    useEffect(() => {
-        let intervalId: ReturnType<typeof setInterval> | null = null;
+  useEffect(() => {
+    let isCancelled = false;
 
-        /** Fetch both endpoints and write results to context. */
-        async function fetchData(): Promise<void> {
-            try {
-                const [convs, count] = await Promise.all([
-                    communicationService.getConversations(),
-                    communicationService.getUnreadCount(),
-                ]);
-                // Merge: keep any optimistic conversations not yet returned by the server
-                _setConversations((prev) => {
-                    const serverIds = new Set(convs.map((c) => c.id));
-                    const optimisticOnly = prev.filter((c) => !serverIds.has(c.id));
-                    return [...convs, ...optimisticOnly];
-                });
-                _setUnreadCount(count);
-            } catch {
-                // Silently ignore — the next tick or SSE event will retry
-            }
-        }
+    /** Fetch both endpoints and write results to context. */
+    async function fetchData(): Promise<void> {
+      try {
+        const [convs, count] = await Promise.all([
+          communicationService.getConversations(),
+          communicationService.getUnreadCount(),
+        ]);
+        if (isCancelled) return;
+        // Merge: keep any optimistic conversations not yet returned by the server
+        _setConversations((prev) => {
+          const serverIds = new Set(convs.map((c) => c.id));
+          const optimisticOnly = prev.filter((c) => !serverIds.has(c.id));
+          return [...convs, ...optimisticOnly];
+        });
+        _setUnreadCount(count);
+      } catch {
+        // Silently ignore — next retry or SSE will handle
+      }
+    }
 
-        /** Start the polling interval. */
-        function startInterval(): void {
-            intervalId = setInterval(() => {
-                void fetchData();
-            }, intervalMs);
-        }
+    /** Stop any active polling timer. */
+    function stopPolling(): void {
+      if (pollTimerRef.current !== null) {
+        clearTimeout(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    }
 
-        /** Stop the polling interval. */
-        function stopInterval(): void {
-            if (intervalId !== null) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-        }
+    /** Schedule next poll with exponential backoff if SSE is disconnected. */
+    function scheduleFallbackPoll(): void {
+      stopPolling();
 
-        /** Handle Page Visibility API changes. */
-        function handleVisibilityChange(): void {
-            if (document.visibilityState === 'hidden') {
-                stopInterval();
-            } else {
-                // Tab became visible — fire an immediate fetch then restart interval
-                void fetchData();
-                startInterval();
-            }
-        }
+      // If document is hidden or SSE is currently connected, do NOT poll
+      if (document.visibilityState === 'hidden' || sseService.isConnected('communication')) {
+        backoffRef.current = initialIntervalMs;
+        return;
+      }
 
-        // Fire an initial fetch on mount
+      pollTimerRef.current = setTimeout(async () => {
+        if (isCancelled) return;
+        await fetchData();
+
+        // Increase backoff delay up to MAX_INTERVAL_MS if SSE is still down
+        backoffRef.current = Math.min(backoffRef.current * 1.5, MAX_INTERVAL_MS);
+        scheduleFallbackPoll();
+      }, backoffRef.current);
+    }
+
+    function syncPollingState(): void {
+      if (sseService.isConnected('communication')) {
+        // SSE is active — switch off polling loop
+        stopPolling();
+        backoffRef.current = initialIntervalMs;
+      } else {
+        // SSE is disconnected — trigger fallback poller with backoff
+        scheduleFallbackPoll();
+      }
+    }
+
+    /** Handle Page Visibility API changes. */
+    function handleVisibilityChange(): void {
+      if (document.visibilityState === 'hidden') {
+        stopPolling();
+      } else {
+        // Tab became visible — fire an immediate fetch then re-evaluate
         void fetchData();
+        syncPollingState();
+      }
+    }
 
-        // Register SSE real-time listener for instant push updates.
-        // Only listen to conversation_new here. message_new, message_read, and
-        // conversation_updated are handled exclusively inside MessageThread to
-        // avoid a three-way update race that caused duplicate/disappearing messages.
-        const unsubscribeSse = sseService.on(['conversation_new'], () => {
-            void fetchData();
-        });
+    // Fire an initial fetch on mount
+    void fetchData();
 
-        const unsubscribePresence = sseService.on('presence_update', (event) => {
-            const data = event.data as any;
-            if (data?.userId && typeof data.isOnline === 'boolean') {
-                _setOnlineUsers(prev => ({ ...prev, [data.userId]: data.isOnline }));
-            }
-        });
+    // Ensure communication SSE channel is connected
+    void sseService.ensureConnected('communication');
 
-        // Start the fallback interval (only if the tab is currently visible)
-        if (document.visibilityState !== 'hidden') {
-            startInterval();
+    // Check initial SSE connection state
+    syncPollingState();
+
+    // Register SSE real-time listeners
+    const unsubscribeSse = sseService.on(['conversation_new'], () => {
+      void fetchData();
+    });
+
+    const unsubscribePresence = sseService.on('presence_update', (event) => {
+      const data = event.data as any;
+      if (data?.userId && typeof data.isOnline === 'boolean') {
+        _setOnlineUsers((prev) => ({ ...prev, [data.userId]: data.isOnline }));
+      }
+    });
+
+    const unsubscribeConn = sseService.on('sse_connection_changed', (event) => {
+      const data = event.data as { channel?: string; connected?: boolean };
+      if (!data?.channel || data.channel === 'communication') {
+        if (data?.connected) {
+          // SSE connected! Shut off polling loop immediately
+          stopPolling();
+          backoffRef.current = initialIntervalMs;
+          void fetchData();
+        } else {
+          // SSE dropped! Enable fallback polling loop
+          scheduleFallbackPoll();
         }
+      }
+    });
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Cleanup on unmount
-        return () => {
-            unsubscribeSse();
-            unsubscribePresence();
-            stopInterval();
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [intervalMs, user?.id]);
+    return () => {
+      isCancelled = true;
+      stopPolling();
+      unsubscribeSse();
+      unsubscribePresence();
+      unsubscribeConn();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialIntervalMs, user?.id]);
 }

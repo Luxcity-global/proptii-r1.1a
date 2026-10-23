@@ -2,7 +2,7 @@ import React from 'react';
 import { Download, FileText, File, AlertTriangle, Eye } from 'lucide-react';
 import { FileItem } from '../../../services/fileService';
 import { fileService } from '../../../services/fileService';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import '../../../styles/tenantModals.css';
 
 interface FilePreviewModalProps {

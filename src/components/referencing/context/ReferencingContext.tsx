@@ -254,15 +254,18 @@ interface ReferencingProviderProps {
   children: ReactNode;
   initialApplicationId?: string;
   propertyId: string;
+  initialStep?: number;
 }
 
 export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
   children,
   initialApplicationId,
-  propertyId
+  propertyId,
+  initialStep,
 }) => {
   const [state, dispatch] = useReducer(referencingReducer, {
     ...initialState,
+    currentStep: typeof initialStep === 'number' && initialStep >= 0 ? initialStep : 0,
     applicationId: initialApplicationId || null,
     propertyId: propertyId || null
   });

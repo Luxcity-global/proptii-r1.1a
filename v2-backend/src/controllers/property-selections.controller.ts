@@ -41,10 +41,11 @@ export class PropertySelectionsController {
   @ApiParam({ name: 'id', description: 'Selection ID' })
   @ApiResponse({ status: 200, description: 'Selection status updated' })
   async updateStatus(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() body: { status: string; notes?: string },
   ) {
-    return this.service.updateSelectionStatus(id, body.status, body.notes);
+    return this.service.updateSelectionStatus(id, req.user.uid, body.status, body.notes);
   }
 
   /** DELETE /api/property-selections/:id */
@@ -52,7 +53,7 @@ export class PropertySelectionsController {
   @ApiOperation({ summary: 'Delete property selection' })
   @ApiParam({ name: 'id', description: 'Selection ID' })
   @ApiResponse({ status: 200, description: 'Selection deleted' })
-  async deleteSelection(@Param('id') id: string) {
-    return this.service.deleteSelection(id);
+  async deleteSelection(@Req() req: any, @Param('id') id: string) {
+    return this.service.deleteSelection(id, req.user.uid);
   }
 }

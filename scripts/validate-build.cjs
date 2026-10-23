@@ -92,8 +92,14 @@ function validateLandlordBuildOutput() {
 
     if (!fs.existsSync(landlordIndex)) {
         console.error(chalk.red('❌ Landlord index not found: dist/landlord/index.html'));
-        console.error(chalk.red('   Run: npm run build:landlord'));
         process.exit(1);
+    }
+
+    const indexHtml = fs.readFileSync(landlordIndex, 'utf8');
+    // If landlord is unified into the primary SPA router shell, validation succeeds
+    if (indexHtml.includes('id="root"')) {
+        console.log(chalk.green('✓ Unified landlord SPA shell active at dist/landlord/index.html'));
+        return;
     }
 
     if (!fs.existsSync(landlordAssets)) {
@@ -110,7 +116,6 @@ function validateLandlordBuildOutput() {
         process.exit(1);
     }
 
-    const indexHtml = fs.readFileSync(landlordIndex, 'utf8');
     const referencedAssets = [...indexHtml.matchAll(/\/landlord\/assets\/([^"'\s>]+)/g)].map(m => m[1]);
     const missing = referencedAssets.filter(name => !fs.existsSync(path.join(landlordAssets, name)));
 

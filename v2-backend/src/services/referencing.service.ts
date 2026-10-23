@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
@@ -274,14 +274,63 @@ export class ReferencingService {
       updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    if (!col) return { success: true, message: 'Application submitted successfully', status: 'submitted' };
+    if (!col) {
+      this.logger.error(`submitApplication failed for ${userId}: Database connection unavailable`);
+      throw new InternalServerErrorException('Database service is unavailable');
+    }
+
+    // Merge existing stored sections on the document with submitted payload
+    let existingData: any = {};
+    try {
+      const existingDoc = await col.doc(userId).get();
+      if (existingDoc && existingDoc.exists) {
+        existingData = existingDoc.data() || {};
+      }
+    } catch {}
+
+    const merged = { ...existingData, ...safeFormData };
+    const missing: string[] = [];
+
+    const identity = merged?.identity || merged?.formData?.identity || {};
+    if (!identity.fullName && !identity.firstName && !identity.name) missing.push('identity.fullName');
+    if (!identity.email && !merged.email) missing.push('identity.email');
+    if (!identity.dateOfBirth && !identity.dob) missing.push('identity.dateOfBirth');
+    if (!identity.identityProof && !identity.proofDocument && !identity.idDocument) missing.push('identity.identityProof');
+
+    const residential = merged?.residential || merged?.formData?.residential || {};
+    if (!residential.currentAddress && !residential.address && !residential.street) missing.push('residential.currentAddress');
+    if (!residential.residentialStatus && !residential.status) missing.push('residential.residentialStatus');
+    if (!residential.proofDocument && !residential.proofOfAddress) missing.push('residential.proofDocument');
+
+    const employment = merged?.employment || merged?.formData?.employment || {};
+    if (!employment.employmentStatus && !employment.status) missing.push('employment.employmentStatus');
+    if (!employment.employerName && !employment.companyName && !employment.accountantName) missing.push('employment.employerName');
+    if (!employment.annualIncome && !employment.salary && !employment.income) missing.push('employment.annualIncome');
+    if (!employment.proofDocument && !employment.payslip && !employment.employmentContract) missing.push('employment.proofDocument');
+
+    const financial = merged?.financial || merged?.formData?.financial || {};
+    if (!financial.monthlyIncome && !financial.annualIncome && !financial.income && !financial.bankName) missing.push('financial.incomeDetails');
+    if (!financial.proofOfIncomeDocument && !financial.proofDocument && !financial.bankStatement) missing.push('financial.proofOfIncomeDocument');
+
+    const requiresGuarantor = merged?.requiresGuarantor || merged?.hasGuarantor || identity?.requiresGuarantor;
+    const guarantor = merged?.guarantor || merged?.formData?.guarantor;
+    if (requiresGuarantor && !guarantor?.name && !guarantor?.fullName && !guarantor?.email) {
+      missing.push('guarantor.details (guarantor required)');
+    }
+
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Referencing application is incomplete. All 5 stages and required documents must be provided before submission: ${missing.join(', ')}`,
+      );
+    }
 
     try {
       await col.doc(userId).set(payload, { merge: true });
       return { success: true, message: 'Application submitted successfully', status: 'submitted' };
     } catch (err: any) {
-      this.logger.warn(`submitApplication failed for ${userId}: ${err?.message || err}`);
-      return { success: true, message: 'Application submitted successfully', status: 'submitted' };
+      if (err instanceof BadRequestException) throw err;
+      this.logger.error(`submitApplication failed for ${userId}: ${err?.message || err}`);
+      throw new InternalServerErrorException(`Failed to submit referencing application: ${err?.message || err}`);
     }
   }
 

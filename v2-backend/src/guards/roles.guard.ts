@@ -19,7 +19,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User is not authenticated');
     }
     if (!user.role) {
-      user.role = 'landlord';
+      throw new ForbiddenException('Access denied: User has no assigned role');
     }
 
     if (!requiredRoles.includes(user.role)) {

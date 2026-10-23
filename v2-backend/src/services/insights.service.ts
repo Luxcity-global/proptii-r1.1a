@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { getRedisClient } from '../utils/redis-client';
 
 @Injectable()
 export class InsightsService {
@@ -83,5 +84,94 @@ export class InsightsService {
         demandTrend: 'high',
       },
     };
+  }
+
+  async getPortfolioSummary(userId: string) {
+    if (!userId) {
+      return {
+        totalProperties: 0,
+        occupiedProperties: 0,
+        vacantProperties: 0,
+        occupancyRate: 0,
+        monthlyRent: 0,
+        annualRent: 0,
+        averageRent: 0,
+        tenantsCount: 0,
+      };
+    }
+
+    const redis = getRedisClient();
+    const cacheKey = `insights:portfolio:${userId}`;
+    if (redis) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch {}
+    }
+
+    const db = this.db;
+    let properties: any[] = [];
+    let tenants: any[] = [];
+
+    if (db) {
+      try {
+        const [propsSnap1, propsSnap2, tenantsSnap] = await Promise.all([
+          db.collection('properties').where('userId', '==', userId).get().catch(() => ({ docs: [] })),
+          db.collection('properties').where('landlordId', '==', userId).get().catch(() => ({ docs: [] })),
+          db.collection('tenants').where('userId', '==', userId).get().catch(() => ({ docs: [] })),
+        ]);
+
+        const propMap = new Map<string, any>();
+        [...propsSnap1.docs, ...propsSnap2.docs].forEach(d => propMap.set(d.id, d.data()));
+        properties = Array.from(propMap.values());
+        tenants = (tenantsSnap.docs || []).map(d => d.data());
+      } catch (err: any) {
+        this.logger.warn(`getPortfolioSummary fetch error: ${err?.message || err}`);
+      }
+    }
+
+    const nonArchivedProps = properties.filter(p => p.status !== 'archived' && !p.archived && !p.isArchived);
+    const totalProperties = nonArchivedProps.length;
+    let occupiedCount = 0;
+    let monthlyRent = 0;
+
+    nonArchivedProps.forEach(p => {
+      const isOccupied = p.status === 'occupied' || Boolean(p.tenantId) || Boolean(p.tenant);
+      if (isOccupied) {
+        occupiedCount++;
+      }
+      const rent = Number(p.price || p.rentAmount || p.rent || 0);
+      if (!isNaN(rent) && rent > 0) {
+        monthlyRent += rent;
+      }
+    });
+
+    const vacantProperties = Math.max(0, totalProperties - occupiedCount);
+    const occupancyRate = totalProperties > 0 ? Math.round((occupiedCount / totalProperties) * 100) : 0;
+    const annualRent = monthlyRent * 12;
+    const averageRent = totalProperties > 0 ? Math.round(monthlyRent / totalProperties) : 0;
+    const tenantsCount = tenants.length;
+
+    const summary = {
+      totalProperties,
+      occupiedProperties: occupiedCount,
+      vacantProperties,
+      occupancyRate,
+      monthlyRent,
+      annualRent,
+      averageRent,
+      tenantsCount,
+      cachedAt: new Date().toISOString(),
+    };
+
+    if (redis) {
+      try {
+        await redis.set(cacheKey, JSON.stringify(summary), 'EX', 300); // 5 min cache
+      } catch {}
+    }
+
+    return summary;
   }
 }

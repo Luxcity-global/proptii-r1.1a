@@ -149,18 +149,18 @@ function PortfolioInsightsContent({
   const renovatingCount = portfolio.renovating;
   const propertyRentTotal = properties.reduce((sum, p) => sum + (p.rent || 0), 0);
 
-  const monthlyRevenue = properties.length > 0 ? portfolio.monthlyRent : (revenue?.totalMonthly || 0);
-  const vacantUnits = properties.length > 0 ? vacantCount : (occupancy?.vacantUnits ?? vacantCount);
-  const occupancyRate = properties.length > 0 ? portfolio.occupancyPct : (occupancy?.rate || 0);
-  const activeTenants = portfolioTenants
+  const monthlyRevenue = analyticsData?.summary?.monthlyRent ?? (properties.length > 0 ? portfolio.monthlyRent : (revenue?.totalMonthly || 0));
+  const vacantUnits = analyticsData?.summary?.vacantProperties ?? (properties.length > 0 ? vacantCount : (occupancy?.vacantUnits ?? vacantCount));
+  const occupancyRate = analyticsData?.summary?.occupancyRate ?? (properties.length > 0 ? portfolio.occupancyPct : (occupancy?.rate || 0));
+  const activeTenants = analyticsData?.summary?.tenantsCount ?? (portfolioTenants
     ? portfolioTenants.filter((tenant) => tenant.status === 'active' || tenant.status === 'pending').length
-    : (tenants?.totalActive || occupiedCount);
+    : (tenants?.totalActive || occupiedCount));
   const netIncome = monthlyRevenue - Math.round(monthlyRevenue * 0.2);
   const outstandingRent = revenue?.outstandingRent || 0;
-  const avgRent =
+  const avgRent = analyticsData?.summary?.averageRent ?? (
     properties.length > 0
       ? Math.round(propertyRentTotal / properties.length)
-      : revenue?.avgRentPerUnit || 0;
+      : revenue?.avgRentPerUnit || 0);
 
   const yieldRows = useMemo(() => {
     if (properties.length === 0) return [];

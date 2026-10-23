@@ -20,7 +20,7 @@ import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess
 import PlanUpgradeWall from '../PlanUpgradeWall';
 import TenantPageHeader from '../ui/TenantPageHeader';
 import BookViewingModal from '../../viewings/BookViewingModal';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { downloadReferencingReportPdf } from '../../../utils/referencingReportPdf';
 import '../../../styles/tenantReferencing.css';
 import '../../../styles/tenantModals.css';

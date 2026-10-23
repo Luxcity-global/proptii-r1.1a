@@ -48,24 +48,26 @@ export class HomeownerService {
     return { success: true, id: docId, ...payload };
   }
 
-  async updateMaintenanceTask(taskId: string, data: any) {
+  async updateMaintenanceTask(taskId: string, userId: string, data: any) {
     const col = this.maintenanceCol;
-    const update = { ...data, updatedAt: new Date().toISOString() };
-    if (col) {
-      try { await col.doc(taskId).set(update, { merge: true }); } catch (err: any) {
-        this.logger.warn(`updateMaintenanceTask error: ${err?.message || err}`);
-      }
+    if (!col) throw new Error('Database unavailable');
+    const doc = await col.doc(taskId).get();
+    if (!doc.exists || doc.data()?.userId !== userId) {
+      throw new Error('Task not found or unauthorized');
     }
+    const update = { ...data, updatedAt: new Date().toISOString() };
+    await col.doc(taskId).set(update, { merge: true });
     return { success: true };
   }
 
-  async deleteMaintenanceTask(taskId: string) {
+  async deleteMaintenanceTask(taskId: string, userId: string) {
     const col = this.maintenanceCol;
-    if (col) {
-      try { await col.doc(taskId).delete(); } catch (err: any) {
-        this.logger.warn(`deleteMaintenanceTask error: ${err?.message || err}`);
-      }
+    if (!col) throw new Error('Database unavailable');
+    const doc = await col.doc(taskId).get();
+    if (!doc.exists || doc.data()?.userId !== userId) {
+      throw new Error('Task not found or unauthorized');
     }
+    await col.doc(taskId).delete();
     return { success: true };
   }
 
@@ -101,31 +103,31 @@ export class HomeownerService {
       updatedAt: new Date().toISOString(),
     };
     if (col) {
-      try { await col.doc(docId).set(payload); } catch (err: any) {
-        this.logger.warn(`createProject error: ${err?.message || err}`);
-      }
+      await col.doc(docId).set(payload);
     }
     return { success: true, id: docId, ...payload };
   }
 
-  async updateProject(projectId: string, data: any) {
+  async updateProject(projectId: string, userId: string, data: any) {
     const col = this.projectsCol;
-    const update = { ...data, updatedAt: new Date().toISOString() };
-    if (col) {
-      try { await col.doc(projectId).set(update, { merge: true }); } catch (err: any) {
-        this.logger.warn(`updateProject error: ${err?.message || err}`);
-      }
+    if (!col) throw new Error('Database unavailable');
+    const doc = await col.doc(projectId).get();
+    if (!doc.exists || doc.data()?.userId !== userId) {
+      throw new Error('Project not found or unauthorized');
     }
+    const update = { ...data, updatedAt: new Date().toISOString() };
+    await col.doc(projectId).set(update, { merge: true });
     return { success: true };
   }
 
-  async deleteProject(projectId: string) {
+  async deleteProject(projectId: string, userId: string) {
     const col = this.projectsCol;
-    if (col) {
-      try { await col.doc(projectId).delete(); } catch (err: any) {
-        this.logger.warn(`deleteProject error: ${err?.message || err}`);
-      }
+    if (!col) throw new Error('Database unavailable');
+    const doc = await col.doc(projectId).get();
+    if (!doc.exists || doc.data()?.userId !== userId) {
+      throw new Error('Project not found or unauthorized');
     }
+    await col.doc(projectId).delete();
     return { success: true };
   }
 }

@@ -44,7 +44,29 @@ export interface ApiError {
   status: number;
 }
 
+// Shared refresh queue promise to prevent concurrent 401 refresh stampedes
+let refreshQueuePromise: Promise<string | null> | null = null;
 
+async function getOrQueueRefreshToken(): Promise<string | null> {
+  if (refreshQueuePromise) {
+    return refreshQueuePromise;
+  }
+
+  refreshQueuePromise = (async () => {
+    try {
+      localStorage.removeItem('auth_token');
+      const token = await getAccessTokenForApiRequest();
+      return token || null;
+    } catch (err) {
+      console.error('[API] Failed to refresh token in queue:', err);
+      return null;
+    } finally {
+      refreshQueuePromise = null;
+    }
+  })();
+
+  return refreshQueuePromise;
+}
 
 class ApiService {
   private api: AxiosInstance;
@@ -131,10 +153,8 @@ class ApiService {
           !originalRequest._retried
         ) {
           originalRequest._retried = true;
-          // Clear the stale token so getAccessTokenForApiRequest() skips the localStorage fallback
-          localStorage.removeItem('auth_token');
           try {
-            const freshToken = await getAccessTokenForApiRequest();
+            const freshToken = await getOrQueueRefreshToken();
             if (freshToken) {
               setBearerAuth(originalRequest, freshToken);
               return this.api.request(originalRequest);

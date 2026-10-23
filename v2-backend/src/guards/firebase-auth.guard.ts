@@ -90,7 +90,7 @@ export class FirebaseAuthGuard implements CanActivate {
     // connection through, instead of throwing 401 before the controller sees it.
     if (request.query?.ticket && typeof request.query.ticket === 'string') {
       const ticket = request.query.ticket as string;
-      const info = getSseTicketInfo(ticket);
+      const info = await getSseTicketInfo(ticket);
       if (info && info.expiresAt > Date.now()) {
         // Do NOT consume the ticket in the guard — let the controller consume it
         // (the controller still calls sseTickets.delete for one-time use semantics).

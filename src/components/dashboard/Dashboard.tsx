@@ -209,8 +209,7 @@ const DashboardInner: React.FC = () => {
   // P1-3: Show a banner if Firebase Auth sync fails (Firestore writes would be blocked)
   useEffect(() => {
     const handleFirebaseSyncFailure = () => {
-      // toast from react-hot-toast is already available in the app
-      import('react-hot-toast').then(({ default: toast }) => {
+      import('sonner').then(({ toast }) => {
         toast.error(
           'Session sync issue — some features may not save correctly. Please refresh the page.',
           { duration: 8000, id: 'firebase-sync-failed' }

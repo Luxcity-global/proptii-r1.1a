@@ -34,13 +34,14 @@ export class LoggingMiddleware implements NestMiddleware {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Surrogate-Control', 'no-store');
 
+    const correlationId = (req as any).correlationId || (req.headers['x-correlation-id'] as string) || 'none';
     const { method, originalUrl, ip } = req;
     const userAgent = req.headers['user-agent'] ?? '—';
     const start = Date.now();
 
     // ── REQUEST ──────────────────────────────────────────────────────────────
     this.logger.log(
-      `→ ${method} ${originalUrl} | ip=${ip} | ua=${userAgent.slice(0, 60)}` +
+      `[${correlationId}] → ${method} ${originalUrl} | ip=${ip} | ua=${userAgent.slice(0, 60)}` +
       (req.body && Object.keys(req.body).length
         ? ` | body=${summarise(req.body)}`
         : ''),
@@ -64,7 +65,7 @@ export class LoggingMiddleware implements NestMiddleware {
         this.logger.log.bind(this.logger);
 
       logFn(
-        `← ${status} ${method} ${originalUrl} | ${ms}ms | uid=${userId}`,
+        `[${correlationId}] ← ${status} ${method} ${originalUrl} | ${ms}ms | uid=${userId}`,
       );
     });
 

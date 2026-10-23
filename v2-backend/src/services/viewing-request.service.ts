@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
 const VIEWING_STATUSES = new Set([
@@ -120,11 +120,22 @@ export class ViewingRequestService {
     };
     if (details.whatsappNumber) viewingDetails.whatsappNumber = details.whatsappNumber;
 
+    const propertyAddress = source.propertyAddress || [property.street, property.town, property.postcode].filter(Boolean).join(', ') || source.propertyTitle || '';
+    const propertyPrice = source.propertyPrice ?? source.property?.price ?? null;
+    const propertyPhoto = source.propertyPhoto || (Array.isArray(source.property?.images) && source.property.images[0]) || source.property?.photo || '';
+    const tenantName = source.tenantName || viewingDetails.userDetails?.fullName || '';
+    const tenantPhone = source.tenantPhone || viewingDetails.userDetails?.phoneNumber || '';
+
     return {
       ...source,
       id: source.id || id,
       userId: source.userId || source.tenantId || '',
       property,
+      propertyAddress,
+      propertyPrice,
+      propertyPhoto,
+      tenantName,
+      tenantPhone,
       viewingDetails,
       status: this.canonicalStatus(source.status),
     };
@@ -194,12 +205,70 @@ export class ViewingRequestService {
     const id = `viewing_${tenantId || callerId}_${Date.now()}`;
     const now = new Date().toISOString();
 
+    const propertyId = data?.propertyId || null;
+
+    // Denormalize property fields directly onto the viewing record to eliminate N+1 queries
+    let propertyAddress = data?.propertyAddress || data?.address || '';
+    let propertyPrice = data?.propertyPrice ?? data?.price ?? null;
+    let propertyPhoto = data?.propertyPhoto || data?.photo || data?.image || '';
+
+    if (propertyId && (!propertyAddress || propertyPrice === null || !propertyPhoto) && this.db) {
+      try {
+        const pDoc = await this.db.collection('properties').doc(propertyId).get();
+        if (pDoc.exists) {
+          const pData = pDoc.data() || {};
+          propertyAddress = propertyAddress || pData.address || pData.fullAddress || [pData.street, pData.town, pData.postcode].filter(Boolean).join(', ') || pData.title || '';
+          propertyPrice = propertyPrice ?? pData.price ?? pData.rentAmount ?? pData.rent ?? null;
+          propertyPhoto = propertyPhoto || (Array.isArray(pData.images) && pData.images[0]) || (Array.isArray(pData.photos) && pData.photos[0]) || pData.coverImage || pData.photo || '';
+        }
+      } catch {}
+    }
+
+    if (!propertyAddress && property) {
+      propertyAddress = [property.street, property.town, property.postcode].filter(Boolean).join(', ') || property.title || property.address || '';
+    }
+    if (!propertyPhoto && property) {
+      propertyPhoto = (Array.isArray(property.images) && property.images[0]) || (Array.isArray(property.photos) && property.photos[0]) || property.photo || property.image || '';
+    }
+    if (propertyPrice === null && property) {
+      propertyPrice = property.price ?? property.rentAmount ?? property.rent ?? null;
+    }
+
+    const tenantName = details?.userDetails?.fullName || data?.tenantName || data?.applicantName || '';
+    const tenantPhone = details?.userDetails?.phoneNumber || data?.tenantPhone || '';
+
+    // Prevent double-booking: check if confirmed/booked viewing already exists for this slot
+    if (col && (propertyId || propertyTitleKey) && requestedDate && requestedTime && (status === 'confirmed' || status === 'booked')) {
+      try {
+        const query = propertyId
+          ? col.where('propertyId', '==', propertyId)
+          : col.where('propertyTitleKey', '==', propertyTitleKey);
+        const existingSnap = await query.where('status', 'in', ['confirmed', 'booked']).limit(20).get();
+        const conflict = existingSnap.docs.some(doc => {
+          const d = doc.data();
+          const dDate = d.requestedDate || d.viewingDetails?.date || d.viewing_date;
+          const dTime = d.requestedTime || d.viewingDetails?.time || d.viewing_time;
+          return dDate === requestedDate && dTime === requestedTime;
+        });
+        if (conflict) {
+          throw new ConflictException('This viewing slot is already booked for this property. Please choose another date or time.');
+        }
+      } catch (err: any) {
+        if (err instanceof ConflictException) throw err;
+      }
+    }
+
     const payload: any = {
       id,
       userId: callerIsManager ? (data?.userId || callerId) : callerId,
       tenantEmail,
-      propertyId: data?.propertyId || null,
+      tenantName,
+      tenantPhone,
+      propertyId,
       propertyTitle,
+      propertyAddress,
+      propertyPrice,
+      propertyPhoto,
       requestedDate,
       requestedTime,
       status,
@@ -229,12 +298,15 @@ export class ViewingRequestService {
     if (details) payload.viewingDetails = details;
     if (data?.agentNotes) payload.agentNotes = data.agentNotes;
 
-    if (col) {
-      try {
-        await col.doc(id).set(payload);
-      } catch (err: any) {
-        console.warn('[ViewingRequestService] createViewing error:', err?.message || err);
-      }
+    if (!col) {
+      throw new InternalServerErrorException('Database service is unavailable');
+    }
+
+    try {
+      await col.doc(id).set(payload);
+    } catch (err: any) {
+      console.error('[ViewingRequestService] createViewing error:', err?.message || err);
+      throw new InternalServerErrorException(`Failed to save viewing request: ${err?.message || err}`);
     }
     return this.presentViewing(id, payload);
   }
@@ -533,7 +605,13 @@ export class ViewingRequestService {
       const now = new Date().toISOString();
       const payload: any = { status: nextStatus, updatedAt: now };
       const callerEmail = this.normalizedEmail(user?.email);
-      const callerIsApplicant = data.tenantId === userId || this.normalizedEmail(data.tenantEmail) === callerEmail;
+      const tenantEmail = this.normalizedEmail(data.tenantEmail);
+      const callerIsApplicant = (Boolean(data.tenantId) && data.tenantId === userId) || (Boolean(callerEmail) && Boolean(tenantEmail) && tenantEmail === callerEmail);
+
+      if (callerIsApplicant && nextStatus !== 'cancelled') {
+        throw new ForbiddenException('Applicants may only cancel a viewing request. Only the property landlord or agent can approve, confirm, or complete viewings.');
+      }
+
       if (!callerIsApplicant && userId) {
         if (!data.landlordId) payload.landlordId = userId;
         if (!data.agentId) payload.agentId = userId;
@@ -557,7 +635,35 @@ export class ViewingRequestService {
           payload.viewing_time = time;
         }
       }
-      if (nextStatus === 'confirmed') payload.confirmedAt = now;
+      if (nextStatus === 'confirmed') {
+        payload.confirmedAt = now;
+
+        const targetDate = payload.requestedDate || data.requestedDate || data.viewingDetails?.date || data.viewing_date;
+        const targetTime = payload.requestedTime || data.requestedTime || data.viewingDetails?.time || data.viewing_time;
+        const targetPropId = data.propertyId;
+        const targetTitleKey = data.propertyTitleKey;
+
+        if (col && (targetPropId || targetTitleKey) && targetDate && targetTime) {
+          try {
+            const query = targetPropId
+              ? col.where('propertyId', '==', targetPropId)
+              : col.where('propertyTitleKey', '==', targetTitleKey);
+            const existingSnap = await query.where('status', 'in', ['confirmed', 'booked']).limit(20).get();
+            const conflict = existingSnap.docs.some(dDoc => {
+              if (dDoc.id === id) return false;
+              const d = dDoc.data();
+              const dDate = d.requestedDate || d.viewingDetails?.date || d.viewing_date;
+              const dTime = d.requestedTime || d.viewingDetails?.time || d.viewing_time;
+              return dDate === targetDate && dTime === targetTime;
+            });
+            if (conflict) {
+              throw new ConflictException('This viewing slot is already confirmed for another applicant. Please select a different time slot.');
+            }
+          } catch (err: any) {
+            if (err instanceof ConflictException) throw err;
+          }
+        }
+      }
       if (nextStatus === 'completed') payload.completedAt = now;
       if (nextStatus === 'cancelled') payload.cancelledAt = now;
       if (nextStatus === 'rescheduled') payload.rescheduledAt = now;
@@ -566,7 +672,7 @@ export class ViewingRequestService {
       return this.presentViewing(id, { ...data, ...payload });
     } catch (err: any) {
       const code = typeof err?.getStatus === 'function' ? err.getStatus() : err?.status;
-      if (code === 400 || code === 403 || code === 404) throw err;
+      if (code === 400 || code === 403 || code === 404 || code === 409) throw err;
       console.warn('[ViewingRequestService] updateViewingStatus error:', err?.message || err);
       throw err;
     }

@@ -231,6 +231,19 @@ function blank(init?: Partial<WizardPropertyData>): WizardPropertyData {
   };
 }
 
+const DRAFT_STORAGE_KEY = 'proptii_property_wizard_draft';
+
+function loadSavedDraft(): Partial<WizardPropertyData> | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function AddPropertyWizard({
@@ -238,7 +251,16 @@ export function AddPropertyWizard({
   onPublish, onBulkImport, onBack, onAddTenant, isSavingForTenant = false,
   onSaveDraft, isSavingDraft = false,
 }: AddPropertyWizardProps) {
-  const [form, setForm]         = useState<WizardPropertyData>(() => blank(initialData));
+  const [form, setForm]         = useState<WizardPropertyData>(() => {
+    if (initialData) return blank(initialData);
+    if (!isEditing) {
+      const draft = loadSavedDraft();
+      if (draft && (draft.address || draft.propertyType || draft.monthlyRent)) {
+        return blank(draft);
+      }
+    }
+    return blank();
+  });
   const [step, setStep]         = useState<Step>(1);
   const [done, setDone]         = useState<Record<Step, boolean>>({ 1:false,2:false,3:false,4:false,5:false });
   const [errors, setErrors]     = useState<FieldErrors>({});
@@ -252,6 +274,27 @@ export function AddPropertyWizard({
   useEffect(() => {
     if (initialData) setForm(blank(initialData));
   }, [JSON.stringify(initialData)]);
+
+  // Auto-persist draft to localStorage so session expiry does not lose work
+  useEffect(() => {
+    if (isEditing) return;
+    try {
+      const draftPayload = {
+        propertyType: form.propertyType,
+        address: form.address,
+        monthlyRent: form.monthlyRent,
+        bedrooms: form.bedrooms,
+        bathrooms: form.bathrooms,
+        squareFootage: form.squareFootage,
+        amenities: form.amenities,
+        additionalNotes: form.additionalNotes,
+        status: form.status,
+      };
+      if (form.address || form.propertyType || form.monthlyRent) {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload));
+      }
+    } catch {}
+  }, [form, isEditing]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef  = useRef<HTMLInputElement>(null);
@@ -328,6 +371,7 @@ export function AddPropertyWizard({
     setPublishing(true);
     try {
       await onPublish(form);
+      try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch {}
     } catch (err: any) {
       setGE(err?.message || 'Failed to save property. Please try again.');
     } finally {

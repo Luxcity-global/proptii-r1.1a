@@ -16,13 +16,15 @@ export class LandlordsService {
     return db ? db.collection('users') : null;
   }
 
-  async getAllLandlords() {
+  async getAllLandlords(agencyId?: string) {
     const col = this.usersCol;
     if (!col) return { users: [] };
     try {
-      const snap = await col
-        .where('role', 'in', ['landlord', 'agent'])
-        .get();
+      let query: admin.firestore.Query = col.where('role', 'in', ['landlord', 'agent']);
+      if (agencyId) {
+        query = col.where('agencyId', '==', agencyId);
+      }
+      const snap = await query.get();
       const users = snap.docs.map((doc) => serializeUserDates({ id: doc.id, ...doc.data() }));
       return { users };
     } catch (err: any) {
@@ -51,7 +53,7 @@ export class LandlordsService {
 
   async registerLandlord(data: any) {
     const col = this.usersCol;
-    const docId = `landlord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const docId = data.uid || data.userId || `landlord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const payload = {
       id: docId,
       ...data,
@@ -62,7 +64,7 @@ export class LandlordsService {
     };
     if (col) {
       try {
-        await col.doc(docId).set(payload);
+        await col.doc(docId).set(payload, { merge: true });
       } catch (err: any) {
         this.logger.warn(`registerLandlord error: ${err?.message || err}`);
       }
@@ -96,10 +98,23 @@ export class LandlordsService {
     }
   }
 
-  async updateLandlord(id: string, updates: any) {
+  async updateLandlord(id: string, callerUidOrUpdates: any, maybeUpdates?: any) {
+    let callerUid = id;
+    let updates = callerUidOrUpdates;
+    if (maybeUpdates !== undefined) {
+      callerUid = callerUidOrUpdates;
+      updates = maybeUpdates;
+    }
     const col = this.usersCol;
-    if (!col) return { success: true };
+    if (!col) return { success: false, error: 'Database unavailable' };
     try {
+      const doc = await col.doc(id).get();
+      if (!doc.exists) return { success: false, error: 'Landlord not found' };
+      const data = doc.data();
+      const isOwner = !callerUid || id === callerUid || data?.agencyId === callerUid || data?.userId === callerUid;
+      if (!isOwner) {
+        return { success: false, error: 'Unauthorized to update this landlord' };
+      }
       await col.doc(id).set(
         { ...updates, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
         { merge: true },
@@ -111,10 +126,17 @@ export class LandlordsService {
     }
   }
 
-  async deleteLandlord(id: string) {
+  async deleteLandlord(id: string, callerUid?: string) {
     const col = this.usersCol;
-    if (!col) return { success: true };
+    if (!col) return { success: false, error: 'Database unavailable' };
     try {
+      const doc = await col.doc(id).get();
+      if (!doc.exists) return { success: false, error: 'Landlord not found' };
+      const data = doc.data();
+      const isOwner = !callerUid || id === callerUid || data?.agencyId === callerUid || data?.userId === callerUid;
+      if (!isOwner) {
+        return { success: false, error: 'Unauthorized to delete this landlord' };
+      }
       await col.doc(id).delete();
       return { success: true };
     } catch (err: any) {

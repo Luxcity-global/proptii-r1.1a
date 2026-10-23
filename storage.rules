@@ -13,19 +13,38 @@ service firebase.storage {
         && request.resource.size < 15 * 1024 * 1024;
     }
     
-    // Contracts folder - restricted to authenticated users with 15MB limit
+    // Contracts folder - restricted to verified tenant, landlord, or administrator
     match /contracts/{contractId}/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.resource.size < 15 * 1024 * 1024;
+      allow read: if isAuthenticated() && (
+        request.auth.token.admin == true ||
+        resource == null ||
+        resource.metadata.tenantId == request.auth.uid ||
+        resource.metadata.landlordId == request.auth.uid ||
+        resource.metadata.userId == request.auth.uid
+      );
+      allow write: if isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.resource.metadata.tenantId == request.auth.uid ||
+        request.resource.metadata.landlordId == request.auth.uid ||
+        request.resource.metadata.userId == request.auth.uid ||
+        request.auth.token.role == 'landlord' ||
+        request.auth.token.role == 'agent'
+      ) && request.resource.size < 15 * 1024 * 1024;
     }
     
     // Properties public media folder (images, listing media)
+    // Reads stay public; writes restricted to authenticated landlords/agents/admins
     match /properties/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated() && request.resource.size < 15 * 1024 * 1024;
+      allow write: if isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'landlord' ||
+        request.auth.token.role == 'agent' ||
+        request.resource.metadata.landlordId == request.auth.uid
+      ) && request.resource.size < 15 * 1024 * 1024;
     }
     
-    // User documents folder - scoped to authenticated user
+    // User documents folder - scoped to authenticated user or admin
     match /documents/{userId}/{allPaths=**} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
       allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true)

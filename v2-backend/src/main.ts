@@ -158,17 +158,22 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // ── Global ValidationPipe (Sprint 1.3 PRD requirement) ──────────────────────
+  // ── Global ValidationPipe (Sprint 1.3 PRD requirement & Phase 4) ───────────
   // Validates all @Body() DTOs across every controller.
-  // whitelist: true  — strips unknown fields from the body (not rejected).
-  // transform: true  — automatically coerces primitives to their DTO types.
+  // whitelist: true            — strips unknown fields from the body.
+  // transform: true            — automatically coerces primitives to their DTO types.
+  // forbidNonWhitelisted: true — rejects requests with unrecognized payload keys (HTTP 400).
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist:            true,
       transform:            true,
-      forbidNonWhitelisted: false,  // strip silently — don't reject
+      forbidNonWhitelisted: true,
     }),
   );
+
+  // ── Global Exception Filter (Phase 5 Observability) ───────────────────────
+  const { AllExceptionsFilter } = require('./filters/all-exceptions.filter');
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // ── CORS (Sprint 2.1 PRD requirement) ───────────────────────────────────
   // Explicit allowlist so the browser permits calls to:
@@ -219,7 +224,12 @@ async function bootstrap() {
       'Pragma',
       'X-CSRF-Token',
       'x-csrf-token',
+      'X-Correlation-Id',
+      'x-correlation-id',
+      'X-Request-Id',
+      'x-request-id',
     ],
+    exposedHeaders: ['X-Correlation-Id'],
   });
 
   // ── Swagger API Documentation ─────────────────────────────────────────────

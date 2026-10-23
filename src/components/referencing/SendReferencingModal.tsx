@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { firestoreService } from '../../services/firestoreService';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface SendReferencingModalProps {
   isOpen: boolean;

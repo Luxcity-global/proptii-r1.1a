@@ -397,12 +397,15 @@ export class BillingService {
     // Determine if we're in live mode by checking the secret key prefix.
     // automatic_tax requires a registered head-office address in Stripe Tax settings
     // which is only configured on the live account. In test mode we skip it to avoid
-    // the "must have a valid head office address" error from Stripe.
+    // Determine if we're in live mode by checking the secret key prefix.
     const isLiveMode = (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_live_');
+    const customerId = await this.getOrCreateStripeCustomer(userId, email);
 
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
-      customer_email: email,
+      ...(customerId && customerId.startsWith('cus_') && !customerId.startsWith('cus_mock')
+        ? { customer: customerId }
+        : { customer_email: (email || '').trim().toLowerCase() }),
       client_reference_id: userId,
       ...(isLiveMode ? { automatic_tax: { enabled: true } } : {}),
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
@@ -418,6 +421,73 @@ export class BillingService {
     return { checkoutUrl: session.url!, sessionId: session.id };
   }
 
+  // ─── getOrCreateStripeCustomer ────────────────────────────────────────────
+  // Task 17: Stop duplicate Stripe customers by normalizing email and checking existing list
+
+  async getOrCreateStripeCustomer(userId: string, rawEmail: string): Promise<string | undefined> {
+    const normalizedEmail = (rawEmail || '').trim().toLowerCase();
+    const db = this.db;
+
+    // Check if subscription doc already has stripeCustomerId
+    if (db && userId) {
+      try {
+        const subSnap = await db.collection('subscriptions').doc(userId).get();
+        const existingId = subSnap.data()?.stripeCustomerId;
+        if (existingId) return existingId;
+      } catch {}
+    }
+
+    if (!this.stripe) {
+      return `cus_mock_${userId}`;
+    }
+
+    // Look up customer in Stripe by normalized email
+    if (normalizedEmail) {
+      try {
+        const existingList = await this.stripe.customers.list({
+          email: normalizedEmail,
+          limit: 1,
+        });
+        if (existingList.data.length > 0) {
+          const customerId = existingList.data[0].id;
+          if (db && userId) {
+            await db.collection('subscriptions').doc(userId).set({
+              stripeCustomerId: customerId,
+              userId,
+              email: normalizedEmail,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+          }
+          return customerId;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Stripe customer lookup by email failed: ${err?.message}`);
+      }
+    }
+
+    // Create new customer with normalized email
+    try {
+      const customer = await this.stripe.customers.create({
+        email: normalizedEmail || undefined,
+        metadata: { userId, source: 'proptii_billing' },
+      });
+
+      if (db && userId) {
+        await db.collection('subscriptions').doc(userId).set({
+          stripeCustomerId: customer.id,
+          userId,
+          email: normalizedEmail,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+
+      return customer.id;
+    } catch (createErr: any) {
+      this.logger.error(`Failed to create Stripe customer for ${userId}: ${createErr?.message}`);
+      return undefined;
+    }
+  }
+
   // ─── createPortalSession ──────────────────────────────────────────────────
 
   async createPortalSession(userId: string, email: string) {
@@ -425,31 +495,9 @@ export class BillingService {
     if (!db) {
       throw new BadRequestException('Database unavailable');
     }
-    const subSnap = await db.collection('subscriptions').doc(userId).get();
-    let customerId: string | undefined = subSnap.data()?.stripeCustomerId;
+    const customerId = await this.getOrCreateStripeCustomer(userId, email);
     if (!customerId) {
-      if (!this.stripe) {
-        throw new BadRequestException(
-          'No billing account found. Please subscribe to a plan first.',
-        );
-      }
-      const customer = await this.stripe.customers.create({
-        email,
-        metadata: { userId, source: 'portal_auto_create' },
-      });
-      customerId = customer.id;
-      await db
-        .collection('subscriptions')
-        .doc(userId)
-        .set(
-          {
-            stripeCustomerId: customerId,
-            userId,
-            email,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true },
-        );
+      throw new BadRequestException('No billing account found. Please subscribe to a plan first.');
     }
     if (!this.stripe) {
       throw new BadRequestException('Stripe is not configured');
@@ -547,6 +595,7 @@ export class BillingService {
     }, { merge: true });
 
     await batch.commit();
+    await this.syncUserProClaim(userId, true);
 
     // Mark session consumed so repeated calls return the cached result
     const result = {
@@ -896,17 +945,9 @@ export class BillingService {
   async handleWebhook(rawBody: Buffer, signature: string): Promise<{ received: boolean }> {
     const isProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL;
     const secret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (!secret) {
-      if (isProd) {
-        this.logger.error('[Webhook] STRIPE_WEBHOOK_SECRET not set in production');
-        throw new BadRequestException('Webhook secret not configured');
-      }
-      // Dev: parse without signature verification
-      this.logger.warn('[Webhook] STRIPE_WEBHOOK_SECRET not set — skipping signature verification (dev mode)');
-      const event = JSON.parse(rawBody.toString()) as Stripe.Event;
-      await this.dispatchWebhookEvent(event);
-      return { received: true };
+    if (!secret || !signature) {
+      this.logger.error('[Webhook] STRIPE_WEBHOOK_SECRET or stripe-signature header is missing');
+      throw new BadRequestException('Webhook signature and secret configuration are required');
     }
 
     let event: Stripe.Event;
@@ -1047,6 +1088,7 @@ export class BillingService {
       plan: planId, isSubscribed: true, billingCadence: cycle, updatedAt: now,
     }, { merge: true });
     await batch.commit();
+    await this.syncUserProClaim(userId, true);
   }
 
   private async updateSubscriptionStatus(
@@ -1066,5 +1108,26 @@ export class BillingService {
       }, { merge: true });
     }
     await batch.commit();
+
+    if (fields.status) {
+      const isPro = fields.status === 'active' || fields.status === 'trialing';
+      await this.syncUserProClaim(userId, isPro);
+    }
+  }
+
+  private async syncUserProClaim(userId: string, isPro: boolean): Promise<void> {
+    if (!admin.apps.length || !userId) return;
+    try {
+      const userRecord = await admin.auth().getUser(userId);
+      const existingClaims = userRecord.customClaims || {};
+      await admin.auth().setCustomUserClaims(userId, {
+        ...existingClaims,
+        hasPro: isPro,
+      });
+      this.logger.log(`[BillingService] Updated hasPro=${isPro} claim for user ${userId}`);
+    } catch (err: any) {
+      this.logger.warn(`[BillingService] Could not set hasPro claim for ${userId}: ${err?.message}`);
+    }
   }
 }
+

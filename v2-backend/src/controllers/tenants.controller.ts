@@ -14,15 +14,18 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { TenantsService } from '../services/tenants.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { RolesGuard } from '../guards/roles.guard';
+import { Roles } from '../decorators/roles.decorator';
 import { CreateTenantDto } from '../dto/create-tenant.dto';
 
 @ApiTags('Tenants')
 @Controller('tenants')
+@UseGuards(FirebaseAuthGuard, RolesGuard)
+@Roles('landlord', 'agent')
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
   @Post()
-  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @HttpCode(201)
   @ApiOperation({ summary: 'Create a new tenant under landlord/agent management' })
@@ -42,32 +45,12 @@ export class TenantsController {
   @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Bulk import up to 500 tenants — continues and reports all errors' })
+  @ApiOperation({ summary: 'Bulk import tenants in batches of 400 without per-row sleep' })
   @ApiResponse({ status: 200, description: 'Bulk import result with per-row success/failure detail' })
   async bulkCreateTenants(@Req() req: any, @Body() body: { tenants: any[] }) {
     const userId = req.user?.uid || req.user?.id || req.user?.email;
     const rows: any[] = Array.isArray(body?.tenants) ? body.tenants : [];
-
-    const results: { index: number; success: boolean; id?: string; error?: string }[] = [];
-    let succeeded = 0;
-    let failed = 0;
-
-    for (let i = 0; i < rows.length; i++) {
-      try {
-        const result = await this.tenantsService.createTenant(rows[i], userId);
-        results.push({ index: i, success: true, id: result.id });
-        succeeded++;
-      } catch (err: any) {
-        results.push({ index: i, success: false, error: err?.message || 'Unknown error' });
-        failed++;
-      }
-      // 50ms delay between writes to avoid Firestore rate-limiting
-      if (i < rows.length - 1) {
-        await new Promise(r => setTimeout(r, 50));
-      }
-    }
-
-    return { total: rows.length, succeeded, failed, results };
+    return this.tenantsService.bulkCreateTenants(rows, userId);
   }
 
   /**

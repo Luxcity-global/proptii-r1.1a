@@ -112,6 +112,7 @@ class SseService {
       source.onopen = () => {
         const prevAttempts = this.reconnectAttempts.get(channel) || 0;
         this.reconnectAttempts.set(channel, 0);
+        this.dispatch({ type: 'sse_connection_changed', data: { channel, connected: true }, timestamp: Date.now() });
         if (prevAttempts > 0) {
           this.dispatch({ type: 'conversation_updated', data: { reconnected: true }, timestamp: Date.now() });
         }
@@ -157,6 +158,7 @@ class SseService {
       };
 
       source.onerror = () => {
+        this.dispatch({ type: 'sse_connection_changed', data: { channel, connected: false }, timestamp: Date.now() });
         this.disconnectChannel(channel);
         this.scheduleReconnect(channel);
       };

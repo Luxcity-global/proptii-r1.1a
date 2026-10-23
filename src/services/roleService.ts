@@ -30,7 +30,7 @@ export interface UserRoleDoc {
 async function fetchBackendRole(uid: string, email: string): Promise<UserRole | null> {
   try {
     const res = await apiService.get('/auth/me');
-    const role = res.data?.role || (res as any).role;
+    const role = (res.data as any)?.role || (res as any).role;
     if (role) return role as UserRole;
   } catch (e) {
     console.warn('[Auth] Could not fetch role from backend:', e);
@@ -44,17 +44,17 @@ export async function resolveRole(
   uid: string,
   email: string,
 ): Promise<UserRole | null> {
-  // 1. localStorage cache — instant, avoids a round-trip on every render
-  const cached = localStorage.getItem(`proptii_role_${uid}`);
-  if (cached === 'tenant' || cached === 'landlord' || cached === 'agent') {
-    return cached as UserRole;
-  }
-
-  // 2. Backend role resolution via v2-backend REST API (canonical source of truth)
+  // 1. Backend role resolution via v2-backend REST API (canonical source of truth)
   const backendRole = await fetchBackendRole(uid, email);
   if (backendRole) {
     localStorage.setItem(`proptii_role_${uid}`, backendRole);
     return backendRole;
+  }
+
+  // 2. Fallback to localStorage cache only if offline or network unreachable
+  const cached = localStorage.getItem(`proptii_role_${uid}`);
+  if (cached === 'tenant' || cached === 'landlord' || cached === 'agent') {
+    return cached as UserRole;
   }
 
   // 3. sessionStorage signup intent (set before B2C redirect during onboarding)
@@ -83,7 +83,7 @@ export async function setRole(
     // POST to avoid a spurious 400 ("Tenants cannot switch to Landlord or Agent"
     // or "Invalid role" errors that appear on every page load).
     const me = await apiService.get('/auth/me');
-    const currentBackendRole = me.data?.role || (me as any).role;
+    const currentBackendRole = (me.data as any)?.role || (me as any).role;
     if (currentBackendRole === role) {
       return; // Already correct — no update needed
     }
@@ -96,7 +96,7 @@ export async function setRole(
 export async function getStoredRole(uid: string): Promise<UserRole | null> {
   try {
     const res = await apiService.get('/auth/me');
-    return res.data?.role || (res as any).role || null;
+    return (res.data as any)?.role || (res as any).role || null;
   } catch {
     return null;
   }

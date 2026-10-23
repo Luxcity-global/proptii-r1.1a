@@ -1,6 +1,7 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { InsightsService } from '../services/insights.service';
+import { OptionalFirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
 @ApiTags('Insights')
 @Controller('insights')
@@ -53,5 +54,16 @@ export class InsightsController {
   @ApiResponse({ status: 200, description: 'Demand metrics data' })
   async getDemand(@Query('location') location?: string) {
     return this.insightsService.getDemandMetrics(location);
+  }
+
+  /** GET /api/insights/portfolio-summary */
+  @Get('portfolio-summary')
+  @UseGuards(OptionalFirebaseAuthGuard)
+  @ApiOperation({ summary: 'Get aggregated portfolio summary metrics' })
+  @ApiQuery({ name: 'userId', required: false, description: 'Landlord user ID' })
+  @ApiResponse({ status: 200, description: 'Aggregated portfolio metrics' })
+  async getPortfolioSummary(@Req() req: any, @Query('userId') userId?: string) {
+    const effectiveUserId = userId || req?.user?.uid || '';
+    return this.insightsService.getPortfolioSummary(effectiveUserId);
   }
 }

@@ -18,72 +18,72 @@ export class ReferencingController {
   @Post(['referencing/identity', 'applications/:id/identity'])
   @Put(['applications/:id/identity'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save identity section data for referencing application' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveIdentityData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'identity', data);
   }
 
   @Post(['referencing/employment', 'applications/:id/employment'])
   @Put(['applications/:id/employment'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save employment section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveEmploymentData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'employment', data);
   }
 
   @Post(['referencing/residential', 'applications/:id/residential'])
   @Put(['applications/:id/residential'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save residential history section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveResidentialData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'residential', data);
   }
 
   @Post(['referencing/financial', 'applications/:id/financial'])
   @Put(['applications/:id/financial'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save financial & banking section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveFinancialData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'financial', data);
   }
 
   @Post(['referencing/guarantor', 'applications/:id/guarantor'])
   @Put(['applications/:id/guarantor'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save guarantor details section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveGuarantorData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'guarantor', data);
   }
 
   @Post(['referencing/agentDetails', 'applications/:id/agentDetails'])
   @Put(['applications/:id/agentDetails'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save agent details section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveAgentDetailsData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'agentDetails', data);
   }
 
@@ -413,6 +413,12 @@ export class ReferencingController {
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'Referencing form document' })
   async getFormData(@Req() req: any, @Param('userId') userId: string) {
+    const callerId = req.user?.uid;
+    const isSelf = callerId === userId;
+    const isStaff = req.user?.role === 'landlord' || req.user?.role === 'agent' || req.user?.role === 'admin' || req.user?.admin === true;
+    if (!isSelf && !isStaff) {
+      throw new ForbiddenException('You do not have permission to view this applicant referencing record');
+    }
     return await this.referencingService.getFormData(userId);
   }
 }

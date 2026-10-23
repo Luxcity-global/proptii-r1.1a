@@ -37,13 +37,19 @@ export class SheetsController {
     return this.sheetsService.getSheetData(sheetId);
   }
 
+  private static readonly ALLOWED_PUBLIC_SHEETS = new Set(['waitlist', 'campaign_leads', 'contact_enquiries']);
+
   /** POST /api/sheets — append a row (waitlist / lead capture) */
   @Post()
   @ApiOperation({ summary: 'Append row to waitlist or campaign lead spreadsheet' })
   @ApiQuery({ name: 'sheetId', required: false, schema: { default: 'waitlist' } })
   @ApiResponse({ status: 201, description: 'Row appended' })
-  async appendRow(@Body() body: any, @Query('sheetId') sheetId = 'waitlist') {
-    return this.sheetsService.appendRow(body.sheetId || sheetId, body);
+  async appendRow(@Body() body: any, @Query('sheetId') sheetId = 'waitlist', @Req() req?: any) {
+    const targetSheet = (body?.sheetId || sheetId || 'waitlist').trim().toLowerCase();
+    if (!SheetsController.ALLOWED_PUBLIC_SHEETS.has(targetSheet)) {
+      this.assertAdminUser(req);
+    }
+    return this.sheetsService.appendRow(targetSheet, body);
   }
 
   /** GET /api/sheets/:sheetId — admin only */
@@ -63,7 +69,11 @@ export class SheetsController {
   @ApiOperation({ summary: 'Append row to specific spreadsheet by ID' })
   @ApiParam({ name: 'sheetId', description: 'Sheet identifier' })
   @ApiResponse({ status: 201, description: 'Row appended' })
-  async appendToSheet(@Param('sheetId') sheetId: string, @Body() body: any) {
-    return this.sheetsService.appendRow(sheetId, body);
+  async appendToSheet(@Param('sheetId') sheetId: string, @Body() body: any, @Req() req?: any) {
+    const targetSheet = (sheetId || '').trim().toLowerCase();
+    if (!SheetsController.ALLOWED_PUBLIC_SHEETS.has(targetSheet)) {
+      this.assertAdminUser(req);
+    }
+    return this.sheetsService.appendRow(targetSheet, body);
   }
 }

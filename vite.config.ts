@@ -274,6 +274,9 @@ export default defineConfig(({ mode = 'development' }) => {
         },
       } : undefined,
     },
+    esbuild: {
+      drop: isProduction ? ['console', 'debugger'] : [],
+    },
     optimizeDeps: {
       // Pre-bundle every bare-package import found in src/ so Vite never has to
       // discover and recompile deps on-demand (which causes browser reloads and
@@ -290,7 +293,7 @@ export default defineConfig(({ mode = 'development' }) => {
         'react-dom/client',
         'react-router-dom',
         'react-hook-form',
-        'react-hot-toast',
+        'sonner',
         'react-dropzone',
 
         // ── MUI + Emotion (must stay together — MUI has Emotion peer dep) ──

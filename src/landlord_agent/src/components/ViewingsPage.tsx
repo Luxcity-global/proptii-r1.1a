@@ -48,53 +48,20 @@ import {
   mergeById,
 } from '../data/agentTestPersona';
 import '../styles/viewingsPage.css';
-
-type RowAction = {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  onSelect: () => void;
-  disabled?: boolean;
-  tone?: RowActionTone;
-};
-
-type RowActionTone = 'success' | 'accent' | 'danger' | 'neutral';
-
-const ROW_ACTION_TONES: Record<RowActionTone, string> = {
-  success: 'text-green-700 focus:bg-green-50 focus:text-green-700 [&_svg]:!text-green-600',
-  accent: 'text-[#136C9E] focus:bg-[#136C9E]/10 focus:text-[#136C9E] [&_svg]:!text-[#136C9E]',
-  danger: 'text-red-600 focus:bg-red-50 focus:text-red-700 [&_svg]:!text-red-600',
-  neutral: 'text-gray-700 focus:bg-gray-100 focus:text-gray-900',
-};
-
-function RowActionsMenu({ actions }: { actions: RowAction[] }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-          title="Actions"
-          aria-label="Actions"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[170px] bg-white">
-        {actions.map(({ label, icon: Icon, onSelect, disabled, tone }) => (
-          <DropdownMenuItem
-            key={label}
-            disabled={disabled}
-            onSelect={onSelect}
-            className={`cursor-pointer ${ROW_ACTION_TONES[tone ?? 'neutral']}`}
-          >
-            <Icon className="mr-2 h-4 w-4" />
-            {label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+import {
+  ViewingCalendar,
+  startOfWeekMonday,
+  addDays,
+  toDateKey,
+  sameDateKey,
+  parseViewingHour,
+  formatHourLabel,
+  calendarEventColor,
+  CALENDAR_HOURS,
+  CALENDAR_EVENT_COLORS,
+} from './viewings/ViewingCalendar';
+import { ViewingTable, RowActionsMenu, type RowAction, type RowActionTone } from './viewings/ViewingTable';
+import { RescheduleModal, type RescheduleFormState } from './viewings/RescheduleModal';
 
 function bookingForTable(booking: ViewingBooking, managerEmail?: string | null): ViewingBooking {
   const withApplicant = applyRememberedApplicant(booking) as ViewingBooking;
@@ -230,63 +197,7 @@ function formatLongDate(date: string) {
   }
 }
 
-function startOfWeekMonday(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
 
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function toDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function sameDateKey(a: string | undefined, b: string): boolean {
-  if (!a) return false;
-  const normalized = a.includes('T') ? a.slice(0, 10) : a.slice(0, 10);
-  return normalized === b;
-}
-
-function parseViewingHour(time?: string): number | null {
-  if (!time) return null;
-  const trimmed = time.trim();
-  const twentyFour = trimmed.match(/^(\d{1,2}):(\d{2})/);
-  if (twentyFour) {
-    const hour = Number(twentyFour[1]);
-    if (Number.isFinite(hour)) return hour;
-  }
-  const twelve = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
-  if (twelve) {
-    let hour = Number(twelve[1]);
-    const meridiem = twelve[3].toUpperCase();
-    if (meridiem === 'PM' && hour < 12) hour += 12;
-    if (meridiem === 'AM' && hour === 12) hour = 0;
-    return hour;
-  }
-  return null;
-}
-
-function formatHourLabel(hour: number): string {
-  if (hour === 0) return '12 AM';
-  if (hour < 12) return `${hour} AM`;
-  if (hour === 12) return '12 PM';
-  return `${hour - 12} PM`;
-}
-
-function calendarEventColor(index: number): string {
-  return CALENDAR_EVENT_COLORS[index % CALENDAR_EVENT_COLORS.length];
-}
 
 function formatDate(date: string) {
   if (!date) return 'TBD';
@@ -2686,128 +2597,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         )}
 
         {activeTab === 'calendar' && (
-          <div className="ll-vw-calendar">
-            <div className="ll-vw-calendar-head">
-              <h2>{calendarMonthLabel}</h2>
-              <div className="ll-vw-calendar-nav">
-                <button
-                  type="button"
-                  aria-label="Previous week"
-                  onClick={() => setCalendarWeekStart((prev) => addDays(prev, -7))}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="is-today"
-                  onClick={() => setCalendarWeekStart(startOfWeekMonday(new Date()))}
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next week"
-                  onClick={() => setCalendarWeekStart((prev) => addDays(prev, 7))}
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div className="ll-vw-calendar-scroll">
-              <div className="ll-vw-calendar-grid">
-                <div className="ll-vw-calendar-weekdays">
-                  <div className="ll-vw-calendar-time-label">Time</div>
-                  {calendarDays.map((day) => {
-                    const key = toDateKey(day);
-                    const isToday = key === toDateKey(new Date());
-                    return (
-                      <div key={key} className="ll-vw-calendar-weekday">
-                        <span>{day.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                        <strong className={isToday ? 'is-today' : undefined}>
-                          {day.getDate()}
-                        </strong>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="ll-vw-calendar-hours">
-                  {CALENDAR_HOURS.map((hour) => (
-                    <div key={hour} className="ll-vw-calendar-row">
-                      <div className="ll-vw-calendar-hour">{formatHourLabel(hour)}</div>
-                      {calendarDays.map((day) => {
-                        const dayKey = toDateKey(day);
-                        const slotEvents = calendarWeekEvents.filter((viewing) => {
-                          const viewingHour = parseViewingHour(viewing.viewingDetails?.time);
-                          return (
-                            sameDateKey(viewing.viewingDetails?.date, dayKey) &&
-                            viewingHour === hour
-                          );
-                        });
-                        return (
-                          <div
-                            key={`${dayKey}-${hour}`}
-                            className="ll-vw-calendar-cell"
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              if (slotEvents[0]) {
-                                handleOpenEventDetail(slotEvents[0]);
-                                return;
-                              }
-                              handleOpenRequestModal(undefined, {
-                                date: dayKey,
-                                time: `${String(hour).padStart(2, '0')}:00`,
-                              });
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                if (slotEvents[0]) {
-                                  handleOpenEventDetail(slotEvents[0]);
-                                  return;
-                                }
-                                handleOpenRequestModal(undefined, {
-                                  date: dayKey,
-                                  time: `${String(hour).padStart(2, '0')}:00`,
-                                });
-                              }
-                            }}
-                          >
-                            {slotEvents.map((viewing, index) => (
-                              <button
-                                key={viewing.id}
-                                type="button"
-                                className="ll-vw-calendar-event"
-                                style={{ background: calendarEventColor(index + hour) }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEventDetail(viewing);
-                                }}
-                              >
-                                <strong>{viewing.property.street}</strong>
-                                <em>
-                                  <Clock size={11} />
-                                  {formatTime(viewing.viewingDetails?.time || '')}
-                                </em>
-                              </button>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {calendarWeekEvents.length === 0 && (
-              <p className="ll-vw-calendar-empty">
-                No viewings scheduled this week. Click an empty slot to request a viewing.
-              </p>
-            )}
-          </div>
+          <ViewingCalendar
+            calendarMonthLabel={calendarMonthLabel}
+            calendarWeekStart={calendarWeekStart}
+            setCalendarWeekStart={setCalendarWeekStart}
+            calendarDays={calendarDays}
+            calendarWeekEvents={calendarWeekEvents}
+            onOpenEventDetail={handleOpenEventDetail}
+            onOpenRequestModal={handleOpenRequestModal}
+            formatTime={formatTime}
+          />
         )}
       </div>
       </div>
@@ -2919,101 +2718,19 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         </div>
       )}
 
-      {/* Reschedule Modal */}
-      {isRescheduleModalOpen && selectedViewing && (
-        <div className="ll-vw-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="ll-vw-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ll-vw-modal-head is-amber">
-              <div className="ll-vw-modal-head-copy">
-                <div className="ll-vw-modal-icon is-amber">
-                  <Clock size={16} />
-                </div>
-                <div>
-                  <h3>Propose Alternative Time</h3>
-                  <p>Suggest a revised slot for this viewing request</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="ll-vw-modal-close"
-                onClick={() => {
-                  setIsRescheduleModalOpen(false);
-                  setSelectedViewing(null);
-                  setRescheduleForm(initialRescheduleForm);
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="ll-vw-modal-body">
-              <div className="ll-vw-modal-info">
-                <span>Applicant & Property</span>
-                <strong>
-                  {selectedViewing.viewingDetails?.userDetails?.fullName || 'Applicant'} ·{' '}
-                  {selectedViewing.property.street}
-                </strong>
-              </div>
-              <label className="ll-vw-field">
-                <span>Proposed New Date</span>
-                <input
-                  type="date"
-                  value={rescheduleForm.date}
-                  onChange={(e) => setRescheduleForm((prev) => ({ ...prev, date: e.target.value }))}
-                />
-              </label>
-              <label className="ll-vw-field">
-                <span>Proposed Time Slot</span>
-                <select
-                  value={rescheduleForm.time}
-                  onChange={(e) => setRescheduleForm((prev) => ({ ...prev, time: e.target.value }))}
-                >
-                  <option value="">Select a time</option>
-                  {VIEWING_TIME_SLOTS.map((slot) => (
-                    <option key={slot.value} value={slot.value}>
-                      {slot.label}
-                    </option>
-                  ))}
-                  {rescheduleForm.time &&
-                    !VIEWING_TIME_SLOTS.some((slot) => slot.value === rescheduleForm.time) && (
-                      <option value={rescheduleForm.time}>{rescheduleForm.time}</option>
-                    )}
-                </select>
-              </label>
-              <label className="ll-vw-field">
-                <span>Message to Applicant</span>
-                <textarea
-                  rows={2}
-                  placeholder="I have another viewing booked then, would this alternative work for you?"
-                  value={rescheduleForm.message}
-                  onChange={(e) => setRescheduleForm((prev) => ({ ...prev, message: e.target.value }))}
-                />
-              </label>
-            </div>
-            <div className="ll-vw-modal-footer is-split">
-              <button
-                type="button"
-                className="ll-vw-modal-secondary"
-                onClick={() => {
-                  setIsRescheduleModalOpen(false);
-                  setSelectedViewing(null);
-                  setRescheduleForm(initialRescheduleForm);
-                }}
-                disabled={isProcessing}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="ll-vw-modal-cta"
-                onClick={handleRescheduleSubmit}
-                disabled={isProcessing}
-              >
-                {isProcessing ? 'Sending…' : 'Send Proposal'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RescheduleModal
+        isOpen={isRescheduleModalOpen}
+        viewing={selectedViewing}
+        form={rescheduleForm}
+        onFormChange={setRescheduleForm}
+        onSubmit={handleRescheduleSubmit}
+        onClose={() => {
+          setIsRescheduleModalOpen(false);
+          setSelectedViewing(null);
+          setRescheduleForm(initialRescheduleForm);
+        }}
+        isProcessing={isProcessing}
+      />
 
       {/* Cancel Modal */}
       {isCancelModalOpen && selectedViewing && (

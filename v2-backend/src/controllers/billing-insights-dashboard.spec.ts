@@ -3,6 +3,7 @@ import { BillingController } from './billing.controller';
 import { InsightsController } from './insights.controller';
 import { TenantDashboardController } from './tenant-dashboard.controller';
 import { AdminDashboardController } from './admin-dashboard.controller';
+import { BadRequestException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
 describe('Section 15, 16, 17 & 18: Billing, Insights, Dashboards Endpoints', () => {
@@ -69,6 +70,26 @@ describe('Section 15, 16, 17 & 18: Billing, Insights, Dashboards Endpoints', () 
       expect(service.confirmCheckoutSession).toHaveBeenCalledWith('u-1', 'cs_test_123', 'u1@test.com');
       expect(res.hasActiveSubscription).toBe(true);
       expect(res.plan).toBe('renter_pro');
+    });
+
+    it('[POST /billing/webhook] forwards raw body and signature header to handleWebhook', async () => {
+      service.handleWebhook = vi.fn().mockResolvedValue({ received: true });
+      const mockBuffer = Buffer.from('{"type":"customer.subscription.updated"}');
+      const req = { rawBody: mockBuffer };
+      const sig = 't=123,v1=valid_signature';
+
+      const res = await controller.stripeWebhook(req, sig);
+      expect(service.handleWebhook).toHaveBeenCalledWith(mockBuffer, sig);
+      expect(res.received).toBe(true);
+    });
+
+    it('[POST /billing/webhook] rejects unsigned webhook when signature is missing or verification fails', async () => {
+      service.handleWebhook = vi.fn().mockRejectedValue(
+        new BadRequestException('Webhook signature and secret configuration are required'),
+      );
+      const req = { body: { type: 'checkout.session.completed' } };
+
+      await expect(controller.stripeWebhook(req, '')).rejects.toThrow(BadRequestException);
     });
   });
 

@@ -12,7 +12,7 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import type { Message } from '../../types/messaging';
 import communicationService from '../../services/communicationService';
 

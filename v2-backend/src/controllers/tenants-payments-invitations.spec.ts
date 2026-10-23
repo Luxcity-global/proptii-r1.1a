@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TenantsController } from './tenants.controller';
 import { PaymentsController } from './payments.controller';
 import { TenantInvitationsController } from './tenant-invitations.controller';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
 describe('Section 4, 5 & 6: Tenants, Payments & Tenant Invitations Endpoints', () => {
@@ -97,7 +97,7 @@ describe('Section 4, 5 & 6: Tenants, Payments & Tenant Invitations Endpoints', (
       controller = new TenantInvitationsController();
     });
 
-    it('[POST /tenant-invitations] creates and records a tenant invitation in Firestore with a token', async () => {
+    it('[POST /tenant-invitations] creates and records a tenant invitation in Firestore with a token, hash, and 7-day cap', async () => {
       const req = { user: { uid: 'landlord-1', email: 'll@proptii.co', name: 'John Landlord' } };
       const body = { tenantEmail: 'invited@tenant.com', propertyId: 'prop-1', propertyAddress: '10 High St' };
 
@@ -116,8 +116,38 @@ describe('Section 4, 5 & 6: Tenants, Payments & Tenant Invitations Endpoints', (
           landlordName: 'John Landlord',
           status: 'pending',
           token: expect.any(String),
+          tokenHash: expect.any(String),
+          expiresAt: expect.any(String),
         }),
       );
+
+      // Verify expiresAt is capped at maximum 7 days in future
+      const expiresMs = new Date(res.invitation.expiresAt).getTime();
+      const maxAllowed = Date.now() + 7 * 24 * 60 * 60 * 1000 + 5000;
+      expect(expiresMs).toBeLessThanOrEqual(maxAllowed);
+    });
+
+    it('[POST /tenant-invitations] rate limits invitation creation to 10 per hour per landlord (429 Too Many Requests)', async () => {
+      const req = { user: { uid: 'landlord-rate-test', email: 'spam@proptii.co', name: 'Spam Landlord' } };
+      const body = { tenantEmail: 'test@tenant.com', propertyId: 'prop-1', propertyAddress: '10 High St' };
+
+      // Dispatch 10 invites within 1 hour
+      for (let i = 0; i < 10; i++) {
+        const res = await controller.createInvitation(req, { ...body, tenantEmail: `tenant-${i}@test.com` });
+        expect(res.success).toBe(true);
+      }
+
+      // 11th invite must be rejected with 429 TOO_MANY_REQUESTS
+      await expect(
+        controller.createInvitation(req, { ...body, tenantEmail: 'tenant-11@test.com' }),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await controller.createInvitation(req, { ...body, tenantEmail: 'tenant-11@test.com' });
+      } catch (err: any) {
+        expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+        expect(err.message.toLowerCase()).toContain('rate limit');
+      }
     });
 
     it('[GET /tenant-invitations/validate] validates token successfully', async () => {

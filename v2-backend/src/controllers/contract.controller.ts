@@ -83,7 +83,12 @@ export class ContractController {
   @ApiResponse({ status: 201, description: 'Contract saved' })
   async saveSignedContract(@Req() req: any, @Body() body: any) {
     const userId = req.user?.uid || req.user?.id || req.user?.email || 'unknown';
-    const result = await this.contractService.saveSignedContract(body, userId);
+    const headers = req?.headers || {};
+    const auditContext = {
+      ip: (headers['x-forwarded-for'] as string) || req?.ip || req?.socket?.remoteAddress || 'unknown',
+      userAgent: (headers['user-agent'] as string) || 'unknown',
+    };
+    const result = await this.contractService.saveSignedContract(body, userId, auditContext);
     const managerEmail = body.landlordEmail || body.agentEmail;
     this.eventsService.emit({
       type: 'contract_sent',

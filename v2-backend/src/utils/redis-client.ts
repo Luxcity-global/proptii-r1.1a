@@ -52,6 +52,35 @@ export function getRedisClient(): Redis {
   return client;
 }
 
+let subscriberClient: Redis | null = null;
+
+export function getRedisSubscriber(): Redis {
+  if (subscriberClient) return subscriberClient;
+
+  const url = process.env.REDIS_URL;
+  if (!url) {
+    return createNoOpRedis();
+  }
+
+  subscriberClient = new Redis(url, {
+    lazyConnect: false,
+    enableReadyCheck: true,
+    maxRetriesPerRequest: 1,
+    retryStrategy: (times) => {
+      if (times > 3) {
+        console.error('[RedisSubscriber] Connection failed after 3 retries.');
+        return null;
+      }
+      return Math.min(times * 200, 1000);
+    },
+  });
+
+  subscriberClient.on('connect', () => console.log('[RedisSubscriber] Connected to Redis Pub/Sub.'));
+  subscriberClient.on('error', (err) => console.error('[RedisSubscriber] Redis error:', err.message));
+
+  return subscriberClient;
+}
+
 /**
  * Returns a lightweight no-op proxy that satisfies the Redis interface used
  * across gov-data services, preventing crashes when REDIS_URL is absent.
@@ -61,7 +90,11 @@ function createNoOpRedis(): any {
   return new Proxy({} as Redis, {
     get(_target, prop) {
       if (prop === 'status') return 'close';
+      if (prop === 'on' || prop === 'subscribe' || prop === 'unsubscribe') {
+        return () => {};
+      }
       return noop;
     },
   });
 }
+

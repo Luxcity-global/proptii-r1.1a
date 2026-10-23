@@ -27,9 +27,9 @@ export class CommunicationController {
   @SkipThrottle()
   @ApiOperation({ summary: 'Exchange Bearer token for a short-lived SSE ticket' })
   @ApiResponse({ status: 200, description: 'One-time SSE ticket valid for 60 seconds' })
-  issueSseTicket(@Req() req: any) {
+  async issueSseTicket(@Req() req: any) {
     const ticket = randomUUID();
-    setSseTicket(ticket, {
+    await setSseTicket(ticket, {
       uid:       req.user.uid,
       email:     req.user.email || '',
       role:      req.user.role  || '',
@@ -41,7 +41,7 @@ export class CommunicationController {
   @Sse('events')
   @SkipThrottle()
   @ApiOperation({ summary: 'Subscribe to real-time communication events stream (SSE)' })
-  sendCommunicationEvents(@Req() req: any, @Query('ticket') ticket?: string): Observable<MessageEvent> {
+  async sendCommunicationEvents(@Req() req: any, @Query('ticket') ticket?: string): Promise<Observable<MessageEvent>> {
     // Accept either ticket-based auth (preferred — token never in URL) or fall
     // back to the legacy req.user populated by FirebaseAuthGuard for backwards compat.
     let uid: string;
@@ -49,11 +49,11 @@ export class CommunicationController {
     let role: string;
 
     if (ticket) {
-      const info = getSseTicketInfo(ticket);
+      const info = await getSseTicketInfo(ticket);
       if (!info || info.expiresAt < Date.now()) {
         throw new UnauthorizedException('SSE ticket is invalid or has expired');
       }
-      deleteSseTicket(ticket); // one-time use
+      await deleteSseTicket(ticket); // one-time use
       uid   = info.uid;
       email = info.email;
       role  = info.role;

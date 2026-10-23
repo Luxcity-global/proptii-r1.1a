@@ -12,6 +12,8 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -50,6 +52,21 @@ export class TenantInvitationsController {
     }
   }
 
+  private static readonly inviteRateLimits = new Map<string, number[]>();
+
+  private assertInviteRateLimit(landlordId: string): void {
+    if (!landlordId) return;
+    const now = Date.now();
+    const oneHour = 60 * 60 * 1000;
+    const timestamps = (TenantInvitationsController.inviteRateLimits.get(landlordId) || [])
+      .filter((ts) => now - ts < oneHour);
+    if (timestamps.length >= 10) {
+      throw new HttpException('Invitation rate limit reached: Maximum 10 invites per hour.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    timestamps.push(now);
+    TenantInvitationsController.inviteRateLimits.set(landlordId, timestamps);
+  }
+
   @Post()
   @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
@@ -58,17 +75,25 @@ export class TenantInvitationsController {
   @ApiResponse({ status: 201, description: 'Invitation record created' })
   async createInvitation(@Req() req: any, @Body() body: any) {
     const col = this.col;
+    if (!col) throw new BadRequestException('Database service is unavailable');
+
+    const landlordId = body.landlordId || req.user?.uid || '';
+    this.assertInviteRateLimit(landlordId);
+
     const docId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    const token = body.token || crypto.randomBytes(24).toString('hex');
+    const rawToken = body.token || crypto.randomBytes(24).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
     const tenantEmail = (body.email || body.tenantEmail || '').toLowerCase().trim();
-    const expiresAt = body.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    // Enforce 7-day maximum expiration
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const payload = {
       id: docId,
-      token,
+      token: rawToken,
+      tokenHash,
       ...body,
       tenantEmail,
-      landlordId: body.landlordId || req.user?.uid || '',
+      landlordId,
       landlordEmail: body.landlordEmail || req.user?.email || '',
       landlordName: body.landlordName || req.user?.name || req.user?.displayName || '',
       propertyId: body.propertyId || '',
@@ -83,15 +108,9 @@ export class TenantInvitationsController {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    if (col) {
-      try {
-        await col.doc(docId).set(payload);
-        this.logger.log(`Created invitation ${docId} with token for ${tenantEmail}`);
-      } catch (err: any) {
-        this.logger.warn(`createInvitation error: ${err?.message || err}`);
-      }
-    }
-    return { success: true, id: docId, token, invitation: payload };
+    await col.doc(docId).set(payload);
+    this.logger.log(`Created invitation ${docId} with token for ${tenantEmail}`);
+    return { success: true, id: docId, token: rawToken, invitation: payload };
   }
 
   /**
@@ -114,7 +133,7 @@ export class TenantInvitationsController {
 
     try {
       const snap = await col.where('token', '==', token).limit(1).get();
-      if (snap.empty) {
+      if (!snap || snap.empty) {
         return { valid: false, reason: 'NOT_FOUND', message: 'This invitation link is invalid or does not exist.' };
       }
 
@@ -180,7 +199,7 @@ export class TenantInvitationsController {
     }
 
     const snap = await col.where('token', '==', token).limit(1).get();
-    if (snap.empty) {
+    if (!snap || snap.empty) {
       throw new NotFoundException('Invitation not found or invalid');
     }
 

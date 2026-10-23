@@ -30,6 +30,9 @@ import { bookViewingRequestService } from '../../services/bookViewingRequestServ
 import landlordUserService from '../../services/landlordUserService';
 import { useAuth } from '../../contexts/AuthContext';
 
+import { ViewingStepWarningModal } from './components/ViewingStepWarningModal';
+import { ViewingSuccessModal } from './components/ViewingSuccessModal';
+
 import { Home, Event, DoneAll, Close, Warning } from '@mui/icons-material';
 import CheckIcon from '@mui/icons-material/Check';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
@@ -195,7 +198,7 @@ interface PropertyDetails {
   };
 }
 
-interface BookViewingModalProps {
+export interface BookViewingModalProps {
   open: boolean;
   onClose: () => void;
   onSubmissionComplete?: () => void;
@@ -594,78 +597,6 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     return messages;
   };
 
-  const WarningPopup = ({ messages, open, onClose }: { messages: string[]; open: boolean; onClose: () => void }) => {
-    return (
-      <Dialog
-        open={open}
-        onClose={onClose}
-        maxWidth="sm"
-        fullWidth
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: 2,
-            [theme.breakpoints.down('sm')]: {
-              margin: 2,
-              maxWidth: 'calc(100% - 32px)',
-            }
-          }
-        }}
-      >
-        <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Box sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: { xs: 1, sm: 1.5 },
-            color: '#DC5F12',
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
-              <Warning sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }} />
-              <Typography
-                variant="h6"
-                fontWeight="bold"
-                sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
-              >
-                Missing Information
-              </Typography>
-            </Box>
-            <Typography sx={{ fontSize: { xs: '0.9rem', sm: '1rem' }, mb: 1 }}>
-              Please complete the following information before continuing:
-            </Typography>
-            <ul style={{
-              marginLeft: 0,
-              paddingLeft: isMobile ? '16px' : '20px',
-              marginBottom: 0
-            }}>
-              {messages.map((message, index) => (
-                <li key={index} style={{ marginBottom: '4px' }}>
-                  <Typography sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-                    {message}
-                  </Typography>
-                </li>
-              ))}
-            </ul>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: { xs: 2, sm: 3 }, pt: 0 }}>
-          <Button
-            onClick={onClose}
-            variant="contained"
-            sx={{
-              bgcolor: BLUE_COLOR,
-              '&:hover': {
-                bgcolor: BLUE_COLOR,
-                opacity: 0.9
-              },
-              fontSize: { xs: '0.9rem', sm: '1rem' }
-            }}
-          >
-            Got it
-          </Button>
-        </DialogActions>
-      </Dialog>
-    );
-  };
-
   const renderStepContent = () => {
     return (
       <ScrollableContent>
@@ -848,43 +779,12 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         </DialogContent>
       </StyledDialog>
 
-      <Dialog
+      <ViewingSuccessModal
         open={showSuccess}
         onClose={handleSuccessClose}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">Viewing Request Submitted</Typography>
-            <IconButton onClick={handleSuccessClose} size="small">
-              <Close />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ mt: 2 }}>
-            Your viewing request has been submitted successfully. The estate agent will contact you shortly to confirm the viewing.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={handleSuccessClose}
-            variant="contained"
-            sx={{
-              bgcolor: BLUE_COLOR,
-              '&:hover': {
-                bgcolor: BLUE_COLOR,
-                opacity: 0.9
-              }
-            }}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+      />
 
-      <WarningPopup
+      <ViewingStepWarningModal
         messages={showStepWarning && activeStep < 2 ? getStepWarningMessage(activeStep) : []}
         open={showStepWarning}
         onClose={handleCloseWarning}

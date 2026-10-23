@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, MinLength } from 'class-validator';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import { AdminGuard } from '../guards/admin.guard';
 import { AdminDashboardService } from '../services/admin-dashboard.service';
+import { BackupService } from '../services/backup.service';
+import { GdprPurgeService } from '../services/gdpr-purge.service';
 
 export class AddAdminNoteDto {
   @ApiProperty({ description: 'Note content' })
@@ -22,7 +24,11 @@ export class AddAdminNoteDto {
 @Controller('admin')
 @UseGuards(FirebaseAuthGuard, AdminGuard)
 export class AdminDashboardController {
-  constructor(private readonly adminDashboard: AdminDashboardService) {}
+  constructor(
+    private readonly adminDashboard: AdminDashboardService,
+    private readonly backupService: BackupService,
+    private readonly gdprPurgeService: GdprPurgeService,
+  ) {}
 
   @Get('me')
   @ApiOperation({ summary: 'Verify admin session status and role' })
@@ -79,5 +85,29 @@ export class AdminDashboardController {
   @ApiResponse({ status: 200, description: 'Partner metrics' })
   partners(@Req() req: any) {
     return this.adminDashboard.partners(req.user?.email || 'unknown');
+  }
+
+  // ── Phase 5: Disaster Recovery & Backup ───────────────────────────────────
+  @Post('backup/export')
+  @ApiOperation({ summary: 'Create full disaster recovery snapshot of core collections' })
+  @ApiResponse({ status: 201, description: 'Backup export manifest' })
+  createBackup(@Req() req: any) {
+    return this.backupService.createBackup(req.user?.email || 'admin');
+  }
+
+  @Get('backup/list')
+  @ApiOperation({ summary: 'List all available disaster recovery backups' })
+  @ApiResponse({ status: 200, description: 'List of backup manifests' })
+  listBackups() {
+    return this.backupService.listBackups();
+  }
+
+  // ── Phase 5: GDPR Right-to-be-Forgotten Compliance ─────────────────────────
+  @Delete('users/:id/gdpr-purge')
+  @ApiOperation({ summary: 'Cascading purge of all user records, documents, and storage objects' })
+  @ApiParam({ name: 'id', description: 'User ID to permanently delete' })
+  @ApiResponse({ status: 200, description: 'GDPR purge result and audit log ID' })
+  purgeUser(@Req() req: any, @Param('id') id: string) {
+    return this.gdprPurgeService.purgeUserData(id, req.user?.email || 'admin');
   }
 }
