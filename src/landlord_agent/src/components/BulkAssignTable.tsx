@@ -175,7 +175,6 @@ export function BulkAssignTable({ tenants, properties, onBack, onComplete }: Bul
         updated[i] = { ...a, _status: 'error', _resultMessage: err?.message || 'Assignment failed' };
       }
       setAssignments([...updated]);
-      if (i < updated.length - 1) await new Promise(r => setTimeout(r, 50));
     }
 
     setIsSubmitting(false);

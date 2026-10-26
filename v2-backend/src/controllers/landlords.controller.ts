@@ -18,9 +18,14 @@ export class LandlordsController {
   @ApiOperation({ summary: 'List registered landlords for agency or caller' })
   @ApiResponse({ status: 200, description: 'Array of landlords' })
   async getAllLandlords(@Req() req?: any) {
-    const isAgency = req?.user?.role === 'agent';
-    const agencyId = isAgency ? req?.user?.uid : undefined;
-    return this.landlordsService.getAllLandlords(agencyId);
+    const role = req?.user?.role;
+    if (role === 'agent') {
+      return this.landlordsService.getAllLandlords(req.user.uid);
+    }
+    if (role === 'landlord') {
+      return this.landlordsService.getAllLandlords(undefined, req.user.uid);
+    }
+    return this.landlordsService.getAllLandlords();
   }
 
   /** GET /api/landlords/check?email=... — check if email is a landlord/agent */
@@ -54,9 +59,14 @@ export class LandlordsController {
   @ApiOperation({ summary: 'List client landlords (scoped to agency)' })
   @ApiResponse({ status: 200, description: 'Array of client landlords' })
   async getClientLandlords(@Req() req?: any) {
-    const isAgency = req?.user?.role === 'agent';
-    const agencyId = isAgency ? req?.user?.uid : undefined;
-    return this.landlordsService.getAllLandlords(agencyId);
+    const role = req?.user?.role;
+    if (role === 'agent') {
+      return this.landlordsService.getAllLandlords(req.user.uid);
+    }
+    if (role === 'landlord') {
+      return this.landlordsService.getAllLandlords(undefined, req.user.uid);
+    }
+    return this.landlordsService.getAllLandlords();
   }
 
   /** POST /api/clients/landlords — create client landlord record */
@@ -81,7 +91,13 @@ export class LandlordsController {
   @ApiOperation({ summary: 'Get a single landlord record by ID' })
   @ApiResponse({ status: 200, description: 'Landlord record' })
   @ApiResponse({ status: 404, description: 'Not found' })
-  async getClientLandlordById(@Param('id') id: string) {
+  async getClientLandlordById(@Param('id') id: string, @Req() req?: any) {
+    const callerId = req?.user?.uid;
+    const role = req?.user?.role;
+    const isAdmin = role === 'admin' || req?.user?.admin === true;
+    if (callerId && role === 'landlord' && callerId !== id && !isAdmin) {
+      throw new ForbiddenException('Access denied to landlord record');
+    }
     return this.landlordsService.getLandlordById(id);
   }
 

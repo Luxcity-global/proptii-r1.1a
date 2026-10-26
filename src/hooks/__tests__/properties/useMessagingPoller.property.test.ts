@@ -33,6 +33,13 @@ vi.mock('../../../services/communicationService', () => ({
     },
 }));
 
+vi.mock('../../../contexts/AuthContext', () => ({
+    useAuth: () => ({
+        user: { id: 'test-user', roles: ['tenant'] },
+        isAuthenticated: true,
+    }),
+}));
+
 import communicationService from '../../../services/communicationService';
 
 const mockGetConversations = communicationService.getConversations as ReturnType<typeof vi.fn>;
@@ -90,9 +97,12 @@ describe('Property 15: Poller calls APIs at 30-second intervals when tab is visi
                     // Flush the initial fetch
                     await vi.runAllTicks();
 
-                    // Advance fake timers by ticks * 30_000 ms
-                    vi.advanceTimersByTime(ticks * 30_000);
-                    await vi.runAllTicks();
+                    // Advance fake timers by each backoff interval sequentially
+                    let currentDelay = 30_000;
+                    for (let i = 0; i < ticks; i++) {
+                        await vi.advanceTimersByTimeAsync(currentDelay);
+                        currentDelay = Math.min(currentDelay * 1.5, 60_000);
+                    }
 
                     const expectedCalls = ticks + 1; // ticks interval calls + 1 initial call
 

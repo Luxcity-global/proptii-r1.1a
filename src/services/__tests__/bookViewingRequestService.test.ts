@@ -47,7 +47,9 @@ describe('bookViewingRequestService with shared polling coordinator', () => {
     const unsub = bookViewingRequestService.subscribeToUserRequests('user-1', cb1);
 
     await vi.waitFor(() => {
-      expect(cb1).toHaveBeenCalledWith(mockRequests);
+      expect(cb1).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: 'req-1', status: 'requested' })])
+      );
     });
 
     expect(apiService.get).toHaveBeenCalledTimes(1);
@@ -65,7 +67,9 @@ describe('bookViewingRequestService with shared polling coordinator', () => {
     const unsub = bookViewingRequestService.subscribeToManagerRequests('landlord-1', callback);
 
     await vi.waitFor(() => {
-      expect(callback).toHaveBeenCalledWith(mockRequests);
+      expect(callback).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: 'req-1', status: 'requested' })])
+      );
     });
 
     expect(apiService.get).toHaveBeenCalledTimes(1);

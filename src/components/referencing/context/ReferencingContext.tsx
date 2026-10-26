@@ -2,7 +2,7 @@ import React, { createContext, useReducer, useContext, ReactNode, useEffect, use
 import { FormData, FormSection, ReferencingState as FormReferencingState, ReferencingAction as FormReferencingAction, ReferencingFormData } from '../../../types/referencing';
 import { saveToLocalStorage, loadFromLocalStorage, saveDraft } from '../../../utils/localStorage';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import * as referencingService from '../../../services/referencingService';
+import referencingService from '../../../services/referencingService';
 import { uploadToFirebaseStorage } from '../../../services/storageService';
 import * as yup from 'yup';
 

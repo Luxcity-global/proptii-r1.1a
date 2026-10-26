@@ -28,6 +28,17 @@ vi.mock('../../../../contexts/AuthContext', () => ({
     }),
 }));
 
+vi.mock('../../../../contexts/SavedPropertiesContext', () => ({
+    useSavedProperties: () => ({
+        isPropertySaved: () => false,
+        toggleSaveProperty: vi.fn(),
+        saveProperty: vi.fn(),
+        unsaveProperty: vi.fn(),
+        savedProperties: [],
+        isLoading: false,
+    }),
+}));
+
 // Mock MessagingContext
 vi.mock('../../../../contexts/MessagingContext', () => ({
     useMessagingContext: () => ({

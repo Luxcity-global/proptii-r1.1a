@@ -16,10 +16,20 @@ export class LandlordsService {
     return db ? db.collection('users') : null;
   }
 
-  async getAllLandlords(agencyId?: string) {
+  async getAllLandlords(agencyId?: string, landlordId?: string) {
     const col = this.usersCol;
     if (!col) return { users: [] };
     try {
+      if (landlordId) {
+        const doc = await col.doc(landlordId).get();
+        if (doc.exists) {
+          return { users: [serializeUserDates({ id: doc.id, ...doc.data() })] };
+        }
+        const snap = await col.where('userId', '==', landlordId).get();
+        const users = snap.docs.map((d) => serializeUserDates({ id: d.id, ...d.data() }));
+        return { users };
+      }
+
       let query: admin.firestore.Query = col.where('role', 'in', ['landlord', 'agent']);
       if (agencyId) {
         query = col.where('agencyId', '==', agencyId);

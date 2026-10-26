@@ -79,9 +79,12 @@ export interface MessageAttachment {
     messageId: string;
     uploaderId: string;
     fileName: string;
+    filename?: string;
     mimeType: string;
     sizeBytes: number;
     blobPath: string;
+    blobUrl?: string;
+    downloadUrl?: string;
     /** ISO 8601 */
     uploadedAt: string;
 }

@@ -137,7 +137,6 @@ class TenantService {
           results.push({ index: i, success: false, error: err?.message || 'Unknown error' });
           failed++;
         }
-        if (i < tenants.length - 1) await new Promise(r => setTimeout(r, 50));
       }
       return { total: tenants.length, succeeded, failed, results };
     }

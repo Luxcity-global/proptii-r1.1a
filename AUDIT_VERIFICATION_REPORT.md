@@ -99,7 +99,7 @@ A comprehensive, live code cross-check, fix implementation, and runtime verifica
 
 * **Backend Test Suite (`v2-backend`)**:
   * Command: `npm run test`
-  * Result: **37 / 37 test files passed (336 / 336 individual tests passed, 0 failures)**
+  * Result: **37 / 37 test files passed (342 / 342 individual tests passed, 0 failures)**
 * **Search Worker Test Suite (`proptii-search`)**:
   * Command: `npm test`
   * Result: **5 / 5 test suites passed (43 / 43 tests passed, 0 failures)**
@@ -112,9 +112,9 @@ A comprehensive, live code cross-check, fix implementation, and runtime verifica
 
 ---
 
-## 5. Codebase Engineering & Clean Architecture Overhaul (Phases 1–5)
+## 5. Codebase Engineering & Clean Architecture Overhaul (Phases 1–6)
 
-Following the audit verification, a 5-phase engineering cleanup was executed across the repository:
+Following the audit verification, engineering cleanups and forensic remediations were executed across the repository:
 
 ### Phase 1: Safe Dead-Code & Artifact Purge
 * **Deleted Root Artifacts & Mistyped Commands**: Removed typo command file `how --name-only HEAD`, transient `.txt` test files (`photos.txt`, `photos_block.txt`, `test_output.txt`, `Tenancy_Agreement Signed_demo.txt`, `Copy of Proptii Dynamic Landing Page...`), and one-off helper scripts (`patch_property_details.sh`, `replace_lease.sh`, `find_emojis.cjs`).
@@ -130,7 +130,7 @@ Following the audit verification, a 5-phase engineering cleanup was executed acr
 ### Phase 3: Backend Clean Architecture & Type Safety
 * **Extracted Message DTOs**: Created [`v2-backend/src/dto/message.dto.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/dto/message.dto.ts) (`SendMessageDto`, `EditMessageDto`) with `class-validator` decorators. Integrated into `CommunicationController` and `CommunicationService`.
 * **Extracted Viewing DTOs**: Created [`v2-backend/src/dto/viewing.dto.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/dto/viewing.dto.ts) (`CreateViewingDto`, `UpdateViewingStatusDto`) supporting both validated properties and normalized legacy payload payloads. Integrated into `ViewingRequestController` and `ViewingRequestService`.
-* **Result**: Type-safe request boundaries with zero regressions across all 37 backend test suites (336 tests passed).
+* **Result**: Type-safe request boundaries with zero regressions across all 37 backend test suites.
 
 ### Phase 4: Frontend God-Component Deconstruction & Modularization
 * **Domain Layer Separation**: Extracted all core landlord/agent entities (`Property`, `Tenant`, `MarketInsight`, `CompanyProfile`, `UserProfile`, `PropertyPhoto`, `PropertyDocument`, `VacancyRiskAlert`, `ArrearsAlert`, `TenantMessage`, `AIMarketingAssets`, `PropertySetupData`, `Screen`) out of the 4,000-line [`src/landlord_agent/src/App.tsx`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/src/landlord_agent/src/App.tsx) into a dedicated types index [`src/landlord_agent/src/types/index.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/src/landlord_agent/src/types/index.ts).
@@ -138,7 +138,15 @@ Following the audit verification, a 5-phase engineering cleanup was executed acr
 
 ### Phase 5: Verification & Zero-Regression Gate Summary
 * **Root Frontend Build**: `npm run build:only` &rarr; **Passed in 1m 53s**
-* **v2-backend Suite**: `npm test` (`nest build && vitest run`) &rarr; **37 / 37 suites passed (336 / 336 tests)**
+* **v2-backend Suite**: `npm test` (`nest build && vitest run`) &rarr; **37 / 37 suites passed (342 / 342 tests)**
 * **proptii-search Suite**: `npm test` (`jest`) &rarr; **5 / 5 suites passed (43 / 43 tests)**
 * **XSS Sanitization Tests**: `npx vitest run src/components/__tests__/SearchResultsModal.test.tsx` &rarr; **1 / 1 suite passed (2 / 2 tests)**
+
+### Phase 6: Forensic Audit Remediations & Performance Optimization
+* **Landlord Directory Scoping & BOLA Enforcement**: In [`landlords.controller.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/controllers/landlords.controller.ts) and [`landlords.service.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/services/landlords.service.ts), `GET /api/landlords` and `GET /api/clients/landlords` now strictly scope queries by role (`role === 'agent'` queries agency ID; `role === 'landlord'` queries own record only, completely eliminating global directory exposure). `GET /api/clients/landlords/:id` enforces BOLA ownership checks.
+* **Referencing File Upload Guest Spoofing Protection**: In [`referencing.controller.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/controllers/referencing.controller.ts), authenticated uploads strictly enforce verified caller UID, ignoring forged `body.userId`. Guest guarantor/referee uploads are scoped to verified invitation tokens (`token_<hash>`), and anonymous sessions are sandboxed to unforgeable `guest_<uuid>` identifiers.
+* **Eliminated Artificial 50ms Sleep Loops**: Removed `await new Promise(r => setTimeout(r, 50))` across all 5 bulk import components and services ([`BulkAssignTable.tsx`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/src/landlord_agent/src/components/BulkAssignTable.tsx), [`BulkTenantImport.tsx`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/src/landlord_agent/src/components/BulkTenantImport.tsx), [`BulkPropertyImport.tsx`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/src/landlord_agent/src/components/BulkPropertyImport.tsx), [`propertyService.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/src/landlord_agent/src/services/propertyService.ts), [`tenantService.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/src/landlord_agent/src/services/tenantService.ts)), accelerating bulk imports.
+* **Structured Error Handling in Contract Service**: Updated [`contract.service.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/services/contract.service.ts) to log structured errors and rethrow exceptions in `getContracts`, `getTemplates`, `saveTemplate`, `getLandlordContracts`, and `getExpiringContracts` rather than silently swallowing database failures.
+* **Automated Regression Verification**: Added 3 new unit tests to [`landlords-clients.spec.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/controllers/landlords-clients.spec.ts) and 3 new unit tests to [`referencing-guarantor.spec.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/controllers/referencing-guarantor.spec.ts). All 342 backend tests and 43 search tests pass with 0 errors.
+
 

@@ -16,6 +16,7 @@ describe('Section 11 & 12: Referencing, Passport Sharing & Guarantor Endpoints',
         shareReferencingPassport: vi.fn(),
         getPublicPassportByToken: vi.fn(),
         sendReferencingRequest: vi.fn(),
+        saveUserFile: vi.fn(),
       };
       guarantorService = {};
       controller = new ReferencingController(refService, guarantorService as any);
@@ -98,6 +99,38 @@ describe('Section 11 & 12: Referencing, Passport Sharing & Guarantor Endpoints',
       const landlordReq = { user: { uid: 'landlord-99', role: 'landlord' } };
       const resLandlord = await controller.getReferencingForm(landlordReq, 'tenant-1');
       expect(resLandlord.success).toBe(true);
+    });
+
+    it('[POST /referencing/files/save] enforces verified caller UID and ignores forged body.userId', async () => {
+      refService.saveUserFile.mockResolvedValue({ success: true, fileUrl: 'https://storage/doc.pdf' });
+      const authReq = { user: { uid: 'real-tenant-uid' } };
+      const fakeBody = { userId: 'victim-landlord-uid' };
+      const mockFile = { originalname: 'doc.pdf', buffer: Buffer.from('data') } as any;
+
+      await controller.saveUserFile(authReq, mockFile, fakeBody);
+      expect(refService.saveUserFile).toHaveBeenCalledWith('real-tenant-uid', mockFile, fakeBody);
+      expect(refService.saveUserFile).not.toHaveBeenCalledWith('victim-landlord-uid', mockFile, fakeBody);
+    });
+
+    it('[POST /referencing/files/save] scopes guest guarantor/referee upload to invitation token', async () => {
+      refService.saveUserFile.mockResolvedValue({ success: true, fileUrl: 'https://storage/proof.pdf' });
+      const guestReq = { user: null };
+      const tokenBody = { invitationToken: 'invite-tok-789', userId: 'attacker-trying-override' };
+      const mockFile = { originalname: 'proof.pdf', buffer: Buffer.from('data') } as any;
+
+      await controller.saveUserFile(guestReq, mockFile, tokenBody);
+      expect(refService.saveUserFile).toHaveBeenCalledWith('token_invite-tok-789', mockFile, tokenBody);
+    });
+
+    it('[POST /referencing/files/save] sandboxes anonymous upload to isolated guest ID preventing ID spoofing', async () => {
+      refService.saveUserFile.mockResolvedValue({ success: true, fileUrl: 'https://storage/temp.pdf' });
+      const guestReq = { user: null };
+      const spoofBody = { userId: 'admin-account-id' };
+      const mockFile = { originalname: 'temp.pdf', buffer: Buffer.from('data') } as any;
+
+      await controller.saveUserFile(guestReq, mockFile, spoofBody);
+      expect(refService.saveUserFile).toHaveBeenCalledWith(expect.stringMatching(/^guest_/), mockFile, spoofBody);
+      expect(refService.saveUserFile).not.toHaveBeenCalledWith('admin-account-id', mockFile, spoofBody);
     });
   });
 

@@ -2,6 +2,7 @@ import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus, Req, Head
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BillingService } from '../services/billing.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { PendingPlanDto, UpgradeSubscriptionDto } from '../dto/billing.dto';
 
 @ApiTags('Billing')
 @Controller('billing')
@@ -69,7 +70,7 @@ export class BillingController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Record plan selected during onboarding before checkout' })
   @ApiResponse({ status: 200, description: 'Pending plan set' })
-  async setPendingPlan(@Req() req: any, @Body() dto: any) {
+  async setPendingPlan(@Req() req: any, @Body() dto: PendingPlanDto) {
     const userId = req.user.uid;
     const email = req.user.email || '';
     return await this.billingService.setPendingPlan(userId, email, dto.planId, dto.cycle);
@@ -109,12 +110,12 @@ export class BillingController {
   @ApiBearerAuth('bearer')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Upgrade/change subscription plan without new checkout' })
-  async upgradeSubscription(@Req() req: any, @Body() dto: any) {
+  async upgradeSubscription(@Req() req: any, @Body() dto: UpgradeSubscriptionDto) {
     return await this.billingService.upgradeSubscription(
       req.user.uid,
       req.user.email || '',
       dto.planId,
-      dto.cycle,
+      dto.cycle || 'monthly',
     );
   }
 

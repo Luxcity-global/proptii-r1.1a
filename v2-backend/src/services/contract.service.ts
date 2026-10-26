@@ -220,8 +220,8 @@ export class ContractService {
       visible.sort((a, b) => (b.sentDate?.getTime?.() || 0) - (a.sentDate?.getTime?.() || 0));
       return { success: true, data: visible };
     } catch (error: any) {
-      this.logger.warn(`Error getting contracts: ${error?.message || error}`);
-      return { success: true, data: [] };
+      this.logger.error(`Error getting contracts: ${error?.message || error}`, error?.stack);
+      throw error;
     }
   }
 
@@ -253,8 +253,8 @@ export class ContractService {
       await withTimeout(col.doc(templateId).set(payload));
       return { success: true, templateId };
     } catch (error: any) {
-      this.logger.warn(`Error saving template: ${error?.message || error}`);
-      return { success: true, templateId };
+      this.logger.error(`Error saving template: ${error?.message || error}`, error?.stack);
+      throw error;
     }
   }
 
@@ -271,8 +271,8 @@ export class ContractService {
       const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       return { success: true, templates };
     } catch (error: any) {
-      this.logger.warn(`Error getting templates: ${error?.message || error}`);
-      return { success: true, templates: [] };
+      this.logger.error(`Error getting templates: ${error?.message || error}`, error?.stack);
+      throw error;
     }
   }
 
@@ -450,8 +450,8 @@ export class ContractService {
       contracts.sort((a, b) => (b.sentDate?.getTime?.() || 0) - (a.sentDate?.getTime?.() || 0));
       return { success: true, contracts };
     } catch (err: any) {
-      this.logger.warn(`getLandlordContracts error: ${err?.message || err}`);
-      return { success: true, contracts: [] };
+      this.logger.error(`getLandlordContracts error: ${err?.message || err}`, err?.stack);
+      throw err;
     }
   }
 
@@ -690,8 +690,8 @@ export class ContractService {
 
       return { success: true, contracts };
     } catch (err: any) {
-      this.logger.warn(`getExpiringContracts error: ${err?.message || err}`);
-      return { success: true, contracts: [] };
+      this.logger.error(`getExpiringContracts error: ${err?.message || err}`, err?.stack);
+      throw err;
     }
   }
 

@@ -196,7 +196,15 @@ class ReferencingService {
     }
   }
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
+  async getDrafts(applicationId: string) {
+    try {
+      const response = await apiService.get(referencingPath('forms/all'));
+      return response.data ?? { success: true, data: [] };
+    } catch (error) {
+      console.error('Error fetching drafts:', error);
+      return { success: false, data: [] };
+    }
+  }
 
   /** Allow longer timeout — backend runs file uploads + Firestore writes on submit. */
   private static readonly SUBMIT_TIMEOUT_MS = 120_000;
@@ -216,4 +224,22 @@ class ReferencingService {
   }
 }
 
-export default new ReferencingService();
+const serviceInstance = new ReferencingService();
+
+export const saveIdentityData = serviceInstance.saveIdentityData.bind(serviceInstance);
+export const saveEmploymentData = serviceInstance.saveEmploymentData.bind(serviceInstance);
+export const saveResidentialData = serviceInstance.saveResidentialData.bind(serviceInstance);
+export const saveFinancialData = serviceInstance.saveFinancialData.bind(serviceInstance);
+export const saveGuarantorData = serviceInstance.saveGuarantorData.bind(serviceInstance);
+export const saveAgentDetailsData = serviceInstance.saveAgentDetailsData.bind(serviceInstance);
+export const saveSectionData = serviceInstance.saveSectionData.bind(serviceInstance);
+export const getFormData = serviceInstance.getFormData.bind(serviceInstance);
+export const uploadDocument = serviceInstance.uploadDocument.bind(serviceInstance);
+export const saveDraft = serviceInstance.saveDraft.bind(serviceInstance);
+export const getDrafts = serviceInstance.getDrafts.bind(serviceInstance);
+export const sharePassport = serviceInstance.sharePassport.bind(serviceInstance);
+export const getShares = serviceInstance.getShares.bind(serviceInstance);
+export const deleteShare = serviceInstance.deleteShare.bind(serviceInstance);
+export const submitApplication = serviceInstance.submitApplication.bind(serviceInstance);
+
+export default serviceInstance;

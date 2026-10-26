@@ -24,6 +24,13 @@ vi.mock('../../services/communicationService', () => ({
     },
 }));
 
+vi.mock('../../contexts/AuthContext', () => ({
+    useAuth: () => ({
+        user: { id: 'test-user', roles: ['tenant'] },
+        isAuthenticated: true,
+    }),
+}));
+
 import communicationService from '../../services/communicationService';
 
 const mockGetConversations = communicationService.getConversations as ReturnType<typeof vi.fn>;
@@ -82,13 +89,11 @@ describe('useMessagingPoller', () => {
         await vi.runAllTicks(); // initial fetch
 
         // Advance 30 seconds — one tick
-        vi.advanceTimersByTime(30_000);
-        await vi.runAllTicks();
+        await vi.advanceTimersByTimeAsync(30_000);
         expect(mockGetConversations).toHaveBeenCalledTimes(2);
 
-        // Advance another 30 seconds — second tick
-        vi.advanceTimersByTime(30_000);
-        await vi.runAllTicks();
+        // Advance by backoff duration (30s * 1.5 = 45s) — second tick
+        await vi.advanceTimersByTimeAsync(45_000);
         expect(mockGetConversations).toHaveBeenCalledTimes(3);
     });
 

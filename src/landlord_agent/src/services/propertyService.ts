@@ -297,7 +297,6 @@ class PropertyService {
                 results.push({ index: i, success: false, error: err?.message || 'Unknown error' });
                 failed++;
             }
-            if (i < propertiesData.length - 1) await new Promise(r => setTimeout(r, 50));
         }
         return { total: propertiesData.length, succeeded, failed, results };
     }

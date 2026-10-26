@@ -1,4 +1,14 @@
-import { Injectable, Logger, Optional, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Optional,
+  HttpException,
+  InternalServerErrorException,
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
@@ -241,8 +251,8 @@ export class ReferencingService {
       await col.doc(formId).set(payload, { merge: true });
       return { success: true };
     } catch (err: any) {
-      this.logger.warn(`saveFormData failed for ${formId}: ${err?.message || err}`);
-      return { success: false, error: err?.message };
+      this.logger.error(`saveFormData failed for ${formId}: ${err?.message || err}`);
+      throw new InternalServerErrorException(`Failed to save referencing draft: ${err?.message || err}`);
     }
   }
 
@@ -633,14 +643,14 @@ export class ReferencingService {
    */
   async refreshFileDownloadUrl(userId: string, fileId: string) {
     const col = this.filesCollection;
-    if (!col) return { success: false, error: 'Service unavailable' };
+    if (!col) throw new ServiceUnavailableException('Database service is unavailable');
 
     try {
       const doc = await col.doc(fileId).get();
-      if (!doc.exists) return { success: false, error: 'File not found' };
+      if (!doc.exists) throw new NotFoundException('File not found');
 
       const data = doc.data() as any;
-      if (!data?.storagePath) return { success: false, error: 'No storage path on record' };
+      if (!data?.storagePath) throw new NotFoundException('No storage path on record');
 
       const { getSignedDownloadUrl } = await import('../utils/firebase-storage');
       const url = await getSignedDownloadUrl(data.storagePath);
@@ -650,8 +660,9 @@ export class ReferencingService {
 
       return { success: true, url, fileName: data.fileName, contentType: data.contentType };
     } catch (err: any) {
-      this.logger.warn(`refreshFileDownloadUrl failed for ${fileId}: ${err?.message || err}`);
-      return { success: false, error: err?.message || 'Failed to generate URL' };
+      if (err instanceof NotFoundException || err instanceof ServiceUnavailableException) throw err;
+      this.logger.error(`refreshFileDownloadUrl failed for ${fileId}: ${err?.message || err}`);
+      throw new InternalServerErrorException(`Failed to generate signed download URL: ${err?.message || err}`);
     }
   }
 
@@ -725,13 +736,13 @@ export class ReferencingService {
     };
 
     if (!col) {
-      return { success: false, error: 'Could not save this referencing link. Please try again.' };
+      throw new ServiceUnavailableException('Could not save this referencing link. Database unavailable.');
     }
     try {
       await col.doc(shareId).set(payload);
     } catch (err: any) {
       this.logger.warn(`shareReferencingPassport Firestore write failed: ${err?.message || err}`);
-      return { success: false, error: 'Could not save this referencing link. Please try again.' };
+      throw new InternalServerErrorException('Could not save this referencing link. Please try again.');
     }
 
     this.emailService.sendReferencingShareNotification({
@@ -930,19 +941,19 @@ export class ReferencingService {
   async claimShare(claimToken: string, landlordId: string, landlordEmail: string) {
     const col = this.sharesCollection;
     const db  = this.db;
-    if (!col || !db) return { success: false, error: 'Service unavailable' };
+    if (!col || !db) throw new ServiceUnavailableException('Service unavailable');
 
     try {
       const snap = await col.where('claimToken', '==', claimToken).limit(1).get();
-      if (snap.empty) return { success: false, error: 'Invalid claim token' };
+      if (snap.empty) throw new NotFoundException('Invalid claim token');
 
       const shareDoc  = snap.docs[0];
       const shareData = shareDoc.data() as any;
 
       if (shareData.expiresAt && new Date(shareData.expiresAt) < new Date()) {
-        return { success: false, error: 'This invitation has expired' };
+        throw new BadRequestException('This invitation has expired');
       }
-      if (shareData.claimedBy) return { success: false, error: 'Already claimed' };
+      if (shareData.claimedBy) throw new ConflictException('Already claimed');
 
       await shareDoc.ref.set({
         claimedBy:    landlordId,
@@ -1006,8 +1017,11 @@ export class ReferencingService {
         propertyAddress: shareData.propertyAddress || '',
       };
     } catch (err: any) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
       this.logger.warn(`claimShare error: ${err?.message || err}`);
-      return { success: false, error: err?.message || 'Failed to claim share' };
+      throw new InternalServerErrorException(err?.message || 'Failed to claim share');
     }
   }
 

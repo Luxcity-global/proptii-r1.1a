@@ -39,6 +39,7 @@ export interface User {
   phone?: string;
   photoURL?: string;
   roles: string[];
+  role?: string;
   roleResolved: boolean;
 }
 
@@ -132,6 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               email: mockUser.email,
               phone: mockUser.phone,
               roles: [mockUser.role],
+              role: mockUser.role,
               roleResolved: true,
             });
             setIsAuthenticated(true);
@@ -203,7 +205,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const { resolveRole } = await import('../services/roleService');
           const role = await resolveRole(userId, email);
           if (role && !cancelled) {
-            setUser((prev) => (prev ? { ...prev, roles: [role], roleResolved: true } : prev));
+            setUser((prev) => (prev ? { ...prev, roles: [role], role: role, roleResolved: true } : prev));
           } else if (!cancelled) {
             setUser((prev) => (prev ? { ...prev, roleResolved: true } : prev));
           }
@@ -323,6 +325,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       email: mockUser.email,
       phone: mockUser.phone,
       roles: [resolvedRole],
+      role: resolvedRole,
       roleResolved: true,
     });
     setIsAuthenticated(true);

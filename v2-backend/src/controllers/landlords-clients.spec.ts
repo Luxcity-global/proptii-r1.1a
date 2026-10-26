@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LandlordsController } from './landlords.controller';
 import { LandlordsService } from '../services/landlords.service';
+import { ForbiddenException } from '@nestjs/common';
 
 describe('Section 7: Landlords & Clients Landlords Endpoints', () => {
   let controller: LandlordsController;
@@ -71,6 +72,30 @@ describe('Section 7: Landlords & Clients Landlords Endpoints', () => {
     const res = await controller.getAllLandlords(agentReq);
     expect(service.getAllLandlords).toHaveBeenCalledWith('agency-99');
     expect(res).toHaveLength(1);
+  });
+
+  it('[GET /landlords] scopes landlord directory to individual landlord UID when role is landlord', async () => {
+    service.getAllLandlords.mockResolvedValue([
+      { id: 'll-self', name: 'Self Landlord' },
+    ]);
+    const landlordReq = { user: { uid: 'll-self', role: 'landlord' } };
+    const res = await controller.getAllLandlords(landlordReq);
+    expect(service.getAllLandlords).toHaveBeenCalledWith(undefined, 'll-self');
+    expect(res).toHaveLength(1);
+  });
+
+  it('[GET /clients/landlords/:id] blocks landlord from reading another landlord profile', async () => {
+    const landlordReq = { user: { uid: 'll-attacker', role: 'landlord' } };
+    await expect(
+      controller.getClientLandlordById('ll-victim', landlordReq),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('[GET /clients/landlords/:id] allows landlord to view their own profile', async () => {
+    service.getLandlordById.mockResolvedValue({ id: 'll-self', name: 'Self Landlord' });
+    const landlordReq = { user: { uid: 'll-self', role: 'landlord' } };
+    const res = await controller.getClientLandlordById('ll-self', landlordReq);
+    expect(res.name).toBe('Self Landlord');
   });
 
   it('[POST /landlords/register] links landlord profile to authenticated caller UID and email', async () => {

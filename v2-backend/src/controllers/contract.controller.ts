@@ -34,6 +34,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { ContractService } from '../services/contract.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { SyncContractDto, UpdateContractStatusDto, MarkContractSignedDto } from '../dto/contract.dto';
 
 export interface MulterUploadedFile {
   fieldname: string;
@@ -301,9 +302,9 @@ export class ContractController {
   @ApiResponse({ status: 200, description: 'Status updated' })
   async updateLandlordContractStatus(
     @Param('id') id: string,
-    @Body() body: { status: string; signedDate?: string },
+    @Body() body: UpdateContractStatusDto,
   ) {
-    return await this.contractService.updateContractStatus(id, body.status, body.signedDate);
+    return await this.contractService.updateContractStatus(id, body.status, body.signedDate, body.signedBy);
   }
 
   @Put('landlord/:id/sign')
@@ -313,7 +314,7 @@ export class ContractController {
   @ApiResponse({ status: 200, description: 'Marked as signed' })
   async markContractSigned(
     @Param('id') id: string,
-    @Body() body: { signedBy: 'tenant' | 'landlord' },
+    @Body() body: MarkContractSignedDto,
   ) {
     return await this.contractService.updateContractStatus(id, 'signed', undefined, body.signedBy);
   }
@@ -332,7 +333,7 @@ export class ContractController {
   @HttpCode(201)
   @ApiOperation({ summary: 'Sync signed contract record to landlord dashboard' })
   @ApiResponse({ status: 201, description: 'Contract synced' })
-  async syncContractToLandlord(@Req() req: any, @Body() body: any) {
+  async syncContractToLandlord(@Req() req: any, @Body() body: SyncContractDto) {
     const result = await this.contractService.syncContractToLandlord(body);
     this.eventsService.emit({
       type: 'contract_synced',
