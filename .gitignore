@@ -61,6 +61,12 @@ Thumbs.db
 proptii-backend/.env
 public/landlord/assets/
 
+# Azurite Emulator
+__azurite*
+__blobstorage__/
+azurite-debug.log
+AzuriteConfig
+
 **/.cache/
 search/backend/.cache/
 search/backend/.cache/ms-playwright/

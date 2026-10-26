@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { CreateViewingDto } from '../dto/viewing.dto';
 
 const VIEWING_STATUSES = new Set([
   'requested',
@@ -141,7 +142,7 @@ export class ViewingRequestService {
     };
   }
 
-  async createViewing(callerId: string, callerEmailRaw: string, data: any) {
+  async createViewing(callerId: string, callerEmailRaw: string, data: CreateViewingDto) {
     const col = this.collection;
     const callerEmail = this.normalizedEmail(callerEmailRaw);
     const legacyDetails = data?.viewing_date || data?.viewing_time || data?.preference

@@ -1,7 +1,6 @@
 packages:
   - '.'
   - 'v2-backend'
-  - 'proptii-backend'
   - 'proptii-search'
 
 allowBuilds:

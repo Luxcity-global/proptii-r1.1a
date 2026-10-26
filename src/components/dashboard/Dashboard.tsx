@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import DashboardSidebar, { getUnreadBadgeLabel } from './ui/DashboardSidebar';
 import DashboardHeader, { TenantPreviewBanner } from './ui/DashboardHeader';
 import { useAuth } from '../../contexts/AuthContext';
@@ -209,12 +210,10 @@ const DashboardInner: React.FC = () => {
   // P1-3: Show a banner if Firebase Auth sync fails (Firestore writes would be blocked)
   useEffect(() => {
     const handleFirebaseSyncFailure = () => {
-      import('sonner').then(({ toast }) => {
-        toast.error(
-          'Session sync issue — some features may not save correctly. Please refresh the page.',
-          { duration: 8000, id: 'firebase-sync-failed' }
-        );
-      });
+      toast.error(
+        'Session sync issue — some features may not save correctly. Please refresh the page.',
+        { duration: 8000, id: 'firebase-sync-failed' }
+      );
     };
     window.addEventListener('firebase-auth-sync-failed', handleFirebaseSyncFailure);
     return () => window.removeEventListener('firebase-auth-sync-failed', handleFirebaseSyncFailure);

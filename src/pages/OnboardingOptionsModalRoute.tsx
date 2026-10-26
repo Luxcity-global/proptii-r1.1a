@@ -4,7 +4,7 @@ import HomeVariant from './HomeVariant';
 import TenantOnboardingOptions from './TenantOnboardingOptions';
 import LandlordOnboardingOptions from './LandlordOnboardingOptions';
 import HomeownerOnboardingOptions from './HomeownerOnboardingOptions';
-import TenantInvitePage from './TenantInvitePage';
+const TenantInvitePage = React.lazy(() => import('./TenantInvitePage'));
 
 interface OnboardingOptionsModalRouteProps {
   type: 'tenant' | 'landlord' | 'homeowner';
@@ -26,7 +26,11 @@ export function OnboardingOptionsModalRoute({ type }: OnboardingOptionsModalRout
 
   // If this is an invited tenant, show the dedicated TenantInvitePage
   if (type === 'tenant' && isInvite) {
-    return <TenantInvitePage />;
+    return (
+      <React.Suspense fallback={null}>
+        <TenantInvitePage />
+      </React.Suspense>
+    );
   }
 
   return (

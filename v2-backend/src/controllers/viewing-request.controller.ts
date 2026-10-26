@@ -5,6 +5,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { ViewingRequestService } from '../services/viewing-request.service';
 import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { CreateViewingDto, UpdateViewingStatusDto } from '../dto/viewing.dto';
 
 @ApiTags('Viewing Requests')
 @ApiBearerAuth('bearer')
@@ -32,7 +33,7 @@ export class ViewingRequestController {
   @Post()
   @ApiOperation({ summary: 'Create a new viewing booking request' })
   @ApiResponse({ status: 201, description: 'Viewing request created' })
-  async createViewing(@Req() req: any, @Body() body: any) {
+  async createViewing(@Req() req: any, @Body() body: CreateViewingDto) {
     const tenantId = req.user.uid;
     const tenantEmail = req.user.email;
     this.logger.log(`[createViewing] uid=${tenantId} email=${tenantEmail} body=${JSON.stringify(body).slice(0, 200)}`);
@@ -119,7 +120,7 @@ export class ViewingRequestController {
   @ApiOperation({ summary: 'Update viewing request status (confirmed, cancelled, rescheduled, completed)' })
   @ApiParam({ name: 'id', description: 'Viewing Request ID' })
   @ApiResponse({ status: 200, description: 'Status updated' })
-  async updateViewingStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: string; notes?: string; agentNotes?: string; viewingDetails?: any }) {
+  async updateViewingStatus(@Req() req: any, @Param('id') id: string, @Body() body: UpdateViewingStatusDto) {
     const userId = req.user.uid;
     this.logger.log(`[updateViewingStatus] uid=${userId} id=${id} status=${body.status}`);
     try {

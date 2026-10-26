@@ -180,14 +180,9 @@ export default defineConfig(({ mode = 'development' }) => {
         interval: 500,
         ignored: [
           '**/node_modules/**',
-          // Explicitly exclude the landlord sub-app's node_modules — the glob above
-          // does not match paths nested inside src/ with chokidar, so without this
-          // entry all ~20k files there are polled on every interval.
-          '**/src/landlord_agent/node_modules/**',
           '**/.git/**',
           '**/dist/**',
           '**/api/**',
-          '**/proptii-backend/**',
           '**/proptii-search/**',
           '**/public/landlord/**',
           '**/coverage/**',

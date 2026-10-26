@@ -6,6 +6,8 @@
  */
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../../../config/firebaseConfig';
 
 const API_BASE = getResolvedApiBaseUrl().replace(/\/api$/, '');
 
@@ -54,8 +56,6 @@ async function ensureOwnerRole(role: 'landlord' | 'agent', userId: string): Prom
         throw new Error(messageFromResponse(assigned.status, errText, 'Could not assign your account role'));
     }
 
-    const { doc, setDoc } = await import('firebase/firestore');
-    const { db } = await import('../../../config/firebaseConfig');
     await setDoc(doc(db, 'users', userId), {
         uid: userId,
         role,

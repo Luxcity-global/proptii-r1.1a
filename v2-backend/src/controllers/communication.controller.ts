@@ -7,6 +7,7 @@ import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import { randomUUID } from 'crypto';
 import { setSseTicket, getSseTicketInfo, deleteSseTicket } from '../utils/sse-tickets';
+import { SendMessageDto, EditMessageDto } from '../dto/message.dto';
 
 
 @ApiTags('Communication')
@@ -156,7 +157,7 @@ export class CommunicationController {
   @ApiOperation({ summary: 'Send message in conversation' })
   @ApiParam({ name: 'id', description: 'Conversation ID' })
   @ApiResponse({ status: 201, description: 'Created message item' })
-  async sendMessage(@Param('id') conversationId: string, @Body() dto: any, @Req() req: any) {
+  async sendMessage(@Param('id') conversationId: string, @Body() dto: SendMessageDto, @Req() req: any) {
     const userId = req.user.uid;
     const result = await this.communicationService.sendMessage(conversationId, dto, userId, req.user);
 
@@ -221,7 +222,7 @@ export class CommunicationController {
   @ApiOperation({ summary: 'Edit message body' })
   @ApiParam({ name: 'id', description: 'Message ID' })
   @ApiResponse({ status: 200, description: 'Message updated' })
-  async editMessage(@Param('id') messageId: string, @Body() dto: { body: string }, @Req() req: any) {
+  async editMessage(@Param('id') messageId: string, @Body() dto: EditMessageDto, @Req() req: any) {
     const userId = req.user.uid;
     const result = await this.communicationService.editMessage(messageId, dto.body, userId);
 

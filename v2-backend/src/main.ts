@@ -356,9 +356,9 @@ async function bootstrap() {
     (require('express') as typeof import('express')).raw({ type: 'application/json' }),
   );
 
-  // Set safe body size limit (5mb max) to prevent memory exhaustion DoS
-  app.use(json({ limit: '5mb' }));
-  app.use(urlencoded({ extended: true, limit: '5mb' }));
+  // Set safe body size limit (1mb max) to prevent memory exhaustion DoS
+  app.use(json({ limit: '1mb' }));
+  app.use(urlencoded({ extended: true, limit: '1mb' }));
 
   const port = process.env.PORT || 3002;
   await app.listen(port);

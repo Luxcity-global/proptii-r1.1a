@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
 import { UserProfileService } from './user-profile.service';
+import { SendMessageDto } from '../dto/message.dto';
 @Injectable()
 export class CommunicationService {
   private readonly logger = new Logger(CommunicationService.name);
@@ -385,7 +386,7 @@ export class CommunicationService {
     }
   }
 
-  async sendMessage(conversationId: string, dto: any, userId: string, user?: any) {
+  async sendMessage(conversationId: string, dto: SendMessageDto, userId: string, user?: any) {
     const col = this.messagesCol;
     const timestamp = new Date().toISOString();
     const id = randomUUID();
