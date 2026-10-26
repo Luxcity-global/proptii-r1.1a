@@ -196,6 +196,30 @@ class ReferencingService {
     }
   }
 
+  async loadDraft(propertyId: string, draftId: string) {
+    try {
+      const response = await apiService.get(referencingPath(`forms/${draftId || propertyId}`));
+      return response.data ?? { success: true, data: null };
+    } catch (error) {
+      console.error('Error loading draft:', error);
+      return { success: false, error: 'Failed to load draft' };
+    }
+  }
+
+  async deleteDraft(propertyId: string, draftId: string) {
+    try {
+      const response = await apiService.delete(referencingPath(`forms/${draftId || propertyId}`));
+      return response.data ?? { success: true };
+    } catch (error) {
+      console.error('Error deleting draft:', error);
+      return { success: false, error: 'Failed to delete draft' };
+    }
+  }
+
+  async getFormData(userId: string) {
+    return this.getApplication(userId);
+  }
+
   async getDrafts(applicationId: string) {
     try {
       const response = await apiService.get(referencingPath('forms/all'));
@@ -226,20 +250,30 @@ class ReferencingService {
 
 const serviceInstance = new ReferencingService();
 
-export const saveIdentityData = serviceInstance.saveIdentityData.bind(serviceInstance);
-export const saveEmploymentData = serviceInstance.saveEmploymentData.bind(serviceInstance);
-export const saveResidentialData = serviceInstance.saveResidentialData.bind(serviceInstance);
-export const saveFinancialData = serviceInstance.saveFinancialData.bind(serviceInstance);
-export const saveGuarantorData = serviceInstance.saveGuarantorData.bind(serviceInstance);
-export const saveAgentDetailsData = serviceInstance.saveAgentDetailsData.bind(serviceInstance);
-export const saveSectionData = serviceInstance.saveSectionData.bind(serviceInstance);
-export const getFormData = serviceInstance.getFormData.bind(serviceInstance);
-export const uploadDocument = serviceInstance.uploadDocument.bind(serviceInstance);
-export const saveDraft = serviceInstance.saveDraft.bind(serviceInstance);
-export const getDrafts = serviceInstance.getDrafts.bind(serviceInstance);
-export const sharePassport = serviceInstance.sharePassport.bind(serviceInstance);
-export const getShares = serviceInstance.getShares.bind(serviceInstance);
-export const deleteShare = serviceInstance.deleteShare.bind(serviceInstance);
-export const submitApplication = serviceInstance.submitApplication.bind(serviceInstance);
+export const saveIdentityData = (data: any) => serviceInstance.saveIdentityData(data);
+export const saveEmploymentData = (data: any) => serviceInstance.saveEmploymentData(data);
+export const saveResidentialData = (data: any) => serviceInstance.saveResidentialData(data);
+export const saveFinancialData = (data: any) => serviceInstance.saveFinancialData(data);
+export const saveGuarantorData = (data: any) => serviceInstance.saveGuarantorData(data);
+export const saveAgentDetailsData = (data: any) => serviceInstance.saveAgentDetailsData(data);
+export const saveSectionData = (userId: string, section: string, data: any) => serviceInstance.saveSectionData(userId, section, data);
+export const getFormData = (userId: string) => serviceInstance.getFormData(userId);
+export const getApplication = (applicationId: string) => serviceInstance.getApplication(applicationId);
+export const createApplication = (propertyId: string) => serviceInstance.createApplication(propertyId);
+export const uploadDocument = (
+  applicationId: string,
+  section: string,
+  file: File,
+  field: string,
+  onProgress?: (progress: number) => void,
+) => serviceInstance.uploadDocument(applicationId, section, file, field, onProgress);
+export const saveDraft = (applicationId: string, name: string, data: any) => serviceInstance.saveDraft(applicationId, name, data);
+export const loadDraft = (propertyId: string, draftId: string) => serviceInstance.loadDraft(propertyId, draftId);
+export const deleteDraft = (propertyId: string, draftId: string) => serviceInstance.deleteDraft(propertyId, draftId);
+export const getDrafts = (applicationId: string) => serviceInstance.getDrafts(applicationId);
+export const sharePassport = (data: any) => serviceInstance.sharePassport(data);
+export const getShares = () => serviceInstance.getShares();
+export const deleteShare = (shareId: string) => serviceInstance.deleteShare(shareId);
+export const submitApplication = (userId: string, data: any) => serviceInstance.submitApplication(userId, data);
 
 export default serviceInstance;
