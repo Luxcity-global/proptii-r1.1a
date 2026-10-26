@@ -4,7 +4,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 
 @ApiTags('Health')
 @SkipThrottle()
-@Controller(['health', 'ping'])
+@Controller(['', 'health', 'ping'])
 export class HealthController {
   @Get()
   @ApiOperation({ summary: 'Health check and ping endpoint' })
