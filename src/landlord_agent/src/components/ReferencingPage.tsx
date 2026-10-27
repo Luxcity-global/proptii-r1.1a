@@ -967,15 +967,8 @@ export function ReferencingPage({
   const inviteEmailRef = useRef<HTMLInputElement>(null);
 
   const loadShares = async () => {
-    const agentPersona = isAgentTestAccount((userProfile as { id?: string } | null)?.id, userProfile?.email);
-    if (agentPersona) {
-      setShares(getAgentDummyReceivedShares());
-      setSharesError(null);
-      setLoadingShares(false);
-    } else {
-      setLoadingShares(true);
-      setSharesError(null);
-    }
+    setLoadingShares(true);
+    setSharesError(null);
     try {
       const token = await getAccessTokenForApiRequest();
       const res = await fetch(`${API}/referencing/received`, {
@@ -990,15 +983,10 @@ export function ReferencingPage({
           steps: derivePassportSteps(share.formData, share.passportStatus || 'in-progress'),
         };
       });
-      const merged = agentPersona ? mergeById(getAgentDummyReceivedShares(), live) : live;
-      setShares(merged.filter((share) => !isTenantDeleted(share.id, share.tenantEmail)));
+      setShares(live.filter((share) => !isTenantDeleted(share.id, share.tenantEmail)));
     } catch {
-      if (agentPersona) {
-        setShares(getAgentDummyReceivedShares().filter((share) => !isTenantDeleted(share.id, share.tenantEmail)));
-        setSharesError(null);
-      } else {
-        setSharesError('Could not load received referencings.');
-      }
+      setShares([]);
+      setSharesError('Could not load received referencings.');
     } finally {
       setLoadingShares(false);
     }

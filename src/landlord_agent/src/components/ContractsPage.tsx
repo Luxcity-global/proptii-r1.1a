@@ -32,8 +32,6 @@ import { MobileAccordionCard } from '../../../components/common/MobileAccordionC
 import { contractService } from '../services/contractService';
 import { fetchContractPdfFile } from '../../../services/contractPdf';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
-import { getLandlordTwoDummyContracts, isLandlordTwoTestAccount } from '../data/landlordTwoDummyContracts';
-import { getAgentDummyContracts, isAgentTestAccount } from '../data/agentTestPersona';
 import { isPropertyArchived } from '../utils/portfolioStats';
 import { Property, UserProfile } from '../App';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
@@ -273,30 +271,11 @@ export function ContractsPage({
       if (userId) { filters.userId = userId; filters.landlordId = userId; }
       if (landlordEmail) { filters.landlordEmail = landlordEmail; }
       const fetchedContracts = await contractService.getContracts(filters);
-      const dummy = isAgentTestAccount(userId, landlordEmail)
-        ? getAgentDummyContracts()
-        : isLandlordTwoTestAccount(userId, landlordEmail)
-          ? getLandlordTwoDummyContracts()
-          : null;
-      if (dummy) {
-        const byId = new Map(dummy.map((contract) => [contract.id, contract]));
-        fetchedContracts.forEach((contract) => byId.set(contract.id, contract));
-        setContracts(Array.from(byId.values()));
-      } else {
-        setContracts(fetchedContracts);
-      }
+      setContracts(fetchedContracts);
     } catch (err) {
       console.error('Error loading contracts:', err);
-      if (isAgentTestAccount(userId, landlordEmail)) {
-        setError(null);
-        setContracts(getAgentDummyContracts());
-      } else if (isLandlordTwoTestAccount(userId, landlordEmail)) {
-        setError(null);
-        setContracts(getLandlordTwoDummyContracts());
-      } else {
-        setError('Failed to load contracts. Please try again.');
-        setContracts([]);
-      }
+      setError('Failed to load contracts. Please try again.');
+      setContracts([]);
     } finally {
       setLoading(false);
     }

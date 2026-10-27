@@ -23,9 +23,7 @@ export const AGENT_TEST_COMPANY_PROFILE: CompanyProfile = {
 const DUMMY_PDF = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
 
 export function isAgentTestAccount(userId?: string | null, email?: string | null): boolean {
-  const id = (userId || '').trim();
-  const mail = (email || '').trim().toLowerCase();
-  return id === AGENT_TEST_ID || mail === AGENT_TEST_EMAIL;
+  return false;
 }
 
 export function mergeById<T extends { id: string }>(dummy: T[], live: T[]): T[] {

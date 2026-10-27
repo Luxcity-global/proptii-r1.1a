@@ -271,11 +271,9 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const showAsTable = displayStyle === 'table' && !isMobile;
   const isAgentPersona = isAgentTestAccount(managerId, managerEmail);
 
-  const withAgentDummyRequests = (live: BookViewingRequest[]) =>
-    isAgentPersona ? mergeById(getAgentDummyViewingRequests(), live) : live;
+  const withAgentDummyRequests = (live: BookViewingRequest[]) => live;
 
-  const withAgentDummyBookings = (live: ViewingBooking[]) =>
-    isAgentPersona ? mergeById(getAgentDummyViewings(), live) : live;
+  const withAgentDummyBookings = (live: ViewingBooking[]) => live;
 
   const viewingStatus = (status?: string) => String(status || '').trim().toLowerCase();
 
