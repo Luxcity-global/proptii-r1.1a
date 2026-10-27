@@ -9,6 +9,9 @@ import { Menu, X, Home, User } from 'lucide-react';
 import { trackEvent } from '../../utils/analytics';
 import { MessagingProvider, useMessagingContext } from '../../contexts/MessagingContext';
 import { useMessagingPoller } from '../../hooks/useMessagingPoller';
+import { MobileHeaderTopBar } from '../common/MobileHeaderTopBar';
+import { MobileBottomNav } from '../common/MobileBottomNav';
+import { MobileCommandSheet } from '../common/MobileCommandSheet';
 
 // Define color constants (matching ReferencingModal)
 export const BLUE_COLOR = '#136C9E';
@@ -199,6 +202,7 @@ const DashboardInner: React.FC = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [commandSheetOpen, setCommandSheetOpen] = useState(false);
   const { user, isLoading } = useAuth();
   const isMobile = useIsMobile();
 
@@ -294,25 +298,18 @@ const DashboardInner: React.FC = () => {
         fontFamily: 'Archivo, sans-serif'
       }}
     >
-      {/* Mobile Header */}
+      {/* Pattern 1: Mobile Header Top Bar (Avatar Hub) */}
       {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b md:hidden" style={{ borderColor: '#ebebeb' }}>
-          <div className="flex items-center justify-between h-16 px-4">
-            <button
-              onClick={() => setMobileSidebarOpen(true)}
-              className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-              aria-label="Open menu"
-            >
-              <Menu className="w-6 h-6" style={{ color: '#374957' }} />
-            </button>
-            <img
-              src="/images/proptii-logo.png"
-              alt="Proptii Logo"
-              className="h-14 object-contain cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={handleLogoClick}
-            />
-            <div className="w-10" /> {/* Spacer for centering */}
-          </div>
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white">
+          <MobileHeaderTopBar
+            userName={user?.name || user?.givenName || 'Tenant User'}
+            userRole="tenant"
+            title={DASHBOARD_SECTIONS.find((s) => s.id === activeSection)?.label || 'Dashboard'}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+            onOpenSettings={() => navigate('/dashboard/settings')}
+            onOpenNotifications={() => navigate('/dashboard/messages')}
+            unreadCount={unreadCount}
+          />
         </div>
       )}
 
@@ -462,6 +459,7 @@ const DashboardInner: React.FC = () => {
         className="flex-1 min-w-0"
         style={{
           backgroundColor: '#F7F7F7',
+          paddingBottom: isMobile ? 'calc(76px + env(safe-area-inset-bottom, 0px))' : undefined,
           ...(location.pathname.startsWith('/dashboard/messages')
             ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
             : {}),
@@ -500,6 +498,28 @@ const DashboardInner: React.FC = () => {
           <Outlet />
         </div>
       </main>
+
+      {/* Pattern 2: Mobile Bottom Command Dock */}
+      {isMobile && (
+        <>
+          <MobileBottomNav
+            activeTab={activeSection}
+            onTabClick={(id, path) => handleNavClick(id, path || `/dashboard/${id}`)}
+            onOpenCommandSheet={() => setCommandSheetOpen(true)}
+            role="tenant"
+          />
+
+          {/* Mobile Command Launcher Sheet */}
+          <MobileCommandSheet
+            isOpen={commandSheetOpen}
+            onClose={() => setCommandSheetOpen(false)}
+            role="tenant"
+            onNavigate={(id, path) => {
+              if (path) navigate(path);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };

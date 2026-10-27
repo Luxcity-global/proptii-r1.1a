@@ -29,8 +29,8 @@ const FinancialForm: React.FC = () => {
   
   // Handle upload complete
   const handleUploadComplete = (url: string, fileName: string) => {
-    console.log(`Financial proof document uploaded successfully: ${fileName} at ${url}`);
-    // You can store the URL in your form data if needed
+    handleFieldChange('proofOfIncomeDocument', { name: fileName, url });
+    handleFieldChange('proofOfIncomeDocumentId', url);
   };
   
   // Handle Open Banking connection

@@ -1037,6 +1037,8 @@ const DashboardHome: React.FC = () => {
         isOpen={isReferencingModalOpen}
         onClose={closeReferencingModal}
         initialStep={referencingStep}
+        propertyId={userId ? `general_${userId}` : 'default-property'}
+        applicationId={userId ? `general_${userId}` : undefined}
       />
 
       <FilePreviewModal

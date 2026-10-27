@@ -24,6 +24,9 @@ import LandlordDashboardHeader from './LandlordDashboardHeader';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { useIsMobile } from './ui/use-mobile';
 import { useMessagingContext } from '../../../contexts/MessagingContext';
+import { MobileHeaderTopBar } from '../../../components/common/MobileHeaderTopBar';
+import { MobileBottomNav } from '../../../components/common/MobileBottomNav';
+import { MobileCommandSheet } from '../../../components/common/MobileCommandSheet';
 import '../styles/sidebarOverview.css';
 
 const proptiiLogoSmall = '/images/Proptii ico.png';
@@ -290,8 +293,23 @@ export function MainLayout({
   children,
 }: MainLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [commandSheetOpen, setCommandSheetOpen] = useState(false);
   const isMobile = useIsMobile();
   const { unreadCount } = useMessagingContext();
+
+  const screenTitleMap: Record<NavigationScreen, string> = {
+    dashboard: 'Dashboard',
+    properties: 'Properties',
+    documents: 'Documents',
+    viewings: 'Viewings',
+    contracts: 'Contracts',
+    clients: 'Clients',
+    referencing: 'Referencing',
+    messages: 'Messages',
+    inbox: 'Inbox',
+    insights: 'Analytics',
+    settings: 'Settings',
+  };
 
   const navigationItems: NavItem[] = [
     { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard' },
@@ -305,6 +323,10 @@ export function MainLayout({
     { id: 'insights', icon: BarChart3, label: 'Analytics' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
+
+  const handleMobileNavClick = (id: string) => {
+    onNavigate(id as NavigationScreen);
+  };
 
   return (
     <SidebarProvider>
@@ -320,29 +342,18 @@ export function MainLayout({
           } as React.CSSProperties
         }
       >
-        {/* Mobile Header */}
-        <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[#e2e8f0]">
-            <div className="flex items-center justify-between h-16 px-4">
-              <button
-                type="button"
-                onClick={() => setMobileSidebarOpen(true)}
-                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-                aria-label="Open menu"
-              >
-                <Menu className="w-6 h-6" style={{ color: '#334155' }} />
-              </button>
-              <button
-                type="button"
-                className="ll-sidebar-brand"
-                style={{ border: 'none', margin: 0, padding: '4px 8px' }}
-                onClick={() => goHomeOrSignIn(userProfile)}
-              >
-                <img src={proptiiLogoSmall} alt="Proptii" className="ll-sidebar-brand-icon" />
-                <span className="ll-sidebar-brand-title">proptii</span>
-              </button>
-              <div className="w-10" />
-            </div>
-          </div>
+        {/* Pattern 1: Mobile Header Top Bar (Avatar Hub) */}
+        <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white">
+          <MobileHeaderTopBar
+            userName={userProfile?.name || 'Agent User'}
+            userRole={userRole}
+            title={screenTitleMap[currentScreen] || 'Dashboard'}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+            onOpenSettings={() => onNavigate('settings')}
+            onOpenNotifications={() => onNavigate('messages')}
+            unreadCount={unreadCount}
+          />
+        </div>
 
         <CustomSidebar
           navigationItems={navigationItems}
@@ -379,6 +390,7 @@ export function MainLayout({
                   : currentScreen === 'contracts'
                     ? '#fbfbfe'
                     : '#F7F7F7',
+            paddingBottom: isMobile ? 'calc(76px + env(safe-area-inset-bottom, 0px))' : undefined,
             ...(currentScreen === 'messages' || currentScreen === 'inbox'
               ? {
                   height: '100vh',
@@ -390,7 +402,7 @@ export function MainLayout({
               : {}),
           }}
         >
-          <div className={`md:hidden h-16${currentScreen === 'messages' || currentScreen === 'inbox' ? ' flex-shrink-0' : ''}`} />
+          <div className={`lg:hidden h-[60px]${currentScreen === 'messages' || currentScreen === 'inbox' ? ' flex-shrink-0' : ''}`} />
           {currentScreen !== 'dashboard' &&
             currentScreen !== 'properties' &&
             currentScreen !== 'contracts' &&
@@ -418,6 +430,22 @@ export function MainLayout({
             children
           )}
         </main>
+
+        {/* Pattern 2: Mobile Bottom Command Dock */}
+        <MobileBottomNav
+          activeTab={currentScreen}
+          onTabClick={handleMobileNavClick}
+          onOpenCommandSheet={() => setCommandSheetOpen(true)}
+          role="landlord"
+        />
+
+        {/* Mobile Command Launcher Sheet */}
+        <MobileCommandSheet
+          isOpen={commandSheetOpen}
+          onClose={() => setCommandSheetOpen(false)}
+          role="landlord"
+          onNavigate={(id) => onNavigate(id as NavigationScreen)}
+        />
       </div>
     </SidebarProvider>
   );

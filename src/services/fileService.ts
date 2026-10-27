@@ -1,4 +1,7 @@
 import { firestoreService, UserFile } from './firestoreService';
+import apiService from './api';
+import { referencingPath } from './referencingService';
+import { uploadToFirebaseStorage } from './storageService';
 
 /** Read a File as a base64 data URL. */
 function readAsDataUrl(file: File): Promise<string> {
@@ -67,18 +70,22 @@ class FileService {
         // Load user-specific files from Firestore
         const result = await firestoreService.getUserFiles(this.currentUserId);
         if (result.success && result.files) {
-          const userFiles: FileItem[] = result.files.map((firestoreFile: UserFile) => ({
-            id: parseInt(firestoreFile.id.split('_')[2]) || Date.now(),
-            name: firestoreFile.name,
-            category: firestoreFile.category,
-            type: firestoreFile.type,
-            size: firestoreFile.size,
+          const userFiles: FileItem[] = result.files.map((firestoreFile: any, index: number) => ({
+            id: parseInt(firestoreFile.id?.split('_')?.[1]) || (Date.now() + index),
+            name: firestoreFile.name || firestoreFile.fileName || 'Untitled Document',
+            category: firestoreFile.category || firestoreFile.section || 'Identity',
+            type: firestoreFile.type || firestoreFile.contentType || 'application/pdf',
+            size: firestoreFile.size || 0,
             uploadDate: firestoreFile.uploadDate?.toDate
               ? firestoreFile.uploadDate.toDate().toLocaleDateString()
-              : firestoreFile.uploadDate
-                ? new Date(firestoreFile.uploadDate).toLocaleDateString()
-                : new Date().toLocaleDateString(),
-            url: firestoreFile.url,
+              : firestoreFile.createdAt?.toDate
+                ? firestoreFile.createdAt.toDate().toLocaleDateString()
+                : firestoreFile.uploadDate
+                  ? new Date(firestoreFile.uploadDate).toLocaleDateString()
+                  : firestoreFile.createdAt
+                    ? new Date(firestoreFile.createdAt).toLocaleDateString()
+                    : new Date().toLocaleDateString(),
+            url: firestoreFile.url || firestoreFile.dataUrl,
             firestoreId: firestoreFile.id,
           }));
           
@@ -93,7 +100,7 @@ class FileService {
     }
   }
 
-  // Upload files — reads each file as base64 and saves directly to Firestore
+  // Upload files — uploads via backend /api/referencing/files/save, with Firebase Storage fallback
   async uploadFiles(
     files: File[], 
     category: string,
@@ -103,59 +110,127 @@ class FileService {
 
     for (const file of files) {
       try {
-        // Signal start
         if (onProgress) onProgress(file.name, 10);
 
-        // Read file as base64 data URL — no Azure dependency
-        const dataUrl = await readAsDataUrl(file);
+        // Pre-validation: enforce 25MB ceiling and block dangerous extensions
+        if (file.size > 25 * 1024 * 1024) {
+          throw new Error(`File "${file.name}" exceeds the maximum 25MB limit`);
+        }
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const prohibitedExts = ['exe', 'dll', 'bat', 'cmd', 'sh', 'php', 'html', 'htm', 'js', 'vbs', 'msi', 'com', 'scr'];
+        if (fileExt && prohibitedExts.includes(fileExt)) {
+          throw new Error(`File type ".${fileExt}" is not allowed for security reasons`);
+        }
 
-        if (onProgress) onProgress(file.name, 60);
+        let uploadedUrl = '';
+        let fileId = `file_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-        if (this.currentUserId) {
-          // Save to backend (Firestore via v2-backend) using the dataUrl as the url field
-          const firestoreResult = await firestoreService.saveUserFile(this.currentUserId, {
-            name: file.name,
+        // 1. Try uploading as multipart/form-data directly to backend
+        try {
+          const additionalData = {
             category,
-            type: file.type,
-            size: file.size,
-            url: dataUrl,
-          });
+            section: category,
+            field: 'document',
+            fileName: file.name,
+            name: file.name,
+            userId: this.currentUserId || 'guest',
+          };
 
-          if (onProgress) onProgress(file.name, 100);
+          const apiRes = await apiService.uploadFile<any>(
+            referencingPath('files/save'),
+            file,
+            additionalData,
+            (pct) => {
+              if (onProgress) onProgress(file.name, Math.min(90, Math.max(10, pct)));
+            }
+          );
 
-          if (firestoreResult.success) {
-            results.push({
-              success: true,
-              file: {
-                id: this.nextId++,
+          if (apiRes.success && (apiRes.data?.url || apiRes.data?.downloadUrl)) {
+            uploadedUrl = apiRes.data.url || apiRes.data.downloadUrl;
+            if (apiRes.data.id) fileId = apiRes.data.id;
+          }
+        } catch (apiErr: any) {
+          console.warn('[FileService] Backend upload failed, trying direct Firebase Storage:', apiErr?.message);
+        }
+
+        // 2. Fallback to Firebase Storage SDK
+        if (!uploadedUrl) {
+          try {
+            const safeCategory = (category || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const targetFolder = `documents/${this.currentUserId || 'guest'}/${safeCategory}`;
+            const storageResult = await uploadToFirebaseStorage(
+              file,
+              targetFolder,
+              (progress) => {
+                if (onProgress) onProgress(file.name, Math.min(90, progress.percentage));
+              }
+            );
+
+            if (storageResult.success && storageResult.url) {
+              uploadedUrl = storageResult.url;
+              // Save metadata to Firestore
+              if (this.currentUserId) {
+                const fsRes = await firestoreService.saveUserFile(this.currentUserId, {
+                  name: file.name,
+                  category,
+                  type: file.type,
+                  size: file.size,
+                  url: uploadedUrl,
+                });
+                if (fsRes.success && fsRes.fileId) {
+                  fileId = fsRes.fileId;
+                }
+              }
+            }
+          } catch (fbErr: any) {
+            console.warn('[FileService] Firebase Storage upload failed:', fbErr?.message);
+          }
+        }
+
+        // 3. Fallback to base64 dataUrl ONLY if file is small enough (<1MB) for Firestore
+        if (!uploadedUrl) {
+          if (file.size <= 1024 * 1024) {
+            uploadedUrl = await readAsDataUrl(file);
+            if (this.currentUserId) {
+              const fsRes = await firestoreService.saveUserFile(this.currentUserId, {
                 name: file.name,
                 category,
                 type: file.type,
                 size: file.size,
-                uploadDate: new Date().toLocaleDateString(),
-                url: dataUrl,
-                firestoreId: firestoreResult.fileId,
-              },
-            });
+                url: uploadedUrl,
+              });
+              if (fsRes.success && fsRes.fileId) {
+                fileId = fsRes.fileId;
+              }
+            }
           } else {
-            results.push({ success: false, error: firestoreResult.error || 'Failed to save file' });
+            throw new Error(`Upload failed and file "${file.name}" exceeds 1MB limit for inline storage`);
           }
-        } else {
-          // No user — keep in memory only
-          const newFile: FileItem = {
-            id: this.nextId++,
-            name: file.name,
-            category,
-            type: file.type,
-            size: file.size,
-            uploadDate: new Date().toLocaleDateString(),
-            url: dataUrl,
-          };
-          this.files.push(newFile);
-          if (onProgress) onProgress(file.name, 100);
-          results.push({ success: true, file: newFile });
         }
+
+        if (onProgress) onProgress(file.name, 100);
+
+        const newFile: FileItem = {
+          id: this.nextId++,
+          name: file.name,
+          category,
+          type: file.type,
+          size: file.size,
+          uploadDate: new Date().toLocaleDateString(),
+          url: uploadedUrl,
+          firestoreId: fileId,
+        };
+
+        if (!this.currentUserId) {
+          this.files.push(newFile);
+        }
+
+        results.push({
+          success: true,
+          file: newFile,
+        });
       } catch (error) {
+        console.error(`[FileService] Failed to upload ${file.name}:`, error);
         results.push({
           success: false,
           error: error instanceof Error ? error.message : 'Upload failed',

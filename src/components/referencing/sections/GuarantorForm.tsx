@@ -27,8 +27,8 @@ const GuarantorForm: React.FC = () => {
   
   // Handle upload complete
   const handleUploadComplete = (url: string, fileName: string) => {
-    console.log(`Guarantor identity document uploaded successfully: ${fileName} at ${url}`);
-    // You can store the URL in your form data if needed
+    handleFieldChange('identityDocument', { name: fileName, url });
+    handleFieldChange('identityDocumentId', url);
   };
 
   return (

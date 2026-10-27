@@ -43,6 +43,7 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
 import { countPortfolio, isUnitOccupied, isPropertyArchived } from '../utils/portfolioStats';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
@@ -1189,7 +1190,7 @@ export function PropertiesPage({
           </div>
         ) : viewMode === 'table' ? (
           <div className="ll-props-table-wrap">
-            <div className="ll-props-table-scroll">
+            <div className="ll-props-table-scroll hidden md:block">
               <table className="ll-props-table">
                 <thead>
                   <tr>
@@ -1272,7 +1273,48 @@ export function PropertiesPage({
                   })}
                 </tbody>
               </table>
-                    </div>
+            </div>
+
+            {/* MOBILE ACCORDION DISCLOSURE VIEW (< md) */}
+            <div className="mob-accordion-container md:hidden">
+              {pagedProperties.map((property) => {
+                const tenant = getTenantForProperty(property);
+                const status = displayStatus(property, tenant);
+                return (
+                  <MobileAccordionCard
+                    key={property.id}
+                    id={property.id}
+                    title={propertyName(property.address)}
+                    subtitle={property.address}
+                    statusBadge={
+                      <span className={`ll-props-status ${status}`}>
+                        <span className="dot" />
+                        {statusLabel(status)}
+                      </span>
+                    }
+                    avatar={
+                      <div className="w-7 h-7 rounded-lg bg-orange-50 text-[#DC5F12] flex items-center justify-center font-bold text-xs border border-orange-200/60">
+                        <Building2 size={15} />
+                      </div>
+                    }
+                    fields={[
+                      { label: 'Tenant', value: tenant ? tenant.name : 'No tenant' },
+                      { label: 'Rent/Month', value: `£${(property.rent || 0).toLocaleString()}` },
+                      { label: 'Lease End', value: tenant ? formatLeaseDate(tenant.leaseEnd) : '—' },
+                      { label: 'Address', value: property.address },
+                    ]}
+                    actions={[
+                      {
+                        label: 'View Property',
+                        variant: 'primary',
+                        icon: <Eye className="w-3.5 h-3.5" />,
+                        onClick: () => onViewProperty(property),
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </div>
             <div className="ll-props-pager">
               <div className="ll-props-pager-left">
                 <span>Show</span>

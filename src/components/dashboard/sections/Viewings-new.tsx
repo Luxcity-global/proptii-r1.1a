@@ -12,6 +12,7 @@ import RequestViewingModal, { RequestViewingProperty } from '../../viewings/Requ
 import emailService from '../../../services/emailService';
 import { useIsMobile } from '../ui/use-mobile';
 import TenantPageHeader from '../ui/TenantPageHeader';
+import { MobileAccordionCard } from '../../common/MobileAccordionCard';
 import '../../../styles/tenantViewings.css';
 import '../../../styles/tenantModals.css';
 
@@ -1319,7 +1320,7 @@ const Viewings: React.FC = () => {
               </div>
             ) : viewMode === 'table' ? (
               <>
-                <div className="tn-vw-table-wrap">
+                <div className="tn-vw-table-wrap hidden md:block">
                   <table className="tn-vw-table">
                     <thead>
                       <tr>
@@ -1352,6 +1353,46 @@ const Viewings: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+
+                {/* MOBILE ACCORDION DISCLOSURE VIEW (< md) */}
+                <div className="mob-accordion-container md:hidden">
+                  {paginatedViewings.map((viewing) => (
+                    <MobileAccordionCard
+                      key={viewing.id}
+                      id={viewing.id}
+                      title={viewing.property.street || 'Property Viewing'}
+                      subtitle={viewingAddress(viewing)}
+                      statusBadge={
+                        <span className={`tn-vw-pill ${statusClass(viewing.status)}`}>
+                          {statusLabel(viewing.status)}
+                        </span>
+                      }
+                      avatar={
+                        <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-xs border border-purple-200/60">
+                          <Calendar className="w-3.5 h-3.5" />
+                        </div>
+                      }
+                      fields={[
+                        { label: 'Date', value: formatDate(viewing.viewingDetails.date) },
+                        { label: 'Time', value: formatTime(viewing.viewingDetails.time) },
+                        { label: 'Agent', value: viewing.property.agent?.name || '—' },
+                        { label: 'Type', value: viewing.viewingDetails.type || 'In-Person' },
+                      ]}
+                      actions={[
+                        {
+                          label: 'Reschedule',
+                          variant: 'primary',
+                          icon: <Clock className="w-3.5 h-3.5" />,
+                          onClick: () => {
+                            setSelectedViewing(viewing);
+                            setIsRescheduleModalOpen(true);
+                          },
+                        },
+                      ]}
+                    />
+                  ))}
+                </div>
+
                 {filteredCurrent.length > 0 && <PaginationControls />}
               </>
             ) : (

@@ -42,7 +42,7 @@ interface ReferencingContextType {
   dispatch: React.Dispatch<ReferencingAction>;
   updateFormData: (section: FormSection, data: any) => void;
   saveCurrentStep: () => Promise<boolean>;
-  submitApplication: () => Promise<boolean>;
+  submitApplication: (userId?: string) => Promise<boolean>;
   nextStep: () => void;
   prevStep: () => void;
   setCurrentStep: (step: FormSection | number) => void;
@@ -336,43 +336,166 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     createApplicationIfNeeded();
   }, [state.propertyId, state.applicationId, useApi]);
 
-  // Update form data
+  // Helper function to normalize document fields for storage and API
+  const normalizeDocumentField = (doc: any): any => {
+    if (!doc) return undefined;
+    if (typeof doc === 'string') {
+      const trimmed = doc.trim();
+      if (!trimmed) return undefined;
+      const name = trimmed.split('/').pop()?.split('?')[0] || 'document';
+      return { name, url: trimmed, dataUrl: trimmed };
+    }
+    if (typeof doc === 'object') {
+      const url = doc.url || doc.dataUrl || doc.downloadUrl;
+      const name = doc.name || doc.fileName || doc.storagePath?.split('/').pop() || (url ? url.split('/').pop()?.split('?')[0] : 'document');
+      if (!name && !url && !doc.storagePath) return undefined;
+      return {
+        name: name || 'document',
+        url: url || undefined,
+        dataUrl: doc.dataUrl || url || undefined,
+        storagePath: doc.storagePath || undefined,
+        type: doc.type || doc.contentType || undefined,
+        size: typeof doc.size === 'number' ? doc.size : undefined,
+        lastModified: doc.lastModified || undefined,
+      };
+    }
+    return undefined;
+  };
+
+  // Upload document with multi-tier resilient fallback
+  const uploadDocument = useCallback(async (
+    section: FormSection,
+    field: string,
+    file: File
+  ): Promise<string | null> => {
+    if (!file) return null;
+    
+    const targetId = state.applicationId || state.propertyId || 'general';
+    
+    try {
+      if (useApi) {
+        const response = await referencingService.uploadDocument(
+          targetId,
+          section,
+          file,
+          field,
+          (progress) => {
+            dispatch({
+              type: 'SET_UPLOAD_PROGRESS',
+              payload: { field, progress }
+            });
+          }
+        );
+        
+        if (response.success && response.data?.fileUrl) {
+          return response.data.fileUrl;
+        }
+      }
+      
+      // Direct Firebase Storage upload fallback
+      const result = await uploadToFirebaseStorage(
+        file,
+        `referencing/${targetId}/${section}/${field}`,
+        (progress) => {
+          dispatch({
+            type: 'SET_UPLOAD_PROGRESS',
+            payload: { field, progress: progress.percentage }
+          });
+        }
+      );
+      
+      if (result.success && result.url) {
+        return result.url;
+      }
+      
+      throw new Error(result.error || 'Failed to upload document');
+    } catch (error) {
+      console.error(`Error uploading ${field} document:`, error);
+      return null;
+    }
+  }, [state.applicationId, state.propertyId, useApi]);
+
+  // Update form data (with automatic File serialization and background upload)
   const updateFormData = useCallback((section: FormSection, data: any) => {
+    const sanitizedData = { ...data };
+    for (const [key, val] of Object.entries(sanitizedData)) {
+      if (val instanceof File) {
+        sanitizedData[key] = {
+          name: val.name,
+          size: val.size,
+          type: val.type,
+          lastModified: val.lastModified,
+          isUploading: true,
+        };
+        // Auto-trigger background upload for the file
+        uploadDocument(section, key, val).then((uploadedUrl) => {
+          if (uploadedUrl) {
+            const uploadedDoc = {
+              name: val.name,
+              size: val.size,
+              type: val.type,
+              lastModified: val.lastModified,
+              url: uploadedUrl,
+              dataUrl: uploadedUrl,
+              isUploading: false,
+            };
+            dispatch({
+              type: 'UPDATE_FORM_DATA',
+              payload: {
+                section,
+                data: {
+                  [key]: uploadedDoc,
+                  [`${key}Id`]: uploadedUrl,
+                },
+              },
+            });
+            updateSection(section, {
+              [key]: uploadedDoc,
+              [`${key}Id`]: uploadedUrl,
+            });
+          }
+        }).catch((err) => {
+          console.error(`Auto-upload failed for ${section}.${key}:`, err);
+        });
+      }
+    }
+
     dispatch({
       type: 'UPDATE_FORM_DATA',
-      payload: { section, data }
+      payload: { section, data: sanitizedData }
     });
-    updateSection(section, data);
-  }, [updateSection]);
+    updateSection(section, sanitizedData);
+  }, [updateSection, uploadDocument]);
 
   // Save form data to API or localStorage
   const saveFormData = useCallback(async (): Promise<boolean> => {
-    if (!state.propertyId) return false;
+    const targetId = state.applicationId || state.propertyId;
+    if (!targetId) return false;
     
     dispatch({ type: 'SET_IS_SAVING', payload: true });
     
     try {
-      if (useApi && state.applicationId) {
+      if (useApi) {
         // Save to API
         const currentSection = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'creditCheck'][state.currentStep] as FormSection;
         const sectionData = state.formData[currentSection];
         
-        // Convert FormData to API format (remove File objects)
+        // Convert FormData to API format preserving document metadata
         const apiData = convertFormSectionToApiFormat(currentSection, sectionData);
         
         const response = await referencingService.saveSectionData(
-          state.applicationId,
+          targetId,
           currentSection,
           apiData
         );
         
         if (!response.success) {
-          throw new Error(response.error || 'Failed to save data');
+          console.warn('API saveSectionData response warning:', response.error);
         }
-      } else {
-        // Save to localStorage
-        saveToLocalStorage(`form_${state.propertyId}`, state.formData);
       }
+      
+      // Save to localStorage
+      saveToLocalStorage(`form_${targetId}`, state.formData);
       
       // Update last saved timestamp
       const timestamp = Date.now();
@@ -392,118 +515,69 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     return await saveFormData();
   }, [saveFormData]);
 
-  // Upload document to Azure Storage
-  const uploadDocument = useCallback(async (
-    section: FormSection,
-    field: string,
-    file: File
-  ): Promise<string | null> => {
-    if (!file) return null;
-    
-    try {
-      if (useApi && state.applicationId) {
-        // Upload to API
-        const response = await referencingService.uploadDocument(
-          state.applicationId,
-          section,
-          file,
-          field,
-          (progress) => {
-            dispatch({
-              type: 'SET_UPLOAD_PROGRESS',
-              payload: { field, progress }
-            });
-          }
-        );
-        
-        if (response.success && response.data) {
-          return response.data.fileUrl;
-        }
-        
-        throw new Error(response.error || 'Failed to upload document');
-      } else {
-        // Upload directly to Firebase Storage
-        const result = await uploadToFirebaseStorage(
-          file,
-          `referencing_documents/${section}/${field}`,
-          (progress) => {
-            dispatch({
-              type: 'SET_UPLOAD_PROGRESS',
-              payload: { field, progress: progress.percentage }
-            });
-          }
-        );
-        
-        if (result.success && result.url) {
-          return result.url;
-        }
-        
-        throw new Error(result.error || 'Failed to upload document to Firebase Storage');
-      }
-    } catch (error) {
-      console.error(`Error uploading ${field} document:`, error);
-      return null;
-    }
-  }, [state.applicationId, useApi]);
-
-  // Helper function to convert FormData to API format
+  // Helper function to convert FormData to API format while preserving document metadata
   const convertFormDataToApiFormat = useCallback((formData: FormData): ReferencingFormData => {
-    // Create a deep copy to avoid modifying the original
+    const targetId = state.propertyId || state.applicationId || '';
     const apiData: ReferencingFormData = {
-      propertyId: state.propertyId || '',
+      propertyId: targetId,
     };
     
-    // Convert each section
     if (formData.identity) {
+      const normDoc = normalizeDocumentField(formData.identity.identityProof);
       apiData.identity = {
         ...formData.identity,
-        identityProofId: formData.identity.identityProof ? 'pending-upload' : undefined
+        identityProof: normDoc,
+        identityProofId: normDoc?.url || formData.identity.identityProofId || (normDoc ? normDoc.name : undefined)
       };
-      delete (apiData.identity as any).identityProof;
     }
     
     if (formData.employment) {
+      const normDoc = normalizeDocumentField(formData.employment.proofDocument);
       apiData.employment = {
         ...formData.employment,
-        proofDocumentId: formData.employment.proofDocument ? 'pending-upload' : undefined
+        proofDocument: normDoc,
+        proofDocumentId: normDoc?.url || formData.employment.proofDocumentId || (normDoc ? normDoc.name : undefined)
       };
-      delete (apiData.employment as any).proofDocument;
     }
     
     if (formData.residential) {
+      const normDoc = normalizeDocumentField(formData.residential.proofDocument);
       apiData.residential = {
         ...formData.residential,
-        proofDocumentId: formData.residential.proofDocument ? 'pending-upload' : undefined
+        proofDocument: normDoc,
+        proofDocumentId: normDoc?.url || formData.residential.proofDocumentId || (normDoc ? normDoc.name : undefined)
       };
-      delete (apiData.residential as any).proofDocument;
     }
     
     if (formData.financial) {
+      const normDoc = normalizeDocumentField(formData.financial.proofOfIncomeDocument);
       apiData.financial = {
         ...formData.financial,
-        proofOfIncomeDocumentId: formData.financial.proofOfIncomeDocument ? 'pending-upload' : undefined
+        proofOfIncomeDocument: normDoc,
+        proofOfIncomeDocumentId: normDoc?.url || formData.financial.proofOfIncomeDocumentId || (normDoc ? normDoc.name : undefined)
       };
-      delete (apiData.financial as any).proofOfIncomeDocument;
     }
     
     if (formData.guarantor) {
+      const normDoc = normalizeDocumentField(formData.guarantor.identityDocument);
       apiData.guarantor = {
         ...formData.guarantor,
-        identityDocumentId: formData.guarantor.identityDocument ? 'pending-upload' : undefined
+        identityDocument: normDoc,
+        identityDocumentId: normDoc?.url || formData.guarantor.identityDocumentId || (normDoc ? normDoc.name : undefined)
       };
-      delete (apiData.guarantor as any).identityDocument;
     }
     
     if (formData.creditCheck) {
+      const normDoc = normalizeDocumentField((formData.creditCheck as any).additionalDocument);
       apiData.creditCheck = {
         ...formData.creditCheck,
-        additionalDocumentId: formData.creditCheck.additionalDocument ? 'pending-upload' : undefined
+        additionalDocument: normDoc,
+        additionalDocumentId: normDoc?.url || (formData.creditCheck as any).additionalDocumentId || (normDoc ? normDoc.name : undefined)
       };
-      delete (apiData.creditCheck as any).additionalDocument;
     }
     
     return apiData;
-  }, [state.propertyId]);
+  }, [state.propertyId, state.applicationId]);
 
   // Submit application
   const submitApplication = useCallback(async (userId?: string): Promise<boolean> => {
@@ -606,49 +680,47 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
   }, []);
 
 
-  // Helper function to convert a form section to API format
+  // Helper function to convert a form section to API format while preserving documents
   const convertFormSectionToApiFormat = (section: FormSection, sectionData: any): any => {
-    // Create a deep copy
     const apiData = { ...sectionData };
     
-    // Remove File objects based on section
     switch (section) {
-      case 'identity':
-        delete apiData.identityProof;
-        if (sectionData.identityProof) {
-          apiData.identityProofId = 'pending-upload';
-        }
+      case 'identity': {
+        const normDoc = normalizeDocumentField(sectionData?.identityProof);
+        apiData.identityProof = normDoc;
+        apiData.identityProofId = normDoc?.url || sectionData?.identityProofId || (normDoc ? normDoc.name : undefined);
         break;
-      case 'employment':
-        delete apiData.proofDocument;
-        if (sectionData.proofDocument) {
-          apiData.proofDocumentId = 'pending-upload';
-        }
+      }
+      case 'employment': {
+        const normDoc = normalizeDocumentField(sectionData?.proofDocument);
+        apiData.proofDocument = normDoc;
+        apiData.proofDocumentId = normDoc?.url || sectionData?.proofDocumentId || (normDoc ? normDoc.name : undefined);
         break;
-      case 'residential':
-        delete apiData.proofDocument;
-        if (sectionData.proofDocument) {
-          apiData.proofDocumentId = 'pending-upload';
-        }
+      }
+      case 'residential': {
+        const normDoc = normalizeDocumentField(sectionData?.proofDocument);
+        apiData.proofDocument = normDoc;
+        apiData.proofDocumentId = normDoc?.url || sectionData?.proofDocumentId || (normDoc ? normDoc.name : undefined);
         break;
-      case 'financial':
-        delete apiData.proofOfIncomeDocument;
-        if (sectionData.proofOfIncomeDocument) {
-          apiData.proofOfIncomeDocumentId = 'pending-upload';
-        }
+      }
+      case 'financial': {
+        const normDoc = normalizeDocumentField(sectionData?.proofOfIncomeDocument);
+        apiData.proofOfIncomeDocument = normDoc;
+        apiData.proofOfIncomeDocumentId = normDoc?.url || sectionData?.proofOfIncomeDocumentId || (normDoc ? normDoc.name : undefined);
         break;
-      case 'guarantor':
-        delete apiData.identityDocument;
-        if (sectionData.identityDocument) {
-          apiData.identityDocumentId = 'pending-upload';
-        }
+      }
+      case 'guarantor': {
+        const normDoc = normalizeDocumentField(sectionData?.identityDocument);
+        apiData.identityDocument = normDoc;
+        apiData.identityDocumentId = normDoc?.url || sectionData?.identityDocumentId || (normDoc ? normDoc.name : undefined);
         break;
-      case 'creditCheck':
-        delete apiData.additionalDocument;
-        if (sectionData.additionalDocument) {
-          apiData.additionalDocumentId = 'pending-upload';
-        }
+      }
+      case 'creditCheck': {
+        const normDoc = normalizeDocumentField(sectionData?.additionalDocument);
+        apiData.additionalDocument = normDoc;
+        apiData.additionalDocumentId = normDoc?.url || sectionData?.additionalDocumentId || (normDoc ? normDoc.name : undefined);
         break;
+      }
     }
     
     return apiData;
@@ -688,6 +760,16 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
 
   // ── Validation schemas — matched exactly to the actual form fields ──────────
 
+  const isDocumentValid = (value: any): boolean => {
+    if (!value) return false;
+    if (value instanceof File) return true;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'object') {
+      return !!(value.name || value.fileName || value.url || value.dataUrl || value.storagePath);
+    }
+    return false;
+  };
+
   const identitySchema = yup.object().shape({
     firstName:     yup.string().required('First name is required'),
     lastName:      yup.string().required('Last name is required'),
@@ -695,7 +777,7 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     phoneNumber:   yup.string().required('Phone number is required'),
     dateOfBirth:   yup.string().required('Date of birth is required'),
     nationality:   yup.string().required('Nationality is required'),
-    identityProof: yup.mixed().required('Identity proof document is required'),
+    identityProof: yup.mixed().test('identity-proof-required', 'Identity proof document is required', isDocumentValid),
   });
 
   const employmentSchema = yup.object().shape({
@@ -732,7 +814,7 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     }),
     proofDocument: yup.mixed().when('employmentStatus', {
       is: (v: string) => v && v !== 'unemployed' && v !== 'retired',
-      then: (s) => s.required('Proof of employment is required'),
+      then: (s) => s.test('employment-proof-required', 'Proof of employment is required', isDocumentValid),
       otherwise: (s) => s.notRequired(),
     }),
   });
@@ -741,7 +823,7 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     currentAddress:            yup.string().required('Current address is required'),
     durationAtCurrentAddress:  yup.string().required('Duration at current address is required'),
     proofType:                 yup.string().required('Proof type is required'),
-    proofDocument:             yup.mixed().required('Proof of address document is required'),
+    proofDocument:             yup.mixed().test('residential-proof-required', 'Proof of address document is required', isDocumentValid),
   });
 
   const financialSchema = yup.object().shape({
@@ -749,7 +831,7 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     proofOfIncomeDocument: yup.mixed().when('useOpenBanking', {
       is: true,
       then: (s) => s.notRequired(),
-      otherwise: (s) => s.required('Proof of income document is required'),
+      otherwise: (s) => s.test('financial-proof-required', 'Proof of income document is required', isDocumentValid),
     }),
   });
 
@@ -759,7 +841,7 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     email:            yup.string().email('Invalid email address').required('Guarantor email is required'),
     phoneNumber:      yup.string().required('Guarantor phone number is required'),
     address:          yup.string().required('Guarantor address is required'),
-    identityDocument: yup.mixed().required('Guarantor identity document is required'),
+    identityDocument: yup.mixed().test('guarantor-proof-required', 'Guarantor identity document is required', isDocumentValid),
   });
 
   const creditCheckSchema = yup.object().shape({

@@ -13,6 +13,7 @@ import { propertySelectionService } from '../../../services/propertySelectionSer
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
 import PlanUpgradeWall from '../PlanUpgradeWall';
+import { MobileAccordionCard } from '../../common/MobileAccordionCard';
 import '../../../styles/tenantContracts.css';
 import '../../../styles/tenantModals.css';
 
@@ -656,23 +657,74 @@ const TenantContracts: React.FC = () => {
             </table>
           </div>
 
-          <div className="tn-ct-cards">
-            {paginatedContracts.map((contract, index) => (
-              <div key={contract.id || `m-${index}`} className="tn-ct-card">
-                <div className="tn-ct-card-top">
-                  <div className="tn-ct-avatar">{agentInitials(contract.agentName)}</div>
-                  <div>
-                    <h3>{contract.documentName || contract.propertyName || 'Contract Document'}</h3>
-                    <div className="tn-ct-card-meta">{contract.agentName || 'Agent Name'}</div>
-                  </div>
-                </div>
-                <span className="tn-ct-status is-signed"><span className="dot" />Signed</span>
-                <div className="tn-ct-card-meta" style={{ marginTop: 10 }}>
-                  Signed {formatDate(getContractDate(contract))}
-                </div>
-                <div className="tn-ct-card-actions">{renderActions(contract)}</div>
-              </div>
-            ))}
+          <div className="tn-ct-cards mob-accordion-container md:hidden">
+            {paginatedContracts.map((contract, index) => {
+              const isSigned = contract.status === 'signed' || !contract.status;
+              const statusLabel =
+                contract.status === 'sent'
+                  ? 'Sent'
+                  : contract.status === 'unsigned'
+                  ? 'Awaiting signature'
+                  : contract.status === 'draft'
+                  ? 'Draft'
+                  : 'Signed';
+
+              return (
+                <MobileAccordionCard
+                  key={contract.id || `m-${index}`}
+                  id={contract.id || `m-${index}`}
+                  title={contract.documentName || contract.propertyName || 'Contract Document'}
+                  subtitle={contract.agentName || 'Agent'}
+                  statusBadge={
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                        isSigned
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
+                          : 'bg-amber-50 text-amber-700 border-amber-200/60'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isSigned ? 'bg-emerald-500' : 'bg-amber-500'
+                        }`}
+                      />
+                      {statusLabel}
+                    </span>
+                  }
+                  avatar={
+                    <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center">
+                      {agentInitials(contract.agentName)}
+                    </div>
+                  }
+                  fields={[
+                    { label: 'Counterparty', value: contract.agentName || 'Agent' },
+                    { label: 'Property / Unit', value: contract.propertyName || 'Property' },
+                    { label: 'Start Date', value: formatDate(getContractDate(contract)) },
+                    { label: 'Expiry Date', value: 'N/A' },
+                  ]}
+                  actions={[
+                    {
+                      label: 'View PDF',
+                      variant: 'primary',
+                      icon: <Eye className="w-3.5 h-3.5" />,
+                      onClick: () => void handleViewContract(contract),
+                    },
+                    {
+                      label: 'Download',
+                      variant: 'secondary',
+                      icon: <Download className="w-3.5 h-3.5" />,
+                      onClick: () => void handleDownloadContract(contract),
+                    },
+                    ...(contract.id ? [{
+                      label: 'Delete',
+                      variant: 'danger' as const,
+                      icon: <Trash2 className="w-3.5 h-3.5" />,
+                      onClick: () => void handleDeleteContract(String(contract.id)),
+                    }] : []),
+                  ]}
+                />
+              );
+            })}
           </div>
 
           {currentContracts.length > ITEMS_PER_PAGE && (

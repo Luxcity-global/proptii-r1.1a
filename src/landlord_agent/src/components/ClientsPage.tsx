@@ -23,6 +23,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import {
   Dialog,
   DialogContent,
@@ -1197,7 +1198,7 @@ export function ClientsPage({
         )}
 
         <div className="ll-cl-table-wrap">
-          <div className="ll-cl-table-scroll">
+          <div className="ll-cl-table-scroll hidden md:block">
             {!showingLandlords ? (
               <table className="ll-cl-table">
                 <thead>
@@ -1469,6 +1470,115 @@ export function ClientsPage({
                   )}
                 </tbody>
               </table>
+            )}
+          </div>
+
+          {/* MOBILE ACCORDION DISCLOSURE VIEW (< md) */}
+          <div className="mob-accordion-container md:hidden">
+            {!showingLandlords ? (
+              paginatedTenants.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  No matching tenants found.
+                </div>
+              ) : (
+                paginatedTenants.map((tenant) => {
+                  const { property: propertyName, unit } = propertyParts(tenant.propertyAddress);
+                  const chip = paymentChip(tenant.paymentStatus);
+
+                  return (
+                    <MobileAccordionCard
+                      key={clientListingKey(tenant)}
+                      id={tenant.id}
+                      title={tenant.name}
+                      subtitle={propertyName}
+                      statusBadge={
+                        <span className={`ll-cl-status is-${chip.key}`}>
+                          <span className="dot" />
+                          {chip.label}
+                        </span>
+                      }
+                      avatar={
+                        <span className={`ll-cl-avatar ${avatarTone(tenant.name)}`}>
+                          {clientInitials(tenant.name)}
+                        </span>
+                      }
+                      fields={[
+                        { label: 'Contact', value: `${tenant.email} • ${tenant.phone || 'No phone'}` },
+                        { label: 'Property & Unit', value: `${propertyName} ${unit ? `(${unit})` : ''}` },
+                        { label: 'Tenancy Period', value: `${formatDate(tenant.leaseStart)} – ${formatDate(tenant.leaseEnd)}` },
+                        { label: 'Rent', value: `${formatCurrency(tenant.rentAmount)} (${rentCycleLabel(tenant)})` },
+                      ]}
+                      actions={[
+                        {
+                          label: 'View Details',
+                          variant: 'primary',
+                          icon: <Eye className="w-3.5 h-3.5" />,
+                          onClick: () => onViewTenant((tenants || []).find((row) => row.id === tenant.id) || tenant),
+                        },
+                        {
+                          label: 'Log Payment',
+                          variant: 'secondary',
+                          icon: <PoundSterling className="w-3.5 h-3.5" />,
+                          onClick: () => onViewTenant((tenants || []).find((row) => row.id === tenant.id) || tenant, { tab: 'payment' }),
+                        },
+                      ]}
+                    />
+                  );
+                })
+              )
+            ) : (
+              filteredLandlords.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  No matching landlords found.
+                </div>
+              ) : (
+                filteredLandlords.map((landlord) => {
+                  const statusKey = landlord.status.toLowerCase();
+                  return (
+                    <MobileAccordionCard
+                      key={landlord.id}
+                      id={landlord.id}
+                      title={landlord.name}
+                      subtitle={`${landlord.propertyCount} properties`}
+                      statusBadge={
+                        <span className={`ll-cl-status is-${statusKey === 'active' ? 'active' : statusKey === 'pending' ? 'pending' : 'inactive'}`}>
+                          <span className="dot" />
+                          {landlord.status}
+                        </span>
+                      }
+                      avatar={
+                        <span className="ll-cl-avatar orange">
+                          {landlord.initials || clientInitials(landlord.name)}
+                        </span>
+                      }
+                      fields={[
+                        { label: 'Email & Phone', value: `${landlord.email} • ${landlord.phone || 'No phone'}` },
+                        { label: 'Portfolio Value', value: landlord.totalValue },
+                        { label: 'Active Tenants', value: `${landlord.activeTenants} active tenants` },
+                        { label: 'Last Activity', value: landlord.lastActive },
+                      ]}
+                      actions={[
+                        {
+                          label: 'View Portfolio',
+                          variant: 'primary',
+                          icon: <LayoutGrid className="w-3.5 h-3.5" />,
+                          onClick: () => onViewLandlord(landlord),
+                        },
+                        {
+                          label: 'Statement',
+                          variant: 'secondary',
+                          icon: <PoundSterling className="w-3.5 h-3.5" />,
+                          onClick: () => mailClient(
+                            landlord.email,
+                            `Owner statement — ${landlord.name}`,
+                            `Hi ${landlord.name.split(' ')[0] || landlord.name},\n\nPlease find your statement attached.`
+                          ),
+                        },
+                      ]}
+                    />
+                  );
+                })
+              )
             )}
           </div>
 

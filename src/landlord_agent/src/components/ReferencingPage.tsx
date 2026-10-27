@@ -23,6 +23,7 @@ import {
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 import { referencingService } from '../services/referencingService';
+import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import { Tenant, UserProfile } from '../App';
 import {
   getAgentDummyReceivedShares,
@@ -700,7 +701,7 @@ function RequestReferencing({
         </div>
 
         <div className="ll-ref-table-wrap">
-          <table className="ll-ref-table">
+          <table className="ll-ref-table hidden md:table">
             <thead>
               <tr>
                 <th>Tenant</th>
@@ -797,6 +798,71 @@ function RequestReferencing({
               )}
             </tbody>
           </table>
+
+          {/* MOBILE ACCORDION DISCLOSURE VIEW (< md) */}
+          <div className="mob-accordion-container md:hidden">
+            {filteredTenants.map((tenant) => {
+              const status = statuses.get(tenant.email)
+                || statuses.get(tenant.email.trim().toLowerCase())
+                || 'not-started';
+              const reqState = requestStates[tenant.email];
+              const isLoading = reqState?.loading;
+              const sentAlready = activeSentRequests.some(
+                (request) => request.tenantEmail.trim().toLowerCase() === tenant.email.trim().toLowerCase(),
+              );
+              const isSent = reqState?.success || sentAlready;
+
+              return (
+                <MobileAccordionCard
+                  key={tenant.id}
+                  id={tenant.id}
+                  initials={initials(tenant.name)}
+                  title={tenant.name}
+                  subtitle={tenant.propertyAddress || '—'}
+                  statusBadge={{
+                    label: getReferencingStatusLabel(status),
+                    variant: status === 'complete' ? 'success' : status === 'in-progress' ? 'warning' : 'neutral',
+                  }}
+                  metrics={[
+                    { label: 'Contact', value: tenant.email },
+                    { label: 'Property', value: tenant.propertyAddress || '—' },
+                    { label: 'Status', value: getReferencingStatusLabel(status) },
+                    { label: 'Last Activity', value: timeAgo(tenant.leaseStart) },
+                  ]}
+                  actions={
+                    <div className="flex items-center gap-2 w-full pt-1">
+                      {onViewTenant && (
+                        <button
+                          type="button"
+                          className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center gap-1.5"
+                          onClick={() => onViewTenant(tenant)}
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+                      )}
+                      {!isSent && status !== 'complete' && (
+                        <button
+                          type="button"
+                          className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-[#DC5F12]/10 text-[#DC5F12] flex items-center justify-center gap-1.5"
+                          disabled={isLoading}
+                          onClick={() => sendRequest(tenant.email, tenant.name, tenant.propertyAddress || '')}
+                        >
+                          {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send size={14} />}
+                          {isLoading ? 'Sending…' : 'Send Request'}
+                        </button>
+                      )}
+                      {isSent && (
+                        <div className="flex-1 py-2 px-3 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg flex items-center justify-center gap-1">
+                          <CheckCircle2 size={14} /> Request sent
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              );
+            })}
+          </div>
         </div>
         <div className="ll-ref-table-foot">
           <span>
@@ -818,7 +884,7 @@ function RequestReferencing({
           </div>
         </div>
         <div className="ll-ref-table-wrap">
-          <table className="ll-ref-table">
+          <table className="ll-ref-table hidden md:table">
             <thead>
               <tr>
                 <th>Tenant</th>
@@ -856,6 +922,25 @@ function RequestReferencing({
               )}
             </tbody>
           </table>
+
+          <div className="mob-accordion-container md:hidden space-y-3">
+            {activeSentRequests.map((request) => (
+              <MobileAccordionCard
+                key={request.id}
+                initials={initials(request.tenantName || 'TN')}
+                title={request.tenantName || 'Tenant'}
+                subtitle={request.propertyAddress || 'No Property'}
+                statusBadge={{
+                  label: request.status || 'sent',
+                  variant: request.status === 'completed' ? 'success' : 'neutral',
+                }}
+                metrics={[
+                  { label: 'Email', value: request.tenantEmail },
+                  { label: 'Sent Date', value: request.createdAt ? new Date(request.createdAt).toLocaleDateString('en-GB') : '—' },
+                ]}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>

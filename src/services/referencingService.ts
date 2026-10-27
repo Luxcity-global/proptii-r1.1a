@@ -1,11 +1,23 @@
 import apiService from './api';
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
+import { uploadToFirebaseStorage } from './storageService';
+
+/** Read a File as a base64 data URL fallback. */
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('FileReader failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
  * Resolves the path prefix for referencing routes.
  * If VITE_API_URL already ends with /api the prefix is empty; otherwise /api is prepended.
  */
-function referencingPath(suffix: string): string {
+export function referencingPath(suffix: string): string {
   const raw = getResolvedApiBaseUrl().replace(/\/$/, '');
   const prefix = raw.endsWith('/api') ? '' : '/api';
   return `${prefix}/referencing/${suffix}`;
@@ -48,7 +60,7 @@ class ReferencingService {
    * Generic section save — called from ReferencingContext.saveFormData().
    * Maps to POST /referencing/{section} which the backend handles for all sections.
    */
-  async saveSectionData(userId: string, section: string, data: any) {
+  async saveSectionData(userId: string, section: string, data: any): Promise<any> {
     try {
       const response = await apiService.post(referencingPath(section), data);
       return response.data ?? { success: true };
@@ -65,7 +77,7 @@ class ReferencingService {
    * Load a saved referencing application by its userId/applicationId.
    * Maps to GET /referencing/:userId
    */
-  async getApplication(applicationId: string) {
+  async getApplication(applicationId: string): Promise<any> {
     try {
       const response = await apiService.get(referencingPath(applicationId));
       const data = response.data;
@@ -121,11 +133,14 @@ class ReferencingService {
     field: string,
     onProgress?: (progress: number) => void,
   ) {
+    // 1. Try backend API multipart upload
     try {
       const additionalData = {
         section,
         field,
         userId: applicationId,
+        name: file.name,
+        fileName: file.name,
       };
 
       const response = await apiService.uploadFile(
@@ -139,10 +154,47 @@ class ReferencingService {
       if (data?.url) {
         return { success: true, data: { fileUrl: data.url, storagePath: data.storagePath } };
       }
-      return { success: false, error: 'Upload succeeded but no URL returned' };
-    } catch (error: any) {
-      console.error(`Error uploading document (${section}/${field}):`, error);
-      return { success: false, error: error?.message || 'Failed to upload document' };
+    } catch (backendError: any) {
+      console.warn(`[ReferencingService] Backend upload failed for (${section}/${field}):`, backendError?.message);
+    }
+
+    // 2. Direct client Firebase Storage upload fallback
+    try {
+      const storageResult = await uploadToFirebaseStorage(
+        file,
+        `referencing/${applicationId || 'general'}/${section}/${field}`,
+        (progress) => {
+          if (onProgress) onProgress(progress.percentage);
+        }
+      );
+
+      if (storageResult.success && storageResult.url) {
+        return {
+          success: true,
+          data: {
+            fileUrl: storageResult.url,
+            storagePath: storageResult.fileName || file.name,
+          },
+        };
+      }
+    } catch (fbError: any) {
+      console.warn(`[ReferencingService] Firebase Storage fallback failed for (${section}/${field}):`, fbError?.message);
+    }
+
+    // 3. Last-resort fallback: read as data URL so referencing form is never blocked
+    try {
+      const dataUrl = await readAsDataUrl(file);
+      if (onProgress) onProgress(100);
+      return {
+        success: true,
+        data: {
+          fileUrl: dataUrl,
+          storagePath: file.name,
+        },
+      };
+    } catch (readError: any) {
+      console.error(`Error processing document (${section}/${field}):`, readError);
+      return { success: false, error: readError?.message || 'Failed to process document' };
     }
   }
 
@@ -150,7 +202,7 @@ class ReferencingService {
    * Save the current form state as a named draft.
    * Maps to POST /referencing/forms/:formId with the full form payload.
    */
-  async saveDraft(applicationId: string, name: string, data: any) {
+  async saveDraft(applicationId: string, name: string, data: any): Promise<any> {
     try {
       const response = await apiService.post(referencingPath(`forms/${applicationId}`), {
         ...data,
@@ -166,7 +218,7 @@ class ReferencingService {
 
   // ── Passport sharing ────────────────────────────────────────────────────────
 
-  async sharePassport(data: any) {
+  async sharePassport(data: any): Promise<any> {
     try {
       const response = await apiService.post(referencingPath('shares'), data);
       return response.data;
@@ -176,7 +228,7 @@ class ReferencingService {
     }
   }
 
-  async getShares() {
+  async getShares(): Promise<any> {
     try {
       const response = await apiService.get(referencingPath('shares'));
       return response.data;
@@ -186,7 +238,7 @@ class ReferencingService {
     }
   }
 
-  async deleteShare(shareId: string) {
+  async deleteShare(shareId: string): Promise<any> {
     try {
       const response = await apiService.delete(referencingPath(`shares/${shareId}`));
       return response.data;
@@ -196,7 +248,7 @@ class ReferencingService {
     }
   }
 
-  async loadDraft(propertyId: string, draftId: string) {
+  async loadDraft(propertyId: string, draftId: string): Promise<any> {
     try {
       const response = await apiService.get(referencingPath(`forms/${draftId || propertyId}`));
       return response.data ?? { success: true, data: null };
@@ -206,7 +258,7 @@ class ReferencingService {
     }
   }
 
-  async deleteDraft(propertyId: string, draftId: string) {
+  async deleteDraft(propertyId: string, draftId: string): Promise<any> {
     try {
       const response = await apiService.delete(referencingPath(`forms/${draftId || propertyId}`));
       return response.data ?? { success: true };
@@ -216,11 +268,11 @@ class ReferencingService {
     }
   }
 
-  async getFormData(userId: string) {
+  async getFormData(userId: string): Promise<any> {
     return this.getApplication(userId);
   }
 
-  async getDrafts(applicationId: string) {
+  async getDrafts(applicationId: string): Promise<any> {
     try {
       const response = await apiService.get(referencingPath('forms/all'));
       return response.data ?? { success: true, data: [] };
@@ -233,7 +285,7 @@ class ReferencingService {
   /** Allow longer timeout — backend runs file uploads + Firestore writes on submit. */
   private static readonly SUBMIT_TIMEOUT_MS = 120_000;
 
-  async submitApplication(userId: string, data: any) {
+  async submitApplication(userId: string, data: any): Promise<any> {
     try {
       const response = await apiService.post(
         referencingPath(`${userId}/submit`),

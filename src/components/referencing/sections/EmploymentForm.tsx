@@ -29,8 +29,8 @@ const EmploymentForm: React.FC = () => {
   
   // Handle upload complete
   const handleUploadComplete = (url: string, fileName: string) => {
-    console.log(`Employment proof document uploaded successfully: ${fileName} at ${url}`);
-    // You can store the URL in your form data if needed
+    handleFieldChange('proofDocument', { name: fileName, url });
+    handleFieldChange('proofDocumentId', url);
   };
 
   return (

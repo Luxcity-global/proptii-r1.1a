@@ -23,7 +23,8 @@ const ResidentialSection: React.FC = () => {
 
   const handleFileRemove = () => {
     updateFormData('residential', {
-      proofDocument: null
+      proofDocument: null,
+      proofDocumentId: null
     });
   };
 

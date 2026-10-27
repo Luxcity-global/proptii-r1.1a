@@ -73,10 +73,12 @@ export class StorageService {
       await fileRef.save(file.buffer, {
         contentType: file.mimetype || 'application/octet-stream',
         metadata: {
+          contentDisposition: `attachment; filename="${encodeURIComponent(cleanOriginalName)}"`,
           metadata: {
             firebaseStorageDownloadTokens: downloadToken,
             originalName: file.originalname,
             uploadedAt: new Date().toISOString(),
+            'x-content-type-options': 'nosniff',
           },
         },
       });

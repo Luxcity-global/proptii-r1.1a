@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException, ForbiddenException, ServiceUnavailableException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
 import { ReferencingService } from '../services/referencing.service';
@@ -169,9 +170,10 @@ export class ReferencingController {
 
   @Post('referencing/ai-extract')
   @HttpCode(200)
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
   @UseGuards(OptionalFirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file', {
-    limits: { fileSize: 15 * 1024 * 1024 },
+    limits: { fileSize: 25 * 1024 * 1024, files: 1 },
   }))
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'AI document data extraction from uploaded payslip or ID' })
@@ -207,8 +209,14 @@ export class ReferencingController {
 
   @Post(['referencing/files/save', 'applications/:id/upload', 'property/upload-photo', 'property/upload-document'])
   @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @UseGuards(OptionalFirebaseAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: {
+      fileSize: 25 * 1024 * 1024,
+      files: 1,
+    },
+  }))
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Upload and save referencing supporting document or photo' })
   @ApiConsumes('multipart/form-data', 'application/json')

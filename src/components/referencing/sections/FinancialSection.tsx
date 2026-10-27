@@ -26,7 +26,8 @@ const FinancialSection: React.FC = () => {
 
   const handleFileRemove = () => {
     updateFormData('financial', {
-      proofOfIncomeDocument: null
+      proofOfIncomeDocument: null,
+      proofOfIncomeDocumentId: null
     });
   };
 

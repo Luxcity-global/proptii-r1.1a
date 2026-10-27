@@ -22,7 +22,8 @@ const GuarantorSection: React.FC = () => {
 
   const handleFileRemove = () => {
     updateFormData('guarantor', {
-      identityDocument: null
+      identityDocument: null,
+      identityDocumentId: null
     });
   };
 

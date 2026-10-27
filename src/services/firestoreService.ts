@@ -308,10 +308,19 @@ class FirestoreService {
   ): Promise<{ success: boolean; fileId?: string; error?: string }> {
     try {
       const headers = await authHeaders();
+      const payload = {
+        ...fileData,
+        fileName: fileData.name,
+        name: fileData.name,
+        section: fileData.category,
+        category: fileData.category,
+        field: 'document',
+        userId,
+      };
       const res = await fetch(`${API_BASE}/api/referencing/files/save`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(fileData)
+        body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
@@ -319,7 +328,7 @@ class FirestoreService {
       }
 
       const json = await res.json();
-      return { success: true, fileId: json.id };
+      return { success: true, fileId: json.id || json.fileId };
     } catch (error: any) {
       console.error('❌ Error saving user file:', error);
       return { success: false, error: error.message };

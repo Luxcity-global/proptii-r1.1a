@@ -94,6 +94,13 @@ class ApiService {
         if (token) {
           setBearerAuth(config, token);
         }
+        // If sending FormData, ensure Content-Type is deleted so Axios / browser can supply multipart boundary
+        if (config.data instanceof FormData && config.headers) {
+          delete config.headers['Content-Type'];
+          if (typeof (config.headers as any).delete === 'function') {
+            (config.headers as any).delete('Content-Type');
+          }
+        }
         // Stamp request start time for duration tracking
         (config as any)._t = Date.now();
         const method = config.method?.toUpperCase() ?? 'GET';
@@ -272,8 +279,9 @@ class ApiService {
       url,
       data: formData,
       headers: {
-        'Content-Type': 'multipart/form-data',
+        'Content-Type': undefined,
       },
+      timeout: 120000,
       ...(onProgress && {
         onUploadProgress: (progressEvent: any) => {
           if (progressEvent.total) {

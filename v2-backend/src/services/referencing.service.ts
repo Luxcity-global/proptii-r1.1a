@@ -10,10 +10,12 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
 import { renderProptiiEmail } from '../utils/emailLayout';
 import { ComplianceTransformService } from '../gov-data/services/compliance-transform.service';
+import { validateFileContent } from '../utils/file-content-validator';
 import {
   getSignedDownloadUrl,
   uploadBase64ToStorage,
@@ -104,9 +106,25 @@ export class ReferencingService {
       if (!rawDataUri) continue;
 
       try {
-        const ext = rawDataUri.split(';')[0].split('/')[1] || 'bin';
-        const storagePath = `referencing/${userId}/${section}/${field}/${randomUUID()}.${ext}`;
-        const uploaded = await uploadBase64ToStorage(rawDataUri, storagePath);
+        const match = rawDataUri.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const declaredMime = match[1];
+        const buffer = Buffer.from(match[2], 'base64');
+        if (buffer.length > 25 * 1024 * 1024) {
+          this.logger.warn(`File for ${section}.${field} exceeds 25MB limit`);
+          continue;
+        }
+        const validation = validateFileContent(buffer, undefined, declaredMime);
+        if (!validation.valid) {
+          this.logger.warn(`File for ${section}.${field} prohibited content: ${validation.error}`);
+          continue;
+        }
+        const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safeSection = section.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safeField = field.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const ext = (validation.detectedType.includes('/') ? validation.detectedType.split('/')[1] : declaredMime.split('/')[1] || 'bin').replace(/[^a-z0-9]/g, '');
+        const storagePath = `referencing/${safeUserId}/${safeSection}/${safeField}/${randomUUID()}.${ext}`;
+        const uploaded = await uploadBase64ToStorage(rawDataUri, storagePath, `${safeSection}_${safeField}.${ext}`);
 
         // Replace raw base64 with metadata object preserving existing fields
         result[field] = {
@@ -556,42 +574,79 @@ export class ReferencingService {
     let storageResult: any = null;
 
     if (file) {
-      const section  = fileData?.section  || 'general';
-      const field    = fileData?.field    || 'document';
-      const ext      = file.originalname.split('.').pop() || 'bin';
-      const storagePath = `referencing/${userId}/${section}/${field}/${randomUUID()}.${ext}`;
+      if (!file.buffer || file.buffer.length === 0) {
+        throw new BadRequestException('Uploaded file is empty');
+      }
+      if (file.size > 25 * 1024 * 1024) {
+        throw new BadRequestException('File exceeds maximum size limit of 25MB');
+      }
+      const validation = validateFileContent(file.buffer, file.originalname, file.mimetype);
+      if (!validation.valid) {
+        this.logger.warn(`saveUserFile prohibited upload for ${userId}: ${validation.error}`);
+        throw new BadRequestException(validation.error || 'Prohibited or unsupported file format');
+      }
+
+      const safeOriginalName = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_') || 'document';
+      const rawExt = path.extname(safeOriginalName).replace(/^\./, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ext = rawExt || (validation.detectedType.includes('/') ? validation.detectedType.split('/')[1] : 'bin');
+      const section = (fileData?.section || fileData?.category || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const field = (fileData?.field || 'document').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const storagePath = `referencing/${safeUserId}/${section}/${field}/${randomUUID()}.${ext}`;
 
       try {
-        storageResult = await uploadBufferToStorage(file.buffer, storagePath, file.mimetype);
+        storageResult = await uploadBufferToStorage(file.buffer, storagePath, validation.detectedType || file.mimetype, safeOriginalName);
       } catch (err: any) {
         this.logger.error(`saveUserFile upload failed for ${userId}: ${err?.message || err}`);
       }
-    } else if (isBase64DataUri(fileData.base64 || fileData.fileData || fileData.content || fileData.dataUrl)) {
+    } else if (isBase64DataUri(fileData?.base64 || fileData?.fileData || fileData?.content || fileData?.dataUrl || fileData?.url)) {
       // Fallback for old base64 payloads if still used anywhere internally
-      const raw = fileData.base64 || fileData.fileData || fileData.content || fileData.dataUrl;
-      const section  = fileData.section  || 'general';
-      const field    = fileData.field    || 'document';
-      const ext      = raw.split(';')[0].split('/')[1] || 'bin';
-      const storagePath = `referencing/${userId}/${section}/${field}/${randomUUID()}.${ext}`;
+      const raw = fileData.base64 || fileData.fileData || fileData.content || fileData.dataUrl || fileData.url;
+      const match = typeof raw === 'string' ? raw.match(/^data:([^;]+);base64,(.+)$/) : null;
+      if (!match) {
+        throw new BadRequestException('Invalid base64 document format');
+      }
+      const declaredMime = match[1];
+      const buffer = Buffer.from(match[2], 'base64');
+      if (buffer.length > 25 * 1024 * 1024) {
+        throw new BadRequestException('Uploaded file exceeds maximum limit of 25MB');
+      }
+      const safeOriginalName = path.basename(fileData?.fileName || fileData?.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const validation = validateFileContent(buffer, safeOriginalName, declaredMime);
+      if (!validation.valid) {
+        this.logger.warn(`saveUserFile base64 prohibited upload for ${userId}: ${validation.error}`);
+        throw new BadRequestException(validation.error || 'Prohibited or unsupported file format');
+      }
+
+      const rawExt = path.extname(safeOriginalName).replace(/^\./, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ext = rawExt || (validation.detectedType.includes('/') ? validation.detectedType.split('/')[1] : 'bin');
+      const section = (fileData?.section || fileData?.category || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const field = (fileData?.field || 'document').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const storagePath = `referencing/${safeUserId}/${section}/${field}/${randomUUID()}.${ext}`;
 
       try {
-        storageResult = await uploadBase64ToStorage(raw, storagePath);
+        storageResult = await uploadBase64ToStorage(raw, storagePath, safeOriginalName);
       } catch (err: any) {
         this.logger.error(`saveUserFile upload failed for ${userId}: ${err?.message || err}`);
       }
     }
 
     // Build the Firestore metadata record — never store raw bytes
+    const cleanFileName = (file?.originalname ? path.basename(file.originalname) : (fileData?.fileName || fileData?.name || 'document')).replace(/[^a-zA-Z0-9._-]/g, '_');
     const payload: any = {
       id: docId,
       userId,
-      section:     fileData.section     || 'general',
-      field:       fileData.field       || 'document',
-      fileName:    file?.originalname   || fileData.fileName    || fileData.name || 'document',
-      contentType: file?.mimetype       || fileData.contentType || fileData.mimeType || storageResult?.contentType || 'application/octet-stream',
-      size:        file?.size           || fileData.size        || storageResult?.size || 0,
-      url:         storageResult?.downloadUrl || fileData.url || '',
-      storagePath: storageResult?.storagePath || fileData.storagePath || '',
+      section:     fileData?.section     || fileData?.category    || 'general',
+      category:    fileData?.category    || fileData?.section     || 'general',
+      field:       fileData?.field       || 'document',
+      fileName:    cleanFileName,
+      name:        cleanFileName,
+      contentType: file?.mimetype       || fileData?.contentType || fileData?.type || fileData?.mimeType || storageResult?.contentType || 'application/octet-stream',
+      type:        file?.mimetype       || fileData?.contentType || fileData?.type || fileData?.mimeType || storageResult?.contentType || 'application/octet-stream',
+      size:        file?.size           || fileData?.size        || storageResult?.size || 0,
+      url:         storageResult?.downloadUrl || (fileData?.url && !isBase64DataUri(fileData.url) ? fileData.url : '') || '',
+      storagePath: storageResult?.storagePath || fileData?.storagePath || '',
       createdAt:   admin.firestore.FieldValue.serverTimestamp(),
     };
 
@@ -1274,8 +1329,15 @@ export class ReferencingService {
     let cleanMimeType = 'image/jpeg';
 
     if (file && file.buffer) {
+      if (file.buffer.length === 0) {
+        return { success: false, error: 'Document file is empty' };
+      }
+      const validation = validateFileContent(file.buffer, file.originalname, file.mimetype);
+      if (!validation.valid) {
+        return { success: false, error: validation.error || 'Prohibited or unsupported file format' };
+      }
       cleanBase64 = file.buffer.toString('base64');
-      cleanMimeType = file.mimetype || 'image/jpeg';
+      cleanMimeType = validation.detectedType || file.mimetype || 'image/jpeg';
     } else if (body?.base64Data || body?.fileData || body?.base64) {
       const raw = body.base64Data || body.fileData || body.base64;
       if (typeof raw === 'string' && raw.includes(',')) {
@@ -1284,6 +1346,14 @@ export class ReferencingService {
       } else if (typeof raw === 'string') {
         cleanBase64 = raw;
         cleanMimeType = body?.mimeType || 'image/jpeg';
+      }
+      if (cleanBase64) {
+        const buffer = Buffer.from(cleanBase64, 'base64');
+        const validation = validateFileContent(buffer, undefined, cleanMimeType);
+        if (!validation.valid) {
+          return { success: false, error: validation.error || 'Prohibited or unsupported file format' };
+        }
+        cleanMimeType = validation.detectedType || cleanMimeType;
       }
     }
 

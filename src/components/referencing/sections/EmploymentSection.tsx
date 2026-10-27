@@ -16,6 +16,7 @@ const EmploymentSection: React.FC = () => {
   const handleFileRemove = () => {
     updateFormData('employment', {
       proofDocument: null,
+      proofDocumentId: null,
       proofType: ''
     });
   };

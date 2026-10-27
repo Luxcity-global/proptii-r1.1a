@@ -867,6 +867,8 @@ const TenantReferencing: React.FC = () => {
           onClose={closeReferencingModal}
           initialStep={referencingStep}
           singleSectionOnly={singleSectionOnly}
+          propertyId={user?.id ? `general_${user.id}` : 'default-property'}
+          applicationId={user?.id ? `general_${user.id}` : undefined}
           onSubmissionComplete={() => {
             loadReferencingData();
           }}

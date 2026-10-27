@@ -1,6 +1,7 @@
 @import 'swiper/css';
 @import 'swiper/css/navigation';
 @import 'swiper/css/pagination';
+@import './styles/mobileResponsive.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

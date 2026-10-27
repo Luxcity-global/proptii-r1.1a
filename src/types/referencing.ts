@@ -20,7 +20,8 @@ export interface IdentityData {
   dateOfBirth: string;
   isBritish: boolean;
   nationality?: string;
-  identityProof?: File | null;
+  identityProof?: File | any | null;
+  identityProofId?: string | null;
 }
 
 /**
@@ -35,7 +36,8 @@ export interface EmploymentData {
   referenceEmail?: string;
   referencePhone?: string;
   proofType?: string;
-  proofDocument?: File | null;
+  proofDocument?: File | any | null;
+  proofDocumentId?: string | null;
 }
 
 /**
@@ -48,16 +50,18 @@ export interface ResidentialData {
   durationAtPreviousAddress?: string;
   reasonForLeaving?: string;
   proofType: string;
-  proofDocument: File | null;
+  proofDocument: File | any | null;
+  proofDocumentId?: string | null;
 }
 
 /**
  * Financial section data
  */
 export interface FinancialData {
-  monthlyIncome: string;
+  monthlyIncome?: string;
   proofOfIncomeType: string;
-  proofOfIncomeDocument?: File | null;
+  proofOfIncomeDocument?: File | any | null;
+  proofOfIncomeDocumentId?: string | null;
   useOpenBanking: boolean;
   isConnectedToOpenBanking?: boolean;
 }
@@ -66,10 +70,16 @@ export interface FinancialData {
  * Guarantor section data
  */
 export interface GuarantorData {
-  fullName: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
+  phoneNumber?: string;
   address: string;
-  identityDocument?: File | null;
+  isUKResident?: boolean;
+  hasGoodCredit?: boolean;
+  identityDocument?: File | any | null;
+  identityDocumentId?: string | null;
 }
 
 /**
@@ -77,6 +87,8 @@ export interface GuarantorData {
  */
 export interface CreditCheckData {
   hasAgreedToCheck: boolean;
+  additionalDocument?: File | any | null;
+  additionalDocumentId?: string | null;
 }
 
 /**
@@ -101,23 +113,29 @@ export interface ReferencingFormData {
   createdAt?: string;
   updatedAt?: string;
   status?: 'draft' | 'submitted' | 'in_progress' | 'approved' | 'rejected';
-  identity?: Omit<IdentityData, 'identityProof'> & {
+  identity?: Partial<IdentityData> & {
     identityProofId?: string;
+    identityProof?: any;
   };
-  employment?: Omit<EmploymentData, 'proofDocument'> & {
+  employment?: Partial<EmploymentData> & {
     proofDocumentId?: string;
+    proofDocument?: any;
   };
-  residential?: Omit<ResidentialData, 'proofDocument'> & {
+  residential?: Partial<ResidentialData> & {
     proofDocumentId?: string;
+    proofDocument?: any;
   };
-  financial?: Omit<FinancialData, 'proofOfIncomeDocument'> & {
+  financial?: Partial<FinancialData> & {
     proofOfIncomeDocumentId?: string;
+    proofOfIncomeDocument?: any;
   };
-  guarantor?: Omit<GuarantorData, 'identityDocument'> & {
+  guarantor?: Partial<GuarantorData> & {
     identityDocumentId?: string;
+    identityDocument?: any;
   };
-  creditCheck?: Omit<CreditCheckData, 'additionalDocument'> & {
+  creditCheck?: Partial<CreditCheckData> & {
     additionalDocumentId?: string;
+    additionalDocument?: any;
   };
 }
 
@@ -165,11 +183,13 @@ export const employmentSchema = yup.object().shape({
   employmentStatus: yup.string().oneOf(['employed', 'self-employed', 'student', 'retired', 'unemployed']).required('Employment status is required'),
   employerName: yup.string().when('employmentStatus', {
     is: 'employed',
-    then: yup.string().required('Employer name is required')
+    then: (s) => s.required('Employer name is required'),
+    otherwise: (s) => s.notRequired(),
   }),
   jobTitle: yup.string().when('employmentStatus', {
     is: 'employed',
-    then: yup.string().required('Job title is required')
+    then: (s) => s.required('Job title is required'),
+    otherwise: (s) => s.notRequired(),
   }),
   annualIncome: yup.number().positive('Annual income must be positive').required('Annual income is required'),
   employmentStartDate: yup.date().max(new Date(), 'Start date cannot be in the future').required('Employment start date is required'),
@@ -182,11 +202,13 @@ export const residentialSchema = yup.object().shape({
   residentialStatus: yup.string().oneOf(['owner', 'tenant', 'living_with_family', 'other']).required('Residential status is required'),
   landlordName: yup.string().when('residentialStatus', {
     is: 'tenant',
-    then: yup.string().required('Landlord name is required')
+    then: (s) => s.required('Landlord name is required'),
+    otherwise: (s) => s.notRequired(),
   }),
   landlordEmail: yup.string().when('residentialStatus', {
     is: 'tenant',
-    then: yup.string().email('Invalid email').required('Landlord email is required')
+    then: (s) => s.email('Invalid email').required('Landlord email is required'),
+    otherwise: (s) => s.notRequired(),
   }),
   proofDocument: yup.mixed().required('Residential proof document is required')
 });

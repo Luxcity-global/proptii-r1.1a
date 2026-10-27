@@ -22,6 +22,7 @@ import { useIsMobile } from '../ui/use-mobile';
 import TenantPageHeader from '../ui/TenantPageHeader';
 import FileUploadModal from './FileUploadModal';
 import FilePreviewModal from './FilePreviewModal';
+import { MobileAccordionCard } from '../../common/MobileAccordionCard';
 import '../../../styles/tenantFiles.css';
 import '../../../styles/tenantModals.css';
 
@@ -155,18 +156,27 @@ const YourFiles: React.FC = () => {
         ];
 
         sections.forEach(({ section, field, category }) => {
-          const sectionData = formData[section as keyof ReferencingFormData];
+          const sectionData = formData?.[section as keyof ReferencingFormData];
           if (sectionData && (sectionData as any)[field]) {
             const document = (sectionData as any)[field];
-            if (document && document.name && (document.dataUrl || document.url)) {
+            const fileUrl = typeof document === 'string'
+              ? document
+              : (document.url || document.dataUrl || document.downloadUrl || null);
+            const fileName = typeof document === 'string'
+              ? (document.split('/').pop()?.split('?')[0] || `${category} Document`)
+              : (document.name || document.fileName || (fileUrl ? fileUrl.split('/').pop()?.split('?')[0] : `${category} Document`));
+
+            if (fileUrl || (typeof document === 'object' && document.name)) {
               referencingFilesList.push({
-                id: Date.now() + Math.random(),
-                name: document.name,
+                id: (typeof document === 'object' && document.id) ? document.id : (Date.now() + Math.random()),
+                name: fileName,
                 category,
-                type: document.type || 'application/pdf',
-                size: document.size || 0,
-                uploadDate: new Date(document.lastModified || Date.now()).toLocaleDateString(),
-                url: document.dataUrl || document.url,
+                type: (typeof document === 'object' && (document.type || document.contentType)) || 'application/pdf',
+                size: (typeof document === 'object' && document.size) || 0,
+                uploadDate: (typeof document === 'object' && document.lastModified)
+                  ? new Date(document.lastModified).toLocaleDateString()
+                  : new Date().toLocaleDateString(),
+                url: fileUrl || '',
               });
             }
           }
@@ -230,6 +240,7 @@ const YourFiles: React.FC = () => {
       }
 
       await loadFiles();
+      await loadReferencingFiles();
     } catch (err) {
       setError('Upload failed');
       console.error('Upload error:', err);
@@ -540,7 +551,7 @@ const YourFiles: React.FC = () => {
         </>
       ) : (
         <div className="tn-fl-table-wrap">
-          <div className="tn-fl-table-scroll">
+          <div className="tn-fl-table-scroll hidden md:block">
             <table className="tn-fl-table">
               <thead>
                 <tr>
@@ -577,19 +588,47 @@ const YourFiles: React.FC = () => {
             </table>
           </div>
 
-          <div className="tn-fl-cards">
+          {/* MOBILE ACCORDION DISCLOSURE VIEW (< md) */}
+          <div className="mob-accordion-container md:hidden">
             {paginatedFiles.map((file) => (
-              <div key={`m-${file.id}`} className="tn-fl-grid-card">
-                <div className="tn-fl-grid-top">
-                  {renderFileIcon(file)}
-                  {renderRowActions(file)}
-                </div>
-                <h4 onClick={() => handleView(file)}>{file.name}</h4>
-                <p className="tn-fl-grid-meta">{formatFileSize(file.size)} • {file.uploadDate}</p>
-                <div className="tn-fl-grid-foot">
-                  <span className={`tn-fl-cat ${categoryClass(file.category)}`}>{file.category}</span>
-                </div>
-              </div>
+              <MobileAccordionCard
+                key={`m-${file.id}`}
+                id={file.id}
+                title={file.name}
+                subtitle={`${formatFileSize(file.size)} • ${file.uploadDate}`}
+                statusBadge={
+                  <span className={`tn-fl-cat ${categoryClass(file.category)}`}>
+                    {file.category}
+                  </span>
+                }
+                avatar={renderFileIcon(file)}
+                fields={[
+                  { label: 'Category', value: file.category },
+                  { label: 'File Size', value: formatFileSize(file.size) },
+                  { label: 'Uploaded', value: file.uploadDate },
+                  { label: 'File Format', value: file.type.split('/')[1]?.toUpperCase() || 'FILE' },
+                ]}
+                actions={[
+                  {
+                    label: 'View',
+                    variant: 'primary',
+                    icon: <Eye className="w-3.5 h-3.5" />,
+                    onClick: () => handleView(file),
+                  },
+                  {
+                    label: 'Download',
+                    variant: 'secondary',
+                    icon: <Download className="w-3.5 h-3.5" />,
+                    onClick: () => handleDownload(file),
+                  },
+                  {
+                    label: 'Delete',
+                    variant: 'danger',
+                    icon: <Trash2 className="w-3.5 h-3.5" />,
+                    onClick: () => setDeleteConfirm(file.id),
+                  },
+                ]}
+              />
             ))}
           </div>
 

@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { SendContractModal } from './SendContractModal';
+import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import { contractService } from '../services/contractService';
 import { fetchContractPdfFile } from '../../../services/contractPdf';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
@@ -1115,22 +1116,38 @@ export function ContractsPage({
                   filteredContracts.map((contract) => {
                     const parts = propertyParts(contract.propertyAddress);
                     return (
-                      <div key={contract.id} className="ll-ct-card" onClick={() => handleViewContract(contract)}>
-                        <div className="ll-ct-tenant" style={{ marginBottom: 10 }}>
-                          <div className={`ll-ct-avatar ${avatarTone(contract.tenantName)}`}>
+                      <MobileAccordionCard
+                        key={contract.id}
+                        id={contract.id}
+                        title={contract.tenantName || 'Unknown Tenant'}
+                        subtitle={parts.property || 'Property'}
+                        statusBadge={<StatusPill contract={contract} />}
+                        avatar={
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] ${avatarTone(contract.tenantName)}`}>
                             {tenantInitials(contract.tenantName)}
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <div className="ll-ct-tenant-name">{contract.tenantName}</div>
-                            <div className="ll-ct-muted">{contract.tenantEmail}</div>
-                          </div>
-                          {renderActions(contract)}
-                        </div>
-                        <div className="ll-ct-prop">{parts.property}</div>
-                        <div className="ll-ct-muted">{parts.unit}</div>
-                        <div style={{ margin: '8px 0' }}>{contract.title || contract.fileName}</div>
-                        <StatusPill contract={contract} />
-                      </div>
+                        }
+                        fields={[
+                          { label: 'Tenant Email', value: contract.tenantEmail || 'N/A' },
+                          { label: 'Property / Unit', value: `${parts.property} ${parts.unit ? `(${parts.unit})` : ''}` },
+                          { label: 'Contract Title', value: contract.title || contract.fileName || 'Contract' },
+                          { label: 'Period / Due', value: formatPeriod(contract) },
+                        ]}
+                        actions={[
+                          {
+                            label: 'View',
+                            variant: 'primary',
+                            icon: <Eye className="w-3.5 h-3.5" />,
+                            onClick: () => handleViewContract(contract),
+                          },
+                          {
+                            label: 'PDF',
+                            variant: 'secondary',
+                            icon: <Download className="w-3.5 h-3.5" />,
+                            onClick: () => handleOpenSignature(contract),
+                          },
+                        ]}
+                      />
                     );
                   })}
               </div>
