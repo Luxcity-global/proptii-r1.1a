@@ -1396,21 +1396,23 @@
     gap: 8px;
   }
 
-  .ll-vw-header-icon {
-    flex: 0 0 auto;
-  }
-
+  .ll-vw-header-icon,
   .ll-vw-btn-insights {
-    flex: 1 1 auto;
-    min-width: 130px;
-    justify-content: center;
-    white-space: nowrap;
+    display: none !important;
   }
 
   .ll-vw-btn-cta {
     flex: 1 1 100%;
+    min-height: 44px;
+    border-radius: 12px;
     justify-content: center;
     white-space: nowrap;
+  }
+
+  @media (max-width: 480px) {
+    .ll-vw-header p {
+      display: none !important;
+    }
   }
 
   /* Filters: stack */

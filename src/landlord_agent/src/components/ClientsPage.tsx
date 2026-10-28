@@ -177,23 +177,7 @@ export function ClientsPage({
 
   const userName = userProfile?.name || 'Mr Flash';
 
-  // Simulation controls state (Matches screenshot and Agent clients baseline)
-  const [isSimStatesOpen, setIsSimStatesOpen] = useState(false);
-  const [isSimLoading, setIsSimLoading] = useState(false);
-  const [isSimEmpty, setIsSimEmpty] = useState(false);
-  const simMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (simMenuRef.current && !simMenuRef.current.contains(e.target as Node)) {
-        setIsSimStatesOpen(false);
-      }
-    };
-    if (isSimStatesOpen) {
-      document.addEventListener('mousedown', handleOutsideClick);
-    }
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [isSimStatesOpen]);
 
   // Search & Filters state
   const [searchTerm, setSearchTerm] = useState('');
@@ -318,27 +302,7 @@ export function ClientsPage({
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const handleSimLoading = () => {
-    setIsSimStatesOpen(false);
-    setIsSimLoading(true);
-    setTimeout(() => {
-      setIsSimLoading(false);
-      showToast('Live state restored', 'info');
-    }, 2000);
-  };
 
-  const handleToggleSimEmpty = () => {
-    setIsSimStatesOpen(false);
-    setIsSimEmpty((prev) => !prev);
-    showToast(!isSimEmpty ? 'Empty state preview active' : 'Live state restored', 'info');
-  };
-
-  const handleResetSimStates = () => {
-    setIsSimStatesOpen(false);
-    setIsSimLoading(false);
-    setIsSimEmpty(false);
-    showToast('All simulated states reset to live', 'info');
-  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -440,7 +404,6 @@ export function ClientsPage({
 
   // Filtered & Sorted Tenants
   const filteredTenants = useMemo(() => {
-    if (isSimEmpty) return [];
     const query = debouncedSearch.toLowerCase().trim();
 
     const result = clientRows.filter((tenant) => {
@@ -505,13 +468,12 @@ export function ClientsPage({
     sortField,
     sortAsc,
     arrearsByTenantId,
-    isSimEmpty,
   ]);
 
   // Reset page when search or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, activeFilterPill, filterStatus, filterProperty, filterExpiry, pageSize, isSimEmpty]);
+  }, [debouncedSearch, activeFilterPill, filterStatus, filterProperty, filterExpiry, pageSize]);
 
   // Pagination calculation
   const totalItems = filteredTenants.length;
@@ -677,13 +639,13 @@ export function ClientsPage({
                 <h1 className="font-heading text-xl sm:text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight leading-none">
                   Clients
                 </h1>
-                <p className="text-slate-500 text-xs sm:text-sm mt-1 font-normal">
+                <p className="text-slate-500 text-xs sm:text-sm mt-1 font-normal hidden sm:block">
                   Manage your tenants, portfolio relationships, agreements, and real-time ledger records.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
               <button
                 id="btnRefresh"
                 type="button"
@@ -733,12 +695,12 @@ export function ClientsPage({
               <User className="w-4 h-4" />
               <span>Tenants</span>
               <span id="tabCountTenants" className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                {isTenantsLoading ? '…' : isSimEmpty ? 0 : kpiStats.total}
+                {isTenantsLoading ? '…' : kpiStats.total}
               </span>
             </button>
 
             {/* Invitations Tab (Available when invitations exist or to manage pending invites) */}
-            {invitations.length > 0 && !isSimEmpty && (
+            {invitations.length > 0 && (
               <button
                 type="button"
                 onClick={() => setActiveMainTab('invitations')}
@@ -756,55 +718,13 @@ export function ClientsPage({
               </button>
             )}
           </div>
-
-          {/* Secondary Compact State Simulation Dropdown (Matches Screenshot & Agent Clients baseline) */}
-          <div ref={simMenuRef} className="relative inline-block self-end sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setIsSimStatesOpen((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all font-heading shadow-xs active:scale-95 cursor-pointer min-h-[40px]"
-              title="Open simulated state controls"
-            >
-              <span className="w-2 h-2 rounded-full bg-[#DC5F12] animate-pulse" />
-              <span>Simulate State</span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-            {isSimStatesOpen && (
-              <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-xl shadow-dropdown border border-slate-200/90 py-1.5 z-30 text-xs font-normal">
-                <button
-                  type="button"
-                  onClick={handleSimLoading}
-                  className="w-full px-3 py-2 text-left text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between cursor-pointer"
-                >
-                  <span>Loading (2s)</span>
-                  <span className="text-[9px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-bold">Shimmer</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToggleSimEmpty}
-                  className="w-full px-3 py-2 text-left text-slate-700 hover:bg-rose-50 hover:text-rose-700 flex items-center justify-between cursor-pointer"
-                >
-                  <span>{isSimEmpty ? 'Disable Empty' : 'Empty State'}</span>
-                  <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">Empty</span>
-                </button>
-                <div className="border-t border-slate-100 my-1" />
-                <button
-                  type="button"
-                  onClick={handleResetSimStates}
-                  className="w-full px-3 py-2 text-left text-slate-500 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  <span>Reset All States</span>
-                </button>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* ========================================================================= */}
         {/* TOP 4 KPI CARDS (MATCHING AGENT CLIENTS.HTML ANATOMY & LIVE METRICS)       */}
         {/* ========================================================================= */}
         <section id="kpiCardsContainer" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          {isSimLoading || isTenantsLoading ? (
+          {isTenantsLoading ? (
             Array(4)
               .fill(0)
               .map((_, i) => (
@@ -820,49 +740,6 @@ export function ClientsPage({
                   </div>
                 </div>
               ))
-          ) : isSimEmpty ? (
-            <>
-              <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Total Tenants</div>
-                  <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0</div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">No records found</div>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Active Contracts</div>
-                  <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0</div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">None active</div>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Pending Checks</div>
-                  <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0</div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">No checks pending</div>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                  <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Payment Status</div>
-                  <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0%</div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">No transactions</div>
-                </div>
-              </div>
-            </>
           ) : (
             <>
               {/* CARD 1: TOTAL TENANTS */}
@@ -957,7 +834,7 @@ export function ClientsPage({
         </section>
 
         {/* INVITATIONS PANEL VIEW (IF ACTIVE) */}
-        {activeMainTab === 'invitations' && !isSimEmpty && (
+        {activeMainTab === 'invitations' && (
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-card mb-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1060,11 +937,11 @@ export function ClientsPage({
           {/* Bottom Row: Filter Pills */}
           <div id="clientsFilterPillsContainer" className="flex items-center gap-2 overflow-x-auto scrollbar-none pt-1">
             {[
-              { key: 'all' as const, label: 'All', count: isSimEmpty ? 0 : pillCounts.total },
-              { key: 'Paid' as const, label: 'Paid', count: isSimEmpty ? 0 : pillCounts.paid },
-              { key: 'Due Soon' as const, label: 'Due Soon', count: isSimEmpty ? 0 : pillCounts.dueSoon },
-              { key: 'Overdue' as const, label: 'Overdue', count: isSimEmpty ? 0 : pillCounts.overdue },
-              { key: 'expiring' as const, label: 'Expiring Soon', count: isSimEmpty ? 0 : pillCounts.expiring },
+              { key: 'all' as const, label: 'All', count: pillCounts.total },
+              { key: 'Paid' as const, label: 'Paid', count: pillCounts.paid },
+              { key: 'Due Soon' as const, label: 'Due Soon', count: pillCounts.dueSoon },
+              { key: 'Overdue' as const, label: 'Overdue', count: pillCounts.overdue },
+              { key: 'expiring' as const, label: 'Expiring Soon', count: pillCounts.expiring },
             ].map((pill) => {
               const isActive = activeFilterPill === pill.key;
               return (

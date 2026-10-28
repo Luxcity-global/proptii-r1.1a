@@ -789,7 +789,7 @@ export function PropertiesPage({
             </button>
             <button
               type="button"
-              className="ll-props-header-icon"
+              className="ll-props-header-icon hidden lg:inline-flex"
               title="Properties Settings"
               onClick={onViewSettings}
             >
@@ -797,7 +797,7 @@ export function PropertiesPage({
             </button>
             <button
               type="button"
-              className="ll-props-header-icon"
+              className="ll-props-header-icon hidden lg:inline-flex"
               title="Notifications"
               onClick={onViewNotifications}
             >
@@ -805,7 +805,7 @@ export function PropertiesPage({
               <span className="ll-props-header-dot" />
             </button>
             {onViewInsights && (
-              <button type="button" className="ll-props-btn-insights" onClick={onViewInsights}>
+              <button type="button" className="ll-props-btn-insights hidden lg:inline-flex" onClick={onViewInsights}>
                 <span className="ll-props-insights-icon">
                   <Sparkles size={12} />
                 </span>
@@ -815,7 +815,7 @@ export function PropertiesPage({
             {onBulkAssignTenants && (
               <button
                 type="button"
-                className="ll-props-btn-insights"
+                className="ll-props-btn-insights hidden lg:inline-flex"
                 onClick={onBulkAssignTenants}
                 title="Assign multiple tenants to properties at once"
               >
@@ -828,7 +828,7 @@ export function PropertiesPage({
             {onEnrichProperties && (
               <button
                 type="button"
-                className="ll-props-btn-insights"
+                className="ll-props-btn-insights hidden lg:inline-flex"
                 onClick={onEnrichProperties}
                 title="Review and enrich your property listings — add photos, documents and missing details"
               >

@@ -1596,6 +1596,27 @@
 
 /* ── Mobile responsiveness additions ───────────────────────────────────────── */
 
+@media (max-width: 1023px) {
+  .ll-props-header-actions .ll-props-header-icon:not(:first-child),
+  .ll-props-btn-insights {
+    display: none !important;
+  }
+  .ll-props-header-actions {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+  }
+  .ll-props-btn-add {
+    flex: 1 !important;
+    min-height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
 @media (max-width: 640px) {
   /* Header: stack title + actions vertically */
   .ll-props-header-inner {
@@ -1604,30 +1625,24 @@
     gap: 10px;
   }
 
-  /* Actions row: wrap cleanly — no horizontal scroll */
+  /* Actions row: 2 items max (refresh + add property) — zero horizontal scroll */
   .ll-props-header-actions {
     width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    display: flex;
+    align-items: center;
     gap: 8px;
+    flex-wrap: nowrap;
   }
 
-  /* Icon buttons: stay their natural size */
   .ll-props-header-icon {
-    flex: 0 0 auto;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
   }
 
-  /* Secondary text buttons: share available row space */
-  .ll-props-btn-insights {
-    flex: 1 1 auto;
-    min-width: 130px;
-    justify-content: center;
-    white-space: nowrap;
-  }
-
-  /* CTA button: always full-width on its own row */
   .ll-props-btn-add {
-    flex: 1 1 100%;
+    flex: 1;
+    min-height: 44px;
     justify-content: center;
     white-space: nowrap;
   }

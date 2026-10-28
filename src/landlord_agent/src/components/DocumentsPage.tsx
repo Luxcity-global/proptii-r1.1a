@@ -1794,7 +1794,7 @@ export function DocumentsPage({
           <div className="ll-docs-header-actions">
             <button
               type="button"
-              className={`ll-docs-header-icon${isRefreshing ? ' refreshing' : ''}`}
+              className={`ll-docs-header-icon hidden lg:inline-flex${isRefreshing ? ' refreshing' : ''}`}
               title="Refresh Portfolio Data"
               onClick={handleRefresh}
             >
@@ -1802,7 +1802,7 @@ export function DocumentsPage({
             </button>
             <button
               type="button"
-              className="ll-docs-header-icon"
+              className="ll-docs-header-icon hidden lg:inline-flex"
               title="Settings"
               onClick={onViewSettings}
             >
@@ -1810,7 +1810,7 @@ export function DocumentsPage({
             </button>
             <button
               type="button"
-              className="ll-docs-header-icon"
+              className="ll-docs-header-icon hidden lg:inline-flex"
               title="Notifications"
               onClick={onViewNotifications}
             >

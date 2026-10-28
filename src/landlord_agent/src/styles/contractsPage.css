@@ -897,26 +897,48 @@
 
   .ll-ct-header-actions {
     width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    display: flex;
+    align-items: center;
     gap: 8px;
+    flex-wrap: nowrap;
   }
 
   .ll-ct-header-icon {
-    flex: 0 0 auto;
+    display: none !important;
   }
 
   .ll-ct-btn-insights {
-    flex: 1 1 auto;
-    min-width: 130px;
+    flex: 0 0 auto;
+    min-width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 0 14px;
+  }
+
+  .ll-ct-btn-send {
+    flex: 1;
+    min-height: 44px;
+    border-radius: 12px;
     justify-content: center;
     white-space: nowrap;
   }
 
-  .ll-ct-btn-send {
-    flex: 1 1 100%;
-    justify-content: center;
-    white-space: nowrap;
+  @media (max-width: 480px) {
+    .ll-ct-header p {
+      display: none !important;
+    }
+    .ll-ct-btn-insights .ll-ct-insights-text {
+      display: none !important;
+    }
+    .ll-ct-btn-insights {
+      width: 44px !important;
+      height: 44px !important;
+      min-height: 44px !important;
+      padding: 0 !important;
+      flex: 0 0 44px !important;
+    }
   }
 
   /* KPI grid: single column */

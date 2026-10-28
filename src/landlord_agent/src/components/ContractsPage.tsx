@@ -749,24 +749,24 @@ export function ContractsPage({
             <p>Manage, track, and send property rent agreements.</p>
           </div>
           <div className="ll-ct-header-actions">
-            <button type="button" className="ll-ct-header-icon" title="Settings" onClick={onViewSettings}>
+            <button type="button" className="ll-ct-header-icon hidden lg:inline-flex" title="Settings" onClick={onViewSettings}>
               <Settings size={16} />
             </button>
-            <button type="button" className="ll-ct-header-icon" title="Notifications" onClick={onViewNotifications}>
+            <button type="button" className="ll-ct-header-icon hidden lg:inline-flex" title="Notifications" onClick={onViewNotifications}>
               <Bell size={16} />
               <span className="ll-ct-header-dot" />
             </button>
             {onViewInsights && (
-              <button type="button" className="ll-ct-btn-insights" onClick={onViewInsights}>
+              <button type="button" className="ll-ct-btn-insights" onClick={onViewInsights} title="Portfolio Insights">
                 <span className="ll-ct-insights-icon">
                   <Sparkles size={12} />
                 </span>
-                Portfolio Insights
+                <span className="ll-ct-insights-text">Portfolio Insights</span>
               </button>
             )}
             <button type="button" className="ll-ct-btn-send" onClick={() => setIsSendModalOpen(true)}>
               <Send size={14} />
-              Send Contract
+              <span>Send Contract</span>
             </button>
           </div>
         </div>

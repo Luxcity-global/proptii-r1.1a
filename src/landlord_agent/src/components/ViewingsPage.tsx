@@ -1570,7 +1570,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           <div className="ll-vw-header-actions">
             <button
               type="button"
-              className={`ll-vw-header-icon${isRefreshing ? ' refreshing' : ''}`}
+              className={`ll-vw-header-icon hidden lg:inline-flex${isRefreshing ? ' refreshing' : ''}`}
               title="Refresh Portfolio Data"
               onClick={handleHeaderRefresh}
             >
@@ -1578,7 +1578,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             </button>
             <button
               type="button"
-              className="ll-vw-header-icon"
+              className="ll-vw-header-icon hidden lg:inline-flex"
               title="Settings"
               onClick={onViewSettings}
             >
@@ -1586,7 +1586,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             </button>
             <button
               type="button"
-              className="ll-vw-header-icon"
+              className="ll-vw-header-icon hidden lg:inline-flex"
               title="Notifications"
               onClick={onViewNotifications}
             >
@@ -1595,7 +1595,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             </button>
             <button
               type="button"
-              className="ll-vw-btn-insights"
+              className="ll-vw-btn-insights hidden lg:inline-flex"
               onClick={() => setIsInsightsModalOpen(true)}
             >
               <span className="ll-vw-insights-icon">

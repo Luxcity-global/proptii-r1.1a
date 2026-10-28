@@ -1076,18 +1076,18 @@ export function ReferencingPage({
           </div>
           <div className="ll-ref-header-actions">
             {onViewSettings && (
-              <button type="button" className="ll-ref-header-icon" title="Referencing settings" onClick={onViewSettings}>
+              <button type="button" className="ll-ref-header-icon hidden lg:inline-flex" title="Referencing settings" onClick={onViewSettings}>
                 <Settings size={18} />
               </button>
             )}
             {onViewNotifications && (
-              <button type="button" className="ll-ref-header-icon" title="Notifications" onClick={onViewNotifications}>
+              <button type="button" className="ll-ref-header-icon hidden lg:inline-flex" title="Notifications" onClick={onViewNotifications}>
                 <Bell size={18} />
                 <span className="ll-ref-header-dot" />
               </button>
             )}
             {onViewInsights && (
-              <button type="button" className="ll-ref-btn-insights" onClick={onViewInsights}>
+              <button type="button" className="ll-ref-btn-insights hidden lg:inline-flex" onClick={onViewInsights}>
                 <span className="ll-ref-insights-icon">
                   <Sparkles size={12} />
                 </span>
