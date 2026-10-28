@@ -309,39 +309,6 @@ function PortfolioInsightsContent({
       {/* ========================================================================= */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-20 shadow-subtle">
         <div className="max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-3 sm:py-5 flex flex-col justify-between gap-3 sm:gap-4">
-          {/* Mobile Top Bar: Profile Container + Notification & Settings */}
-          <div id="headerMobileTopBar" className="flex items-center justify-between w-full lg:hidden pb-3 mb-2 border-b border-slate-100">
-            {/* Profile Avatar Hub Button */}
-            <div className="flex items-center gap-2 p-1 pl-1 pr-2.5 rounded-full bg-white border border-slate-200/90 shadow-xs min-h-[40px]">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#136C9E] to-[#0f766e] flex items-center justify-center text-white font-bold text-[11px] shadow-xs">
-                {userInitials}
-              </div>
-              <span className="text-xs font-heading font-bold text-slate-800">{userDisplayName}</span>
-            </div>
-
-            {/* Top Header Settings & Notification Icons */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onViewSettings}
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200/80 shadow-subtle transition-all cursor-pointer active:scale-95 min-w-[36px] min-h-[36px]"
-                title="Settings"
-                aria-label="Settings"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onViewNotifications}
-                className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200/80 shadow-subtle transition-all cursor-pointer active:scale-95 min-w-[36px] min-h-[36px]"
-                title="Notifications"
-                aria-label="Notifications"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
-              </button>
-            </div>
-          </div>
 
           {/* Desktop & Main Title Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
