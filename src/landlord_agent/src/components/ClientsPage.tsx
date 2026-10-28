@@ -3,9 +3,11 @@ import {
   Plus,
   Search,
   Users,
+  User,
   CheckCircle2,
   Clock,
   PoundSterling,
+  DollarSign,
   AlertTriangle,
   Eye,
   Trash2,
@@ -25,6 +27,9 @@ import {
   ShieldCheck,
   Sparkles,
   Building2,
+  Bell,
+  Settings,
+  Menu,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -75,6 +80,7 @@ interface ClientsPageProps {
   onViewInsights?: () => void;
   onViewSettings?: () => void;
   onViewNotifications?: () => void;
+  onOpenSidebar?: () => void;
 }
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
@@ -157,7 +163,38 @@ export function ClientsPage({
   onDeleteTenant,
   onExportTenants,
   userProfile,
+  onViewSettings,
+  onViewNotifications,
+  onOpenSidebar,
 }: ClientsPageProps) {
+  // Mobile Header & Sidebar handler
+  const handleOpenSidebar = useCallback(() => {
+    if (onOpenSidebar) {
+      onOpenSidebar();
+    }
+    window.dispatchEvent(new CustomEvent('open-mobile-sidebar'));
+  }, [onOpenSidebar]);
+
+  const userName = userProfile?.name || 'Mr Flash';
+
+  // Simulation controls state (Matches screenshot and Agent clients baseline)
+  const [isSimStatesOpen, setIsSimStatesOpen] = useState(false);
+  const [isSimLoading, setIsSimLoading] = useState(false);
+  const [isSimEmpty, setIsSimEmpty] = useState(false);
+  const simMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (simMenuRef.current && !simMenuRef.current.contains(e.target as Node)) {
+        setIsSimStatesOpen(false);
+      }
+    };
+    if (isSimStatesOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isSimStatesOpen]);
+
   // Search & Filters state
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -281,6 +318,28 @@ export function ClientsPage({
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  const handleSimLoading = () => {
+    setIsSimStatesOpen(false);
+    setIsSimLoading(true);
+    setTimeout(() => {
+      setIsSimLoading(false);
+      showToast('Live state restored', 'info');
+    }, 2000);
+  };
+
+  const handleToggleSimEmpty = () => {
+    setIsSimStatesOpen(false);
+    setIsSimEmpty((prev) => !prev);
+    showToast(!isSimEmpty ? 'Empty state preview active' : 'Live state restored', 'info');
+  };
+
+  const handleResetSimStates = () => {
+    setIsSimStatesOpen(false);
+    setIsSimLoading(false);
+    setIsSimEmpty(false);
+    showToast('All simulated states reset to live', 'info');
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     invalidateTenants();
@@ -381,6 +440,7 @@ export function ClientsPage({
 
   // Filtered & Sorted Tenants
   const filteredTenants = useMemo(() => {
+    if (isSimEmpty) return [];
     const query = debouncedSearch.toLowerCase().trim();
 
     const result = clientRows.filter((tenant) => {
@@ -445,12 +505,13 @@ export function ClientsPage({
     sortField,
     sortAsc,
     arrearsByTenantId,
+    isSimEmpty,
   ]);
 
   // Reset page when search or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, activeFilterPill, filterStatus, filterProperty, filterExpiry, pageSize]);
+  }, [debouncedSearch, activeFilterPill, filterStatus, filterProperty, filterExpiry, pageSize, isSimEmpty]);
 
   // Pagination calculation
   const totalItems = filteredTenants.length;
@@ -551,40 +612,102 @@ export function ClientsPage({
       {/* TOP HEADER BAR (WHITE BACKGROUND, STICKY)                                  */}
       {/* ========================================================================= */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-20 shadow-subtle">
-        <div className="max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-xl sm:text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight leading-none">
-              Clients
-            </h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-1.5 font-normal">
-              Manage your tenants, portfolio relationships, agreements, and real-time ledger records.
-            </p>
+        <div className="max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-3 sm:py-5 flex flex-col justify-between gap-3 sm:gap-4">
+          {/* Option 2 Mobile Top Bar: Profile Container + Notification & Settings on same line */}
+          <div id="headerMobileTopBar" className="flex items-center justify-between w-full lg:hidden pb-3 mb-1 border-b border-slate-100">
+            {/* Profile Avatar Hub Button */}
+            <button
+              id="mobileHeaderAvatarHub"
+              type="button"
+              onClick={handleOpenSidebar}
+              className="flex items-center gap-2 p-1 pl-1 pr-2.5 rounded-full bg-white border border-slate-200/90 shadow-xs hover:bg-slate-50 transition-all cursor-pointer min-h-[40px]"
+              title="Open Agent Profile Hub"
+              aria-label="Open Agent Profile Hub"
+            >
+              {userProfile?.photoURL ? (
+                <img
+                  src={userProfile.photoURL}
+                  alt={userName}
+                  className="w-7 h-7 rounded-full object-cover shadow-xs border border-slate-200"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#136C9E] to-[#0f766e] flex items-center justify-center text-white font-bold text-[11px] shadow-xs">
+                  {clientInitials(userName)}
+                </div>
+              )}
+              <span className="text-xs font-heading font-bold text-slate-800">{userName}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {/* Top Header Settings & Notification Icons */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => (onViewSettings ? onViewSettings() : window.dispatchEvent(new CustomEvent('navigate-to', { detail: 'settings' })))}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200/80 shadow-subtle transition-all cursor-pointer active:scale-95 min-w-[36px] min-h-[36px]"
+                title="Settings"
+                aria-label="Settings"
+              >
+                <Settings className="w-4 h-4 text-slate-600" />
+              </button>
+              <button
+                type="button"
+                onClick={() => (onViewNotifications ? onViewNotifications() : window.dispatchEvent(new CustomEvent('navigate-to', { detail: 'messages' })))}
+                className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200/80 shadow-subtle transition-all cursor-pointer active:scale-95 min-w-[36px] min-h-[36px]"
+                title="Notifications"
+                aria-label="Notifications"
+              >
+                <Bell className="w-4 h-4 text-slate-600" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-            <button
-              id="btnRefresh"
-              type="button"
-              onClick={handleRefresh}
-              title="Refresh Client Records"
-              className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 flex items-center justify-center transition-all shadow-subtle group hover:bg-slate-50 min-w-[40px] min-h-[40px] cursor-pointer"
-            >
-              <RotateCw
-                className={`w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-transform ${
-                  isRefreshing ? 'animate-spin text-[#DC5F12]' : ''
-                }`}
-              />
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleOpenSidebar}
+                className="p-2 -ml-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 lg:hidden flex items-center justify-center shrink-0 cursor-pointer"
+                aria-label="Open navigation menu"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+              <div>
+                <h1 className="font-heading text-xl sm:text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight leading-none">
+                  Clients
+                </h1>
+                <p className="text-slate-500 text-xs sm:text-sm mt-1 font-normal">
+                  Manage your tenants, portfolio relationships, agreements, and real-time ledger records.
+                </p>
+              </div>
+            </div>
 
-            <button
-              id="btnAddClientModal"
-              type="button"
-              onClick={() => setIsChoiceModalOpen(true)}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-[#DC5F12] hover:bg-[#ba4e0b] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 min-h-[44px] cursor-pointer"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>Add Tenant</span>
-            </button>
+            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+              <button
+                id="btnRefresh"
+                type="button"
+                onClick={handleRefresh}
+                title="Refresh Client Records"
+                className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 flex items-center justify-center transition-all shadow-subtle group hover:bg-slate-50 min-w-[40px] min-h-[40px] cursor-pointer"
+              >
+                <RotateCw
+                  className={`w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-transform ${
+                    isRefreshing ? 'animate-spin text-[#DC5F12]' : ''
+                  }`}
+                />
+              </button>
+
+              <button
+                id="btnAddClientModal"
+                type="button"
+                onClick={() => setIsChoiceModalOpen(true)}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 bg-[#DC5F12] hover:bg-[#ba4e0b] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all transform active:scale-95 min-h-[44px] cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span id="btnAddClientText">Add Tenant</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -594,10 +717,11 @@ export function ClientsPage({
       {/* ========================================================================= */}
       <main className="flex-1 px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-[1720px] mx-auto w-full pb-24 lg:pb-8">
         {/* SEGMENTED SWITCHER: STRICTLY NO LANDLORD TAB AS REQUESTED */}
-        <div className="mb-7 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 gap-1.5 shadow-subtle">
-            {/* Tenants Tab */}
+        <div className="mb-5 sm:mb-7 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 gap-1.5 shadow-subtle self-start">
+            {/* Tenants Tab Button */}
             <button
+              id="btnTabTenants"
               type="button"
               onClick={() => setActiveMainTab('tenants')}
               className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold font-heading transition-all ${
@@ -606,15 +730,15 @@ export function ClientsPage({
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <Users className="w-4 h-4" />
+              <User className="w-4 h-4" />
               <span>Tenants</span>
-              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                {isTenantsLoading ? '…' : kpiStats.total}
+              <span id="tabCountTenants" className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">
+                {isTenantsLoading ? '…' : isSimEmpty ? 0 : kpiStats.total}
               </span>
             </button>
 
             {/* Invitations Tab (Available when invitations exist or to manage pending invites) */}
-            {invitations.length > 0 && (
+            {invitations.length > 0 && !isSimEmpty && (
               <button
                 type="button"
                 onClick={() => setActiveMainTab('invitations')}
@@ -632,101 +756,208 @@ export function ClientsPage({
               </button>
             )}
           </div>
+
+          {/* Secondary Compact State Simulation Dropdown (Matches Screenshot & Agent Clients baseline) */}
+          <div ref={simMenuRef} className="relative inline-block self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setIsSimStatesOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all font-heading shadow-xs active:scale-95 cursor-pointer min-h-[40px]"
+              title="Open simulated state controls"
+            >
+              <span className="w-2 h-2 rounded-full bg-[#DC5F12] animate-pulse" />
+              <span>Simulate State</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+            {isSimStatesOpen && (
+              <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-xl shadow-dropdown border border-slate-200/90 py-1.5 z-30 text-xs font-normal">
+                <button
+                  type="button"
+                  onClick={handleSimLoading}
+                  className="w-full px-3 py-2 text-left text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                >
+                  <span>Loading (2s)</span>
+                  <span className="text-[9px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-bold">Shimmer</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleSimEmpty}
+                  className="w-full px-3 py-2 text-left text-slate-700 hover:bg-rose-50 hover:text-rose-700 flex items-center justify-between cursor-pointer"
+                >
+                  <span>{isSimEmpty ? 'Disable Empty' : 'Empty State'}</span>
+                  <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">Empty</span>
+                </button>
+                <div className="border-t border-slate-100 my-1" />
+                <button
+                  type="button"
+                  onClick={handleResetSimStates}
+                  className="w-full px-3 py-2 text-left text-slate-500 hover:bg-slate-50 font-semibold cursor-pointer"
+                >
+                  <span>Reset All States</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ========================================================================= */}
         {/* TOP 4 KPI CARDS (MATCHING AGENT CLIENTS.HTML ANATOMY & LIVE METRICS)       */}
         {/* ========================================================================= */}
         <section id="kpiCardsContainer" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          {/* CARD 1: TOTAL TENANTS */}
-          <div
-            onClick={() => {
-              setActiveFilterPill('all');
-              setFilterStatus('all');
-            }}
-            className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
-          >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading truncate">Total Tenants</div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
-                {isTenantsLoading ? '…' : kpiStats.total}
+          {isSimLoading || isTenantsLoading ? (
+            Array(4)
+              .fill(0)
+              .map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4"
+                >
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl skeleton-box shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-20 skeleton-box rounded" />
+                    <div className="h-6 w-14 skeleton-box rounded" />
+                    <div className="h-2.5 w-24 skeleton-box rounded" />
+                  </div>
+                </div>
+              ))
+          ) : isSimEmpty ? (
+            <>
+              <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                  <User className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Total Tenants</div>
+                  <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">No records found</div>
+                </div>
               </div>
-              <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate">
-                {kpiStats.activeCount} Active · {kpiStats.pendingCount} Onboarding
+              <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Active Contracts</div>
+                  <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">None active</div>
+                </div>
               </div>
-            </div>
-          </div>
+              <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Pending Checks</div>
+                  <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">No checks pending</div>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Payment Status</div>
+                  <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0%</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">No transactions</div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* CARD 1: TOTAL TENANTS */}
+              <div
+                onClick={() => {
+                  setActiveFilterPill('all');
+                  setFilterStatus('all');
+                }}
+                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+              >
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <User className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading truncate">Total Tenants</div>
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
+                    {kpiStats.total}
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate">
+                    {kpiStats.activeCount} Active · {kpiStats.pendingCount} Onboarding
+                  </div>
+                </div>
+              </div>
 
-          {/* CARD 2: ACTIVE CONTRACTS */}
-          <div
-            onClick={() => {
-              setActiveFilterPill('Paid');
-              setFilterStatus('Paid');
-            }}
-            className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
-          >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading truncate">Active Contracts</div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
-                {isTenantsLoading ? '…' : kpiStats.activeContracts}
+              {/* CARD 2: ACTIVE CONTRACTS */}
+              <div
+                onClick={() => {
+                  setActiveFilterPill('Paid');
+                  setFilterStatus('Paid');
+                }}
+                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+              >
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading truncate">Active Contracts</div>
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
+                    {kpiStats.activeContracts}
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] text-emerald-600 font-semibold truncate">In good standing</div>
+                </div>
               </div>
-              <div className="text-[10px] sm:text-[11px] text-emerald-600 font-semibold truncate">In good standing</div>
-            </div>
-          </div>
 
-          {/* CARD 3: PENDING CHECKS */}
-          <div
-            onClick={() => {
-              setActiveFilterPill('Due Soon');
-              setFilterStatus('Due Soon');
-            }}
-            className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
-          >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading truncate">Pending Checks</div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
-                {isTenantsLoading ? '…' : kpiStats.pendingChecks}
+              {/* CARD 3: PENDING CHECKS */}
+              <div
+                onClick={() => {
+                  setActiveFilterPill('Due Soon');
+                  setFilterStatus('Due Soon');
+                }}
+                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+              >
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading truncate">Pending Checks</div>
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
+                    {kpiStats.pendingChecks}
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] text-amber-600 font-semibold truncate">
+                    Referencing in progress
+                  </div>
+                </div>
               </div>
-              <div className="text-[10px] sm:text-[11px] text-amber-600 font-semibold truncate">
-                Referencing in progress
-              </div>
-            </div>
-          </div>
 
-          {/* CARD 4: PAYMENT STATUS */}
-          <div
-            onClick={() => {
-              setActiveFilterPill('Overdue');
-              setFilterStatus('Overdue');
-            }}
-            className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
-          >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <PoundSterling className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading truncate">Payment Status</div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
-                {isTenantsLoading ? '…' : `${kpiStats.paymentHealthPct}%`}
+              {/* CARD 4: PAYMENT STATUS */}
+              <div
+                onClick={() => {
+                  setActiveFilterPill('Overdue');
+                  setFilterStatus('Overdue');
+                }}
+                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+              >
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading truncate">Payment Status</div>
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
+                    {`${kpiStats.paymentHealthPct}%`}
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate">
+                    {kpiStats.overdueCount > 0
+                      ? `${kpiStats.overdueCount} overdue invoice${kpiStats.overdueCount === 1 ? '' : 's'}`
+                      : 'All accounts clear'}
+                  </div>
+                </div>
               </div>
-              <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate">
-                {kpiStats.overdueCount > 0 ? `${kpiStats.overdueCount} in arrears` : 'All accounts clear'}
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </section>
 
         {/* INVITATIONS PANEL VIEW (IF ACTIVE) */}
-        {activeMainTab === 'invitations' && (
+        {activeMainTab === 'invitations' && !isSimEmpty && (
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-card mb-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -784,9 +1015,9 @@ export function ClientsPage({
         {/* FILTER & CONTROLS BAR (SEARCH + FILTER BUTTON + FILTER PILLS)             */}
         {/* ========================================================================= */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card space-y-3.5 mb-6">
-          {/* Top Row: Search Input + Filter Drawer Button */}
+          {/* Top Row: Search Input + Filter Drawer Button (Stacked full-width on mobile) */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
-            <div className="relative flex-1 min-w-0">
+            <div className="relative flex-1 min-w-0 w-full">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <Search className="w-4 h-4" />
               </div>
@@ -813,7 +1044,7 @@ export function ClientsPage({
               type="button"
               id="openClientsFilterDrawerBtn"
               onClick={() => setIsFilterDrawerOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-all shrink-0 active:scale-95 hover:border-slate-300 cursor-pointer min-h-[44px]"
+              className="w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-all shrink-0 active:scale-95 hover:border-slate-300 cursor-pointer min-h-[44px]"
               title="Open Client Filters (Status, Property, Lease Expiry)"
             >
               <Filter className="w-4 h-4 text-[#136C9E]" />
@@ -829,11 +1060,11 @@ export function ClientsPage({
           {/* Bottom Row: Filter Pills */}
           <div id="clientsFilterPillsContainer" className="flex items-center gap-2 overflow-x-auto scrollbar-none pt-1">
             {[
-              { key: 'all' as const, label: 'All', count: pillCounts.total },
-              { key: 'Paid' as const, label: 'Paid', count: pillCounts.paid },
-              { key: 'Due Soon' as const, label: 'Due Soon', count: pillCounts.dueSoon },
-              { key: 'Overdue' as const, label: 'Overdue', count: pillCounts.overdue },
-              { key: 'expiring' as const, label: 'Expiring Soon', count: pillCounts.expiring },
+              { key: 'all' as const, label: 'All', count: isSimEmpty ? 0 : pillCounts.total },
+              { key: 'Paid' as const, label: 'Paid', count: isSimEmpty ? 0 : pillCounts.paid },
+              { key: 'Due Soon' as const, label: 'Due Soon', count: isSimEmpty ? 0 : pillCounts.dueSoon },
+              { key: 'Overdue' as const, label: 'Overdue', count: isSimEmpty ? 0 : pillCounts.overdue },
+              { key: 'expiring' as const, label: 'Expiring Soon', count: isSimEmpty ? 0 : pillCounts.expiring },
             ].map((pill) => {
               const isActive = activeFilterPill === pill.key;
               return (

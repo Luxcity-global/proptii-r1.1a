@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   LayoutGrid,
@@ -297,6 +297,12 @@ export function MainLayout({
   const isMobile = useIsMobile();
   const { unreadCount } = useMessagingContext();
 
+  useEffect(() => {
+    const handleOpenMobileSidebar = () => setMobileSidebarOpen(true);
+    window.addEventListener('open-mobile-sidebar', handleOpenMobileSidebar);
+    return () => window.removeEventListener('open-mobile-sidebar', handleOpenMobileSidebar);
+  }, []);
+
   const screenTitleMap: Record<NavigationScreen, string> = {
     dashboard: 'Dashboard',
     properties: 'Properties',
@@ -343,17 +349,19 @@ export function MainLayout({
         }
       >
         {/* Pattern 1: Mobile Header Top Bar (Avatar Hub) */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white">
-          <MobileHeaderTopBar
-            userName={userProfile?.name || 'Agent User'}
-            userRole={userRole}
-            title={screenTitleMap[currentScreen] || 'Dashboard'}
-            onOpenSidebar={() => setMobileSidebarOpen(true)}
-            onOpenSettings={() => onNavigate('settings')}
-            onOpenNotifications={() => onNavigate('messages')}
-            unreadCount={unreadCount}
-          />
-        </div>
+        {currentScreen !== 'clients' && (
+          <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white">
+            <MobileHeaderTopBar
+              userName={userProfile?.name || 'Agent User'}
+              userRole={userRole}
+              title={screenTitleMap[currentScreen] || 'Dashboard'}
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+              onOpenSettings={() => onNavigate('settings')}
+              onOpenNotifications={() => onNavigate('messages')}
+              unreadCount={unreadCount}
+            />
+          </div>
+        )}
 
         <CustomSidebar
           navigationItems={navigationItems}
@@ -402,7 +410,9 @@ export function MainLayout({
               : {}),
           }}
         >
-          <div className={`lg:hidden h-[60px]${currentScreen === 'messages' || currentScreen === 'inbox' ? ' flex-shrink-0' : ''}`} />
+          {currentScreen !== 'clients' && (
+            <div className={`lg:hidden h-[60px]${currentScreen === 'messages' || currentScreen === 'inbox' ? ' flex-shrink-0' : ''}`} />
+          )}
           {currentScreen !== 'dashboard' &&
             currentScreen !== 'properties' &&
             currentScreen !== 'contracts' &&
