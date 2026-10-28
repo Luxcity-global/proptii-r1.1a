@@ -282,13 +282,13 @@ function DashboardOverviewHeader({
           <h1>
             Welcome, <span>{userName}</span>
           </h1>
-          <p>Here&apos;s the latest update on your portfolio today.</p>
+          <p className="ll-header-subtitle">Here&apos;s the latest update on your portfolio today.</p>
         </div>
       </div>
       <div className="header-actions ll-header-actions">
         <button
           type="button"
-          className={`icon-action-btn ll-header-icon${isRefreshing ? " refreshing" : ""}`}
+          className={`icon-action-btn ll-header-icon hidden lg:inline-flex${isRefreshing ? " refreshing" : ""}`}
           title="Refresh Portfolio Data"
           onClick={handleRefresh}
         >
@@ -296,7 +296,7 @@ function DashboardOverviewHeader({
         </button>
         <button
           type="button"
-          className="icon-action-btn ll-header-icon"
+          className="icon-action-btn ll-header-icon hidden lg:inline-flex"
           title="Settings & Preferences"
           aria-label="Settings"
           onClick={onViewSettings}
@@ -305,7 +305,7 @@ function DashboardOverviewHeader({
         </button>
         <button
           type="button"
-          className="icon-action-btn ll-header-icon"
+          className="icon-action-btn ll-header-icon hidden lg:inline-flex"
           title="Messages"
           onClick={onViewMessages || onViewNotifications}
           style={{ position: "relative" }}
@@ -339,7 +339,7 @@ function DashboardOverviewHeader({
         </button>
         <button
           type="button"
-          className="icon-action-btn ll-header-icon"
+          className="icon-action-btn ll-header-icon hidden lg:inline-flex"
           title="Notifications"
           onClick={onViewNotifications}
           style={{ position: "relative" }}
@@ -352,9 +352,10 @@ function DashboardOverviewHeader({
             type="button"
             className="btn-insights ll-header-insights"
             onClick={onViewInsights}
+            title="Portfolio Insights"
           >
             <span className="ll-insights-icon">✦</span>
-            <span>Portfolio Insights</span>
+            <span className="ll-insights-text">Portfolio Insights</span>
           </button>
         )}
         {onAddProperty && (

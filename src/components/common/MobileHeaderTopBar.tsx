@@ -4,6 +4,8 @@ export interface MobileHeaderTopBarProps {
   userName?: string;
   userRole?: string;
   title?: string;
+  showTitle?: boolean;
+  userPhoto?: string;
   onOpenSidebar: () => void;
   onOpenSettings?: () => void;
   onOpenNotifications?: () => void;
@@ -14,6 +16,8 @@ export const MobileHeaderTopBar: React.FC<MobileHeaderTopBarProps> = ({
   userName = 'User',
   userRole,
   title,
+  showTitle = false,
+  userPhoto,
   onOpenSidebar,
   onOpenSettings,
   onOpenNotifications,
@@ -38,8 +42,19 @@ export const MobileHeaderTopBar: React.FC<MobileHeaderTopBarProps> = ({
         title="Open Profile Navigation Hub"
         aria-label="Open Profile Navigation Hub"
       >
-        <div className="mobile-avatar-circle">
-          {initials}
+        <div className="mobile-avatar-circle overflow-hidden flex items-center justify-center">
+          {userPhoto ? (
+            <img
+              src={userPhoto}
+              alt={userName}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            initials
+          )}
         </div>
         <span className="mobile-avatar-name">{userName}</span>
         <svg
@@ -55,8 +70,8 @@ export const MobileHeaderTopBar: React.FC<MobileHeaderTopBarProps> = ({
         </svg>
       </button>
 
-      {/* Center: Title / Badge */}
-      {title && (
+      {/* Center: Title / Badge - only shown if showTitle is explicitly true */}
+      {showTitle && title && (
         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100/80 border border-slate-200/60 max-w-[150px] truncate">
           <span className="text-xs font-bold text-slate-700 font-heading truncate">
             {title}

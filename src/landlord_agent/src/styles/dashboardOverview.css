@@ -1942,6 +1942,14 @@
   }
 }
 
+@media (max-width: 1023px) {
+  .header-actions .icon-action-btn,
+  .ll-header-actions .icon-action-btn,
+  .ll-header-actions .ll-header-icon {
+    display: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   .ll-overview,
   .dashboard-root {
@@ -1967,13 +1975,18 @@
   .ll-header-bar p {
     font-size: 12px;
   }
+  .header-actions .icon-action-btn,
+  .ll-header-actions .icon-action-btn,
+  .ll-header-actions .ll-header-icon {
+    display: none !important;
+  }
   .header-actions,
   .ll-header-actions {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 8px;
-    overflow-x: auto;
+    gap: 10px;
+    overflow-x: visible;
     padding-bottom: 2px;
     scrollbar-width: none;
   }
@@ -1986,6 +1999,8 @@
     padding: 8px 12px;
     font-size: 12px;
     white-space: nowrap;
+    min-height: 44px;
+    border-radius: 12px;
   }
   .btn-add-property,
   .ll-header-add {
@@ -1993,6 +2008,8 @@
     font-size: 13px;
     white-space: nowrap;
     margin-left: auto;
+    min-height: 44px;
+    border-radius: 12px;
   }
   .top-stat-grid,
   .ll-top-stat-grid {
@@ -2157,7 +2174,36 @@
     height: min(120px, 100%);
   }
   .header-bar p,
-  .ll-header-bar p {
-    font-size: 13px;
+  .ll-header-bar p,
+  .header-title-group p,
+  .ll-header-subtitle {
+    display: none !important;
+  }
+  .ll-header-insights .ll-insights-text,
+  .btn-insights span:not(.ll-insights-icon) {
+    display: none !important;
+  }
+  .ll-header-insights,
+  .btn-insights {
+    width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 44px !important;
+    border-radius: 12px !important;
+  }
+  .ll-header-add,
+  .btn-add-property {
+    flex: 1 !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-left: 0 !important;
+    border-radius: 12px !important;
   }
 }

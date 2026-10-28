@@ -353,8 +353,10 @@ export function MainLayout({
           <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white">
             <MobileHeaderTopBar
               userName={userProfile?.name || 'Agent User'}
+              userPhoto={userProfile?.photoURL}
               userRole={userRole}
               title={screenTitleMap[currentScreen] || 'Dashboard'}
+              showTitle={false}
               onOpenSidebar={() => setMobileSidebarOpen(true)}
               onOpenSettings={() => onNavigate('settings')}
               onOpenNotifications={() => onNavigate('messages')}
