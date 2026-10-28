@@ -6,6 +6,8 @@ import { SearchInput } from '../components/SearchInput';
 import { GettingStartedHub } from '../components/getting-started';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
 import { ServicesSection } from '../components/home/ServicesSection';
+import { AudienceTogglePill, type HomeAudience } from '../components/home/AudienceTogglePill';
+import { LandlordAgentHero } from '../components/home/LandlordAgentHero';
 import { useAuth } from '../contexts/AuthContext';
 import { hasOnboardingCompleted, HOMEPAGE_ONBOARDING_FLOW_ENABLED } from '../utils/onboardingSession';
 import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
@@ -31,12 +33,34 @@ const PAUSE_AFTER_DELETING_MS = 400;
 const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
   const [, forceOnboardingRefresh] = useState(0);
 
-  const isLandlordPersona = isAuthenticated && Boolean(user?.roles?.includes('landlord') || user?.roles?.includes('agent'));
+  // Firebase sign-in sets roles: [] and resolves the role from the backend afterwards; the role
+  // cached by roleService picks the right hero in the meantime instead of flashing the tenant one.
+  const isRolePending = isAuthenticated && user?.roleResolved === false;
+  const cachedRole = isRolePending && user?.id ? localStorage.getItem(`proptii_role_${user.id}`) : null;
+  const heroRoles = isRolePending && cachedRole ? [cachedRole] : user?.roles ?? [];
+  const isLandlordPersona = isAuthenticated && (heroRoles.includes('landlord') || heroRoles.includes('agent'));
+  const isHeroPending = isAuthLoading || (isRolePending && !cachedRole && heroRoles.length === 0);
 
-  const activePhrases = isLandlordPersona ? LANDLORD_TYPING_PHRASES : TENANT_TYPING_PHRASES;
+  // Guests pick their audience via the hero pill (persisted in ?audience= so it can be linked to).
+  const guestAudience: HomeAudience = searchParams.get('audience') === 'landlords' ? 'landlords' : 'renters';
+  const showLandlordHero = isLandlordPersona || (!isAuthenticated && guestAudience === 'landlords');
+
+  const handleGuestAudienceChange = (audience: HomeAudience) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (audience === 'landlords') next.set('audience', 'landlords');
+        else next.delete('audience');
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  const activePhrases = showLandlordHero ? LANDLORD_TYPING_PHRASES : TENANT_TYPING_PHRASES;
 
   // Typing/deleting animation for hero headline
   const [typingIndex, setTypingIndex] = useState(0);
@@ -190,7 +214,25 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
         tenantEmail={tenantEmail}
       />
 
-      {/* Hero Section */}
+      {/* Hero Section — landlords/agents get a two-CTA hero instead of the search-first tenant hero */}
+      {isHeroPending ? (
+        <section className="h-[95vh] relative bg-[#0b2238]" aria-busy="true" aria-label="Loading" />
+      ) : showLandlordHero ? (
+        <LandlordAgentHero
+          audienceToggle={
+            !isAuthenticated ? (
+              <AudienceTogglePill value={guestAudience} onChange={handleGuestAudienceChange} />
+            ) : undefined
+          }
+          typingText={typingText}
+          isSignedIn={isLandlordPersona}
+          isAgent={heroRoles.includes('agent') && !heroRoles.includes('landlord')}
+          firstName={user?.givenName || user?.name?.split(' ')[0]}
+          initialQuery={prefilledSearchQuery}
+          initialSearchType={prefilledSearchType}
+          onQuickAction={(action) => navigate(`/landlord?start=${action === 'add-property' ? 'property-setup-step1' : action}`)}
+        />
+      ) : (
       <section
         className={`h-[95vh] pt-32 relative flex items-center md:pt-0 z-10`}
         style={{ paddingBottom: `${getDynamicPadding()}px` }}
@@ -209,6 +251,10 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0 pt-20 md:pt-16">
+          {!isAuthenticated && (
+            <AudienceTogglePill value={guestAudience} onChange={handleGuestAudienceChange} />
+          )}
+
           {/* Main Role-Tailored Heading */}
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight tracking-tight">
             {isLandlordPersona ? 'List. Screen. ' : 'Search. Verify. '}
@@ -256,6 +302,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
           )} */}
         </div>
       </section>
+      )}
 
       <section className="mt-6 md:mt-8">
         <ServicesSection variant="v1" />

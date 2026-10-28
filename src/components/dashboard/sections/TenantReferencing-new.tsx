@@ -22,6 +22,7 @@ import TenantPageHeader from '../ui/TenantPageHeader';
 import BookViewingModal from '../../viewings/BookViewingModal';
 import { toast } from 'sonner';
 import { downloadReferencingReportPdf } from '../../../utils/referencingReportPdf';
+import { isReferencingStepComplete } from '../../../utils/referencingProgress';
 import '../../../styles/tenantReferencing.css';
 import '../../../styles/tenantModals.css';
 
@@ -202,43 +203,8 @@ const TenantReferencing: React.FC = () => {
     return false;
   };
 
-  const isSectionCompleted = (step: number): boolean => {
-    if (!formData) return false;
-    if (stepStatus[step] === 'complete') return true;
-
-    switch (step) {
-      case 1:
-        return !!(
-          formData.identity?.firstName &&
-          formData.identity?.lastName &&
-          formData.identity?.email &&
-          (formData.identity?.identityProof || formData.identity?.dateOfBirth)
-        );
-      case 2:
-        return !!(
-          formData.employment?.employmentStatus &&
-          (['Unemployed', 'Retired', 'Student'].includes(formData.employment?.employmentStatus) ||
-            formData.employment?.companyDetails ||
-            formData.employment?.jobPosition)
-        );
-      case 3:
-        return !!(formData.residential?.currentAddress && formData.residential?.durationAtCurrentAddress);
-      case 4:
-        return !!(
-          formData.financial?.monthlyIncome ||
-          formData.financial?.proofOfIncomeDocument ||
-          formData.financial?.useOpenBanking
-        );
-      case 5:
-        return (
-          (formData as any)?.guarantor?.verifiedViaLink ||
-          (formData as any)?.guarantorInvitation?.status === 'completed' ||
-          !!(formData.guarantor?.firstName && formData.guarantor?.lastName && formData.guarantor?.email)
-        );
-      default:
-        return false;
-    }
-  };
+  const isSectionCompleted = (step: number): boolean =>
+    isReferencingStepComplete(formData, stepStatus, step);
 
   const calculateProgress = () => {
     if (!formData) return { overall: 0, completed: 0, pending: 5, documents: 0 };

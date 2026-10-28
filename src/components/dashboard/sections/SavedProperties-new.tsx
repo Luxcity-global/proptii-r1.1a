@@ -5,7 +5,7 @@ import BookViewingModal from '../../viewings/BookViewingModal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useIsMobile } from '../ui/use-mobile';
 import { trackEvent } from '../../../utils/analytics';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import communicationService from '../../../services/communicationService';
 import TenantPageHeader from '../ui/TenantPageHeader';
 import '../../../styles/tenantSaved.css';
@@ -47,6 +47,7 @@ const SavedProperties: React.FC = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -382,6 +383,14 @@ const SavedProperties: React.FC = () => {
       source: p.source,
     });
   };
+
+  useEffect(() => {
+    const requested = (location.state as { openSavedProperty?: SavedProperty } | null)?.openSavedProperty;
+    if (!requested?.id) return;
+    const match = savedProperties.find((p) => p.id === requested.id) || requested;
+    openDetails(match);
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [location.state]);
 
   const handleBookViewing = (property: SavedProperty) => {
     const locationParts = property.location?.split(',').map((s: string) => s.trim()) || [];

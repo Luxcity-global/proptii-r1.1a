@@ -69,6 +69,8 @@ interface ContractsPageProps {
   onViewInsights?: () => void;
   onViewSettings?: () => void;
   onViewNotifications?: () => void;
+  openSendOnMount?: boolean;
+  onSendOpenedOnMount?: () => void;
 }
 
 type Subsection = 'sent' | 'unsigned' | 'signed' | 'all';
@@ -230,6 +232,8 @@ export function ContractsPage({
   onViewInsights,
   onViewSettings,
   onViewNotifications,
+  openSendOnMount = false,
+  onSendOpenedOnMount,
 }: ContractsPageProps) {
   const { user } = useAuth();
   const landlordEmail = user?.email ?? userProfile?.email ?? null;
@@ -247,6 +251,11 @@ export function ContractsPage({
   const [propertyFilter, setPropertyFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  useEffect(() => {
+    if (!openSendOnMount) return;
+    setIsSendModalOpen(true);
+    onSendOpenedOnMount?.();
+  }, [openSendOnMount]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

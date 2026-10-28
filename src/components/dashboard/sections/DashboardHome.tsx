@@ -21,6 +21,7 @@ import FilePreviewModal from './FilePreviewModal';
 import { trackEvent } from '../../../utils/analytics';
 import AgentQuotaWidget from '../AgentQuotaWidget';
 import TenantPageHeader from '../ui/TenantPageHeader';
+import { isReferencingStepComplete } from '../../../utils/referencingProgress';
 import '../../../styles/tenantDashboard.css';
 
 const REF_PILLARS = [
@@ -295,26 +296,12 @@ const DashboardHome: React.FC = () => {
             if (ts) setReferencingStartedAt(ts.toISOString());
           }
 
-          const completed = new Set<string>();
-          if (formData.identity?.firstName && formData.identity?.lastName && formData.identity?.email) {
-            completed.add('identity');
-          }
-          if (formData.employment?.employmentStatus) {
-            completed.add('employment');
-          }
-          if (formData.residential?.currentAddress) {
-            completed.add('residential');
-          }
-          if (formData.financial?.proofOfIncomeType?.trim()) {
-            completed.add('financial');
-          }
-          if (
-            formData.guarantor?.firstName?.trim() &&
-            formData.guarantor?.lastName?.trim() &&
-            formData.guarantor?.email?.trim()
-          ) {
-            completed.add('guarantor');
-          }
+          const stepStatus = (firestoreResult.data as any).stepStatus || {};
+          const completed = new Set<string>(
+            REF_PILLARS.filter((pillar) => isReferencingStepComplete(formData, stepStatus, pillar.step)).map(
+              (pillar) => pillar.key
+            )
+          );
           setCompletedSections(completed);
         }
       } catch (error) {
@@ -372,11 +359,7 @@ const DashboardHome: React.FC = () => {
   }, [savedProperties]);
 
   const openSavedProperty = (property: SavedProperty) => {
-    if (property.id) {
-      navigate(`/search?propertyId=${encodeURIComponent(property.id)}`);
-      return;
-    }
-    navigate('/dashboard/saved-searches');
+    navigate('/dashboard/saved-searches', property.id ? { state: { openSavedProperty: property } } : undefined);
   };
 
   const cyclePropertyImage = (property: SavedProperty) => {

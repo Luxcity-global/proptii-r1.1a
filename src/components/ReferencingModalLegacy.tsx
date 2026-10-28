@@ -1,9 +1,47 @@
-import React from 'react';
-import { ReferencingProvider } from './referencing/context/ReferencingContext';
-import ReferencingModal from './referencing/ReferencingModal';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { 
+  X, 
+  Menu, 
+  User, 
+  Briefcase, 
+  Home, 
+  PoundSterling, 
+  Users, 
+  CheckCircle, 
+  AlertTriangle, 
+  Send,
+  ArrowRight,
+  Mail,
+  Copy,
+  Check,
+  ExternalLink,
+  ShieldCheck,
+  Clock,
+  Sparkles,
+  RefreshCw,
+  Lock,
+  FileCheck,
+  Phone,
+  MapPin,
+  RotateCcw,
+  FileText
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import FileUpload from "./Uploads/FileUpload";
+import EmploymentUpload from "./Uploads/EmploymentUpload";
+import ResidentialUpload from "./Uploads/ResidentialUpload";
+import FinancialUpload from "./Uploads/FinancialUpload";
+import GuarantorUpload from "./Uploads/GuarantorUpload";
+import referencingService from '../services/referencingService';
+import { firestoreService } from '../services/firestoreService';
+import { toast } from 'react-hot-toast';
+import QuickFillBanner from './referencing/ui/QuickFillBanner';
+import { ExtractedData } from '../services/openRouterService';
+import SendReferencingModal from './referencing/SendReferencingModal';
+import { isReferencingStepComplete } from '../utils/referencingProgress';
 
-export interface ReferencingModalLegacyProps {
+interface ReferencingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmissionComplete?: () => void;
@@ -13,46 +51,1678 @@ export interface ReferencingModalLegacyProps {
   applicationId?: string;
 }
 
-/**
- * ReferencingModalLegacy:
- * Replaced legacy monolithic modal with the modern, modular referencing workflow
- * from src/components/referencing/ReferencingModal.tsx.
- */
-export const ReferencingModalLegacy: React.FC<ReferencingModalLegacyProps> = ({
-  isOpen,
-  onClose,
+// Form data types for the 5 Referencing Passport steps
+interface IdentityData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  dateOfBirth: string;
+  dateOfBirthError?: string;
+  isBritish: boolean;
+  nationality: string;
+  identityProof: StoredFile | File | null;
+}
+
+interface EmploymentData {
+  employmentStatus: string;
+  companyDetails: string;
+  lengthOfEmployment: string;
+  jobPosition: string;
+  referenceFullName: string;
+  referenceEmail: string;
+  referencePhone: string;
+  proofType: string;
+  proofDocument: StoredFile | File | null;
+}
+
+interface ResidentialData {
+  currentAddress: string;
+  durationAtCurrentAddress: string;
+  previousAddress: string;
+  durationAtPreviousAddress: string;
+  reasonForLeaving: string;
+  alreadyHavePropertyAddress: string;
+  propertyAddress: string;
+  proofType: string;
+  proofDocument: StoredFile | File | null;
+}
+
+interface FinancialData {
+  monthlyIncome: string;
+  proofOfIncomeType: string;
+  proofOfIncomeDocument: StoredFile | File | null;
+  useOpenBanking: boolean;
+  isConnectedToOpenBanking: boolean;
+}
+
+export interface GuarantorInvitation {
+  token?: string;
+  guarantorName?: string;
+  guarantorEmail?: string;
+  guarantorPhone?: string;
+  message?: string;
+  status?: 'invited' | 'completed' | 'cancelled';
+  invitedAt?: string;
+  completedAt?: string;
+}
+
+export interface GuarantorData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  address: string;
+  employmentStatus?: string;
+  annualIncome?: string;
+  relationship?: string;
+  consent?: string;
+  verifiedViaLink?: boolean;
+  submittedAt?: string;
+  identityDocument: StoredFile | File | null;
+}
+
+export interface FormData {
+  identity: IdentityData;
+  employment: EmploymentData;
+  residential: ResidentialData;
+  financial: FinancialData;
+  guarantor: GuarantorData;
+  guarantorInvitation?: GuarantorInvitation;
+}
+
+interface StoredFile {
+  name: string;
+  type: string;
+  size: number;
+  lastModified: number;
+  dataUrl?: string;
+  url?: string;
+}
+
+interface NavigationItem {
+  label: string;
+  Icon: LucideIcon;
+  step: number;
+}
+
+const navigationItems: NavigationItem[] = [
+  { label: "Identity", Icon: User, step: 1 },
+  { label: "Employment", Icon: Briefcase, step: 2 },
+  { label: "Residential", Icon: Home, step: 3 },
+  { label: "Financial", Icon: PoundSterling, step: 4 },
+  { label: "Guarantor", Icon: Users, step: 5 },
+];
+
+/** `<input type="date">` requires `yyyy-MM-dd` or ""; Firestore/JSON may store null as string `"null"`. */
+function normalizeHtmlDateValue(value: unknown): string {
+  if (value == null) return '';
+  const s = String(value).trim();
+  if (s === '' || s === 'null' || s === 'undefined') return '';
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : '';
+}
+
+function mergeLoadedFormData(prev: FormData, patch: Partial<FormData>): FormData {
+  return {
+    ...prev,
+    ...patch,
+    identity: {
+      ...prev.identity,
+      ...(patch.identity || {}),
+      dateOfBirth: normalizeHtmlDateValue(
+        patch.identity?.dateOfBirth !== undefined
+          ? patch.identity.dateOfBirth
+          : prev.identity.dateOfBirth,
+      ),
+    },
+  };
+}
+
+function sanitizeForLocalStorage(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeForLocalStorage);
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    // Strip giant base64 strings so browser localStorage quota is never exceeded
+    if (key === 'dataUrl' && typeof val === 'string' && val.length > 500) {
+      continue;
+    }
+    result[key] = sanitizeForLocalStorage(val);
+  }
+  return result;
+}
+
+const fileToStoredFile = async (file: File): Promise<StoredFile> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    const timeout = setTimeout(() => {
+      reader.abort();
+      reject(new Error('File reading timeout'));
+    }, 8000);
+
+    reader.onload = () => {
+      clearTimeout(timeout);
+      resolve({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: file.lastModified,
+        dataUrl: reader.result as string
+      });
+    };
+    reader.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error('File reading failed'));
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+const ReferencingModal: React.FC<ReferencingModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSubmissionComplete, 
   initialStep = 1,
-  propertyId,
-  applicationId,
+  singleSectionOnly = false
 }) => {
   const { user } = useAuth();
+  const [currentStep, setCurrentStep] = useState(initialStep);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialStep) {
+      setCurrentStep(initialStep);
+    }
+  }, [isOpen, initialStep]);
+
+  const [formData, setFormData] = useState<FormData>({
+    identity: {
+      firstName: user?.givenName || user?.name?.split(' ')[0] || '',
+      lastName: user?.familyName || user?.name?.split(' ').slice(1).join(' ') || '',
+      email: user?.email || '',
+      phoneNumber: '',
+      dateOfBirth: '',
+      dateOfBirthError: undefined,
+      isBritish: true,
+      nationality: 'British',
+      identityProof: null
+    },
+    employment: {
+      employmentStatus: '',
+      companyDetails: '',
+      lengthOfEmployment: '',
+      jobPosition: '',
+      referenceFullName: '',
+      referenceEmail: '',
+      referencePhone: '',
+      proofType: '',
+      proofDocument: null
+    },
+    residential: {
+      currentAddress: '',
+      durationAtCurrentAddress: '',
+      previousAddress: '',
+      durationAtPreviousAddress: '',
+      reasonForLeaving: '',
+      proofType: '',
+      alreadyHavePropertyAddress: '',
+      propertyAddress: '',
+      proofDocument: null
+    },
+    financial: {
+      monthlyIncome: '',
+      proofOfIncomeType: '',
+      proofOfIncomeDocument: null,
+      useOpenBanking: false,
+      isConnectedToOpenBanking: false
+    },
+    guarantor: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      address: '',
+      identityDocument: null
+    }
+  });
+
+  const [lastSavedSteps, setLastSavedSteps] = useState<{ [key: number]: Date | null }>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileCache, setFileCache] = useState<Map<string, StoredFile>>(new Map());
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({
+    1: 'partial',
+    2: 'partial',
+    3: 'partial',
+    4: 'partial',
+    5: 'partial'
+  });
+  const completedStepCount = [1, 2, 3, 4, 5].filter((step) =>
+    isReferencingStepComplete(formData, stepStatus, step)
+  ).length;
+  const completionPercent = Math.round((completedStepCount / 5) * 100);
+
+  const [guarantorMode, setGuarantorMode] = useState<'manual' | 'invite'>('manual');
+  const [inviteGuarantorName, setInviteGuarantorName] = useState('');
+  const [inviteGuarantorEmail, setInviteGuarantorEmail] = useState('');
+  const [inviteGuarantorPhone, setInviteGuarantorPhone] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+
+  useEffect(() => {
+    if (formData.guarantorInvitation?.status === 'invited') {
+      setGuarantorMode('invite');
+      if (formData.guarantorInvitation.guarantorName && !inviteGuarantorName) {
+        setInviteGuarantorName(formData.guarantorInvitation.guarantorName);
+      }
+      if (formData.guarantorInvitation.guarantorEmail && !inviteGuarantorEmail) {
+        setInviteGuarantorEmail(formData.guarantorInvitation.guarantorEmail);
+      }
+    }
+  }, [formData.guarantorInvitation]);
+
+  const getGuarantorDirectLink = () => {
+    const tenantName = `${formData.identity.firstName} ${formData.identity.lastName}`.trim() || user?.name || 'Applicant';
+    const tenantEmail = formData.identity.email.trim() || user?.email || '';
+    const token = formData.guarantorInvitation?.token || `inv_${Date.now()}`;
+    const gEmail = formData.guarantorInvitation?.guarantorEmail || inviteGuarantorEmail || formData.guarantor?.email || '';
+    const gName = formData.guarantorInvitation?.guarantorName || inviteGuarantorName || `${formData.guarantor?.firstName || ''} ${formData.guarantor?.lastName || ''}`.trim();
+    const gPhone = formData.guarantorInvitation?.guarantorPhone || inviteGuarantorPhone || formData.guarantor?.phoneNumber || '';
+    return `${window.location.origin}/guarantor-reference?token=${encodeURIComponent(token)}&tenantId=${encodeURIComponent(user?.id || 'general')}&tenantEmail=${encodeURIComponent(tenantEmail)}&tenantName=${encodeURIComponent(tenantName)}&email=${encodeURIComponent(gEmail)}&name=${encodeURIComponent(gName)}&phone=${encodeURIComponent(gPhone)}`;
+  };
+
+  const handleCopyGuarantorLink = () => {
+    const link = getGuarantorDirectLink();
+    navigator.clipboard.writeText(link).then(() => {
+      setInviteCopied(true);
+      toast.success('Guarantor link copied to clipboard!');
+      setTimeout(() => setInviteCopied(false), 2500);
+    });
+  };
+
+  const handleSendGuarantorInvite = async () => {
+    const email = inviteGuarantorEmail.trim() || formData.guarantor.email.trim();
+    const name = inviteGuarantorName.trim() || `${formData.guarantor.firstName} ${formData.guarantor.lastName}`.trim();
+
+    if (!email) {
+      toast.error('Please enter the guarantor\'s email address.');
+      return;
+    }
+
+    setIsSendingInvite(true);
+    try {
+      const tenantName = `${formData.identity.firstName} ${formData.identity.lastName}`.trim() || user?.name || 'Applicant';
+      const tenantEmail = formData.identity.email.trim() || user?.email || '';
+
+      const res = await firestoreService.inviteGuarantor(user?.id || 'general', {
+        guarantorName: name || 'Guarantor',
+        guarantorEmail: email,
+        guarantorPhone: inviteGuarantorPhone.trim(),
+        message: inviteMessage.trim(),
+        tenantName,
+        tenantEmail
+      });
+
+      if (res.success) {
+        if ((res as any).emailSent === false) {
+          toast.success('Guarantor link generated!');
+          if (res.error) {
+            toast(res.error, { icon: 'ℹ️', duration: 6000 });
+          }
+        } else {
+          toast.success(res.message || 'Invitation sent to guarantor successfully!');
+        }
+
+        const updatedInvitation: GuarantorInvitation = {
+          token: (res as any).token || `inv_${Date.now()}`,
+          guarantorName: name || 'Guarantor',
+          guarantorEmail: email,
+          guarantorPhone: inviteGuarantorPhone.trim(),
+          message: inviteMessage.trim(),
+          status: 'invited',
+          invitedAt: new Date().toISOString()
+        };
+
+        updateFormData('guarantorInvitation', updatedInvitation);
+        if (!formData.guarantor.email) {
+          updateFormData('guarantor', { email });
+        }
+      } else {
+        toast.error(res.error || 'Failed to send invitation.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error sending invitation.');
+    } finally {
+      setIsSendingInvite(false);
+    }
+  };
+
+  // Calculate step status based on current form data
+  useEffect(() => {
+    const newStatus = {
+      1: determineStepStatus('identity', formData.identity),
+      2: determineStepStatus('employment', formData.employment),
+      3: determineStepStatus('residential', formData.residential),
+      4: determineStepStatus('financial', formData.financial),
+      5: determineStepStatus('guarantor', formData.guarantor)
+    };
+
+    setStepStatus(newStatus);
+  }, [formData]);
+
+  const processFileUpload = async (file: File): Promise<StoredFile> => {
+    const cacheKey = `${file.name}_${file.size}_${file.lastModified}`;
+    if (fileCache.has(cacheKey)) {
+      return fileCache.get(cacheKey)!;
+    }
+    const storedFile = await fileToStoredFile(file);
+    setFileCache(prev => new Map(prev.set(cacheKey, storedFile)));
+    return storedFile;
+  };
+
+  const updateFormData = async (step: keyof FormData | string, data: Partial<FormData[keyof FormData]>) => {
+    let processedData: any = { ...data };
+    let fileProcessingPromises: Promise<void>[] = [];
+
+    if ('identityProof' in data && (data as any).identityProof instanceof File) {
+      fileProcessingPromises.push(
+        processFileUpload((data as any).identityProof).then(result => {
+          processedData.identityProof = result;
+        })
+      );
+    }
+
+    if ('proofDocument' in data && (data as any).proofDocument instanceof File) {
+      fileProcessingPromises.push(
+        processFileUpload((data as any).proofDocument).then(result => {
+          processedData.proofDocument = result;
+        })
+      );
+    }
+
+    if ('identityDocument' in data && (data as any).identityDocument instanceof File) {
+      fileProcessingPromises.push(
+        processFileUpload((data as any).identityDocument).then(result => {
+          processedData.identityDocument = result;
+        })
+      );
+    }
+
+    if ('proofOfIncomeDocument' in data && (data as any).proofOfIncomeDocument instanceof File) {
+      fileProcessingPromises.push(
+        processFileUpload((data as any).proofOfIncomeDocument).then(result => {
+          processedData.proofOfIncomeDocument = result;
+        })
+      );
+    }
+
+    if (fileProcessingPromises.length > 0) {
+      try {
+        await Promise.all(fileProcessingPromises);
+      } catch (error) {
+        console.error('Error processing files:', error);
+      }
+    }
+
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [step]: {
+          ...prev[step as keyof FormData],
+          ...processedData
+        }
+      };
+
+      if (user?.id) {
+        try {
+          const sanitized = sanitizeForLocalStorage(updated);
+          localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(sanitized));
+        } catch (storageErr) {
+          console.warn('Could not save referencing form draft to localStorage:', storageErr);
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
+    if (!data) return 'partial';
+
+    switch (step) {
+      case 'identity': {
+        const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality && !data.dateOfBirthError;
+        const hasRequiredDocument = data.identityProof?.name && (data.identityProof?.url || data.identityProof?.dataUrl);
+        if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+        return 'partial';
+      }
+
+      case 'employment': {
+        const nonApplicableStatus = ['Unemployed', 'Retired', 'Student'];
+        if (nonApplicableStatus.includes(data.employmentStatus)) {
+          return 'complete';
+        }
+        if (data.employmentStatus && !nonApplicableStatus.includes(data.employmentStatus)) {
+          const hasAllRequiredFields = data.employmentStatus && data.companyDetails && data.lengthOfEmployment && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType;
+          const hasRequiredDocument = data.proofDocument?.name && (data.proofDocument?.url || data.proofDocument?.dataUrl);
+          if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+        }
+        return 'partial';
+      }
+
+      case 'residential': {
+        let requiredFields = [
+          'currentAddress', 'durationAtCurrentAddress', 'reasonForLeaving', 'proofType', 'alreadyHavePropertyAddress'
+        ];
+        if (data.alreadyHavePropertyAddress === 'Yes') {
+          requiredFields.push('propertyAddress');
+        }
+        const needsPreviousAddress = data.durationAtCurrentAddress && data.durationAtCurrentAddress !== '2-3 years';
+        if (needsPreviousAddress) {
+          requiredFields.push('previousAddress', 'durationAtPreviousAddress');
+        }
+        const hasAllRequiredFields = requiredFields.every(field => !!data[field]);
+        const hasRequiredDocument = data.proofDocument?.name && (data.proofDocument?.url || data.proofDocument?.dataUrl);
+        if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+        return 'partial';
+      }
+
+      case 'financial': {
+        const hasAllRequiredFields = data.monthlyIncome && data.proofOfIncomeType;
+        const hasRequiredDocument = data.proofOfIncomeDocument?.name && (data.proofOfIncomeDocument?.url || data.proofOfIncomeDocument?.dataUrl);
+        const isOpenBankingConnected = data.useOpenBanking && data.isConnectedToOpenBanking;
+        if (hasAllRequiredFields && (hasRequiredDocument || isOpenBankingConnected)) return 'complete';
+        return 'partial';
+      }
+
+      case 'guarantor': {
+        if (formData.guarantorInvitation?.status === 'invited') {
+          return 'partial';
+        }
+        if (formData.guarantorInvitation?.status === 'completed' || data.verifiedViaLink) {
+          return 'complete';
+        }
+        const hasAnyData = Object.values(data).some(value => !!value && value !== null && value !== '');
+        if (hasAnyData) {
+          const hasAllRequiredFields = data.firstName && data.lastName && data.email;
+          const hasRequiredDocument = data.identityDocument?.name && (data.identityDocument?.url || data.identityDocument?.dataUrl);
+          if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+          return 'partial';
+        }
+        return 'empty';
+      }
+
+      default:
+        return 'partial';
+    }
+  };
+
+  const renderSidebarNavigation = () => {
+    return navigationItems.map(({ label, Icon, step }) => {
+      const status = stepStatus[step];
+      let dotColor = isReferencingStepComplete(formData, stepStatus, step) ? 'bg-green-500' : 'bg-orange-500';
+
+      return (
+        <li
+          key={step}
+          onClick={() => setCurrentStep(step)}
+          className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
+            currentStep === step
+              ? 'bg-blue-100 text-black font-semibold rounded-lg'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
+          <span>{label}</span>
+          <span
+            className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+            title={`Status: ${status}`}
+          />
+        </li>
+      );
+    });
+  };
+
+  // Load stored data on mount
+  useEffect(() => {
+    const loadStoredData = async () => {
+      if (!user?.id) return;
+      try {
+        const propertyId = `general_${user.id}`;
+        const result = await firestoreService.getReferencingForm(user.id, propertyId);
+        if (result.success && result.data && result.data.formData) {
+          setFormData(prev => mergeLoadedFormData(prev, result.data!.formData as any));
+          if (result.data.stepStatus) {
+            setStepStatus(prev => ({ ...prev, ...result.data!.stepStatus }));
+          }
+        } else {
+          const localData = localStorage.getItem(`referencing_${user.id}_formData`);
+          if (localData) {
+            setFormData(prev => mergeLoadedFormData(prev, JSON.parse(localData)));
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading referencing data:', err);
+      }
+    };
+
+    loadStoredData();
+  }, [user?.id]);
+
+  const saveCurrentStep = async (stepToSave: number = currentStep) => {
+    if (!user?.id) return;
+    setIsSaving(true);
+    
+    // Evaluate if the saved step is complete
+    let isComplete = false;
+    switch(stepToSave) {
+      case 1:
+        isComplete = !!(formData.identity.firstName && formData.identity.lastName && formData.identity.email && formData.identity.phoneNumber && formData.identity.dateOfBirth && (formData.identity.identityProof || formData.identity.nationality));
+        break;
+      case 2:
+        isComplete = !!(formData.employment.employmentStatus && (['Unemployed', 'Retired', 'Student'].includes(formData.employment.employmentStatus) || formData.employment.companyDetails || formData.employment.jobPosition));
+        break;
+      case 3:
+        isComplete = !!(formData.residential.currentAddress && formData.residential.durationAtCurrentAddress);
+        break;
+      case 4:
+        isComplete = !!(formData.financial.monthlyIncome || formData.financial.proofOfIncomeDocument || formData.financial.useOpenBanking);
+        break;
+      case 5:
+        isComplete = !!(formData.guarantor.firstName && formData.guarantor.lastName && formData.guarantor.email) || formData.guarantorInvitation?.status === 'completed' || !!formData.guarantor.verifiedViaLink;
+        break;
+    }
+
+    const newStepStatus = {
+      ...stepStatus,
+      [stepToSave]: isComplete ? 'complete' : 'partial'
+    } as any;
+    
+    setStepStatus(newStepStatus);
+
+    try {
+      const propertyId = `general_${user.id}`;
+      const saveResult = await firestoreService.saveReferencingForm(
+        user.id,
+        propertyId,
+        formData as any,
+        stepToSave,
+        newStepStatus
+      );
+      if (!saveResult.success) {
+        throw new Error(saveResult.error || 'Failed to save referencing form');
+      }
+      setLastSavedSteps(prev => ({ ...prev, [stepToSave]: new Date() }));
+      setShowSaveSuccess(true);
+      setTimeout(() => setShowSaveSuccess(false), 3000);
+      const sectionName = navigationItems.find(n => n.step === stepToSave)?.label || 'Details';
+      toast.success(`${sectionName} saved successfully!`);
+      if (onSubmissionComplete) {
+        onSubmissionComplete();
+      }
+    } catch (err) {
+      console.error('Error saving step:', err);
+      toast.error('Failed to save. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAndClose = async () => {
+    await saveCurrentStep(currentStep);
+    onClose();
+  };
+
+  const nextStep = async () => {
+    await saveCurrentStep(currentStep);
+    if (currentStep < 5) {
+      setCurrentStep(prev => prev + 1);
+    } else {
+      handleCompleteAndSave();
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  const handleCompleteAndSave = async () => {
+    const userId = user?.id || 'anonymous_tenant';
+    setIsSubmitting(true);
+    try {
+      await saveCurrentStep(currentStep);
+      localStorage.setItem(`referencing_${userId}_submitted`, 'true');
+      toast.success('Referencing Passport saved successfully!');
+      if (onSubmissionComplete) {
+        onSubmissionComplete();
+      }
+      onClose();
+    } catch (err) {
+      console.error('Error saving referencing passport:', err);
+      toast.error('Failed to save. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAIDataExtracted = (
+    data: ExtractedData,
+    attachedDoc?: { name: string; type: string; size: number; url?: string },
+    targetSection?: string
+  ) => {
+    const activeSection = targetSection || (
+      currentStep === 1 ? 'identity' :
+      currentStep === 2 ? 'employment' :
+      currentStep === 3 ? 'residential' :
+      currentStep === 4 ? 'financial' :
+      currentStep === 5 ? 'guarantor' : 'identity'
+    );
+
+    setFormData(prev => {
+      const next = { ...prev };
+
+      // 1. Identity
+      if (data.firstName || data.lastName || data.email || data.phoneNumber || data.dateOfBirth || data.nationality) {
+        next.identity = {
+          ...next.identity,
+          firstName: data.firstName || next.identity.firstName,
+          lastName: data.lastName || next.identity.lastName,
+          email: data.email || next.identity.email,
+          phoneNumber: data.phoneNumber || next.identity.phoneNumber,
+          dateOfBirth: data.dateOfBirth || next.identity.dateOfBirth,
+          nationality: data.nationality || next.identity.nationality,
+        };
+      }
+
+      // 2. Employment
+      if (data.companyDetails || data.jobPosition || data.employmentStatus) {
+        next.employment = {
+          ...next.employment,
+          companyDetails: data.companyDetails || next.employment.companyDetails,
+          jobPosition: data.jobPosition || next.employment.jobPosition,
+          employmentStatus: data.employmentStatus || next.employment.employmentStatus,
+        };
+      }
+
+      // 3. Residential
+      if (data.currentAddress) {
+        next.residential = {
+          ...next.residential,
+          currentAddress: data.currentAddress || next.residential.currentAddress,
+        };
+      }
+
+      // 4. Financial
+      if (data.monthlyIncome) {
+        next.financial = {
+          ...next.financial,
+          monthlyIncome: data.monthlyIncome || next.financial.monthlyIncome,
+        };
+      }
+
+      // 5. Attach document to corresponding section if attachedDoc exists
+      if (attachedDoc && attachedDoc.url) {
+        if (activeSection === 'identity') {
+          next.identity = { ...next.identity, identityProof: attachedDoc };
+        } else if (activeSection === 'employment') {
+          next.employment = { ...next.employment, proofDocument: attachedDoc };
+        } else if (activeSection === 'residential') {
+          next.residential = { ...next.residential, proofDocument: attachedDoc };
+        } else if (activeSection === 'financial') {
+          next.financial = { ...next.financial, proofOfIncomeDocument: attachedDoc };
+        } else if (activeSection === 'guarantor') {
+          next.guarantor = { ...next.guarantor, identityDocument: attachedDoc };
+        }
+      }
+
+      return next;
+    });
+
+    toast.success(
+      attachedDoc
+        ? '✨ Document attached & details auto-populated by AI!'
+        : 'AI Extracted document details populated!'
+    );
+  };
+
+  const handleResetGuarantor = () => {
+    if (window.confirm('Are you sure you want to remove this verified guarantor and invite someone else? This will clear the verified guarantor status.')) {
+      updateFormData('guarantor', {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        address: '',
+        employmentStatus: '',
+        annualIncome: '',
+        relationship: '',
+        verifiedViaLink: false,
+        identityDocument: null,
+      });
+      updateFormData('guarantorInvitation', {
+        token: '',
+        status: 'cancelled',
+        guarantorName: '',
+        guarantorEmail: '',
+        guarantorPhone: '',
+      });
+      setInviteGuarantorEmail('');
+      setInviteGuarantorName('');
+      setInviteGuarantorPhone('');
+      setGuarantorMode('invite');
+      toast.success('Guarantor cleared. You can now invite a new guarantor.');
+    }
+  };
+
+  const renderGuarantorStep = () => {
+    const isGuarantorVerified = formData.guarantorInvitation?.status === 'completed' || !!formData.guarantor.verifiedViaLink;
+    const isGuarantorInvited = formData.guarantorInvitation?.status === 'invited';
+    const directLink = getGuarantorDirectLink();
+
+    // ── 1. Verified Guarantor: STRICT READ-ONLY MODE (Cannot be edited by tenant) ──
+    if (isGuarantorVerified) {
+      const g = formData.guarantor;
+      const docUrl = g.identityDocument?.url || (typeof g.identityDocument === 'string' ? g.identityDocument : null);
+      const docName = g.identityDocument?.name || 'Guarantor_ID_Document.pdf';
+
+      return (
+        <div className="space-y-5">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-green-50 rounded-2xl p-5 sm:p-6 border border-emerald-200 shadow-xs">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 shadow-2xs">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-gray-900 text-base sm:text-lg">
+                      Guarantor Verified &amp; Signed
+                    </h3>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Lock className="w-3 h-3 text-emerald-600" />
+                      Locked
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-0.5 leading-relaxed">
+                    Completed and legally verified directly by <strong>{g.firstName} {g.lastName}</strong> via secure invite link.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3.5 border-t border-emerald-200/70 flex items-center gap-2 text-xs text-emerald-800 font-medium">
+              <Lock className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>This section is non-editable. To maintain referencing integrity, guarantor verification details cannot be edited by the applicant.</span>
+            </div>
+          </div>
+
+          {/* Read-Only Verified Information Cards */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden divide-y divide-gray-100">
+            {/* 1. Identity & Contact */}
+            <div className="p-5">
+              <div className="flex items-center space-x-2.5 mb-3 text-gray-800 font-bold text-sm">
+                <User className="w-4 h-4 text-[#136C9E]" />
+                <h4>Guarantor Personal Details</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <span className="text-gray-400 block font-medium">Full Legal Name</span>
+                  <span className="font-bold text-gray-800 text-sm">{g.firstName} {g.lastName}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Email Address</span>
+                  <span className="font-bold text-gray-800 flex items-center gap-1.5 text-sm">
+                    {g.email}
+                    <Lock className="w-3 h-3 text-gray-400" title="Verified email identifier" />
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Phone Number</span>
+                  <span className="font-semibold text-gray-800">{g.phoneNumber || 'Provided via link'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Relationship to Applicant</span>
+                  <span className="font-semibold text-gray-800">{g.relationship || 'Guarantor'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Residential & Employment */}
+            <div className="p-5">
+              <div className="flex items-center space-x-2.5 mb-3 text-gray-800 font-bold text-sm">
+                <Briefcase className="w-4 h-4 text-[#136C9E]" />
+                <h4>Address &amp; Financial Verification</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="sm:col-span-2">
+                  <span className="text-gray-400 block font-medium">Residential Address</span>
+                  <span className="font-semibold text-gray-800">{g.address || 'Address verified by guarantor'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Employment Status</span>
+                  <span className="font-semibold text-gray-800">{g.employmentStatus || 'Employed'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Declared Annual Income</span>
+                  <span className="font-bold text-[#136C9E] text-sm">
+                    {g.annualIncome ? `£${g.annualIncome}/year` : 'Provided'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Proof of ID Document */}
+            <div className="p-5">
+              <div className="flex items-center space-x-2.5 mb-3 text-gray-800 font-bold text-sm">
+                <FileCheck className="w-4 h-4 text-emerald-600" />
+                <h4>Proof of Identification Document</h4>
+              </div>
+              {docUrl ? (
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-gray-50 border border-gray-200">
+                  <div className="flex items-center space-x-3 truncate">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                      <FileCheck className="w-5 h-5" />
+                    </div>
+                    <div className="truncate">
+                      <p className="text-xs font-bold text-gray-800 truncate">{docName}</p>
+                      <p className="text-[11px] text-gray-400">Guarantor Passport / Driving Licence</p>
+                    </div>
+                  </div>
+                  <a
+                    href={docUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-[#136C9E] hover:bg-blue-50 text-xs font-semibold flex items-center gap-1.5 transition-colors flex-shrink-0 shadow-2xs"
+                  >
+                    <span>View Document</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-xl">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span>Identification verified electronically during submission.</span>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Declaration & Actions */}
+            <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gray-50/50">
+              <div>
+                <span className="text-gray-400 block text-[11px] font-medium uppercase tracking-wider">Digital Declaration</span>
+                <p className="text-xs font-serif italic text-gray-800 mt-0.5">
+                  Signed electronically by {g.firstName} {g.lastName}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetGuarantor}
+                className="text-xs font-semibold text-gray-500 hover:text-red-600 hover:bg-red-50 px-3.5 py-2 rounded-xl border border-gray-200 hover:border-red-200 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Remove &amp; Invite Different Guarantor</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── 2. Unverified Guarantor: Manual or Invite Mode ──
+    return (
+      <div className="relative">
+        <QuickFillBanner
+          onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'guarantor')}
+          sectionKey="guarantor"
+          descriptionText="Upload your guarantor's passport, driving licence, or ID. AI will auto-populate guarantor fields and attach their document."
+        />
+        
+        <div className="mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">5. Guarantor Details</h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              Optional
+            </span>
+            {isGuarantorInvited && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Invite Pending
+              </span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
+            Skip this section if you do not require a guarantor, fill details manually, or invite your guarantor to complete their own verification.
+          </p>
+        </div>
+
+        {/* Segmented Mode Toggle */}
+        <div className="flex bg-gray-100 p-1 rounded-xl mb-5 border border-gray-200 w-full sm:w-auto self-start">
+          <button
+            type="button"
+            onClick={() => setGuarantorMode('manual')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              guarantorMode === 'manual'
+                ? 'bg-white text-[#136C9E] shadow-xs'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            Fill in Manually
+          </button>
+          <button
+            type="button"
+            onClick={() => setGuarantorMode('invite')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer relative ${
+              guarantorMode === 'invite'
+                ? 'bg-white text-[#136C9E] shadow-xs'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            Send Email Invite / Share Link
+            {isGuarantorInvited && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            )}
+          </button>
+        </div>
+
+        {guarantorMode === 'manual' ? (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor First Name</label>
+                <input
+                  type="text"
+                  value={formData.guarantor.firstName}
+                  onChange={(e) => updateFormData('guarantor', { firstName: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="First name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Last Name</label>
+                <input
+                  type="text"
+                  value={formData.guarantor.lastName}
+                  onChange={(e) => updateFormData('guarantor', { lastName: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="Last name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Email</label>
+                <input
+                  type="email"
+                  value={formData.guarantor.email}
+                  onChange={(e) => updateFormData('guarantor', { email: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="guarantor@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Phone</label>
+                <input
+                  type="tel"
+                  value={formData.guarantor.phoneNumber}
+                  onChange={(e) => updateFormData('guarantor', { phoneNumber: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="07123 456789"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Address</label>
+                <input
+                  type="text"
+                  value={formData.guarantor.address}
+                  onChange={(e) => updateFormData('guarantor', { address: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="Guarantor full address"
+                />
+              </div>
+            </div>
+            <GuarantorUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {isGuarantorInvited && (
+              <div className="bg-white rounded-2xl p-6 border border-amber-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Guarantor Invitation Dispatched</h3>
+                    <p className="text-xs text-gray-500">
+                      Invite sent to <strong className="text-gray-800">{formData.guarantorInvitation?.guarantorEmail || formData.guarantor.email}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                  Your guarantor will receive an email containing a secure link to complete their personal details, employment, annual income, and upload their ID document. Once submitted, this section will automatically update to <strong>Complete</strong>.
+                </p>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Direct Invitation Link</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={directLink}
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs text-gray-600 select-all font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyGuarantorLink}
+                      className="px-3.5 py-2 bg-[#136C9E] hover:bg-[#0D4E73] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {inviteCopied ? <Check className="w-3.5 h-3.5 text-green-300" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{inviteCopied ? 'Copied' : 'Copy Link'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={handleSendGuarantorInvite}
+                    disabled={isSendingInvite}
+                    className="px-4 py-2 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSendingInvite ? 'animate-spin' : ''}`} />
+                    <span>{isSendingInvite ? 'Resending...' : 'Resend Email Invitation'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGuarantorMode('manual')}
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition-colors"
+                  >
+                    Switch to Manual Fill
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!isGuarantorInvited && (
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#136C9E] flex items-center justify-center">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Invite Guarantor via Email</h3>
+                    <p className="text-xs text-gray-500">Your guarantor can securely provide their details and upload their ID</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Name</label>
+                      <input
+                        type="text"
+                        value={inviteGuarantorName || `${formData.guarantor.firstName} ${formData.guarantor.lastName}`.trim()}
+                        onChange={(e) => setInviteGuarantorName(e.target.value)}
+                        placeholder="e.g. Sarah Smith"
+                        className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Guarantor Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={inviteGuarantorEmail || formData.guarantor.email}
+                        onChange={(e) => {
+                          setInviteGuarantorEmail(e.target.value);
+                          updateFormData('guarantor', { email: e.target.value });
+                        }}
+                        required
+                        placeholder="guarantor@example.com"
+                        className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Phone (Optional)</label>
+                      <input
+                        type="tel"
+                        value={inviteGuarantorPhone || formData.guarantor.phoneNumber}
+                        onChange={(e) => setInviteGuarantorPhone(e.target.value)}
+                        placeholder="07123 456789"
+                        className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Personal Note (Optional)</label>
+                      <input
+                        type="text"
+                        value={inviteMessage}
+                        onChange={(e) => setInviteMessage(e.target.value)}
+                        placeholder="e.g. For our flat application on High Street"
+                        className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSendGuarantorInvite}
+                    disabled={isSendingInvite}
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#DC5F12] hover:bg-[#C45210] text-white font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  >
+                    {isSendingInvite ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Sending Invitation...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Send Email Invitation</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyGuarantorLink}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {inviteCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
+                    <span>{inviteCopied ? 'Link Copied!' : 'Copy Direct Link'}</span>
+                  </button>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-500">
+                  <ShieldCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span>The guarantor will receive an email with instructions. Once submitted, your passport updates automatically.</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderFormContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="relative">
+            <QuickFillBanner
+              onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'identity')}
+              sectionKey="identity"
+              descriptionText="Upload your Passport, UK Driving Licence, or National ID. AI will auto-populate your personal details and attach your identity document."
+            />
+            <div className="mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">1. Identity Verification</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Your verified identity details for tenancy checks</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 sm:p-6 mb-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">First Name *</label>
+                <input
+                  type="text"
+                  value={formData.identity.firstName}
+                  onChange={(e) => updateFormData('identity', { firstName: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="First name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Last Name *</label>
+                <input
+                  type="text"
+                  value={formData.identity.lastName}
+                  onChange={(e) => updateFormData('identity', { lastName: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="Last name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address *</label>
+                <input
+                  type="email"
+                  value={formData.identity.email}
+                  onChange={(e) => updateFormData('identity', { email: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="email@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number *</label>
+                <input
+                  type="tel"
+                  value={formData.identity.phoneNumber}
+                  onChange={(e) => updateFormData('identity', { phoneNumber: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="07123 456789"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Date of Birth *</label>
+                <input
+                  type="date"
+                  value={formData.identity.dateOfBirth}
+                  onChange={(e) => updateFormData('identity', { dateOfBirth: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Nationality *</label>
+                <input
+                  type="text"
+                  value={formData.identity.nationality}
+                  onChange={(e) => updateFormData('identity', { nationality: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="e.g. British, Irish, French"
+                />
+              </div>
+            </div>
+            <FileUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="relative">
+            <QuickFillBanner
+              onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'employment')}
+              sectionKey="employment"
+              descriptionText="Upload a payslip, P60, or employment contract. AI will auto-fill your employer, position, and attach proof of employment."
+            />
+            <div className="mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">2. Employment & Referee Details</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Provide employment details or reference contact</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 sm:p-6 mb-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Employment Status *</label>
+                <select
+                  value={formData.employment.employmentStatus}
+                  onChange={(e) => updateFormData('employment', { employmentStatus: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                >
+                  <option value="" disabled>Select status</option>
+                  <option value="Full-time">Full-time</option>
+                  <option value="Part-time">Part-time</option>
+                  <option value="Self-employed">Self-employed</option>
+                  <option value="Unemployed">Unemployed</option>
+                  <option value="Retired">Retired</option>
+                  <option value="Student">Student</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Company / Employer Name</label>
+                <input
+                  type="text"
+                  value={formData.employment.companyDetails}
+                  onChange={(e) => updateFormData('employment', { companyDetails: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Job Position / Title</label>
+                <input
+                  type="text"
+                  value={formData.employment.jobPosition}
+                  onChange={(e) => updateFormData('employment', { jobPosition: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="e.g. Software Engineer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Length of Employment</label>
+                <input
+                  type="text"
+                  value={formData.employment.lengthOfEmployment}
+                  onChange={(e) => updateFormData('employment', { lengthOfEmployment: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="e.g. 2 years"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Referee Full Name</label>
+                <input
+                  type="text"
+                  value={formData.employment.referenceFullName}
+                  onChange={(e) => updateFormData('employment', { referenceFullName: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="e.g. John Manager"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Referee Email Address</label>
+                <input
+                  type="email"
+                  value={formData.employment.referenceEmail}
+                  onChange={(e) => updateFormData('employment', { referenceEmail: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="referee@company.com"
+                />
+              </div>
+            </div>
+            <EmploymentUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="relative">
+            <QuickFillBanner
+              onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'residential')}
+              sectionKey="residential"
+              descriptionText="Upload a utility bill, council tax statement, or tenancy agreement. AI will auto-fill your address and attach proof of residency."
+            />
+            <div className="mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">3. Residential History</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Current & previous address records</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 sm:p-6 mb-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Current Address *</label>
+                <input
+                  type="text"
+                  value={formData.residential.currentAddress}
+                  onChange={(e) => updateFormData('residential', { currentAddress: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="Current full address"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Duration at Current Address *</label>
+                <select
+                  value={formData.residential.durationAtCurrentAddress}
+                  onChange={(e) => updateFormData('residential', { durationAtCurrentAddress: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                >
+                  <option value="" disabled>Select duration</option>
+                  <option value="Less than 1 year">Less than 1 year</option>
+                  <option value="1-2 years">1-2 years</option>
+                  <option value="2-3 years">2-3 years</option>
+                  <option value="3+ years">3+ years</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Reason for Moving</label>
+                <input
+                  type="text"
+                  value={formData.residential.reasonForLeaving}
+                  onChange={(e) => updateFormData('residential', { reasonForLeaving: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="e.g. Relocating for work"
+                />
+              </div>
+            </div>
+            <ResidentialUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="relative">
+            <QuickFillBanner
+              onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'financial')}
+              sectionKey="financial"
+              descriptionText="Upload a bank statement or proof of income. AI will auto-fill your declared income and attach your financial statement."
+            />
+            <div className="mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">4. Financial & Affordability</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Monthly earnings and income verification</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 sm:p-6 mb-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Monthly Income (£) *</label>
+                <input
+                  type="number"
+                  value={formData.financial.monthlyIncome}
+                  onChange={(e) => updateFormData('financial', { monthlyIncome: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="e.g. 3500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Proof of Income Type *</label>
+                <select
+                  value={formData.financial.proofOfIncomeType}
+                  onChange={(e) => updateFormData('financial', { proofOfIncomeType: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                >
+                  <option value="" disabled>Select proof type</option>
+                  <option value="Payslip">Recent Payslip</option>
+                  <option value="Bank Statement">Bank Statement</option>
+                  <option value="Employment Contract">Employment Contract</option>
+                  <option value="Tax Return">Tax Return</option>
+                  <option value="P60">P60</option>
+                </select>
+              </div>
+            </div>
+            <FinancialUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+      case 5:
+        return renderGuarantorStep();
+
+      default:
+        return null;
+    }
+  };
+
   if (!isOpen) return null;
 
-  const effectivePropertyId =
-    propertyId && propertyId !== 'default-property'
-      ? propertyId
-      : user?.id
-        ? `general_${user.id}`
-        : 'default-property';
-
-  const effectiveApplicationId =
-    applicationId ||
-    (user?.id ? `general_${user.id}` : effectivePropertyId);
+  const currentNav = navigationItems.find(n => n.step === currentStep) || navigationItems[0];
 
   return (
-    <ReferencingProvider
-      propertyId={effectivePropertyId}
-      initialApplicationId={effectiveApplicationId}
-      initialStep={Math.max(0, initialStep - 1)}
-    >
-      <ReferencingModal
-        open={isOpen}
-        onClose={onClose}
-        propertyId={effectivePropertyId}
-        applicationId={effectiveApplicationId}
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 font-sans">
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+          onClick={onClose}
+        />
+
+        {singleSectionOnly ? (
+          /* Focused Single-Section Modal (Opened for a specific section) */
+          <div className="relative w-full max-w-lg sm:max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] z-10 animate-in fade-in zoom-in-95 duration-200">
+            {/* Section Header */}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100 bg-white">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#136C9E] flex items-center justify-center flex-shrink-0">
+                  <currentNav.Icon size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">
+                    {currentNav.label} Details
+                  </h2>
+                  <span className="text-xs text-gray-500 font-medium">
+                    Section {currentStep} of 5 · Referencing Passport
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                aria-label="Close modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Section Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#f8fafc]">
+              {renderFormContent()}
+            </div>
+
+            {/* Section Footer */}
+            <div className="px-5 sm:px-6 py-3.5 border-t border-gray-100 bg-white flex items-center justify-between">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-xs sm:text-sm font-medium border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAndClose}
+                disabled={isSaving}
+                className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-[#136C9E] text-white rounded-xl hover:bg-[#0F5A82] transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Save {currentNav.label} Details</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Full Passport Modal with Step Navigation */
+          <div className="relative w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl flex overflow-hidden h-[85vh] sm:h-[82vh] md:min-h-[600px] max-h-[92vh] z-10 animate-in fade-in zoom-in-95 duration-200">
+            {/* Desktop Sidebar */}
+            <div className="w-64 bg-gray-50/80 py-5 px-4 border-r border-gray-200 hidden md:flex flex-col">
+              <div className="mb-4 px-2">
+                <h2 className="text-lg font-bold text-orange-600">Referencing Passport</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Fill once, update anytime, and share with multiple landlords & agents.
+                </p>
+              </div>
+              <ul className="space-y-1">
+                {renderSidebarNavigation()}
+              </ul>
+              <div className="mt-auto pt-4 px-2">
+                <div className="flex justify-between text-xs text-gray-600 mb-2">
+                  <span>{completedStepCount} of 5 completed</span>
+                  <span className="font-semibold">{completionPercent}%</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#136C9E] transition-all duration-300"
+                    style={{ width: `${completionPercent}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Area */}
+            <div className="flex-1 flex flex-col max-h-[92vh]">
+              {/* Top Bar */}
+              <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-200 bg-white">
+                <div className="flex items-center space-x-2">
+                  <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-1.5 rounded-lg hover:bg-gray-100">
+                    <Menu size={20} />
+                  </button>
+                  <h2 className="text-sm sm:text-base font-bold text-gray-800">
+                    Tenant Referencing Passport
+                  </h2>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={onClose}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                    aria-label="Close modal"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Content View */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#f8fafc]">
+                {renderFormContent()}
+              </div>
+
+              {/* Bottom Footer Actions */}
+              <div className="px-4 sm:px-6 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
+                <div>
+                  {(lastSavedSteps[currentStep] || showSaveSuccess) && (
+                    <div className="flex items-center text-xs text-green-600 font-medium">
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      <span>Saved</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  {currentStep > 1 && (
+                    <button
+                      onClick={prevStep}
+                      className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      Previous
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSaveAndClose}
+                    className="px-4 py-2 text-sm bg-gray-100 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Saving...' : 'Save & Close'}
+                  </button>
+
+                  {currentStep < 5 ? (
+                    <button
+                      onClick={nextStep}
+                      className="px-5 py-2 text-sm font-semibold bg-[#136C9E] text-white rounded-xl hover:bg-[#0F5A82] transition-colors flex items-center gap-1.5"
+                    >
+                      <span>Continue</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleCompleteAndSave}
+                      className="px-5 py-2 text-sm font-semibold bg-[#DC5F12] text-white rounded-xl hover:bg-opacity-95 transition-all shadow-md flex items-center gap-1.5"
+                      disabled={isSubmitting}
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span>{isSubmitting ? 'Saving...' : 'Save Passport'}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Standalone Send/Share Modal */}
+      <SendReferencingModal
+        isOpen={isSendModalOpen}
+        onClose={() => setIsSendModalOpen(false)}
+        onEditPassport={() => {
+          setIsSendModalOpen(false);
+          setCurrentStep(1);
+        }}
+        onShareComplete={() => {
+          if (onSubmissionComplete) {
+            onSubmissionComplete();
+          }
+        }}
       />
-    </ReferencingProvider>
+    </>
   );
 };
 
-export default ReferencingModalLegacy;
+export default ReferencingModal;

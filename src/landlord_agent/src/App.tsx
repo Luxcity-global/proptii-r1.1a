@@ -152,6 +152,7 @@ export function AppContent() {
   const { user: hostUser, isAuthenticated: hostIsAuthenticated, isLoading: hostIsLoading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
   const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
+  const [openSendContractOnStart, setOpenSendContractOnStart] = useState(false);
   // Sync URL pathname → navigation state.
   // Only fires on actual URL changes (e.g. initial load, external navigation).
   // Does NOT override popstate restorations — those are handled by the
@@ -472,6 +473,12 @@ export function AppContent() {
       if (qpStart === 'contracts') {
         setCurrentScreen('main-app');
         setNavigationScreen('contracts');
+        return;
+      }
+      if (qpStart === 'send-contract') {
+        setCurrentScreen('main-app');
+        setNavigationScreen('contracts');
+        setOpenSendContractOnStart(true);
         return;
       }
       const startScreen = localStorage.getItem('startScreen');
@@ -2289,6 +2296,8 @@ export function AppContent() {
               navigateToScreen('property-setup-step1');
             }}
             onBack={() => setNavigationScreen('dashboard')}
+            openSendOnMount={openSendContractOnStart}
+            onSendOpenedOnMount={() => setOpenSendContractOnStart(false)}
           />
         );
 
