@@ -21,6 +21,7 @@ export interface MobileCommandSheetProps {
   onClose: () => void;
   role?: 'landlord' | 'tenant';
   onNavigate?: (id: string, path?: string) => void;
+  onQuickAction?: (actionId: string) => void;
   customActions?: MobileCommandAction[];
   customTools?: MobileCommandTool[];
 }
@@ -30,6 +31,7 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
   onClose,
   role = 'landlord',
   onNavigate,
+  onQuickAction,
   customActions,
   customTools,
 }) => {
@@ -64,7 +66,11 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
       ),
       onClick: () => {
         onClose();
-        onNavigate?.('contracts', '/contracts');
+        if (onQuickAction) {
+          onQuickAction('send-contract');
+        } else {
+          onNavigate?.('contracts', '/contracts');
+        }
       },
     },
     {
@@ -82,7 +88,11 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
       ),
       onClick: () => {
         onClose();
-        onNavigate?.('properties', '/properties');
+        if (onQuickAction) {
+          onQuickAction('add-property');
+        } else {
+          onNavigate?.('properties', '/properties');
+        }
       },
     },
     {
@@ -100,7 +110,11 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
       ),
       onClick: () => {
         onClose();
-        onNavigate?.('clients', '/clients');
+        if (onQuickAction) {
+          onQuickAction('add-tenant');
+        } else {
+          onNavigate?.('clients', '/clients');
+        }
       },
     },
     {
@@ -119,7 +133,11 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
       ),
       onClick: () => {
         onClose();
-        onNavigate?.('viewings', '/viewings');
+        if (onQuickAction) {
+          onQuickAction('book-viewing');
+        } else {
+          onNavigate?.('viewings', '/viewings');
+        }
       },
     },
   ];
@@ -141,7 +159,11 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
       ),
       onClick: () => {
         onClose();
-        onNavigate?.('viewings', '/dashboard/viewings');
+        if (onQuickAction) {
+          onQuickAction('request-viewing');
+        } else {
+          onNavigate?.('viewings', '/dashboard/viewings');
+        }
       },
     },
     {
@@ -157,7 +179,11 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
       ),
       onClick: () => {
         onClose();
-        onNavigate?.('tenant-contracts', '/dashboard/tenant-contracts');
+        if (onQuickAction) {
+          onQuickAction('view-contracts');
+        } else {
+          onNavigate?.('tenant-contracts', '/dashboard/tenant-contracts');
+        }
       },
     },
     {
@@ -173,7 +199,11 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
       ),
       onClick: () => {
         onClose();
-        onNavigate?.('tenant-referencing', '/dashboard/tenant-referencing');
+        if (onQuickAction) {
+          onQuickAction('tenant-passport');
+        } else {
+          onNavigate?.('tenant-referencing', '/dashboard/tenant-referencing');
+        }
       },
     },
     {
@@ -190,7 +220,11 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
       ),
       onClick: () => {
         onClose();
-        onNavigate?.('your-files', '/dashboard/your-files');
+        if (onQuickAction) {
+          onQuickAction('upload-doc');
+        } else {
+          onNavigate?.('your-files', '/dashboard/your-files');
+        }
       },
     },
   ];

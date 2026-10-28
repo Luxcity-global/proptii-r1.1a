@@ -256,6 +256,11 @@ export function ContractsPage({
     setIsSendModalOpen(true);
     onSendOpenedOnMount?.();
   }, [openSendOnMount]);
+  useEffect(() => {
+    const handleOpen = () => setIsSendModalOpen(true);
+    window.addEventListener('open-send-contract', handleOpen);
+    return () => window.removeEventListener('open-send-contract', handleOpen);
+  }, []);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

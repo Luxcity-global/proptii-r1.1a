@@ -81,6 +81,8 @@ interface ClientsPageProps {
   onViewSettings?: () => void;
   onViewNotifications?: () => void;
   onOpenSidebar?: () => void;
+  openAddOnMount?: boolean;
+  onAddOpenedOnMount?: () => void;
 }
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
@@ -166,6 +168,8 @@ export function ClientsPage({
   onViewSettings,
   onViewNotifications,
   onOpenSidebar,
+  openAddOnMount = false,
+  onAddOpenedOnMount,
 }: ClientsPageProps) {
   // Mobile Header & Sidebar handler
   const handleOpenSidebar = useCallback(() => {
@@ -201,6 +205,16 @@ export function ClientsPage({
   const [activeDrawerTab, setActiveDrawerTab] = useState<'overview' | 'agreement' | 'payment' | 'referencing' | 'notes'>('overview');
   const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
   const [isDeletingTenant, setIsDeletingTenant] = useState(false);
+
+  useEffect(() => {
+    if (openAddOnMount) {
+      setIsChoiceModalOpen(true);
+      onAddOpenedOnMount?.();
+    }
+    const handleOpen = () => setIsChoiceModalOpen(true);
+    window.addEventListener('open-add-tenant', handleOpen);
+    return () => window.removeEventListener('open-add-tenant', handleOpen);
+  }, [openAddOnMount, onAddOpenedOnMount]);
 
   // Log Payment modal
   const [isLogPaymentModalOpen, setIsLogPaymentModalOpen] = useState(false);

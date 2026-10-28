@@ -55,6 +55,7 @@ export type NavigationScreen =
 interface MainLayoutProps {
   currentScreen: NavigationScreen;
   onNavigate: (screen: NavigationScreen) => void;
+  onQuickAction?: (actionId: string) => void;
   userProfile: UserProfile | null;
   userRole: UserRole;
   isAuthenticated: boolean;
@@ -287,6 +288,7 @@ function MobileSidebar({
 export function MainLayout({
   currentScreen,
   onNavigate,
+  onQuickAction,
   userProfile,
   userRole,
   isAuthenticated,
@@ -457,6 +459,26 @@ export function MainLayout({
           onClose={() => setCommandSheetOpen(false)}
           role="landlord"
           onNavigate={(id) => onNavigate(id as NavigationScreen)}
+          onQuickAction={(actionId) => {
+            setCommandSheetOpen(false);
+            if (onQuickAction) {
+              onQuickAction(actionId);
+            } else {
+              if (actionId === 'send-contract') {
+                onNavigate('contracts');
+                window.dispatchEvent(new CustomEvent('open-send-contract'));
+              } else if (actionId === 'add-property') {
+                onNavigate('properties');
+                window.dispatchEvent(new CustomEvent('open-add-property'));
+              } else if (actionId === 'add-tenant') {
+                onNavigate('clients');
+                window.dispatchEvent(new CustomEvent('open-add-tenant'));
+              } else if (actionId === 'book-viewing') {
+                onNavigate('viewings');
+                window.dispatchEvent(new CustomEvent('open-book-viewing'));
+              }
+            }
+          }}
         />
       </div>
     </SidebarProvider>

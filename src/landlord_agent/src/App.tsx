@@ -127,15 +127,28 @@ const SCREEN_TO_PATH: Record<NavigationScreen, string> = {
 };
 
 function screenFromPathname(pathname: string): NavigationScreen | null {
-  if (pathname === '/index.html') return 'dashboard';
-  let normalizedPath = pathname.startsWith('/landlord')
-    ? pathname.slice('/landlord'.length) || '/'
-    : pathname;
-  if (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
-    normalizedPath = normalizedPath.slice(0, -1);
+  if (!pathname || pathname === '/' || pathname === '/index.html') return null;
+  let clean = pathname;
+  if (clean.startsWith('/landlord-demo')) {
+    clean = clean.slice('/landlord-demo'.length);
+  } else if (clean.startsWith('/landlord')) {
+    clean = clean.slice('/landlord'.length);
+  } else if (clean.startsWith('/agent')) {
+    clean = clean.slice('/agent'.length);
   }
-  if (!normalizedPath.startsWith('/')) normalizedPath = `/${normalizedPath}`;
-  return PATH_TO_NAV_SCREEN[normalizedPath] ?? null;
+  while (clean.length > 1 && clean.endsWith('/')) {
+    clean = clean.slice(0, -1);
+  }
+  if (!clean.startsWith('/')) clean = `/${clean}`;
+  if (clean === '/' || clean === '') return null;
+  return PATH_TO_NAV_SCREEN[clean] ?? null;
+}
+
+function screenFromHash(hash: string): NavigationScreen | null {
+  if (!hash) return null;
+  const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+  return PATH_TO_NAV_SCREEN[normalized] ?? null;
 }
 
 function isEmbeddedInParent(): boolean {
@@ -150,17 +163,58 @@ function isEmbeddedInParent(): boolean {
 export function AppContent() {
   const location = useLocation();
   const { user: hostUser, isAuthenticated: hostIsAuthenticated, isLoading: hostIsLoading } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
-  const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
+  
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const qpStart = params.get('start');
+      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup') {
+        return qpStart as Screen;
+      }
+      if (qpStart === 'add-tenant') {
+        return 'add-tenant';
+      }
+      const savedScreen = sessionStorage.getItem('proptii_current_screen') as Screen | null;
+      if (savedScreen && savedScreen !== 'welcome') {
+        return savedScreen;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'main-app';
+  });
+
+  const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>(() => {
+    try {
+      const fromPath = screenFromPathname(window.location.pathname);
+      if (fromPath) return fromPath;
+
+      const fromHash = screenFromHash(window.location.hash);
+      if (fromHash) return fromHash;
+
+      const params = new URLSearchParams(window.location.search);
+      const qp = params.get('tab') || params.get('section') || params.get('screen') || params.get('start');
+      if (qp && PATH_TO_NAV_SCREEN[`/${qp}`]) {
+        return PATH_TO_NAV_SCREEN[`/${qp}`];
+      }
+
+      const savedNav = sessionStorage.getItem('proptii_navigation_screen') as NavigationScreen | null;
+      if (savedNav && PATH_TO_NAV_SCREEN[`/${savedNav}`]) {
+        return savedNav;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'dashboard';
+  });
+
   const [openSendContractOnStart, setOpenSendContractOnStart] = useState(false);
+  const [openClientsAddOnMount, setOpenClientsAddOnMount] = useState(false);
+  const [openViewingsRequestOnMount, setOpenViewingsRequestOnMount] = useState(false);
+
   // Sync URL pathname → navigation state.
-  // Only fires on actual URL changes (e.g. initial load, external navigation).
-  // Does NOT override popstate restorations — those are handled by the
-  // popstate listener above which runs synchronously before React Router
-  // updates location. We guard by checking if the history state already
-  // carries a proptiiScreen so we don't snap a full-screen back to main-app.
   useEffect(() => {
-    const state = window.history.state as { proptiiScreen?: Screen } | null;
+    const state = window.history.state as { proptiiScreen?: Screen; proptiiNavSection?: NavigationScreen } | null;
     // If the current history entry was pushed by us and has a known screen,
     // let the popstate handler deal with it — don't override.
     if (state?.proptiiScreen && state.proptiiScreen !== 'main-app') return;
@@ -168,13 +222,38 @@ export function AppContent() {
     if (targetScreen) {
       setNavigationScreen(targetScreen);
       setCurrentScreen('main-app');
+      try {
+        sessionStorage.setItem('proptii_navigation_screen', targetScreen);
+        sessionStorage.setItem('proptii_current_screen', 'main-app');
+      } catch { /* ignore */ }
     }
   }, [location.pathname]);
+
+  // Sync address bar URL on mount or section switch if at root /landlord
+  useEffect(() => {
+    if (!isEmbeddedInParent() && currentScreen === 'main-app') {
+      const currentPath = window.location.pathname;
+      const expectedPath = `/landlord${navigationScreen === 'dashboard' ? '' : `/${navigationScreen}`}`;
+      if (currentPath === '/landlord' && navigationScreen !== 'dashboard') {
+        window.history.replaceState(
+          { proptiiScreen: 'main-app', proptiiNavSection: navigationScreen },
+          '',
+          expectedPath
+        );
+      }
+    }
+  }, [navigationScreen, currentScreen]);
+
   // Wrapper function to log navigation changes and update URL
   const handleNavigation = useCallback((screen: NavigationScreen) => {
     trackEvent('landlord_nav_click', { section: screen });
     setCurrentScreen('main-app');
     setNavigationScreen(screen);
+
+    try {
+      sessionStorage.setItem('proptii_navigation_screen', screen);
+      sessionStorage.setItem('proptii_current_screen', 'main-app');
+    } catch { /* ignore */ }
 
     const path = SCREEN_TO_PATH[screen] || '/dashboard';
 
@@ -504,11 +583,16 @@ export function AppContent() {
       if (params.get('start')) return; // Deep link takes priority
       if (params.get('tab') === 'signed') return; // Signed-contract email link
       const savedScreen = sessionStorage.getItem('proptii_current_screen') as Screen | null;
+      const savedNavScreen = sessionStorage.getItem('proptii_navigation_screen') as NavigationScreen | null;
       const savedPreviousScreen = sessionStorage.getItem('proptii_previous_screen') as Screen | null;
       if (savedScreen && savedScreen !== 'main-app' && savedScreen !== 'welcome') {
         console.log('🔄 Restoring screen from sessionStorage:', savedScreen);
         setCurrentScreen(savedScreen);
         if (savedPreviousScreen) setPreviousScreen(savedPreviousScreen);
+      } else if (savedNavScreen && PATH_TO_NAV_SCREEN[`/${savedNavScreen}`]) {
+        console.log('🔄 Restoring navigationScreen from sessionStorage:', savedNavScreen);
+        setNavigationScreen(savedNavScreen);
+        setCurrentScreen('main-app');
       }
     } catch (e) {
       console.warn('Failed to restore screen from sessionStorage:', e);
@@ -789,20 +873,28 @@ export function AppContent() {
       if (state?.proptiiScreen) {
         // Restore the exact screen the user was on
         setCurrentScreen(state.proptiiScreen);
-        if (state.proptiiNavSection) setNavigationScreen(state.proptiiNavSection);
+        if (state.proptiiNavSection) {
+          setNavigationScreen(state.proptiiNavSection);
+          try { sessionStorage.setItem('proptii_navigation_screen', state.proptiiNavSection); } catch { /* ignore */ }
+        }
         if (state.proptiiScreen === 'main-app') {
           setSelectedProperty(null);
-          try { sessionStorage.removeItem('proptii_current_screen'); } catch { /* ignore */ }
+          try {
+            sessionStorage.removeItem('proptii_current_screen');
+          } catch { /* ignore */ }
         } else {
           try { sessionStorage.setItem('proptii_current_screen', state.proptiiScreen); } catch { /* ignore */ }
         }
       } else {
         // Fallback: derive from URL (sidebar section changes without state)
-        const targetSection = screenFromPathname(window.location.pathname);
+        const targetSection = screenFromPathname(window.location.pathname) || screenFromHash(window.location.hash);
         if (targetSection) {
           setNavigationScreen(targetSection);
           setCurrentScreen('main-app');
-          try { sessionStorage.removeItem('proptii_current_screen'); } catch { /* ignore */ }
+          try {
+            sessionStorage.setItem('proptii_navigation_screen', targetSection);
+            sessionStorage.setItem('proptii_current_screen', 'main-app');
+          } catch { /* ignore */ }
         }
       }
     };
@@ -853,7 +945,8 @@ export function AppContent() {
     setIsTransitioning(false);
     setSelectedProperty(null);
     try {
-      sessionStorage.removeItem('proptii_current_screen');
+      sessionStorage.setItem('proptii_navigation_screen', section);
+      sessionStorage.setItem('proptii_current_screen', 'main-app');
       sessionStorage.removeItem('proptii_previous_screen');
       sessionStorage.removeItem('proptii_selected_property_id');
     } catch { /* ignore */ }
@@ -869,6 +962,43 @@ export function AppContent() {
       );
     }
   };
+
+  const handleQuickAction = useCallback((actionId: string) => {
+    switch (actionId) {
+      case 'send-contract':
+        setOpenSendContractOnStart(true);
+        handleNavigation('contracts');
+        window.dispatchEvent(new CustomEvent('open-send-contract'));
+        break;
+
+      case 'add-property':
+        trackEvent('landlord_add_property_clicked', { source: 'mobile_quick_task' });
+        navigateToScreen('property-setup-step1');
+        break;
+
+      case 'add-tenant':
+        setOpenClientsAddOnMount(true);
+        handleNavigation('clients');
+        window.dispatchEvent(new CustomEvent('open-add-tenant'));
+        break;
+
+      case 'book-viewing':
+        setOpenViewingsRequestOnMount(true);
+        handleNavigation('viewings');
+        window.dispatchEvent(new CustomEvent('open-book-viewing'));
+        break;
+
+      case 'upload-doc':
+      case 'upload-document':
+        setOpenDocsUploadOnMount(true);
+        handleNavigation('documents');
+        window.dispatchEvent(new CustomEvent('open-upload-document'));
+        break;
+
+      default:
+        console.warn('Unhandled quick action:', actionId);
+    }
+  }, [handleNavigation, navigateToScreen]);
 
   const completeOnboarding = () => {
     setIsOnboarding(false);
@@ -1392,7 +1522,31 @@ export function AppContent() {
 
   const selectTenant = (tenant: Tenant) => {
     setSelectedTenant(tenant);
+    try {
+      if (tenant?.id) {
+        sessionStorage.setItem('proptii_selected_tenant_id', tenant.id);
+      } else {
+        sessionStorage.removeItem('proptii_selected_tenant_id');
+      }
+    } catch { /* ignore */ }
   };
+
+  // Re-hydrate selectedTenant on refresh or tenants load
+  React.useEffect(() => {
+    if (selectedTenant) return;
+    try {
+      const savedTenantId = sessionStorage.getItem('proptii_selected_tenant_id');
+      if (savedTenantId && tenants.length > 0) {
+        const found = tenants.find(t => t.id === savedTenantId);
+        if (found) {
+          console.log('🔄 Restoring selectedTenant from storage:', found.id);
+          setSelectedTenant(found);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore selectedTenant:', e);
+    }
+  }, [tenants, selectedTenant]);
 
   const selectLandlord = (landlord: any) => {
     setSelectedLandlord(landlord);
@@ -2272,6 +2426,8 @@ export function AppContent() {
             managerEmail={userProfile?.email}
             userProfile={userProfile}
             properties={properties}
+            openRequestOnMount={openViewingsRequestOnMount}
+            onRequestOpenedOnMount={() => setOpenViewingsRequestOnMount(false)}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -2311,6 +2467,8 @@ export function AppContent() {
             properties={properties}
             arrearsAlerts={arrearsAlerts}
             userRole={userRole}
+            openAddOnMount={openClientsAddOnMount}
+            onAddOpenedOnMount={() => setOpenClientsAddOnMount(false)}
             onViewInsights={() => handleNavigation('insights')}
             onViewSettings={() => handleNavigation('settings')}
             onViewNotifications={() => handleNavigation('messages')}
@@ -2911,6 +3069,7 @@ export function AppContent() {
             <MainLayout
               currentScreen={navigationScreen}
               onNavigate={handleNavigation}
+              onQuickAction={handleQuickAction}
               userProfile={userProfile}
               userRole={userRole}
               isAuthenticated={isAuthenticated}

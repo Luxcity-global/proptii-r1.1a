@@ -95,6 +95,8 @@ interface ViewingsPageProps {
   onViewSettings?: () => void;
   onViewNotifications?: () => void;
   onViewInsights?: () => void;
+  openRequestOnMount?: boolean;
+  onRequestOpenedOnMount?: () => void;
 }
 
 interface ScheduleFormState {
@@ -237,6 +239,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   onViewSettings,
   onViewNotifications,
   onViewInsights,
+  openRequestOnMount = false,
+  onRequestOpenedOnMount,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -252,6 +256,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isEventDetailOpen, setIsEventDetailOpen] = useState(false);
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (openRequestOnMount) {
+      setIsRequestModalOpen(true);
+      onRequestOpenedOnMount?.();
+    }
+    const handleOpen = () => setIsRequestModalOpen(true);
+    window.addEventListener('open-book-viewing', handleOpen);
+    return () => window.removeEventListener('open-book-viewing', handleOpen);
+  }, [openRequestOnMount, onRequestOpenedOnMount]);
   const [selectedRequest, setSelectedRequest] = useState<BookViewingRequest | null>(null);
   const [selectedViewing, setSelectedViewing] = useState<ViewingBooking | null>(null);
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(initialScheduleForm);
