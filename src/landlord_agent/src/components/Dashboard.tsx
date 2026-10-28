@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import {
   Plus,
   Building2,
@@ -26,6 +26,7 @@ import { countPortfolio, isUnitOccupied, isPropertyArchived } from "../utils/por
 import viewingService from "../../../services/viewingService";
 import { listViewingsForLandlord } from "../../../services/viewingInboxService";
 import { useMessagingContext } from "../../../contexts/MessagingContext";
+import AuthContext from "../../../contexts/AuthContext";
 import "../styles/dashboardOverview.css";
 
 interface DashboardProps {
@@ -395,13 +396,13 @@ function DashboardSkeleton({
         <section className="top-stat-grid ll-top-stat-grid">
           {/* Card 1 Profile Skeleton */}
           <div className="stat-card-gradient card-profile state-loading">
-            <div className="sk-circle sk-shimmer-light" style={{ width: 44, height: 44, margin: "0 auto 10px" }} />
-            <div className="sk-line sk-shimmer-light" style={{ width: 90, height: 16, margin: "0 auto 6px" }} />
-            <div className="sk-line sk-shimmer-light" style={{ width: 140, height: 12, margin: "0 auto 4px" }} />
-            <div className="sk-line sk-shimmer-light" style={{ width: 80, height: 11, margin: "0 auto 16px" }} />
-            <div className="profile-pill-stats" style={{ marginTop: "auto", display: "flex", gap: 12 }}>
-              <div className="sk-box sk-shimmer-light" style={{ height: 52, flex: 1, borderRadius: 14 }} />
-              <div className="sk-box sk-shimmer-light" style={{ height: 52, flex: 1, borderRadius: 14 }} />
+            <div className="sk-circle sk-shimmer-light" style={{ width: 56, height: 56, margin: "0 auto 8px" }} />
+            <div className="sk-line sk-shimmer-light" style={{ width: 110, height: 16, margin: "0 auto 6px" }} />
+            <div className="sk-line sk-shimmer-light" style={{ width: 150, height: 12, margin: "0 auto 4px" }} />
+            <div className="sk-line sk-shimmer-light" style={{ width: 90, height: 11, margin: "0 auto 12px" }} />
+            <div className="profile-pill-stats" style={{ marginTop: "auto", display: "flex", gap: 10, width: "100%", justifyContent: "center" }}>
+              <div className="sk-box sk-shimmer-light" style={{ height: 50, flex: 1, maxWidth: 140, borderRadius: 14 }} />
+              <div className="sk-box sk-shimmer-light" style={{ height: 50, flex: 1, maxWidth: 140, borderRadius: 14 }} />
             </div>
           </div>
           {/* Card 2 Revenue Skeleton */}
@@ -654,6 +655,33 @@ export function Dashboard({
   const [propertyPill, setPropertyPill] = useState<PropertyPill>("all");
   const [hoveredDonutSegment, setHoveredDonutSegment] = useState<"occupied" | "vacant" | "renovating" | null>(null);
   const docsCarouselRef = useRef<HTMLDivElement>(null);
+
+  const authContext = useContext(AuthContext);
+  const authUser = authContext?.user;
+  const [avatarImgError, setAvatarImgError] = useState(false);
+
+  const profilePhoto =
+    userProfile?.photoURL ||
+    userProfile?.avatar ||
+    userProfile?.avatarUrl ||
+    userProfile?.photo ||
+    userProfile?.profilePhoto ||
+    authUser?.photoURL ||
+    userProfile?.logo;
+
+  useEffect(() => {
+    setAvatarImgError(false);
+  }, [profilePhoto]);
+
+  const userInitials = useMemo(() => {
+    const raw = userProfile?.name || authUser?.name || "";
+    if (!raw.trim() || raw.trim().toLowerCase() === "there") return "U";
+    const parts = raw.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return raw.trim().slice(0, 2).toUpperCase();
+  }, [userProfile?.name, authUser?.name]);
 
   const [overviewViewings, setOverviewViewings] = useState<Array<{
     id: string;
@@ -1000,18 +1028,45 @@ export function Dashboard({
               <div className="profile-info-group">
                 <div className="user-avatar-wrap ll-profile-avatar-wrap">
                   <div className="user-avatar ll-profile-avatar">
-                    <User size={22} />
+                    {profilePhoto && !avatarImgError ? (
+                      <img
+                        src={profilePhoto}
+                        alt={userName || "Profile photo"}
+                        className="user-avatar-img ll-profile-avatar-img"
+                        onError={() => setAvatarImgError(true)}
+                      />
+                    ) : (
+                      <span className="user-avatar-initials ll-profile-avatar-initials">
+                        {userInitials}
+                      </span>
+                    )}
                   </div>
-                  <div className="avatar-status-badge ll-avatar-badge">
-                    <Check size={9} color="#fff" strokeWidth={3} />
+                  <div className="avatar-status-badge ll-avatar-badge" title="Verified Account">
+                    <Check size={10} color="#fff" strokeWidth={3.5} />
                   </div>
                 </div>
                 <h3>{userName}</h3>
-                <div className="profile-email ll-profile-email">{userProfile?.email || "—"}</div>
-                <div className="profile-phone ll-profile-phone">{userProfile?.phone || "Phone not provided"}</div>
+                <div className="profile-email ll-profile-email" title={userProfile?.email || ""}>
+                  {userProfile?.email || "—"}
+                </div>
+                <div className="profile-phone ll-profile-phone">
+                  {userProfile?.phone || "Phone not provided"}
+                </div>
               </div>
               <div className="profile-pill-stats ll-pill-stats">
-                <div className="pill-stat ll-pill-stat">
+                <div
+                  className="pill-stat ll-pill-stat"
+                  onClick={onViewAllProperties}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onViewAllProperties?.();
+                    }
+                  }}
+                  title="View all properties"
+                >
                   <span className="pill-stat-icon ll-pill-icon">
                     <Home size={18} />
                   </span>
@@ -1020,7 +1075,19 @@ export function Dashboard({
                     <div className="pill-stat-val ll-pill-val">{totalProperties}</div>
                   </div>
                 </div>
-                <div className="pill-stat ll-pill-stat">
+                <div
+                  className="pill-stat ll-pill-stat"
+                  onClick={onViewNotifications}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onViewNotifications?.();
+                    }
+                  }}
+                  title="View alerts"
+                >
                   <span className="pill-stat-icon alert-icon ll-pill-icon alert">
                     <Bell size={18} />
                   </span>

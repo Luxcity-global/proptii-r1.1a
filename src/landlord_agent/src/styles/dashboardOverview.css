@@ -295,96 +295,142 @@
   outline-color: #60a5fa;
 }
 
+/* Ensure state-normal fills card height with balanced flex layout */
+.card-profile .state-normal,
+.ll-card-profile .state-normal {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .profile-info-group {
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
+  text-align: center;
 }
 
 .user-avatar-wrap,
 .ll-profile-avatar-wrap {
   position: relative;
-  margin: 0 auto 5px;
-  width: 44px;
-  height: 44px;
+  margin: 0 auto 8px;
+  width: 56px;
+  height: 56px;
 }
 
 .user-avatar,
 .ll-profile-avatar {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  border: 2.5px solid rgba(255, 255, 255, 0.95);
+  overflow: hidden;
+  position: relative;
+}
+
+.user-avatar-img,
+.ll-profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+
+.user-avatar-initials,
+.ll-profile-avatar-initials {
+  font-size: 19px;
+  font-weight: 700;
+  color: #136c9e;
+  letter-spacing: -0.5px;
+  user-select: none;
 }
 
 .avatar-status-badge,
 .ll-avatar-badge {
   position: absolute;
-  bottom: -1px;
-  right: -1px;
-  width: 14px;
-  height: 14px;
+  bottom: 0px;
+  right: 0px;
+  width: 16px;
+  height: 16px;
   background: #10b981;
-  border: 2px solid #cbe5ff;
+  border: 2px solid #ffffff;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  z-index: 2;
 }
 
 .card-profile h3,
 .ll-card-profile h3 {
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 700;
   color: #0f172a;
   margin: 0;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
 }
 
 .profile-email,
 .ll-profile-email {
-  font-size: 14px;
+  font-size: 13px;
   color: #334155;
   font-weight: 500;
-  margin-top: 2px;
+  margin-top: 3px;
+  line-height: 1.25;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-phone,
 .ll-profile-phone {
-  font-size: 13px;
+  font-size: 12.5px;
   color: #475569;
-  margin-top: 1px;
+  font-weight: 500;
+  margin-top: 2px;
+  line-height: 1.25;
 }
 
 .profile-pill-stats,
 .ll-pill-stats {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
   justify-content: center;
+  align-items: center;
   margin-top: auto;
+  padding-top: 10px;
 }
 
 .pill-stat,
 .ll-pill-stat {
   background: #ffffff;
   border-radius: 14px;
-  padding: 10px 14px;
-  min-height: 52px;
-  height: 52px;
+  padding: 8px 12px;
+  min-height: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   flex: 1;
   max-width: 140px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   cursor: pointer;
   box-sizing: border-box;
 }
@@ -393,12 +439,13 @@
 .ll-pill-stat:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-color: #ffffff;
 }
 
 .pill-stat-icon,
 .ll-pill-icon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 10px;
   background: #f8fafc;
   display: flex;
@@ -410,6 +457,7 @@
 
 .pill-stat-icon.alert-icon,
 .ll-pill-icon.alert {
+  background: #fff7ed;
   color: var(--primary-orange);
 }
 
@@ -418,6 +466,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-width: 0;
 }
 
 .pill-stat-label,
@@ -426,12 +475,12 @@
   color: #64748b;
   font-weight: 600;
   letter-spacing: 0.1px;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .pill-stat-val,
 .ll-pill-val {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: #0f172a;
   line-height: 1.15;

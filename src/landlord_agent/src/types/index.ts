@@ -14,12 +14,18 @@ export interface CompanyProfile {
 }
 
 export interface UserProfile {
+  id?: string;
   name: string;
   email: string;
   phone: string;
   companyName?: string;
   logo?: string;
   companyProfile?: CompanyProfile;
+  photoURL?: string;
+  avatar?: string;
+  avatarUrl?: string;
+  photo?: string;
+  profilePhoto?: string;
 }
 
 export interface PropertyPhoto {

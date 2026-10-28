@@ -365,7 +365,8 @@ export function AppContent() {
           prev.email === hostUser.email &&
           prev.name === nextName &&
           (prev.phone || '') === nextPhone &&
-          (prev.companyName || '') === nextCompany
+          (prev.companyName || '') === nextCompany &&
+          (prev as any).photoURL === hostUser.photoURL
         ) {
           return prev;
         }
@@ -377,6 +378,7 @@ export function AppContent() {
           companyProfile: nextProfile,
           companyName: nextCompany,
           logo: prev?.logo,
+          photoURL: hostUser.photoURL || (prev as any)?.photoURL,
         } as any;
       });
     } else {
