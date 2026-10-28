@@ -1,4 +1,54 @@
-/* Landlord clients page — scoped to .ll-cl */
+/* Landlord clients page — scoped to .ll-cl and Tailwind utilities from Agent clients.html */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-box {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-slide-up {
+  animation: fadeSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.shadow-subtle {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+.shadow-card {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+}
+.shadow-hover {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+.shadow-dropdown {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+}
+.shadow-drawer {
+  box-shadow: -8px 0 30px rgba(15, 23, 42, 0.12);
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
 
 .ll-cl {
   --ll-bg: #f8fafc;

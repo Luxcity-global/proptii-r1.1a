@@ -2334,6 +2334,10 @@ export function AppContent() {
               setPreviousScreen(null);
               navigateToScreen('tenant-selection');
             }}
+            onBulkImportTenant={() => {
+              trackEvent('landlord_bulk_import_tenant_clicked', { source: 'clients_page' });
+              navigateToScreen('bulk-import-tenant');
+            }}
             onAddLandlord={() => navigateToScreen('add-landlord')}
             onViewLandlord={(landlord) => {
               selectLandlord(landlord);

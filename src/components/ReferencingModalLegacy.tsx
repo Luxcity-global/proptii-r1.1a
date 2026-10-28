@@ -35,7 +35,7 @@ import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
 import { firestoreService } from '../services/firestoreService';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import QuickFillBanner from './referencing/ui/QuickFillBanner';
 import { ExtractedData } from '../services/openRouterService';
 import SendReferencingModal from './referencing/SendReferencingModal';
