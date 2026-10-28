@@ -1,20 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, UploadCloud, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  UploadCloud, X, ChevronLeft, ChevronRight, ChevronDown, Check, FileText, HelpCircle, Search,
+  Trash2, RotateCcw, Download, Lock, ArrowRight, ArrowUpRight, Send, Sparkles, CheckCircle2,
+} from 'lucide-react';
 import * as pdfjs from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker?url';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
-import { useNavigate } from 'react-router-dom';
-import CustomizePage from './CustomizePage';
-import { contractService, ContractTemplate } from '../../services/contractService';
+import DocumentSigningViewer from './DocumentSigningViewer';
+import SendContract from './SendContract';
+import { SignUpPromptModal } from '../onboarding/SignUpPromptModal';
+import { useOnboardingSession } from '../../contexts/OnboardingSessionContext';
+import { contractService } from '../../services/contractService';
 import signedContractsFirestoreService from '../../services/signedContractsFirestoreService';
 import { fetchContractPdfFile } from '../../services/contractPdf';
 import { uploadToFirebaseStorage } from '../../services/storageService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBillingStatus } from '../../hooks/useBillingStatus';
+import { canAccessSection, sectionUpgradeLabel } from '../../utils/planAccess';
+import { getPlanById, type PlanId } from '../../config/plans';
+import { isMockTestUserId } from '../../data/mockTestUsers';
+
+type TemplateActionResult = { success: boolean; error?: string };
+const LOCAL_ACTION_OK: TemplateActionResult = { success: true };
+
 interface ContractModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: 'uploaded' | 'deleted' | 'received';
   openContractId?: string | null;
+  /** Show the paid-feature overlay regardless of the billing lookup. */
+  locked?: boolean;
 }
 
 interface Template {
@@ -162,18 +178,58 @@ async function prepareReceivedPdf(contract: any): Promise<{
   };
 }
 
-const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialTab, openContractId }) => {
+type WizardStep = 1 | 2 | 3;
+type LibraryTab = 'uploaded' | 'deleted' | 'received';
+
+const SEND_FORM_ID = 'tenant-send-contract-form';
+const TEMPLATE_SLOTS = 4;
+
+const STEPS: { id: WizardStep; label: string }[] = [
+  { id: 1, label: 'Choose & Upload' },
+  { id: 2, label: 'Review & Sign' },
+  { id: 3, label: 'Recipients & Send' },
+];
+
+function normalizePlanId(plan: string | null | undefined): PlanId {
+  if (!plan || plan === 'free') return 'explorer';
+  return plan as PlanId;
+}
+
+function receivedStatusBadge(status: string | undefined) {
+  if (status === 'signed') return { label: 'Signed', className: 'bg-emerald-50 text-emerald-700' };
+  if (status === 'unsigned') return { label: 'Awaiting Signature', className: 'bg-amber-50 text-amber-700' };
+  return { label: 'Sent', className: 'bg-blue-50 text-[#136C9E]' };
+}
+
+type LibraryRow = {
+  id: string;
+  name: string;
+  badge?: { label: string; className: string };
+  date: string;
+  from?: string;
+  actions: React.ReactNode;
+};
+
+const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialTab, openContractId, locked = false }) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'uploaded' | 'deleted' | 'received'>(initialTab || 'uploaded');
+  const { isDemoMode } = useOnboardingSession();
+  // Dev test personas have no real Firebase session, so the API rejects their storage and template calls.
+  const isLocalTestSession = import.meta.env.DEV && isMockTestUserId(user?.id);
+  const { plan, status: planStatus, loading: billingLoading, error: billingError } = useBillingStatus();
+  const isLocked =
+    locked || (!billingLoading && !billingError && !canAccessSection('tenant-contracts', plan, planStatus));
+  const planName = getPlanById(normalizePlanId(plan))?.name ?? 'Explorer';
+
+  const [activeTab, setActiveTab] = useState<LibraryTab>(initialTab || 'uploaded');
   const [uploadedTemplates, setUploadedTemplates] = useState<Template[]>([]);
   const [deletedTemplates, setDeletedTemplates] = useState<Template[]>([]);
   const [receivedContracts, setReceivedContracts] = useState<any[]>([]);
   const [previewFile, setPreviewFile] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const navigate = useNavigate(); // Initialize navigation
-  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
   // PDF Preview states
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -182,10 +238,14 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
   const [pdfError, setPdfError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // New state to track if we're in customize mode and which template is being customized
-  const [customizeMode, setCustomizeMode] = useState(false);
+  // Wizard state: step 2 signs the chosen document, step 3 sends it
+  const [step, setStep] = useState<WizardStep>(1);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [customizingTemplateId, setCustomizingTemplateId] = useState<string | null>(null);
   const [customizingTemplate, setCustomizingTemplate] = useState<Template | null>(null);
+  const [signedPdfBytes, setSignedPdfBytes] = useState<Uint8Array | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [returnRecipient, setReturnRecipient] = useState<{ email: string; name: string } | null>(null);
   const [signingSource, setSigningSource] = useState<{
     id: string;
@@ -358,135 +418,112 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
     loadTemplatesFromFirestore();
   }, [isOpen, user?.id, user?.email]);
 
+  const resetWizard = () => {
+    setStep(1);
+    setCustomizingTemplateId(null);
+    setCustomizingTemplate(null);
+    setSignedPdfBytes(null);
+    setReturnRecipient(null);
+    setSigningSource(null);
+    setOpenForSigning(false);
+    setIsSending(false);
+  };
+
   useEffect(() => {
     if (!isOpen) {
       openedContractRef.current = null;
+      resetWizard();
+      setSelectedTemplateId(null);
+      setPreviewFile(null);
+      setSearchQuery('');
+      setNotice(null);
+      setActiveTab(initialTab || 'uploaded');
       return;
     }
-    if (!openContractId || !user?.id || isLoadingTemplates) return;
+    if (!openContractId || !user?.id || isLoadingTemplates || billingLoading || isLocked) return;
     if (openedContractRef.current === openContractId) return;
     openedContractRef.current = openContractId;
     setActiveTab('received');
     const match = receivedContracts.find((item) => String(item.id) === String(openContractId)) || { id: openContractId };
     void openReceivedContract(match, 'customize');
-  }, [isOpen, openContractId, user?.id, isLoadingTemplates, receivedContracts]);
+  }, [isOpen, openContractId, user?.id, isLoadingTemplates, receivedContracts, initialTab, billingLoading, isLocked]);
 
-  // Clear all storage (for testing) - now clears Firestore data
-  const handleClearStorage = async () => {
-    if (!user?.id) {
-      alert('You must be logged in to clear storage.');
-      return;
+  // Start (or restart) signing for a template and move to Review & Sign
+  const handleCustomize = (templateId: string, templateOverride?: Template) => {
+    const template = templateOverride ?? uploadedTemplates.find(t => t.id === templateId) ?? null;
+    if (!template) return;
+    if (!templateOverride) {
+      setReturnRecipient(null);
+      setOpenForSigning(false);
+      setSigningSource(null);
     }
-    
+    setCustomizingTemplateId(templateId);
+    setCustomizingTemplate(template);
+    setSelectedTemplateId(templateId);
+    setSignedPdfBytes(null);
+    setStep(2);
+  };
+
+  const openReceivedContract = async (contract: any, mode: 'preview' | 'customize' | 'download') => {
     try {
-      // This would require implementing a bulk delete function in contractService
-      // For now, just clear local state
-      setUploadedTemplates([]);
-      setDeletedTemplates([]);
-      alert('All contract templates have been cleared!');
+      const prepared = await prepareReceivedPdf(contract);
+      if (mode === 'download') {
+        const link = document.createElement('a');
+        link.href = prepared.url;
+        link.download = prepared.name;
+        link.click();
+        return;
+      }
+
+      const template: Template = {
+        id: String(contract.id),
+        name: prepared.name,
+        uploadDate: contract.sentDate ? new Date(contract.sentDate).toLocaleDateString() : new Date().toLocaleDateString(),
+        fileUrl: prepared.url,
+        imagePreview: null,
+        file: prepared.file,
+        fileData: prepared.fileData,
+        fileSize: prepared.file.size,
+      };
+
+      if (mode === 'preview') {
+        handlePreview(template);
+        return;
+      }
+
+      setReturnRecipient(prepared.sender);
+      setSigningSource({
+        id: String(contract.id),
+        title: prepared.name,
+        propertyAddress: contract.propertyAddress || '',
+        tenantName: contract.tenantName || '',
+        tenantEmail: contract.tenantEmail || '',
+        landlordEmail: prepared.sender?.email || contract.landlordEmail || '',
+        landlordId: contract.landlordId || '',
+        contractType: contract.contractType || 'tenancy-agreement',
+      });
+      setOpenForSigning(true);
+      setUploadedTemplates((prev) => (prev.some((item) => item.id === template.id) ? prev : [...prev, template]));
+      handleCustomize(template.id, template);
     } catch (error) {
-      console.error('Error clearing templates:', error);
+      console.error('Error opening received contract:', error);
+      alert(error instanceof Error ? error.message : 'Failed to open this contract. Please try again.');
     }
   };
-
-
-  // Toggle sidebar visibility
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-
-  // Handle Customize (Redirect)
-  {/*const handleCustomize = (templateId: string) => {
-    navigate(`/customize/${templateId}`);
-  };*/}
-
-// Handle Customize
-const handleCustomize = (templateId: string, templateOverride?: Template) => {
-  const template = templateOverride ?? uploadedTemplates.find(t => t.id === templateId) ?? null;
-  if (!templateOverride) {
-    setReturnRecipient(null);
-    setOpenForSigning(false);
-    setSigningSource(null);
-  }
-  setCustomizingTemplateId(templateId);
-  setCustomizingTemplate(template);
-  setCustomizeMode(true);
-  setDropdownOpen(null); // Close the dropdown
-};
-
-const openReceivedContract = async (contract: any, mode: 'preview' | 'customize' | 'download') => {
-  try {
-    const prepared = await prepareReceivedPdf(contract);
-    if (mode === 'download') {
-      const link = document.createElement('a');
-      link.href = prepared.url;
-      link.download = prepared.name;
-      link.click();
-      return;
-    }
-
-    const template: Template = {
-      id: String(contract.id),
-      name: prepared.name,
-      uploadDate: contract.sentDate ? new Date(contract.sentDate).toLocaleDateString() : new Date().toLocaleDateString(),
-      fileUrl: prepared.url,
-      imagePreview: null,
-      file: prepared.file,
-      fileData: prepared.fileData,
-      fileSize: prepared.file.size,
-    };
-
-    if (mode === 'preview') {
-      handlePreview(template);
-      return;
-    }
-
-    setReturnRecipient(prepared.sender);
-    setSigningSource({
-      id: String(contract.id),
-      title: prepared.name,
-      propertyAddress: contract.propertyAddress || '',
-      tenantName: contract.tenantName || '',
-      tenantEmail: contract.tenantEmail || '',
-      landlordEmail: prepared.sender?.email || contract.landlordEmail || '',
-      landlordId: contract.landlordId || '',
-      contractType: contract.contractType || 'tenancy-agreement',
-    });
-    setOpenForSigning(true);
-    setUploadedTemplates((prev) => (prev.some((item) => item.id === template.id) ? prev : [...prev, template]));
-    handleCustomize(template.id, template);
-  } catch (error) {
-    console.error('Error opening received contract:', error);
-    alert(error instanceof Error ? error.message : 'Failed to open this contract. Please try again.');
-  } finally {
-    setDropdownOpen(null);
-  }
-};
-
-// Return from customize mode
-const handleBackFromCustomize = () => {
-  setCustomizeMode(false);
-  setCustomizingTemplateId(null);
-  setCustomizingTemplate(null);
-};
-
-// Find the template being customized
-const findCustomizedTemplate = () => {
-  return customizingTemplate;
-};
-  
 
   // Handle Delete (Move to Deleted Templates)
   const handleDelete = async (templateId: string) => {
     try {
-      const result = await contractService.deleteContractTemplate(templateId);
+      const result: TemplateActionResult = isLocalTestSession
+        ? LOCAL_ACTION_OK
+        : await contractService.deleteContractTemplate(templateId);
       if (result.success) {
         const templateToDelete = uploadedTemplates.find((t) => t.id === templateId);
         if (templateToDelete) {
           setUploadedTemplates(uploadedTemplates.filter((t) => t.id !== templateId));
           setDeletedTemplates([...deletedTemplates, templateToDelete]);
           setConfirmDelete(null);
+          if (selectedTemplateId === templateId) setSelectedTemplateId(null);
           console.log("Template moved to deleted status in Firestore");
         }
       } else {
@@ -502,7 +539,9 @@ const findCustomizedTemplate = () => {
   // Handle Restore (Move to Uploaded Templates)
   const handleRestore = async (templateId: string) => {
     try {
-      const result = await contractService.restoreContractTemplate(templateId);
+      const result: TemplateActionResult = isLocalTestSession
+        ? LOCAL_ACTION_OK
+        : await contractService.restoreContractTemplate(templateId);
       if (result.success) {
         const restoredTemplate = deletedTemplates.find(template => template.id === templateId);
         if (restoredTemplate) {
@@ -523,7 +562,9 @@ const findCustomizedTemplate = () => {
   // Handle Permanent Delete (Remove from Deleted Templates)
   const handleDeletePermanently = async (templateId: string) => {
     try {
-      const result = await contractService.permanentlyDeleteContractTemplate(templateId);
+      const result: TemplateActionResult = isLocalTestSession
+        ? LOCAL_ACTION_OK
+        : await contractService.permanentlyDeleteContractTemplate(templateId);
       if (result.success) {
         setDeletedTemplates(deletedTemplates.filter(template => template.id !== templateId));
         setConfirmDelete(null);
@@ -561,6 +602,7 @@ const findCustomizedTemplate = () => {
     if (file.type !== "application/pdf") {
       console.warn("Invalid file type:", file.type);
       alert("Please select a PDF file. Only PDF files are supported.");
+      event.target.value = '';
       return;
     }
     
@@ -569,6 +611,7 @@ const findCustomizedTemplate = () => {
     if (file.size > maxFileSize) {
       console.warn("File too large:", file.size, "bytes");
       alert(`File is too large. Maximum file size is 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`);
+      event.target.value = '';
       return;
     }
     
@@ -576,6 +619,7 @@ const findCustomizedTemplate = () => {
     if (file.size < 1024) { // Less than 1KB
       console.warn("File too small:", file.size, "bytes");
       alert("File appears to be corrupted or empty. Please try a different file.");
+      event.target.value = '';
       return;
     }
     
@@ -583,6 +627,7 @@ const findCustomizedTemplate = () => {
     
     try {
       setIsSaving(true);
+      setNotice(null);
       const fileUrl = URL.createObjectURL(file);
       console.log("Created blob URL:", fileUrl);
       
@@ -594,6 +639,24 @@ const findCustomizedTemplate = () => {
       } catch (previewError) {
         console.warn("Failed to generate preview, continuing without preview:", previewError);
         // Continue without preview - this is not critical
+      }
+
+      if (isLocalTestSession) {
+        const localTemplate: Template = {
+          id: `local-${Date.now()}`,
+          name: file.name,
+          uploadDate: new Date().toLocaleDateString(),
+          fileUrl,
+          imagePreview,
+          file,
+          fileSize: file.size,
+        };
+        setUploadedTemplates((prev) => [...prev, localTemplate]);
+        setSelectedTemplateId(localTemplate.id);
+        setActiveTab('uploaded');
+        setNotice(`"${file.name}" added for this test session only (test personas can't save to the server).`);
+        event.target.value = '';
+        return;
       }
 
       const uploadRes = await uploadToFirebaseStorage(file, `contractTemplates/${userId}`);
@@ -628,8 +691,10 @@ const findCustomizedTemplate = () => {
           firestoreId: result.templateId
         };
         setUploadedTemplates([...uploadedTemplates, newTemplate]);
+        setSelectedTemplateId(newTemplate.id);
+        setActiveTab('uploaded');
+        setNotice(`"${file.name}" uploaded and selected. Continue to Review & Sign when you're ready.`);
         console.log("Template saved to Firestore successfully");
-        alert(`File "${file.name}" uploaded successfully!`);
       } else {
         console.error("Failed to save template to Firestore:", result.error);
         alert(`Failed to save template: ${result.error || 'Unknown error'}. Please try again.`);
@@ -793,237 +858,618 @@ const findCustomizedTemplate = () => {
     }
   }, [currentPage, pdfDocument]);
 
+  const needle = searchQuery.trim().toLowerCase();
+  const matches = (name: string) => !needle || name.toLowerCase().includes(needle);
+
+  const actionBtn = 'px-2.5 py-1 font-semibold rounded-md transition-colors text-xs';
+  const ghostBtn = `${actionBtn} text-slate-600 hover:text-[#136C9E] bg-slate-100 hover:bg-blue-50`;
+  const primaryBtn = `${actionBtn} px-3 bg-[#136C9E] hover:bg-[#0f567e] text-white shadow-sm`;
+  const dangerBtn = `${actionBtn} text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100`;
+
+  const buildLibraryRows = (): LibraryRow[] => {
+    if (activeTab === 'uploaded') {
+      return uploadedTemplates
+        .filter((t) => matches(t.name))
+        .map((template, index) => ({
+          id: template.id,
+          name: template.name,
+          badge: selectedTemplateId === template.id ? { label: 'Selected', className: 'bg-blue-50 text-[#136C9E]' } : undefined,
+          date: template.uploadDate,
+          actions: (
+            <>
+              <button type="button" onClick={() => handlePreview(template)} className={ghostBtn}>Preview</button>
+              <button
+                type="button"
+                onClick={() => handleCustomize(template.id)}
+                className={primaryBtn}
+                {...(index === 0 ? { 'data-demo-contract-manage-first': true } : {})}
+              >
+                Sign &amp; Send
+              </button>
+              <button type="button" onClick={() => setConfirmDelete(template.id)} className={dangerBtn} aria-label={`Delete ${template.name}`}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </>
+          ),
+        }));
+    }
+    if (activeTab === 'received') {
+      return receivedContracts
+        .filter((c) => matches(receivedContractName(c)))
+        .map((contract) => ({
+          id: String(contract.id),
+          name: receivedContractName(contract),
+          badge: receivedStatusBadge(contract.status),
+          date: contract.sentDate ? new Date(contract.sentDate).toLocaleDateString() : '',
+          from: contract.landlordEmail,
+          actions: (
+            <>
+              <button type="button" onClick={() => { void openReceivedContract(contract, 'preview'); }} className={ghostBtn}>Preview</button>
+              <button type="button" onClick={() => { void openReceivedContract(contract, 'download'); }} className={ghostBtn} aria-label="Download">
+                <Download className="w-3.5 h-3.5" />
+              </button>
+              <button type="button" onClick={() => { void openReceivedContract(contract, 'customize'); }} className={primaryBtn}>Sign</button>
+            </>
+          ),
+        }));
+    }
+    return deletedTemplates
+      .filter((t) => matches(t.name))
+      .map((template) => ({
+        id: template.id,
+        name: template.name,
+        date: template.uploadDate,
+        actions: (
+          <>
+            <button type="button" onClick={() => setConfirmDelete(template.id)} className={dangerBtn}>Delete</button>
+            <button type="button" onClick={() => handleRestore(template.id)} className={`${primaryBtn} inline-flex items-center gap-1`}>
+              <RotateCcw className="w-3.5 h-3.5" /> Restore
+            </button>
+          </>
+        ),
+      }));
+  };
+
   if (!isOpen) return null;
 
-  const customizedTemplate = findCustomizedTemplate();
+  const libraryRows = buildLibraryRows();
+
+  const hasActiveDocument = Boolean(customizingTemplateId && customizingTemplate);
+  const selectedTemplate = uploadedTemplates.find((t) => t.id === selectedTemplateId) ?? null;
+  const headerDocName = customizingTemplate?.name ?? selectedTemplate?.name ?? 'No document selected';
+
+  const goToStep = (target: WizardStep) => {
+    if (target > 1 && !hasActiveDocument) return;
+    setStep(target);
+  };
+
+  const handleForward = () => {
+    if (step === 1) {
+      if (hasActiveDocument && (!selectedTemplateId || selectedTemplateId === customizingTemplateId)) {
+        setStep(2);
+      } else if (selectedTemplateId) {
+        handleCustomize(selectedTemplateId);
+      }
+      return;
+    }
+    if (step === 2) setStep(3);
+  };
+
+  const canGoForward = step === 1
+    ? Boolean(selectedTemplateId || hasActiveDocument)
+    : step === 2
+      ? true
+      : Boolean(signedPdfBytes) && !isSending;
+
+  const nextLabel = step === 1
+    ? 'Continue to Review & Sign'
+    : step === 2
+      ? (signedPdfBytes ? 'Proceed to Send' : 'Next: Recipients & Send')
+      : (isSending ? 'Sending…' : 'Send Contract');
+
+  const tabCounts: Record<LibraryTab, number> = {
+    uploaded: uploadedTemplates.length,
+    received: receivedContracts.length,
+    deleted: deletedTemplates.length,
+  };
+  const tabLabels: Record<LibraryTab, string> = {
+    uploaded: 'Uploaded Templates',
+    received: 'Received Contracts',
+    deleted: 'Deleted Templates',
+  };
+  const emptyText: Record<LibraryTab, string> = {
+    uploaded: 'No templates yet. Upload a PDF above to get started.',
+    received: 'No contracts received yet. Contracts sent by your landlord will appear here.',
+    deleted: 'No deleted templates.',
+  };
+
+  const confirmIsPermanent = Boolean(confirmDelete && deletedTemplates.some((t) => t.id === confirmDelete));
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-
-      {/* Main Container */}
-      <div className={`flex transition-all duration-300 ${isSidebarOpen ? 'max-w-5xl' : 'max-w-3xl'}`}>
-
-        {/* Sidebar (Outside the modal, placed beside it) */}
-        {isSidebarOpen && !customizeMode && (
-          <div className="max-h-[700px] w-64 bg-white shadow-lg p-6 flex flex-col">
-            {/*<button onClick={() => setIsSidebarOpen(false)} className="self-end">
-              <X className="text-gray-700" />
-        </button>*/}
-
-            <h2 className="text-xl font-bold text-orange-600 mb-6">Actions Menu</h2>
-            <p className="text-gray-600 mb-6">
-              Our contract management solution streamlines contracting, saves time, and reduces errors.
-            </p>
-            
-            <button className="flex items-center gap-2 bg-blue-50 text-gray-900 px-4 py-3 rounded-md w-full justify-center hover:bg-blue-100">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-orange-500 bi bi-upload" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
-                <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"/>
-              </svg>
-              Upload Template
-            </button>
-            
-            <button 
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-gray-600 mt-6 hover:text-gray-900 px-4 py-3 rounded-md w-full justify-center hover:bg-blue-100">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-orange-500 bi bi-person" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
-              </svg>
-              Go To Dashboard
-            </button>
-
-            {/* Storage Status */}
-            <div className="mt-6 p-3 bg-gray-50 rounded-md text-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="font-medium text-gray-700">Auto-Save</span>
-                {isSaving && <span className="text-orange-500">Saving...</span>}
+    <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 lg:p-6 font-nunito-sans text-slate-800">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="contracts-wizard-title"
+        className="relative bg-white rounded-2xl sm:rounded-3xl shadow-[0_25px_60px_-15px_rgba(15,23,42,0.25)] w-full max-w-5xl max-h-[94vh] flex flex-col border border-slate-200/90 overflow-hidden"
+      >
+        {/* Header */}
+        <header className="px-5 sm:px-7 py-4 bg-white border-b border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#e8f3f8] text-[#136C9E] flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 id="contracts-wizard-title" className="font-archivo font-extrabold text-slate-900 text-base sm:text-lg tracking-tight truncate">
+                  Contracts Wizard
+                </h2>
+                {hasActiveDocument && (
+                  signedPdfBytes ? (
+                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Signed
+                    </span>
+                  ) : (
+                    <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      Unsigned Draft
+                    </span>
+                  )
+                )}
               </div>
-              <p className="text-gray-600">
-                Templates: {uploadedTemplates.length} stored
-              </p>
-              
-              {/* Clear Storage Button (for testing) */}
-              <button 
-                onClick={handleClearStorage}
-                className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+              <div className="text-xs text-slate-500 truncate" title={headerDocName}>{headerDocName}</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="relative group">
+              <button
+                type="button"
+                className="w-9 h-9 rounded-xl text-slate-400 hover:text-[#136C9E] hover:bg-[#e8f3f8]/60 flex items-center justify-center transition-colors"
+                aria-label="How electronic signing works"
               >
-                Clear All Storage
+                <HelpCircle className="w-4 h-4" />
               </button>
+              <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 transition-opacity absolute right-0 top-11 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-xl z-50">
+                <div className="font-bold text-amber-400 mb-1">Electronic signatures</div>
+                <p className="text-slate-300 leading-normal text-[11px]">
+                  Choose a contract, sign it, then send it. Each recipient gets an email with the signed PDF, and a copy is saved to your contracts.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Stepper */}
+        <nav className="bg-slate-50/80 px-4 sm:px-8 py-3 border-b border-slate-200/80 flex items-center justify-between shrink-0 overflow-x-auto">
+          <div className="flex items-center gap-2 sm:gap-6 min-w-max mx-auto sm:mx-0">
+            {STEPS.map((item, index) => {
+              const isCurrent = item.id === step;
+              const isDone = item.id < step;
+              const disabled = item.id > 1 && !hasActiveDocument;
+              return (
+                <React.Fragment key={item.id}>
+                  {index > 0 && <ChevronRight className="w-4 h-4 text-slate-300" />}
+                  <button
+                    type="button"
+                    onClick={() => goToStep(item.id)}
+                    disabled={disabled}
+                    aria-current={isCurrent ? 'step' : undefined}
+                    className={`flex items-center gap-2.5 py-1 px-2 rounded-lg text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isCurrent ? 'font-bold text-[#DC5F12]' : isDone ? 'font-semibold text-emerald-700' : 'font-semibold text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                        isCurrent ? 'bg-[#DC5F12] text-white shadow-sm' : isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {isDone ? <Check className="w-3 h-3" strokeWidth={3} /> : item.id}
+                    </span>
+                    <span className="font-archivo">{item.label}</span>
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+          <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+            <span className={`inline-block w-2 h-2 rounded-full ${isSaving ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+            {isSaving ? 'Saving…' : 'Templates saved to your account'}
+          </div>
+        </nav>
+
+        {/* Step content */}
+        <div className={`flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-7 ${step === 2 && customizingTemplate ? 'flex flex-col' : ''}`}>
+          {step === 1 && (
+            <section className="flex flex-col gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-archivo font-extrabold text-lg text-slate-900 tracking-tight">Select Contract Template</h3>
+                  <p className="text-xs text-slate-500">Choose one of your templates or upload a PDF agreement.</p>
+                </div>
+                <span className="text-xs font-medium text-slate-400">PDF only • Max 10MB</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div
+                  data-demo-contract-upload
+                  className="relative group border-2 border-dashed border-slate-300 hover:border-[#136C9E] bg-slate-50/70 hover:bg-[#e8f3f8]/30 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all min-h-[170px]"
+                >
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleUpload}
+                    disabled={isSaving}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10 disabled:cursor-wait"
+                    aria-label="Upload a PDF template"
+                  />
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-[#136C9E] flex items-center justify-center mb-2.5 shadow-sm group-hover:scale-105 transition-transform">
+                    <UploadCloud className="w-6 h-6" />
+                  </div>
+                  <div className="text-xs font-bold text-slate-800 font-archivo">Click or Drag &amp; Drop</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">Upload Custom PDF</div>
+                  {isSaving && (
+                    <div className="w-full mt-3">
+                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-[#136C9E] h-full w-1/2 animate-pulse rounded-full" />
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1 font-semibold">Uploading…</div>
+                    </div>
+                  )}
+                </div>
+
+                {Array.from({ length: TEMPLATE_SLOTS }).map((_, index) => {
+                  const template = uploadedTemplates[index];
+                  const slot = String.fromCharCode(65 + index);
+                  if (!template) {
+                    return (
+                      <div
+                        key={`slot-${slot}`}
+                        className="hidden sm:flex border border-dashed border-slate-200 bg-slate-50/50 rounded-2xl p-4 flex-col items-center justify-center text-center min-h-[170px] text-slate-400"
+                      >
+                        <FileText className="w-6 h-6 mb-1.5" />
+                        <span className="text-[11px] font-semibold">Template {slot}</span>
+                        <span className="text-[10px]">Empty slot</span>
+                      </div>
+                    );
+                  }
+                  const isSelected = selectedTemplateId === template.id;
+                  return (
+                    <button
+                      type="button"
+                      key={template.id}
+                      onClick={() => setSelectedTemplateId(template.id)}
+                      onDoubleClick={() => handleCustomize(template.id)}
+                      aria-pressed={isSelected}
+                      className={`relative text-left bg-white rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all group min-h-[170px] ${
+                        isSelected ? 'border-2 border-[#136C9E] shadow-md' : 'border border-slate-200 hover:border-[#136C9E]/50 shadow-sm hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1 mb-2">
+                        <span className="bg-[#e8f3f8] text-[#136C9E] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Template {slot}
+                        </span>
+                        <span
+                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                            isSelected ? 'bg-[#136C9E] text-white' : 'bg-slate-200 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity'
+                          }`}
+                        >
+                          <Check className="w-3 h-3" strokeWidth={3} />
+                        </span>
+                      </div>
+                      <div className="h-24 bg-slate-100 rounded-lg border border-slate-200/60 overflow-hidden mb-2">
+                        {template.imagePreview ? (
+                          <img src={template.imagePreview} alt="" className="w-full h-full object-cover object-top" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <FileText className="w-6 h-6" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-archivo font-bold text-xs text-slate-800 group-hover:text-[#136C9E] transition-colors truncate" title={template.name}>
+                          {template.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5 truncate">Uploaded {template.uploadDate}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {notice && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-emerald-800">
+                  <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 shrink-0" />{notice}</span>
+                  <button type="button" onClick={() => setNotice(null)} className="text-emerald-700 hover:text-emerald-900" aria-label="Dismiss">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-sm">
+                <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 flex-wrap" role="tablist">
+                    {(['uploaded', 'received', 'deleted'] as LibraryTab[]).map((tab) => (
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === tab}
+                        key={tab}
+                        onClick={() => { setActiveTab(tab); setExpandedRow(null); }}
+                        className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                          activeTab === tab
+                            ? 'font-bold bg-orange-50 text-[#DC5F12] border border-[#DC5F12]/20'
+                            : 'font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent'
+                        }`}
+                      >
+                        {tabLabels[tab]} ({tabCounts[tab]})
+                      </button>
+                    ))}
+                  </div>
+                  <div className="relative w-full sm:w-56">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search…"
+                      className="w-full text-base sm:text-xs pl-8 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#136C9E]"
+                    />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                {isLoadingTemplates ? (
+                  <div className="flex items-center justify-center gap-2 py-10 text-xs text-slate-500">
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#136C9E]" />
+                    Loading your contracts…
+                  </div>
+                ) : libraryRows.length === 0 ? (
+                  <div className="py-10 px-4 text-center text-xs text-slate-400">
+                    {needle ? `Nothing matches "${searchQuery}".` : emptyText[activeTab]}
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden md:block overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50/60 text-slate-400 font-archivo uppercase text-[10px] tracking-wider sticky top-0">
+                          <tr>
+                            <th className="py-2.5 px-5">{activeTab === 'received' ? 'Contract' : 'Template File'}</th>
+                            <th className="py-2.5 px-4">{activeTab === 'received' ? 'Received' : 'Date'}</th>
+                            <th className="py-2.5 px-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-600">
+                          {libraryRows.map((row) => (
+                            <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-3 px-5 max-w-0 w-1/2">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-7 h-7 rounded bg-red-50 text-red-600 flex items-center justify-center font-bold text-[10px] shrink-0">PDF</div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="font-semibold text-slate-800 truncate" title={row.name}>{row.name}</span>
+                                      {row.badge && (
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${row.badge.className}`}>{row.badge.label}</span>
+                                      )}
+                                    </div>
+                                    {row.from && <div className="text-[11px] text-slate-400 truncate" title={`From: ${row.from}`}>From: {row.from}</div>}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-slate-400 whitespace-nowrap">{row.date}</td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center justify-end gap-1.5">{row.actions}</div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="block md:hidden p-3 space-y-2.5 bg-slate-50/60">
+                      {libraryRows.map((row) => {
+                        const expanded = expandedRow === row.id;
+                        return (
+                          <div key={row.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRow(expanded ? null : row.id)}
+                              aria-expanded={expanded}
+                              className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors min-h-[48px]"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-[10px] shrink-0">PDF</div>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-xs text-slate-900 truncate">{row.name}</div>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    {row.badge && <span className={`text-[10px] font-semibold px-2 rounded ${row.badge.className}`}>{row.badge.label}</span>}
+                                    <span className="text-[10px] text-slate-400">{row.date}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+                              </span>
+                            </button>
+                            {expanded && (
+                              <div className="px-3.5 pb-3.5 pt-2 border-t border-slate-100 space-y-2">
+                                {row.from && <div className="text-[11px] text-slate-500 truncate">From: {row.from}</div>}
+                                <div className="flex items-center gap-2 flex-wrap [&>button]:min-h-[40px] [&>button]:flex-1">{row.actions}</div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+          )}
+
+          {step === 2 && customizingTemplate && (
+            <DocumentSigningViewer
+              key={customizingTemplate.id}
+              variant="wizard"
+              template={customizingTemplate}
+              recipient={returnRecipient || {
+                email: 'user@example.com',
+                name: 'Document Signer'
+              }}
+              sourceContractId={openForSigning ? customizingTemplate.id : undefined}
+              onSigned={(signedBytes) => setSignedPdfBytes(signedBytes)}
+            />
+          )}
+
+          {hasActiveDocument && customizingTemplate && (
+            <div className={step === 3 ? 'max-w-2xl mx-auto' : 'hidden'}>
+              <SendContract
+                key={customizingTemplate.id}
+                formId={SEND_FORM_ID}
+                initialRecipient={returnRecipient || undefined}
+                sourceContract={signingSource || undefined}
+                contractData={{
+                  title: customizingTemplate.name,
+                  content: 'Contract content will be extracted here',
+                  extractedFields: {
+                    landlord: 'Landlord Name',
+                    tenant: 'Tenant Name',
+                    propertyAddress: 'Property Address',
+                    startDate: 'Start Date'
+                  }
+                }}
+                signedPdfBytes={signedPdfBytes}
+                interceptWithSignUp={isDemoMode}
+                onInterceptSignUp={() => setShowSignUpModal(true)}
+                onSubmittingChange={setIsSending}
+                onReviewSignature={() => setStep(2)}
+                onSend={(recipients) => {
+                  console.log('Sending contract to:', recipients);
+                }}
+                onClose={() => {
+                  resetWizard();
+                  setSelectedTemplateId(null);
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <footer className="px-5 sm:px-7 py-4 bg-slate-50/90 border-t border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => goToStep((step - 1) as WizardStep)}
+            disabled={step === 1}
+            className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold text-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button type="button" onClick={onClose} className="px-3.5 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">
+              Cancel
+            </button>
+            {step === 3 ? (
+              <button
+                type="submit"
+                form={SEND_FORM_ID}
+                disabled={!canGoForward}
+                className="px-5 py-2.5 rounded-xl bg-[#DC5F12] hover:bg-[#ba4e0b] text-white text-xs font-bold shadow-sm hover:shadow transition-all flex items-center gap-2 active:scale-95 disabled:bg-slate-300 disabled:cursor-not-allowed disabled:active:scale-100"
+              >
+                <Send className="w-4 h-4" />
+                {nextLabel}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleForward}
+                disabled={!canGoForward}
+                className="px-5 py-2.5 rounded-xl bg-[#DC5F12] hover:bg-[#ba4e0b] text-white text-xs font-bold shadow-sm hover:shadow transition-all flex items-center gap-2 active:scale-95 disabled:bg-slate-300 disabled:cursor-not-allowed disabled:active:scale-100"
+              >
+                {nextLabel}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </footer>
+
+        {isLocked && (
+          <div className="absolute inset-0 z-40 bg-white/70 backdrop-blur-[3px] flex items-center justify-center p-4">
+            <div
+              role="alertdialog"
+              aria-labelledby="contracts-locked-title"
+              className="w-full max-w-md bg-white rounded-3xl border border-[#80B2FF] shadow-[0_12px_40px_rgba(70,95,194,0.18)] overflow-hidden"
+            >
+              <div className="px-6 py-5 flex items-center gap-3" style={{ background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)' }}>
+                <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Lock className="w-5 h-5 text-[#136C9E]" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#136C9E]">Locked on your plan</p>
+                  <h3 id="contracts-locked-title" className="font-archivo font-bold text-lg text-[#374957]">This feature is a paid feature</h3>
+                </div>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <p className="text-sm leading-relaxed text-[#717182]">
+                  {sectionUpgradeLabel('tenant-contracts')} You are on the{' '}
+                  <span className="font-semibold text-[#374957]">{planName}</span> plan, so uploading, signing and sending contracts stays locked until you upgrade.
+                </p>
+                <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-slate-50 border border-slate-200">
+                  <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-[#DC5F12]" />
+                  <p className="text-xs leading-relaxed text-[#374957]">Upgrade to unlock e-signing, contract templates and secure sending.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <Link
+                    to="/pricing?segment=renters"
+                    onClick={onClose}
+                    className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-full text-sm font-semibold text-white bg-[#DC5F12] hover:opacity-90 transition-opacity"
+                  >
+                    Upgrade your plan
+                    <ArrowUpRight className="w-4 h-4" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-sm font-semibold border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
-
-
-        {/* Main Content Area */}
-        {customizeMode && customizingTemplateId && customizedTemplate ? (
-          <CustomizePage 
-            templateId={customizingTemplateId}
-            template={customizedTemplate}
-            onBack={handleBackFromCustomize}
-            recipient={returnRecipient || undefined}
-            initialTab={openForSigning ? 'edit' : 'home'}
-            markSourceSigned={openForSigning}
-            sourceContract={signingSource || undefined}
-          />
-        ) : (
-          <div className="bg-[#EDF3FA] max-h-[700px] rounded-md shadow-lg w-full max-w-3xl p-6 relative pt-20">
-            <nav className="absolute top-0 left-0 right-0 bg-white p-4 shadow flex items-center z-10">
-            <button onClick={toggleSidebar}>
-                <Menu className="text-gray-700 cursor-pointer mr-2" />
-              </button>
-              <h2 className="text-xl font-bold text-gray-800">Main Contract Page</h2>
-              <button 
-                onClick={onClose} 
-                className="absolute top-1 right-6 text-gray-600 hover:text-gray-800 text-2xl font-bold p-2"
-              >
-                &times;
-              </button>
-            </nav>
-
-        <div className="mb-6">
-          <div className="mb-3">
-            <h3 className="text-xl font-semibold">Upload your Template</h3>
-          </div>
-          <div className="flex gap-6 items-start">
-            {/* Upload Box */}
-            <label
-              className="border-dashed bg-white border-2 border-gray-300 rounded-lg w-44 h-56 flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:border-gray-400 transition-all"
-              data-demo-contract-upload
-            >
-              <UploadCloud size={32} className="mb-2 text-gray-400" />
-              <span className="text-center text-sm">Click to upload or drag & drop</span>
-              <span className="text-center text-xs text-gray-400 mt-1">Max 10MB • PDF only</span>
-              <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleUpload} />
-            </label>
-
-            {/* Template Previews */}
-            <div className="flex space-x-4 overflow-x-auto">
-              {[0, 1, 2, 3].map((index) => {
-                const template = uploadedTemplates[index];
-                return template && template.imagePreview ? (
-                  <img
-                    key={template.id}
-                    src={template.imagePreview}
-                    alt={`Template ${String.fromCharCode(65 + index)}`} // A, B, C, D
-                    className="w-44 h-56 object-cover rounded-lg border cursor-pointer"
-                    onClick={() => handlePreview(template)}
-                  />
-                ) : (
-                  <div key={index} className="w-44 h-56 rounded-lg border bg-gray-200 flex items-center justify-center text-gray-500">
-                    Template {String.fromCharCode(65 + index)}
-                  </div>
-    );
-  })}
-</div>
-
-          </div>
-        </div>
-
-
-       {/* Uploaded, Deleted Templates & Received Contracts */}
-<div className="border-b border-gray-300 flex space-x-4">
-  {['uploaded', 'received', 'deleted'].map((tab) => (
-    <button
-      key={tab}
-      onClick={() => setActiveTab(tab as 'uploaded' | 'deleted' | 'received')}
-      className={`py-2 px-4 font-medium text-sm border-b-2 transition-all ${
-        activeTab === tab
-          ? 'border-[#DC5F12] text-[#DC5F12]'
-          : 'border-transparent text-gray-500 hover:text-gray-700'
-      }`}
-    >
-      {tab === 'uploaded' ? 'Uploaded Templates' : tab === 'received' ? 'Received Contracts' : 'Deleted Templates'}
-    </button>
-  ))}
-</div>
-
-<div className="mt-4 max-h-[200px] overflow-y-auto">
-  {activeTab === 'uploaded' ? (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-700">Your Templates</h3>
-        {isLoadingTemplates && (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-            Loading templates...
-          </div>
-        )}
       </div>
-      {/* Uploaded Templates Table */}
-      <table className="w-full border-collapse table-fixed">
-        <thead>
-          <tr className="bg-gray-100 text-gray-700">
-            <th className="p-2 border text-left w-2/5">Template</th>
-            <th className="p-2 border text-center w-1/5">Date</th>
-            <th className="p-2 border text-right w-2/5">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {uploadedTemplates.map((template, index) => (
-          <tr key={template.id} className="border-t">
-              <td className="p-2 border text-left max-w-0 w-2/5">
-                <div className="truncate" title={template.name}>
-                  {template.name}
-                </div>
-              </td>
-              <td className="p-2 border text-left w-1/5">{template.uploadDate}</td>
-              <td className="p-2 border text-right space-x-2 w-2/5 relative">
-                {/* Manage Button */}
-                <button
-                  onClick={() => setDropdownOpen(dropdownOpen === template.id ? null : template.id)}
-                  className="border border-[#136C9E] text-[#136C9E] px-4 py-1 rounded-full hover:bg-[#136C9E]/10"
-                  {...(index === 0 ? { 'data-demo-contract-manage-first': true } : {})}
-                >
-                  Manage
-                </button>
-                <button
-                  onClick={() => handlePreview(template)}
-                  className="bg-[#136C9E] text-white px-4 py-1 rounded-full hover:bg-[#0F5B88]"
-                >
-                  Preview
-                </button>
-
-                {/* Dropdown Menu */}
-                {dropdownOpen === template.id && (
-                  <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-md shadow-lg z-20">
-                    <button
-                      onClick={() => handleCustomize(template.id)}
-                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
-                    >
-                      Customize
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete(template.id)}
-                      className="block w-full text-left px-4 py-2 text-red-600 hover:bg-red-100"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
 
       {confirmDelete && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <p className="text-lg font-semibold">Are you sure you want to delete this template?</p>
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="mr-4 px-4 py-2 bg-gray-200 rounded-lg"
-              >
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-slate-950/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) setConfirmDelete(null); }}>
+          <div role="alertdialog" className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full border border-slate-200">
+            <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mb-3">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <p className="font-archivo font-bold text-base text-slate-900">
+              {confirmIsPermanent ? 'Delete this template permanently?' : 'Delete this template?'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {confirmIsPermanent ? 'This cannot be undone.' : 'You can restore it later from Deleted Templates.'}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmDelete(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">
                 Cancel
               </button>
               <button
-                onClick={() => handleDelete(confirmDelete)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                type="button"
+                onClick={() => (confirmIsPermanent ? handleDeletePermanently(confirmDelete) : handleDelete(confirmDelete))}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl"
               >
                 Delete
               </button>
@@ -1032,241 +1478,75 @@ const findCustomizedTemplate = () => {
         </div>
       )}
 
-    </div>
-  ) : activeTab === 'received' ? (
-    <div>
-      <h3 className="text-lg font-semibold text-gray-700 mb-3">Received Contracts</h3>
-      {receivedContracts.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          <p>No contracts received yet</p>
-          <p className="text-sm mt-2">Contracts sent by your landlord will appear here</p>
-        </div>
-      ) : (
-        <table className="w-full border-collapse table-fixed">
-          <thead>
-            <tr className="bg-gray-100 text-gray-700">
-              <th className="p-2 border text-left w-2/5">Contract</th>
-              <th className="p-2 border text-center w-1/5">Date</th>
-              <th className="p-2 border text-right w-2/5">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {receivedContracts.map((contract) => (
-              <tr key={contract.id} className="border-t">
-                <td className="p-2 border text-left max-w-0 w-2/5">
-                  <div className="truncate" title={receivedContractName(contract)}>
-                    <strong>{receivedContractName(contract)}</strong>
-                  </div>
-                  <div className="text-xs text-gray-500 truncate mt-1">
-                    <span className={`px-2 py-0.5 rounded ${
-                      contract.status === 'signed' ? 'bg-green-100 text-green-800' :
-                      contract.status === 'unsigned' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {contract.status === 'sent' ? 'Sent' : contract.status === 'unsigned' ? 'Awaiting Signature' : 'Signed'}
-                    </span>
-                  </div>
-                  {contract.landlordEmail && (
-                    <div className="text-xs text-gray-500 truncate mt-1" title={`From: ${contract.landlordEmail}`}>
-                      From: {contract.landlordEmail}
-                    </div>
-                  )}
-                </td>
-                <td className="p-2 border text-left w-1/5">
-                  {contract.sentDate && new Date(contract.sentDate).toLocaleDateString()}
-                </td>
-                <td className="p-2 border text-right space-x-2 w-2/5 relative">
-                  {/* Manage Button */}
-                  <button
-                    onClick={() => setDropdownOpen(dropdownOpen === contract.id ? null : contract.id)}
-                    className="border border-[#136C9E] text-[#136C9E] px-4 py-1 rounded-full hover:bg-[#136C9E]/10"
-                  >
-                    Manage
-                  </button>
-                  <button
-                    onClick={() => { void openReceivedContract(contract, 'preview'); }}
-                    className="bg-[#136C9E] text-white px-4 py-1 rounded-full hover:bg-[#0F5B88]"
-                  >
-                    Preview
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {dropdownOpen === contract.id && (
-                    <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-md shadow-lg z-20">
-                      <button
-                        onClick={() => { void openReceivedContract(contract, 'customize'); }}
-                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
-                      >
-                        Sign
-                      </button>
-                      <button
-                        onClick={() => { void openReceivedContract(contract, 'download'); }}
-                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
-                      >
-                        Download
-                      </button>
-                    </div>
-                  )}
-
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  ) : (
-    <div>
-      <h3 className="text-lg font-semibold text-gray-700 mb-3">Deleted Templates</h3>
-      <table className="w-full border-collapse table-fixed">
-        <thead>
-          <tr className="bg-gray-100 text-gray-700">
-            <th className="p-2 border text-left w-2/5">Template</th>
-            <th className="p-2 border text-left w-1/5">Date</th>
-            <th className="p-2 border text-right w-2/5">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {deletedTemplates.map((template) => (
-            <tr key={template.id} className="border-t">
-              <td className="p-2 border text-left max-w-0 w-2/5">
-                <div className="truncate" title={template.name}>
-                  {template.name}
-                </div>
-              </td>
-              <td className="p-2 border text-left w-1/5">{template.uploadDate}</td>
-              <td className="p-2 border text-right space-x-2 w-2/5 relative">
-                <button className="border border-red-500 text-red-500 px-4 py-1 rounded-full hover:bg-red-50"
-                onClick={() => setConfirmDelete(template.id)}
-                >
-                  Delete
-                </button>
-                <button className="bg-[#136C9E] text-white px-4 py-1 rounded-full hover:bg-[#0F5B88]"
-                onClick={() => handleRestore(template.id)}
-                >
-                  Restore
-                </button>
-              </td>
-            </tr>
-          ))}
-
-          {/* Confirmation Modal */}
-        {confirmDelete && (
-          <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-            <div className="bg-white p-5 rounded-md shadow-md">
-              <p>Are you sure you want to delete this template permanently?</p>
-              <div className="flex justify-end mt-4 gap-3">
-                <button className="bg-gray-500 text-white px-3 py-1 rounded-md" onClick={() => setConfirmDelete(null)}>Cancel</button>
-                <button className="bg-red-500 text-white px-3 py-1 rounded-md" onClick={() => handleDeletePermanently(confirmDelete)}>Delete</button>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        </tbody>
-      </table>
-    </div>
-  )}
-</div>
-
-      </div>
-        )}  
-
       {previewFile && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closePreview}>
-          <div className="bg-white p-4 rounded-md shadow-lg relative w-3/5 h-4/5 flex flex-col" onClick={(e) => e.stopPropagation()}>
-            {/* Header with close button and page info */}
-            <div className="flex justify-between items-center mb-4 border-b pb-2">
-              <div className="flex items-center space-x-4">
-                <h3 className="text-lg font-semibold text-gray-800">PDF Preview</h3>
-                {totalPages > 0 && (
-                  <span className="text-sm text-gray-600">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                )}
+        <div className="fixed inset-0 z-[85] bg-slate-950/60 flex items-center justify-center p-3 sm:p-6" onClick={closePreview}>
+          <div className="bg-white rounded-2xl shadow-xl relative w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-5 py-3.5 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <h3 className="font-archivo font-bold text-base text-slate-800">PDF Preview</h3>
+                {totalPages > 0 && <span className="text-xs text-slate-500">Page {currentPage} of {totalPages}</span>}
               </div>
-              <button 
-                className="text-gray-700 hover:text-gray-900 p-1" 
-                onClick={closePreview}
-              >
-                <X size={24} />
+              <button type="button" className="text-slate-400 hover:text-slate-700 p-1 rounded-lg" onClick={closePreview} aria-label="Close preview">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* PDF Canvas Container */}
-            <div className="flex-1 flex items-center justify-center overflow-auto bg-gray-100 rounded">
-              <canvas 
+            <div className="flex-1 flex items-center justify-center overflow-auto bg-slate-100 p-4">
+              <canvas
                 ref={canvasRef}
-                className="max-w-full max-h-full shadow-lg"
+                className="max-w-full max-h-full shadow-lg bg-white"
                 style={{ display: pdfDocument && !isLoadingPdf && !pdfError ? 'block' : 'none' }}
               />
-              
-              {/* Loading indicator */}
+
               {isLoadingPdf && (
-                <div className="flex flex-col items-center justify-center space-y-2">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                  <div className="text-gray-500">Loading PDF...</div>
+                <div className="flex flex-col items-center justify-center gap-2 text-xs text-slate-500">
+                  <span className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#136C9E]" />
+                  Loading PDF…
                 </div>
               )}
 
-              {/* Error message */}
               {pdfError && (
-                <div className="flex flex-col items-center justify-center space-y-2 p-4">
-                  <div className="text-red-500 text-center">
-                    <div className="font-semibold">Error loading PDF</div>
-                    <div className="text-sm mt-1">{pdfError}</div>
+                <div className="flex flex-col items-center justify-center gap-3 p-4 text-center">
+                  <div className="text-red-600">
+                    <div className="font-semibold text-sm">Error loading PDF</div>
+                    <div className="text-xs mt-1">{pdfError}</div>
                   </div>
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => {
                       const template = [...uploadedTemplates, ...deletedTemplates].find(t => t.fileUrl === previewFile);
                       if (template) handlePreview(template);
                     }}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    className="px-4 py-2 text-xs font-bold bg-[#136C9E] text-white rounded-xl hover:bg-[#0f567e]"
                   >
                     Retry
                   </button>
                 </div>
               )}
 
-              {/* No document state */}
               {!isLoadingPdf && !pdfError && !pdfDocument && (
-                <div className="text-gray-500">
-                  No PDF loaded
-                </div>
+                <div className="text-xs text-slate-500">No PDF loaded</div>
               )}
             </div>
 
-            {/* Navigation Controls */}
             {totalPages > 1 && (
-              <div className="flex justify-center items-center space-x-4 mt-4 pt-2 border-t">
+              <div className="flex justify-center items-center gap-4 px-4 py-3 border-t border-slate-200">
                 <button
+                  type="button"
                   onClick={goToPrevPage}
                   disabled={currentPage === 1}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded ${
-                    currentPage === 1 
-                      ? 'text-gray-400 cursor-not-allowed' 
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <ChevronLeft size={16} />
-                  <span>Previous</span>
+                  <ChevronLeft className="w-4 h-4" /> Previous
                 </button>
-                
-                <span className="text-sm text-gray-600 font-medium">
-                  {currentPage} / {totalPages}
-                </span>
-                
+                <span className="text-xs text-slate-600 font-bold">{currentPage} / {totalPages}</span>
                 <button
+                  type="button"
                   onClick={goToNextPage}
                   disabled={currentPage === totalPages}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded ${
-                    currentPage === totalPages 
-                      ? 'text-gray-400 cursor-not-allowed' 
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <span>Next</span>
-                  <ChevronRight size={16} />
+                  Next <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             )}
@@ -1274,9 +1554,12 @@ const findCustomizedTemplate = () => {
         </div>
       )}
 
-      
-        
-    </div>
+      <SignUpPromptModal
+        isOpen={showSignUpModal}
+        onClose={() => setShowSignUpModal(false)}
+        title="Sign up to send your contract"
+        reassurance="Create a free account to send contracts to your tenants and manage everything in one place."
+      />
     </div>
   );
 };

@@ -283,7 +283,7 @@ export class BillingService {
       this.logger.warn('[BillingService] STRIPE_SECRET_KEY not set — running in mock mode');
       return null;
     }
-    this._stripe = new Stripe(key, { apiVersion: '2024-06-20' });
+    this._stripe = new Stripe(key, { apiVersion: '2024-06-20' as Stripe.LatestApiVersion });
     return this._stripe;
   }
 
@@ -1007,20 +1007,23 @@ export class BillingService {
   }
 
   private async onInvoicePaymentSucceeded(invoice: Stripe.Invoice): Promise<void> {
-    const subId = typeof invoice.subscription === 'string' ? invoice.subscription : (invoice.subscription as any)?.id;
+    const subscription = (invoice as { subscription?: string | { id?: string } }).subscription;
+    const subId = typeof subscription === 'string' ? subscription : subscription?.id;
     if (!subId || !this.stripe) return;
     const sub = await this.stripe.subscriptions.retrieve(subId);
     const userId = sub.metadata?.userId;
     if (!userId) return;
+    const periodEnd = (sub as { current_period_end?: number }).current_period_end;
     await this.updateSubscriptionStatus(userId, {
       status: 'active',
-      currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+      currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined,
     });
     this.logger.log(`[Webhook] invoice.payment_succeeded → renewed ${userId}`);
   }
 
   private async onInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
-    const subId = typeof invoice.subscription === 'string' ? invoice.subscription : (invoice.subscription as any)?.id;
+    const subscription = (invoice as { subscription?: string | { id?: string } }).subscription;
+    const subId = typeof subscription === 'string' ? subscription : subscription?.id;
     if (!subId || !this.stripe) return;
     const sub = await this.stripe.subscriptions.retrieve(subId);
     const userId = sub.metadata?.userId;
@@ -1035,7 +1038,7 @@ export class BillingService {
     const planId = sub.items.data[0]?.price?.metadata?.planId || sub.metadata?.planId;
     await this.updateSubscriptionStatus(userId, {
       status: sub.status as any,
-      currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+      currentPeriodEnd: new Date(((sub as { current_period_end?: number }).current_period_end || 0) * 1000).toISOString(),
       trialEndsAt: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
       ...(planId ? { planId } : {}),

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FileText, Download, Eye, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Search, Filter, Star, Trash2, Upload, MoreHorizontal, Check } from 'lucide-react';
+import { FileText, Download, Eye, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Search, Filter, Star, Trash2, Upload, MoreHorizontal, Check, PenLine } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
@@ -37,7 +37,8 @@ const TenantContracts: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const signContractId = (location.state as { signContractId?: string } | null)?.signContractId || null;
-  const { plan, status } = useBillingStatus();
+  const { plan, status, loading: billingLoading } = useBillingStatus();
+  const [isLockedModalOpen, setIsLockedModalOpen] = useState(true);
   const { signedContracts, isLoading, removeSignedContract } = useSignedContracts();
   const { isAuthenticated, user } = useAuth();
   const [isContractModalOpen, setIsContractModalOpen] = useState(Boolean(signContractId));
@@ -50,13 +51,11 @@ const TenantContracts: React.FC = () => {
   }, [signContractId]);
   const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
   const [viewingProperties, setViewingProperties] = useState<RequestViewingProperty[]>([]);
-  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
-  const [issueTemplate, setIssueTemplate] = useState('Standard Assured Shorthold Tenancy (AST) — 12 Months');
-  const [issueProperty, setIssueProperty] = useState('');
-  const [issueTenant, setIssueTenant] = useState('');
-  const [issueEmail, setIssueEmail] = useState('');
-  const [issueStart, setIssueStart] = useState('');
-  const [issueExpiry, setIssueExpiry] = useState('');
+
+  const openContractWorkspace = (contractId?: string | null) => {
+    setContractToSign(contractId || null);
+    setIsContractModalOpen(true);
+  };
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<ContractTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,11 +196,20 @@ const TenantContracts: React.FC = () => {
 
   if (!canAccessSection('tenant-contracts', plan, status)) {
     return (
-      <PlanUpgradeWall
-        featureName="Contracts"
-        upgradeLabel={sectionUpgradeLabel('tenant-contracts')}
-        segment="renters"
-      />
+      <>
+        <PlanUpgradeWall
+          featureName="Contracts"
+          upgradeLabel={sectionUpgradeLabel('tenant-contracts')}
+          segment="renters"
+        />
+        {!billingLoading && (
+          <ContractModal
+            isOpen={isLockedModalOpen}
+            onClose={() => setIsLockedModalOpen(false)}
+            locked
+          />
+        )}
+      </>
     );
   }
 
@@ -324,6 +332,13 @@ const TenantContracts: React.FC = () => {
     <>
       <button
         type="button"
+        onClick={() => openContractWorkspace(contract.id ? String(contract.id) : null)}
+        className="tn-ct-btn-view"
+      >
+        Sign
+      </button>
+      <button
+        type="button"
         onClick={() => void handleViewContract(contract)}
         className="tn-ct-btn-view"
       >
@@ -359,7 +374,11 @@ const TenantContracts: React.FC = () => {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content align="end" sideOffset={6} className="tn-ct-menu">
-          <DropdownMenu.Item className="tn-ct-menu-item is-accent" onSelect={() => void handleViewContract(contract)}>
+          <DropdownMenu.Item className="tn-ct-menu-item is-accent" onSelect={() => openContractWorkspace(contract.id ? String(contract.id) : null)}>
+            <PenLine className="w-4 h-4" />
+            Sign &amp; Send
+          </DropdownMenu.Item>
+          <DropdownMenu.Item className="tn-ct-menu-item" onSelect={() => void handleViewContract(contract)}>
             <Eye className="w-4 h-4" />
             View PDF
           </DropdownMenu.Item>
@@ -385,9 +404,15 @@ const TenantContracts: React.FC = () => {
     <TenantPageHeader
       title="Contracts"
       subtitle="Manage and track your property lease agreements and legal documents."
-      primaryLabel="Request Viewing"
-      primaryIcon={<Eye className="w-4 h-4" />}
-      onPrimary={() => setIsBookViewingOpen(true)}
+      primaryLabel="Sign & Send"
+      primaryIcon={<PenLine className="w-4 h-4" />}
+      onPrimary={() => openContractWorkspace()}
+      extraActions={
+        <button type="button" className="tn-ct-btn-outline" onClick={() => setIsBookViewingOpen(true)}>
+          <Eye className="w-4 h-4" />
+          Request Viewing
+        </button>
+      }
     />
   );
 
@@ -594,11 +619,7 @@ const TenantContracts: React.FC = () => {
                 <span className="tn-ct-step"><span className="tn-ct-step-num">4</span>Manage &amp; Renew</span>
               </div>
               <div className="tn-ct-empty-actions">
-                <button type="button" className="tn-ct-btn-primary" onClick={() => {
-                  setIssueTenant(user?.name || '');
-                  setIssueEmail(user?.email || '');
-                  setIsIssueModalOpen(true);
-                }}>
+                <button type="button" className="tn-ct-btn-primary" onClick={() => openContractWorkspace()}>
                   <Upload className="w-4 h-4" />
                   Upload First File
                 </button>
@@ -786,86 +807,6 @@ const TenantContracts: React.FC = () => {
         initialTab={contractToSign ? 'received' : 'uploaded'}
         openContractId={contractToSign}
       />
-      {isIssueModalOpen && (
-        <div className="tn-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setIsIssueModalOpen(false); }}>
-          <div className="tn-modal tn-modal-lg" role="dialog" aria-labelledby="tn-issue-title">
-            <div className="tn-modal-head">
-              <div className="tn-drawer-head-main">
-                <span className="tn-modal-ico orange">
-                  <FileText className="w-5 h-5" />
-                </span>
-                <div>
-                  <h3 id="tn-issue-title">Issue Property Agreement</h3>
-                  <p>Draft AST or commercial tenancy with e-signature relay</p>
-                </div>
-              </div>
-              <button type="button" className="tn-modal-x" onClick={() => setIsIssueModalOpen(false)} aria-label="Close">✕</button>
-            </div>
-            <div className="tn-modal-body">
-              <label className="tn-modal-label">
-                Contract Template
-                <select value={issueTemplate} onChange={(e) => setIssueTemplate(e.target.value)}>
-                  <option>Standard Assured Shorthold Tenancy (AST) — 12 Months</option>
-                  <option>Commercial Lease Agreement — 3 Years</option>
-                  <option>Guarantor Deed & Surety Agreement</option>
-                </select>
-              </label>
-              <label className="tn-modal-label">
-                Property Name / Unit
-                <input
-                  type="text"
-                  value={issueProperty}
-                  onChange={(e) => setIssueProperty(e.target.value)}
-                  placeholder="e.g. Flat 4B, 22 Meadow Lane"
-                />
-              </label>
-              <div className="tn-modal-grid2">
-                <label className="tn-modal-label">
-                  Counterparty Tenant
-                  <input
-                    type="text"
-                    value={issueTenant}
-                    onChange={(e) => setIssueTenant(e.target.value)}
-                    placeholder="e.g. Sarah Jones"
-                  />
-                </label>
-                <label className="tn-modal-label">
-                  Tenant Email
-                  <input
-                    type="email"
-                    value={issueEmail}
-                    onChange={(e) => setIssueEmail(e.target.value)}
-                    placeholder="e.g. sarah.j@gmail.com"
-                  />
-                </label>
-              </div>
-              <div className="tn-modal-grid2">
-                <label className="tn-modal-label">
-                  Start Date
-                  <input type="date" value={issueStart} onChange={(e) => setIssueStart(e.target.value)} />
-                </label>
-                <label className="tn-modal-label">
-                  Expiry Date
-                  <input type="date" value={issueExpiry} onChange={(e) => setIssueExpiry(e.target.value)} />
-                </label>
-              </div>
-            </div>
-            <div className="tn-modal-foot">
-              <button type="button" className="tn-modal-cancel" onClick={() => setIsIssueModalOpen(false)}>Cancel</button>
-              <button
-                type="button"
-                className="tn-modal-primary"
-                onClick={() => {
-                  setIsIssueModalOpen(false);
-                  setIsContractModalOpen(true);
-                }}
-              >
-                Generate &amp; Dispatch Contract
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {viewingModal}
     </div>
   );

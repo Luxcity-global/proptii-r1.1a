@@ -14,7 +14,7 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getResolvedApiBaseUrl } from '../../config/apiBaseUrl';
 import { isMockTestUserId } from '../../data/mockTestUsers';
@@ -27,10 +27,26 @@ const MOCK_USERS = [
     { id: 'tenant-test-002', role: 'tenant', label: 'Emily Davis (Tenant 2)', color: '#0f766e' },
 ] as const;
 
+/** Paths that belong to a signed-in app or the auth flow. Anywhere else is a public landing page. */
+const APP_PATH_PREFIXES = [
+    '/dashboard',
+    '/landlord',
+    '/agent',
+    '/login',
+    '/signup',
+    '/register',
+    '/select-role',
+    '/unauthorized',
+];
+
+const isAppPath = (pathname: string) =>
+    APP_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+
 const DevAuthToolbar: React.FC = () => {
     const { user, loginAsMockUser, logout } = useAuth();
     const [open, setOpen] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Only render in dev
     if (!import.meta.env.DEV) return null;
@@ -92,6 +108,7 @@ const DevAuthToolbar: React.FC = () => {
                                     onClick={() => {
                                         loginAsMockUser(id, role);
                                         setOpen(false);
+                                        if (!isAppPath(location.pathname)) return;
                                         if (role === 'landlord' || role === 'agent') {
                                             navigate('/landlord');
                                         } else {

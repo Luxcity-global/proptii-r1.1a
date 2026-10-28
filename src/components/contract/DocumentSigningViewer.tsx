@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Download, Save, X, Move, RotateCcw, Trash2, FileText, PenTool, Type, Upload, MousePointer, Keyboard } from 'lucide-react';
+import { Download, Save, X, Move, RotateCcw, Trash2, FileText, PenTool, Type, Upload, MousePointer, Keyboard, PenLine, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PDFDocument, rgb } from 'pdf-lib';
 import * as pdfjs from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 import SignaturePadComponent from './SignaturePad';
+import SignatureCaptureModal from './SignatureCaptureModal';
 import { useSignedContracts } from '../../contexts/SignedContractsContext';
 import contractEmailService from '../../services/contractEmailService';
 import signedContractsFirestoreService from '../../services/signedContractsFirestoreService';
@@ -30,6 +31,8 @@ interface DocumentSigningViewerProps {
   sourceContractId?: string;
   /** When set, the caller stores the signed PDF. The tenant save path stays unchanged. */
   onPersistSigned?: (signedPdfBytes: Uint8Array, documentUrl: string) => Promise<void>;
+  /** 'wizard' is the tenant contracts wizard layout. The landlord app uses the default. */
+  variant?: 'classic' | 'wizard';
 }
 
 interface SignaturePlacement {
@@ -52,6 +55,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
   onUseSignature,
   sourceContractId,
   onPersistSigned,
+  variant = 'classic',
 }) => {
   // Debug: Check if context is available
   console.log('🔍 DocumentSigningViewer - Component rendering, checking context...');
@@ -70,6 +74,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
   const [currentSignature, setCurrentSignature] = useState<string | null>(null);
   const [typedSignature, setTypedSignature] = useState('');
   const [uploadedSignature, setUploadedSignature] = useState<string | null>(null);
+  const [preparedSignature, setPreparedSignature] = useState<string | null>(null);
   const [isSigning, setIsSigning] = useState(false);
   const [signedPdfBytes, setSignedPdfBytes] = useState<Uint8Array | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -78,6 +83,9 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
+  // pdf.js corrupts the output (flipped/mirrored pages) if two render() calls share one canvas.
+  const renderTaskRef = useRef<ReturnType<pdfjs.PDFPageProxy['render']> | null>(null);
+  const renderSeqRef = useRef(0);
 
   // Load PDF document
   useEffect(() => {
@@ -129,9 +137,20 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
   const renderPage = async (pageNumber: number) => {
     if (!pdfDocument || !canvasRef.current) return;
 
+    const seq = ++renderSeqRef.current;
+
     try {
+      const previousTask = renderTaskRef.current;
+      if (previousTask) {
+        previousTask.cancel();
+        await previousTask.promise.catch(() => undefined);
+      }
+
       const page = await pdfDocument.getPage(pageNumber);
+      if (seq !== renderSeqRef.current) return;
+
       const canvas = canvasRef.current;
+      if (!canvas) return;
       const context = canvas.getContext('2d');
 
       if (!context) return;
@@ -172,7 +191,13 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
         viewport: viewport,
       };
 
-      await page.render(renderContext).promise;
+      const renderTask = page.render(renderContext);
+      renderTaskRef.current = renderTask;
+      try {
+        await renderTask.promise;
+      } finally {
+        if (renderTaskRef.current === renderTask) renderTaskRef.current = null;
+      }
       
       console.log(`✅ Page ${pageNumber} rendered successfully:`, {
         canvas: { width: canvas.width, height: canvas.height },
@@ -180,6 +205,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
         scale: 1.5
       });
     } catch (error) {
+      if ((error as { name?: string })?.name === 'RenderingCancelledException') return;
       console.error('❌ Error rendering PDF page:', error);
     }
   };
@@ -190,6 +216,11 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
       renderPage(currentPage);
     }
   }, [currentPage, pdfDocument]);
+
+  useEffect(() => () => {
+    renderSeqRef.current++;
+    renderTaskRef.current?.cancel();
+  }, []);
 
   // Handle signature creation
   const handleCreateSignature = () => {
@@ -224,6 +255,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
 
   // Get current signature based on method
   const getCurrentSignature = (): string | null => {
+    if (preparedSignature) return preparedSignature;
     let signature = null;
     switch (signatureMethod) {
       case 'draw':
@@ -301,6 +333,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
     setCurrentSignature(null);
     setTypedSignature('');
     setUploadedSignature(null);
+    setPreparedSignature(null);
     console.log('🖊️ Signature placed on document at coordinates:', pdfX, pdfY);
   };
 
@@ -576,7 +609,9 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
       // NOTE: Email sending is now handled in SendContract component
       // Just notify that signing is complete
       console.log('✅ Document signed successfully! Now go to the Send tab to email the contract.');
-      alert('Contract signed successfully! Go to the "Send" tab to email the signed contract to recipients.');
+      if (variant !== 'wizard') {
+        alert('Contract signed successfully! Go to the "Send" tab to email the signed contract to recipients.');
+      }
       
       if (onSigned) {
         onSigned(signedPdfBytes);
@@ -619,6 +654,76 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
     }
   };
 
+  const renderPlacementOverlays = () =>
+    signaturePlacements
+      .filter(placement => placement.pageNumber === currentPage)
+      .map(placement => {
+        // Convert PDF coordinates back to display coordinates
+        const canvas = canvasRef.current;
+        if (!canvas) return null;
+
+        const canvasRect = canvas.getBoundingClientRect();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const displayWidth = canvasRect.width;
+        const displayHeight = canvasRect.height;
+
+        // Calculate scale factors from canvas to display
+        const scaleX = displayWidth / canvasWidth;
+        const scaleY = displayHeight / canvasHeight;
+
+        // Convert PDF coordinates to display coordinates
+        const displayX = placement.x * scaleX;
+        const displayY = (canvasHeight - placement.y) * scaleY;
+
+        return (
+          <div
+            key={placement.id}
+            className="absolute border-2 border-blue-500 bg-transparent rounded cursor-move overflow-hidden"
+            style={{
+              left: displayX,
+              top: displayY,
+              width: placement.width * scaleX,
+              height: placement.height * scaleY,
+            }}
+            onMouseDown={() => handleDragStart(placement.id)}
+            draggable={false}
+          >
+            {/* Show actual signature image */}
+            {placement.signatureData.startsWith('data:image/') ? (
+              <img
+                src={placement.signatureData}
+                alt="Signature"
+                className="w-full h-full object-contain"
+              />
+            ) : placement.signatureData.startsWith('data:text/plain') ? (
+              <div className="w-full h-full flex items-center justify-center p-2">
+                <div className="text-lg font-cursive text-gray-800 border-b-2 border-gray-400 pb-1">
+                  {atob(placement.signatureData.split(',')[1])}
+                </div>
+              </div>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center p-2">
+                <div className="text-lg font-cursive text-gray-800 border-b-2 border-gray-400 pb-1">
+                  {placement.signatureData}
+                </div>
+              </div>
+            )}
+
+            {/* Remove button overlay */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                removeSignaturePlacement(placement.id);
+              }}
+              className="absolute top-1 right-1 text-red-500 hover:text-red-700 bg-white rounded-full p-1 shadow-sm z-10"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        );
+      });
+
   // Loading state
   if (isLoading) {
     return (
@@ -647,6 +752,155 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
             Try Again
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (variant === 'wizard') {
+    const pageCount = totalPages || 1;
+    const placedCount = signaturePlacements.length;
+    const statusBadge = isCompleted
+      ? { label: 'Signed', className: 'bg-emerald-100 text-emerald-800' }
+      : placedCount > 0
+        ? { label: `${placedCount} signature${placedCount > 1 ? 's' : ''} placed`, className: 'bg-blue-100 text-[#136C9E]' }
+        : { label: 'Signature Required', className: 'bg-amber-100 text-amber-800' };
+
+    return (
+      <div className="flex flex-col gap-4 flex-1 min-h-0 font-nunito-sans">
+        <div className="shrink-0 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#DC5F12] flex items-center justify-center shrink-0">
+              <PenLine className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-archivo font-extrabold text-sm text-slate-800 truncate max-w-[240px] sm:max-w-[360px]" title={template.name}>
+                  {template.name}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge.className}`}>{statusBadge.label}</span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Page {currentPage} of {pageCount} • Adopt a signature, then click the page where it belongs
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap" data-demo-customize-sign-tools>
+            <button
+              type="button"
+              onClick={() => { handleCreateSignature(); onSignatureMethodSelect?.(); }}
+              className="px-3.5 py-2 rounded-xl bg-[#DC5F12] hover:bg-[#ba4e0b] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
+            >
+              <PenLine className="w-4 h-4" />
+              {placedCount > 0 || isCompleted ? 'Add Signature' : 'Adopt Signature'}
+            </button>
+            <button
+              type="button"
+              data-demo-customize-sign-document
+              onClick={signDocument}
+              disabled={isSigning || placedCount === 0}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 disabled:bg-slate-300 disabled:cursor-not-allowed"
+            >
+              {isSigning ? (
+                <>
+                  <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                  Signing…
+                </>
+              ) : (
+                <>
+                  <PenTool className="w-4 h-4" />
+                  {isCompleted ? 'Re-apply Signatures' : 'Finish Signing'}
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={downloadSignedPdf}
+              disabled={!signedPdfBytes}
+              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Download signed PDF"
+              aria-label="Download signed PDF"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {isPlacingSignature && (
+          <div className="shrink-0 bg-blue-50 border border-[#bcd9ea] rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-[#0f567e]">
+              <strong>Click on the document</strong> where your signature should go. You can drag it afterwards.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setIsPlacingSignature(false); setPreparedSignature(null); }}
+              className="text-xs font-semibold text-[#136C9E] hover:underline shrink-0"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {isCompleted && !isPlacingSignature && (
+          <div className="shrink-0 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <p className="text-xs text-emerald-800">
+              <strong>Document signed.</strong> Your signature is stamped on the PDF. Continue to Recipients &amp; Send.
+            </p>
+          </div>
+        )}
+
+        <div className="h-[60vh] min-h-[240px] shrink bg-slate-200/70 p-3 sm:p-6 rounded-2xl overflow-auto overscroll-contain">
+          <div
+            ref={containerRef}
+            data-demo-customize-document-canvas
+            className="relative mx-auto w-fit max-w-full bg-white rounded-xl border border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.08)] overflow-hidden"
+          >
+            <canvas
+              ref={canvasRef}
+              className="block max-w-full h-auto"
+              onClick={handleCanvasClick}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleDragEnd}
+              style={{ cursor: isPlacingSignature ? 'crosshair' : (draggedSignature ? 'grabbing' : 'default') }}
+            />
+            {renderPlacementOverlays()}
+          </div>
+        </div>
+
+        {totalPages > 1 && (
+          <div className="shrink-0 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" /> Previous
+            </button>
+            <span className="text-xs font-bold text-slate-600">Page {currentPage} of {totalPages}</span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <SignatureCaptureModal
+          isOpen={showSignaturePad}
+          defaultName={user?.name || ''}
+          onClose={() => setShowSignaturePad(false)}
+          onAdopt={(png) => {
+            setPreparedSignature(png);
+            setShowSignaturePad(false);
+            setIsPlacingSignature(true);
+            onUseSignature?.();
+          }}
+        />
       </div>
     );
   }
@@ -792,74 +1046,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
             />
             
             {/* Signature Placements Overlay */}
-            {signaturePlacements
-              .filter(placement => placement.pageNumber === currentPage)
-              .map(placement => {
-                // Convert PDF coordinates back to display coordinates
-                const canvas = canvasRef.current;
-                if (!canvas) return null;
-                
-                const canvasRect = canvas.getBoundingClientRect();
-                const canvasWidth = canvas.width;
-                const canvasHeight = canvas.height;
-                const displayWidth = canvasRect.width;
-                const displayHeight = canvasRect.height;
-                
-                // Calculate scale factors from canvas to display
-                const scaleX = displayWidth / canvasWidth;
-                const scaleY = displayHeight / canvasHeight;
-                
-                // Convert PDF coordinates to display coordinates
-                const displayX = placement.x * scaleX;
-                const displayY = (canvasHeight - placement.y) * scaleY;
-                
-                return (
-                  <div
-                    key={placement.id}
-                    className="absolute border-2 border-blue-500 bg-transparent rounded cursor-move overflow-hidden"
-                    style={{
-                      left: displayX,
-                      top: displayY,
-                      width: placement.width * scaleX,
-                      height: placement.height * scaleY,
-                    }}
-                    onMouseDown={() => handleDragStart(placement.id)}
-                    draggable={false}
-                  >
-                  {/* Show actual signature image */}
-                  {placement.signatureData.startsWith('data:image/') ? (
-                    <img 
-                      src={placement.signatureData} 
-                      alt="Signature" 
-                      className="w-full h-full object-contain"
-                    />
-                  ) : placement.signatureData.startsWith('data:text/plain') ? (
-                    <div className="w-full h-full flex items-center justify-center p-2">
-                      <div className="text-lg font-cursive text-gray-800 border-b-2 border-gray-400 pb-1">
-                        {atob(placement.signatureData.split(',')[1])}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center p-2">
-                      <div className="text-lg font-cursive text-gray-800 border-b-2 border-gray-400 pb-1">
-                        {placement.signatureData}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Remove button overlay */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeSignaturePlacement(placement.id);
-                    }}
-                    className="absolute top-1 right-1 text-red-500 hover:text-red-700 bg-white rounded-full p-1 shadow-sm z-10"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-                );
-              })}
+            {renderPlacementOverlays()}
           </div>
 
           {/* Page Navigation - Always Show */}

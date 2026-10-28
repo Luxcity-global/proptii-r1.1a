@@ -74,6 +74,45 @@ class UserService {
   }
 
   /**
+   * Check whether an email belongs to a registered account.
+   * Returns exists:false only after a completed lookup. uncertain means the
+   * caller should not label the address as unregistered.
+   */
+  async checkRegisteredEmail(email: string): Promise<{
+    success: boolean;
+    exists: boolean;
+    name?: string;
+    uncertain?: boolean;
+    error?: string;
+  }> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized.includes('@')) {
+      return { success: true, exists: false };
+    }
+
+    try {
+      const response = await apiService.get<{ exists?: boolean; name?: string; uncertain?: boolean }>(
+        '/users/check',
+        { email: normalized },
+      );
+      const data = response.data || {};
+      return {
+        success: true,
+        exists: !!data.exists,
+        name: data.name,
+        uncertain: !!data.uncertain,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        exists: false,
+        uncertain: true,
+        error: error?.message || 'Unable to check registration',
+      };
+    }
+  }
+
+  /**
    * Get a user by email address
    */
   async getUserByEmail(email: string): Promise<UserServiceResponse> {
@@ -85,7 +124,8 @@ class UserService {
       const allUsersResponse = await this.getAllUsers();
       
       if (allUsersResponse.success && allUsersResponse.users) {
-        const user = allUsersResponse.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        const needle = email.trim().toLowerCase();
+        const user = allUsersResponse.users.find((u) => String(u?.email || '').trim().toLowerCase() === needle);
         
         if (user) {
           console.log('✅ UserService - Found user by email:', user.name);

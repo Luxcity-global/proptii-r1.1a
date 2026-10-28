@@ -2296,6 +2296,7 @@ export function AppContent() {
           <ContractsPage
             tenants={tenants}
             userProfile={userProfile}
+            userRole={userRole}
             properties={properties}
             onViewInsights={() => handleNavigation('insights')}
             onViewSettings={() => handleNavigation('settings')}

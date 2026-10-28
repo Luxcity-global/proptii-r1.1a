@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
 import {
   Clock,
   CheckCircle,
@@ -33,7 +32,9 @@ import { contractService } from '../services/contractService';
 import { fetchContractPdfFile } from '../../../services/contractPdf';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { isPropertyArchived } from '../utils/portfolioStats';
-import { Property, UserProfile } from '../App';
+import { Property, UserProfile, UserRole } from '../App';
+import { useLandlordBillingStatus } from '../hooks/useLandlordBillingStatus';
+import { openInParentApp } from '../utils/authBridge';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 import { renderProptiiEmail } from '../../../utils/proptiiEmailLayout';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -62,6 +63,7 @@ interface ContractsPageProps {
   tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
   onBack?: () => void;
   userProfile?: UserProfile | null;
+  userRole?: UserRole;
   properties?: Property[];
   onAddProperty?: () => void;
   onViewInsights?: () => void;
@@ -223,6 +225,7 @@ export function ContractsPage({
   tenants = [],
   onBack,
   userProfile,
+  userRole = 'landlord',
   properties = [],
   onViewInsights,
   onViewSettings,
@@ -231,6 +234,13 @@ export function ContractsPage({
   const { user } = useAuth();
   const landlordEmail = user?.email ?? userProfile?.email ?? null;
   const userId = user?.id ?? null;
+
+  const { plan, loading: billingLoading } = useLandlordBillingStatus(Boolean(userId || landlordEmail), {
+    email: landlordEmail,
+    role: userRole,
+  });
+  // A failed billing lookup leaves plan null; that must not lock paying users out.
+  const contractsLocked = !billingLoading && (plan === 'free' || plan === 'explorer');
 
   const [subsection, setSubsection] = useState<Subsection>(subsectionFromLocation);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -710,49 +720,6 @@ export function ContractsPage({
     </DropdownMenu>
   );
 
-  if (showSuccessScreen && successData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#fbfbfe', fontFamily: 'Archivo, sans-serif' }}>
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="p-8">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold mb-4" style={{ color: '#374957' }}>
-              Contract Sent Successfully!
-            </h2>
-            <p className="text-gray-600 mb-6">
-              A contract has been sent to <strong>{successData.recipientName}</strong>
-            </p>
-            <p className="text-gray-600 mb-6">
-              Email: <strong>{successData.recipientEmail}</strong>
-            </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-left">
-                  <p className="text-sm text-blue-800">
-                    Attachment: <strong>{successData.fileName}</strong>
-                  </p>
-                </div>
-              </div>
-            </div>
-            <Button
-              onClick={() => {
-                setShowSuccessScreen(false);
-                setSuccessData(null);
-              }}
-              className="w-full"
-              style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12' }}
-            >
-              Done
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (!userId && !landlordEmail) {
     return <LandlordPageEmptyShell page="contracts" variant="guest" />;
   }
@@ -1149,7 +1116,58 @@ export function ContractsPage({
         onClose={() => setIsSendModalOpen(false)}
         onSend={handleSendContract}
         tenants={tenants}
+        locked={contractsLocked}
+        accessPending={billingLoading}
+        onUpgrade={() => openInParentApp(`/pricing?segment=${userRole === 'agent' ? 'agents' : 'landlords'}`)}
       />
+
+      {showSuccessScreen && successData && (
+        <div
+          className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ll-ct-receipt-title"
+        >
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center border border-slate-200 flex flex-col items-center">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4">
+              <Check className="w-7 h-7" strokeWidth={2.5} />
+            </div>
+            <h3
+              id="ll-ct-receipt-title"
+              className="font-extrabold text-lg text-slate-900 tracking-tight"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Contract Sent!
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              Dispatched to {successData.recipientName} ({successData.recipientEmail}).
+            </p>
+            <div className="w-full bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-left my-4 space-y-1.5 text-xs">
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-400">Document:</span>
+                <span className="font-semibold text-slate-700 truncate max-w-[190px]" title={successData.fileName}>
+                  {successData.fileName}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-400">Status:</span>
+                <span className="text-emerald-700 font-bold">Email Dispatched</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSuccessScreen(false);
+                setSuccessData(null);
+              }}
+              className="w-full py-2.5 rounded-xl text-white text-xs font-bold shadow-sm hover:brightness-95 transition-all"
+              style={{ backgroundColor: '#DC5F12' }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {signingContract && (
         <div className="fixed inset-0 z-[80] flex flex-col bg-white">
