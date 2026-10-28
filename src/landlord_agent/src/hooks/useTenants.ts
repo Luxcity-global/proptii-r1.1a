@@ -80,10 +80,6 @@ export function useTenants({ userId, propertyIds = [] }: UseTenantsOptions): Use
 
         let list = await tenantService.getTenants(userId, ownedPropertyIds);
 
-        // Merge demo data for agent test accounts without replacing real records.
-        if (isAgentTestAccount(userId, user?.email)) {
-          list = mergeById(getAgentDummyTenants(), list) as Tenant[];
-        }
         list = dedupeTenants(list) as Tenant[];
 
         // Filter out any tenant marked as deleted

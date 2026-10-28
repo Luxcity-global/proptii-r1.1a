@@ -99,12 +99,6 @@
   box-shadow: 0 10px 24px -4px rgba(15, 23, 42, 0.06);
 }
 
-/* Simulated State Hover Highlight */
-.simulated-hover-card {
-  transform: translateY(-4px) !important;
-  outline: 2px solid #DC5F12 !important;
-  box-shadow: 0 14px 32px -4px rgba(220, 95, 18, 0.2) !important;
-}
 
 /* Scrollbar Utilities */
 .scrollbar-none {

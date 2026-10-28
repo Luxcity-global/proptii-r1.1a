@@ -134,7 +134,6 @@ function PortfolioInsightsContent({
   const [currentTab, setCurrentTab] = useState<TabType>('Overview');
   const [selectedScope, setSelectedScope] = useState<string>('all');
   const [paymentSearch, setPaymentSearch] = useState('');
-  const [chartHoverActive, setChartHoverActive] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   // Toast Helper
@@ -292,7 +291,6 @@ function PortfolioInsightsContent({
     showToast('Exporting comprehensive Portfolio Performance Report (CSV/PDF)...', 'success');
   };
 
-  const isSimHover = chartHoverActive;
   const isSkeleton = isHookLoading;
   const isEmpty = scopedProperties.length === 0;
 
@@ -474,7 +472,7 @@ function PortfolioInsightsContent({
                   currentTab === 'Revenue' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
                 }`}
               >
-                +14.2%
+                Coming Soon
               </span>
             </button>
 
@@ -531,7 +529,7 @@ function PortfolioInsightsContent({
                   currentTab === 'Market' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
                 }`}
               >
-                UK Lettings
+                Coming Soon
               </span>
             </button>
           </div>
@@ -605,9 +603,7 @@ function PortfolioInsightsContent({
                   {/* CARD 1: Monthly Revenue */}
                   <div
                     onClick={() => handleTabChange('Revenue')}
-                    className={`bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group ${
-                      isSimHover ? 'simulated-hover-card' : ''
-                    }`}
+                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
                   >
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform font-bold text-base">
                       £
@@ -617,8 +613,11 @@ function PortfolioInsightsContent({
                       <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
                         {money(displayRevenue)}
                       </div>
-                      <div className="text-[10px] sm:text-[11px] text-emerald-600 font-semibold truncate">
-                        ↑ +3.2% vs last month
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                          Coming Soon
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium truncate">· MoM trend</span>
                       </div>
                     </div>
                   </div>
@@ -626,9 +625,7 @@ function PortfolioInsightsContent({
                   {/* CARD 2: Occupancy Rate */}
                   <div
                     onClick={() => handleTabChange('Occupancy')}
-                    className={`bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group ${
-                      isSimHover ? 'simulated-hover-card' : ''
-                    }`}
+                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
                   >
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-orange-50 text-[#DC5F12] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <Home className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -647,9 +644,7 @@ function PortfolioInsightsContent({
                   {/* CARD 3: Net Income */}
                   <div
                     onClick={() => handleTabChange('Revenue')}
-                    className={`bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group ${
-                      isSimHover ? 'simulated-hover-card' : ''
-                    }`}
+                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
                   >
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -659,8 +654,11 @@ function PortfolioInsightsContent({
                       <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
                         {money(displayNetIncome)}
                       </div>
-                      <div className="text-[10px] sm:text-[11px] text-emerald-600 font-semibold truncate">
-                        ↑ +1.8% after ops
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                          Coming Soon
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium truncate">· Net variance</span>
                       </div>
                     </div>
                   </div>
@@ -668,9 +666,7 @@ function PortfolioInsightsContent({
                   {/* CARD 4: Active Tenants */}
                   <div
                     onClick={() => handleTabChange('Tenants')}
-                    className={`bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group ${
-                      isSimHover ? 'simulated-hover-card' : ''
-                    }`}
+                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
                   >
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <Users className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -766,57 +762,66 @@ function PortfolioInsightsContent({
                           <span className="text-slate-600 font-medium">Expenses</span>
                         </div>
                       </div>
-                    </div>
-
-                    <div
-                      className="relative w-full h-64"
-                      onMouseEnter={() => setChartHoverActive(true)}
-                      onMouseLeave={() => setChartHoverActive(false)}
-                    >
-                      {isSimHover && (
-                        <div className="absolute top-2 right-12 z-10 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs shadow-lg flex items-center gap-2 fade-slide-up">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                          <span className="font-bold">May 2026:</span>
-                          <span>Rev £11,800 · Exp £3,900 (Net +£7,900)</span>
-                        </div>
-                      )}
-
-                      <svg viewBox="0 0 700 240" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                        <defs>
-                          <linearGradient id="revAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#136C9E" stopOpacity="0.18" />
-                            <stop offset="100%" stopColor="#136C9E" stopOpacity="0.0" />
-                          </linearGradient>
-                        </defs>
-
-                        {/* Guidelines */}
-                        <line x1="40" y1="30" x2="690" y2="30" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3"></line>
-                        <line x1="40" y1="80" x2="690" y2="80" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3"></line>
-                        <line x1="40" y1="130" x2="690" y2="130" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3"></line>
-                        <line x1="40" y1="180" x2="690" y2="180" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3"></line>
-                        <line x1="40" y1="220" x2="690" y2="220" stroke="#e2e8f0" strokeWidth="1"></line>
-
-                        {/* Y-Axis */}
-                        <text x="5" y="34" fontSize="10" fill="#94a3b8" fontFamily="Nunito Sans">£12k</text>
-                        <text x="10" y="84" fontSize="10" fill="#94a3b8" fontFamily="Nunito Sans">£9k</text>
-                        <text x="10" y="134" fontSize="10" fill="#94a3b8" fontFamily="Nunito Sans">£6k</text>
-                        <text x="10" y="184" fontSize="10" fill="#94a3b8" fontFamily="Nunito Sans">£3k</text>
-                        <text x="10" y="224" fontSize="10" fill="#94a3b8" fontFamily="Nunito Sans">£0k</text>
-
-                        {/* Curves */}
-                        <path d="M 60 100 Q 180 120 300 125 T 540 60 T 680 85 L 680 220 L 60 220 Z" fill="url(#revAreaGradient)"></path>
-                        <path d="M 60 100 Q 180 120 300 125 T 540 60 T 680 85" fill="none" stroke="#136C9E" strokeWidth="2.5" strokeLinecap="round"></path>
-                        <path d="M 60 170 Q 200 172 320 168 T 550 152 T 680 148" fill="none" stroke="#DC5F12" strokeWidth="2" strokeDasharray="4 4" strokeLinecap="round"></path>
-
-                        {/* Highlight Points */}
-                        <circle cx="540" cy="60" r={isSimHover ? '6' : '4'} fill="#136C9E" stroke="#ffffff" strokeWidth="2" className="cursor-pointer transition-all"></circle>
-                        <circle cx="550" cy="152" r={isSimHover ? '5' : '3.5'} fill="#DC5F12" stroke="#ffffff" strokeWidth="2" className="cursor-pointer transition-all"></circle>
-                      </svg>
-
-                      <div className="flex items-center justify-between pl-12 pr-4 pt-2 text-[11px] font-semibold text-slate-400">
-                        <span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span><span>JUN</span>
-                      </div>
-                    </div>
+                                <div className="relative w-full h-64 pt-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={chartData} margin={{ top: 10, right: 15, left: -15, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="revAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#136C9E" stopOpacity={0.18} />
+                              <stop offset="100%" stopColor="#136C9E" stopOpacity={0.0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" vertical={false} />
+                          <XAxis
+                            dataKey="month"
+                            tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'Nunito Sans', fontWeight: 600 }}
+                            axisLine={{ stroke: '#e2e8f0' }}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'Nunito Sans' }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(v) => `£${Math.round(v / 1000)}k`}
+                          />
+                          <RechartsTooltip
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length) {
+                                const rev = Number(payload.find((p) => p.dataKey === 'revenue')?.value || 0);
+                                const exp = Number(payload.find((p) => p.dataKey === 'expenses')?.value || 0);
+                                const net = rev - exp;
+                                return (
+                                  <div className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs shadow-lg flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    <span className="font-bold">{label}:</span>
+                                    <span>
+                                      Rev {money(rev)} · Exp {money(exp)} (Net {net >= 0 ? '+' : ''}{money(net)})
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="revenue"
+                            fill="url(#revAreaGradient)"
+                            stroke="#136C9E"
+                            strokeWidth={2.5}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="expenses"
+                            stroke="#DC5F12"
+                            strokeWidth={2}
+                            strokeDasharray="4 4"
+                            dot={{ r: 3.5, fill: '#DC5F12', stroke: '#ffffff', strokeWidth: 1.5 }}
+                            activeDot={{ r: 5, fill: '#DC5F12', stroke: '#ffffff', strokeWidth: 2 }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>                   </div>
                   </>
                 )}
               </div>
@@ -1055,11 +1060,7 @@ function PortfolioInsightsContent({
                 ) : (
                   <>
                     {/* Mini Card 1 */}
-                    <div
-                      className={`bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card flex items-center justify-between ${
-                        isSimHover ? 'simulated-hover-card' : ''
-                      }`}
-                    >
+                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card flex items-center justify-between">
                       <div>
                         <div className="font-heading text-2xl font-bold text-slate-900 leading-none">{occupiedCount}</div>
                         <div className="text-xs text-slate-500 mt-1">Rent payments up to date</div>
@@ -1072,7 +1073,11 @@ function PortfolioInsightsContent({
                     {/* Mini Card 2 */}
                     <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card flex items-center justify-between">
                       <div>
-                        <div className="font-heading text-2xl font-bold text-slate-900 leading-none">14 days</div>
+                        <div className="mb-1">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            Coming Soon
+                          </span>
+                        </div>
                         <div className="text-xs text-slate-500 mt-1">Avg. time-to-let</div>
                       </div>
                       <div className="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
@@ -1083,8 +1088,10 @@ function PortfolioInsightsContent({
                     {/* Mini Card 3 */}
                     <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card flex items-center justify-between">
                       <div>
-                        <div className="font-heading text-2xl font-bold text-slate-900 leading-none">
-                          4.7 <span className="text-sm font-normal text-slate-400">/5</span>
+                        <div className="mb-1">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            Coming Soon
+                          </span>
                         </div>
                         <div className="text-xs text-slate-500 mt-1">Avg. tenant satisfaction</div>
                       </div>
@@ -1111,7 +1118,12 @@ function PortfolioInsightsContent({
                 </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Total Revenue</div>
                 <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">{money(displayRevenue)}</div>
-                <div className="text-[11px] text-emerald-600 font-semibold mt-1">↑ +3.2% MoM growth</div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                    Coming Soon
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">· MoM growth</span>
+                </div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
                 <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#DC5F12] flex items-center justify-center mb-3">
@@ -1126,8 +1138,21 @@ function PortfolioInsightsContent({
                   <TrendingUp className="w-5 h-5" />
                 </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Avg Net Yield</div>
-                <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">6.2%</div>
-                <div className="text-[11px] text-emerald-600 font-semibold mt-1">+0.4% vs regional avg</div>
+                <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">
+                  {yieldRows.length > 0 ? (
+                    `${(yieldRows.reduce((acc, r) => acc + r.yieldPct, 0) / yieldRows.length).toFixed(1)}%`
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-500">
+                      Coming Soon
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                    Coming Soon
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">· vs regional avg</span>
+                </div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
                 <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3">
@@ -1135,7 +1160,7 @@ function PortfolioInsightsContent({
                 </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Avg Rent / Unit</div>
                 <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">
-                  {money(scopedProperties.length > 0 ? displayRevenue / scopedProperties.length : 1420)}
+                  {money(scopedProperties.length > 0 ? displayRevenue / scopedProperties.length : 0)}
                 </div>
                 <div className="text-[11px] text-slate-400 font-medium mt-1">Across managed stock</div>
               </div>
@@ -1284,13 +1309,21 @@ function PortfolioInsightsContent({
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
                 <div className="text-xs font-bold text-slate-500 font-heading">Avg. Days to Let</div>
-                <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">14 days</div>
-                <div className="text-[11px] text-emerald-600 font-semibold mt-1">5 days faster than UK avg</div>
+                <div className="mt-1">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                    Coming Soon
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-medium mt-1.5">Vacancy tracking in development</div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
                 <div className="text-xs font-bold text-slate-500 font-heading">Lease Renewal Rate</div>
-                <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">92%</div>
-                <div className="text-[11px] text-slate-400 font-medium mt-1">High tenant retention</div>
+                <div className="mt-1">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                    Coming Soon
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-medium mt-1.5">Tenancy lifecycle analytics</div>
               </div>
             </div>
 
@@ -1338,13 +1371,21 @@ function PortfolioInsightsContent({
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
                 <div className="text-xs font-bold text-slate-500 font-heading">Tenant Satisfaction</div>
-                <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">4.7 / 5</div>
-                <div className="text-[11px] text-emerald-600 font-semibold mt-1">Based on check-in audits</div>
+                <div className="mt-1">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                    Coming Soon
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-medium mt-1.5">Review feedback system</div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
                 <div className="text-xs font-bold text-slate-500 font-heading">Avg. Tenancy Length</div>
-                <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">18 months</div>
-                <div className="text-[11px] text-slate-400 font-medium mt-1">Stable contract terms</div>
+                <div className="mt-1">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                    Coming Soon
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-medium mt-1.5">Historical contract durations</div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
                 <div className="text-xs font-bold text-slate-500 font-heading">Open Requests</div>
@@ -1420,18 +1461,30 @@ function PortfolioInsightsContent({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="text-xs font-bold text-slate-500 font-heading">Greater London Yield</div>
-                  <div className="text-2xl font-bold text-slate-900 font-heading mt-1">5.1%</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Your London avg: 5.8% (+0.7%)</div>
+                  <div className="mt-1.5">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                      Coming Soon
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1.5">HM Land Registry regional indices</div>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="text-xs font-bold text-slate-500 font-heading">North West Yield</div>
-                  <div className="text-2xl font-bold text-slate-900 font-heading mt-1">6.8%</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Your Manchester avg: 6.4%</div>
+                  <div className="mt-1.5">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                      Coming Soon
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1.5">Regional market intelligence pipeline</div>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="text-xs font-bold text-slate-500 font-heading">UK Lettings Inflation</div>
-                  <div className="text-2xl font-bold text-slate-900 font-heading mt-1">+6.4%</div>
-                  <div className="text-[11px] text-emerald-600 font-semibold mt-1">Annual national rent growth</div>
+                  <div className="mt-1.5">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                      Coming Soon
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1.5">ONS national rental price index</div>
                 </div>
               </div>
             </div>

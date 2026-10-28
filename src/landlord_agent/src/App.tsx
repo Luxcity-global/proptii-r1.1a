@@ -378,15 +378,6 @@ export function AppContent() {
           logo: prev?.logo,
         } as any;
       });
-
-      if (agentPersona) {
-        setProperties((prev) =>
-          prev.length === 0
-            ? getAgentDummyProperties()
-            : mergeAgentDemoProperties(getAgentDummyProperties(), prev),
-        );
-        setIsPortfolioLoading(false);
-      }
     } else {
       setUserProfile(null);
       setProperties([]);
@@ -903,20 +894,12 @@ export function AppContent() {
         });
         const activeFetched = fetchedProperties.filter(p => !isPropertyDeleted(p.id, p.address));
         if (!cancelled) {
-          setProperties(
-            isAgentTestAccount(currentUserId, userEmail)
-              ? mergeAgentDemoProperties(getAgentDummyProperties(), activeFetched)
-              : activeFetched
-          );
+          setProperties(activeFetched);
         }
       } catch (error) {
         console.error('Error loading properties:', error);
         if (!cancelled) {
-          setProperties(
-            isAgentTestAccount(currentUserId, userEmail)
-              ? getAgentDummyProperties().filter(p => !isPropertyDeleted(p.id, p.address))
-              : []
-          );
+          setProperties([]);
         }
       } finally {
         if (!cancelled) {

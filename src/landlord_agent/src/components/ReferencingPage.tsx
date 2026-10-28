@@ -26,7 +26,6 @@ import { referencingService } from '../services/referencingService';
 import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import { Tenant, UserProfile } from '../App';
 import {
-  getAgentDummyReceivedShares,
   isAgentTestAccount,
   mergeById,
   type PassportStep,

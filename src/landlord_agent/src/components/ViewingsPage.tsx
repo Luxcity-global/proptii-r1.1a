@@ -43,8 +43,6 @@ import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { Property, UserProfile } from '../App';
 import { isPropertyArchived } from '../utils/portfolioStats';
 import {
-  getAgentDummyViewingRequests,
-  getAgentDummyViewings,
   isAgentTestAccount,
   mergeById,
 } from '../data/agentTestPersona';
@@ -271,10 +269,6 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const showAsTable = displayStyle === 'table' && !isMobile;
   const isAgentPersona = isAgentTestAccount(managerId, managerEmail);
 
-  const withAgentDummyRequests = (live: BookViewingRequest[]) => live;
-
-  const withAgentDummyBookings = (live: ViewingBooking[]) => live;
-
   const viewingStatus = (status?: string) => String(status || '').trim().toLowerCase();
 
   const statsFromBookings = (items: ViewingBooking[]): ViewingStats =>
@@ -345,14 +339,6 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         }
 
         if (!managerEmail) {
-          if (isAgentPersona) {
-            const dummyBookings = getAgentDummyViewings();
-            setRequests(getAgentDummyViewingRequests());
-            setBookings(dummyBookings);
-            setStats(statsFromBookings(dummyBookings));
-            setLoading(false);
-            return;
-          }
           setError('Unable to determine your email. Please sign in again.');
           setLoading(false);
           return;
@@ -415,8 +401,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           bookingsMap.set(item.id, item);
         });
 
-        const mergedRequests = withAgentDummyRequests(Array.from(requestsMap.values()));
-        const mergedBookings = withAgentDummyBookings(Array.from(bookingsMap.values()));
+        const mergedRequests = Array.from(requestsMap.values());
+        const mergedBookings = Array.from(bookingsMap.values());
 
         // Calculate stats from merged bookings
         const stats = statsFromBookings(mergedBookings);
@@ -457,7 +443,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   prevBookings.forEach(b => merged.set(b.id, b));
                   // Add/update with ID-based bookings
                   items.forEach(b => merged.set(b.id, b));
-                  return withAgentDummyBookings(Array.from(merged.values()));
+                  return Array.from(merged.values());
                 });
               },
               (err) => {
@@ -487,7 +473,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   prevRequests.forEach(r => merged.set(r.id, r));
                   // Add/update with ID-based requests
                   items.forEach(r => merged.set(r.id, r));
-                  return withAgentDummyRequests(Array.from(merged.values()));
+                  return Array.from(merged.values());
                 });
               },
               (err) => console.error('Viewing requests subscription error (ID-based):', err)
@@ -509,7 +495,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   prevBookings.forEach(b => merged.set(b.id, b));
                   // Add/update with email-based bookings
                   items.forEach(b => merged.set(b.id, b));
-                  return withAgentDummyBookings(Array.from(merged.values()));
+                  return Array.from(merged.values());
                 });
               },
               (err) => {
@@ -545,7 +531,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   prevRequests.forEach(r => merged.set(r.id, r));
                   // Add/update with email-based requests
                   items.forEach(r => merged.set(r.id, r));
-                  return withAgentDummyRequests(Array.from(merged.values()));
+                  return Array.from(merged.values());
                 });
               },
               (err) => console.error('Viewing requests subscription error (email-based):', err)
@@ -567,15 +553,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         };
       } catch (err) {
         console.error('Error loading manager viewings:', err);
-        if (isAgentPersona) {
-          const dummyBookings = getAgentDummyViewings();
-          setError(null);
-          setRequests(getAgentDummyViewingRequests());
-          setBookings(dummyBookings);
-          setStats(statsFromBookings(dummyBookings));
-        } else {
-          setError('Failed to load viewings data. Please try again later.');
-        }
+        setError('Failed to load viewings data. Please try again later.');
         setLoading(false);
       }
     };

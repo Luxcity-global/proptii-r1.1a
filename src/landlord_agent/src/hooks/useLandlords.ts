@@ -50,9 +50,7 @@ export function useLandlords() {
       }
 
       try {
-        if (!agentTest) {
-          setIsLoading(true);
-        }
+        setIsLoading(true);
         const API_BASE_URL = PRIMARY_API_BASE_URL.replace(/\/api$/, '');
         const response = await axios.get(`${API_BASE_URL}/api/clients/landlords`, {
           headers: {
@@ -62,15 +60,13 @@ export function useLandlords() {
 
         if (response.data && response.data.success) {
           const live = response.data.data || [];
-          setLandlords(agentTest ? mergeById(getAgentDummyLandlords(), live) : live);
-        } else if (!agentTest) {
+          setLandlords(live);
+        } else {
           setError(response.data?.error || 'Failed to fetch landlords');
         }
       } catch (err: any) {
-        if (!agentTest) {
-          setError(err.message || 'An error occurred fetching landlords');
-          console.error('Error fetching landlords:', err);
-        }
+        setError(err.message || 'An error occurred fetching landlords');
+        console.error('Error fetching landlords:', err);
       } finally {
         setIsLoading(false);
       }
