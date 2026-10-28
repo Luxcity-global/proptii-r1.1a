@@ -303,8 +303,13 @@ export function ClientsPage({
     // Load live referencing document
     if (activeDrawerTenant.email) {
       setIsLoadingDrawerRef(true);
-      referencingService
-        .getReferencingDocumentByTenantEmail(activeDrawerTenant.email)
+      const fetchDoc = typeof referencingService?.getReferencingDocumentByTenantEmail === 'function'
+        ? referencingService.getReferencingDocumentByTenantEmail(activeDrawerTenant.email)
+        : typeof referencingService?.getReferencingStatusByEmail === 'function'
+          ? referencingService.getReferencingStatusByEmail(activeDrawerTenant.email).then((res) => (res?.data as ReferencingDocument) || null)
+          : Promise.resolve(null);
+
+      fetchDoc
         .then((doc) => setDrawerReferencingDoc(doc))
         .catch(() => setDrawerReferencingDoc(null))
         .finally(() => setIsLoadingDrawerRef(false));

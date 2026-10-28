@@ -352,6 +352,20 @@ class ReferencingService {
   }
 
   /**
+   * Get referencing document for a tenant by their email
+   */
+  async getReferencingDocumentByTenantEmail(
+    email: string
+  ): Promise<ReferencingDocument | null> {
+    try {
+      const res = await this.getReferencingStatusByEmail(email);
+      return (res.data as ReferencingDocument) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get all referencing forms for multiple tenants
    * Useful for batch loading in the clients page
    */
