@@ -67,7 +67,8 @@ service firebase.storage {
     match /contractTemplates/{userId}/{allPaths=**} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
       allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true)
-        && request.resource.size < 15 * 1024 * 1024;
+        && request.resource.size < 15 * 1024 * 1024
+        && isValidDocType();
     }
 
     // Deny all other unmapped paths
