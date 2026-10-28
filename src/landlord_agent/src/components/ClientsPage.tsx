@@ -1394,7 +1394,7 @@ export function ClientsPage({
       {activeDrawerTenant && (
         <div
           id="clientDrawer"
-          className="fixed inset-0 z-50 overflow-hidden"
+          className="fixed inset-0 z-[1000] overflow-hidden"
           role="dialog"
           aria-modal="true"
         >
@@ -1813,7 +1813,7 @@ export function ClientsPage({
       {isChoiceModalOpen && (
         <div
           id="tenantChoiceModal"
-          className="fixed inset-0 z-50 overflow-y-auto"
+          className="fixed inset-0 z-[1000] overflow-y-auto"
           role="dialog"
           aria-modal="true"
         >
@@ -2046,7 +2046,7 @@ export function ClientsPage({
       {/* MODAL: LOG NEW PAYMENT (EXACT REPLICA FROM AGENT CLIENTS.HTML)             */}
       {/* ========================================================================= */}
       {isLogPaymentModalOpen && logPaymentTenant && (
-        <div id="logPaymentModal" className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+        <div id="logPaymentModal" className="fixed inset-0 z-[1000] overflow-y-auto" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
             <div
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"

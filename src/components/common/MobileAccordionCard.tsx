@@ -12,16 +12,24 @@ export interface MobileAccordionAction {
   variant?: 'primary' | 'secondary' | 'danger';
 }
 
+export interface MobileAccordionStatusBadgeObj {
+  label: string;
+  variant?: 'success' | 'warning' | 'danger' | 'neutral' | string;
+}
+
 export interface MobileAccordionCardProps {
   id?: string | number;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
-  statusBadge?: React.ReactNode;
-  fields: MobileAccordionField[];
-  actions?: MobileAccordionAction[];
+  statusBadge?: React.ReactNode | MobileAccordionStatusBadgeObj;
+  fields?: MobileAccordionField[];
+  metrics?: MobileAccordionField[];
+  actions?: MobileAccordionAction[] | React.ReactNode;
   defaultExpanded?: boolean;
   avatar?: React.ReactNode;
+  initials?: string;
   onRowClick?: () => void;
+  children?: React.ReactNode;
 }
 
 export const MobileAccordionCard: React.FC<MobileAccordionCardProps> = ({
@@ -30,16 +38,92 @@ export const MobileAccordionCard: React.FC<MobileAccordionCardProps> = ({
   subtitle,
   statusBadge,
   fields,
+  metrics,
   actions,
   defaultExpanded = false,
   avatar,
+  initials,
   onRowClick,
+  children,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   const toggleExpand = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsExpanded((prev) => !prev);
+  };
+
+  const displayFields = (fields && Array.isArray(fields)
+    ? fields
+    : metrics && Array.isArray(metrics)
+      ? metrics
+      : []) as MobileAccordionField[];
+
+  const renderStatusBadge = () => {
+    if (!statusBadge) return null;
+    if (React.isValidElement(statusBadge)) {
+      return statusBadge;
+    }
+    if (typeof statusBadge === 'object' && 'label' in statusBadge) {
+      const badgeObj = statusBadge as MobileAccordionStatusBadgeObj;
+      const v = badgeObj.variant || 'neutral';
+      let badgeClasses = 'bg-slate-100 text-slate-700 border-slate-200';
+      if (v === 'success') {
+        badgeClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      } else if (v === 'warning') {
+        badgeClasses = 'bg-amber-50 text-amber-700 border-amber-200';
+      } else if (v === 'danger') {
+        badgeClasses = 'bg-rose-50 text-rose-700 border-rose-200';
+      }
+      return (
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badgeClasses} uppercase tracking-wider`}
+        >
+          {badgeObj.label}
+        </span>
+      );
+    }
+    return <>{String(statusBadge)}</>;
+  };
+
+  const renderAvatar = () => {
+    if (avatar) return <div className="shrink-0">{avatar}</div>;
+    if (initials) {
+      return (
+        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0 border border-slate-200">
+          {initials}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const renderActions = () => {
+    if (!actions) return null;
+    if (React.isValidElement(actions)) {
+      return <div className="mob-accordion-custom-actions pt-2">{actions}</div>;
+    }
+    if (Array.isArray(actions) && actions.length > 0) {
+      return (
+        <div className="mob-accordion-actions">
+          {actions.map((act, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                act.onClick(e);
+              }}
+              className={`mob-accordion-btn ${act.variant === 'primary' ? 'btn-orange' : ''}`}
+            >
+              {act.icon}
+              <span>{act.label}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -79,8 +163,8 @@ export const MobileAccordionCard: React.FC<MobileAccordionCardProps> = ({
             </svg>
           </button>
 
-          {/* Optional Avatar */}
-          {avatar && <div className="shrink-0">{avatar}</div>}
+          {/* Optional Avatar / Initials */}
+          {renderAvatar()}
 
           {/* Title & Subtitle */}
           <div className="mob-accordion-title-wrap">
@@ -90,42 +174,27 @@ export const MobileAccordionCard: React.FC<MobileAccordionCardProps> = ({
         </div>
 
         {/* Status Badge */}
-        {statusBadge && <div className="shrink-0 ml-2">{statusBadge}</div>}
+        {statusBadge && <div className="shrink-0 ml-2">{renderStatusBadge()}</div>}
       </div>
 
       {/* Expandable Details Panel */}
       <div className={`mob-accordion-details ${isExpanded ? 'is-open' : ''}`}>
         {/* Fields Grid */}
-        <div className="mob-accordion-grid">
-          {fields.map((field, idx) => (
-            <div key={idx} className="mob-accordion-field">
-              <span className="mob-accordion-field-label">{field.label}</span>
-              <span className="mob-accordion-field-value">{field.value}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Action Buttons Row */}
-        {actions && actions.length > 0 && (
-          <div className="mob-accordion-actions">
-            {actions.map((act, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  act.onClick(e);
-                }}
-                className={`mob-accordion-btn ${
-                  act.variant === 'primary' ? 'btn-orange' : ''
-                }`}
-              >
-                {act.icon}
-                <span>{act.label}</span>
-              </button>
+        {displayFields.length > 0 && (
+          <div className="mob-accordion-grid">
+            {displayFields.map((field, idx) => (
+              <div key={idx} className="mob-accordion-field">
+                <span className="mob-accordion-field-label">{field.label}</span>
+                <span className="mob-accordion-field-value">{field.value}</span>
+              </div>
             ))}
           </div>
         )}
+
+        {children}
+
+        {/* Action Buttons Row */}
+        {renderActions()}
       </div>
     </div>
   );

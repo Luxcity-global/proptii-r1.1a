@@ -586,15 +586,17 @@ function RequestReferencing({
     }
   };
 
-  const activeTenants = tenants.filter((t) => !isTenantDeleted(t.id, t.email));
-  const activeSentRequests = sentRequests.filter((req) => !isTenantDeleted(undefined, req.tenantEmail));
+  const list = Array.isArray(tenants) ? tenants : [];
+  const reqList = Array.isArray(sentRequests) ? sentRequests : [];
+  const activeTenants = list.filter((t) => !isTenantDeleted(t.id, t.email));
+  const activeSentRequests = reqList.filter((req) => !isTenantDeleted(undefined, req.tenantEmail));
 
   const filteredTenants = activeTenants.filter((t) => {
-    const q = search.toLowerCase();
+    const q = (search || '').toLowerCase();
     return (
-      t.name?.toLowerCase().includes(q) ||
-      t.email?.toLowerCase().includes(q) ||
-      t.propertyAddress?.toLowerCase().includes(q)
+      (t.name || '').toLowerCase().includes(q) ||
+      (t.email || '').toLowerCase().includes(q) ||
+      (t.propertyAddress || '').toLowerCase().includes(q)
     );
   });
 
@@ -822,7 +824,7 @@ function RequestReferencing({
                     label: getReferencingStatusLabel(status),
                     variant: status === 'complete' ? 'success' : status === 'in-progress' ? 'warning' : 'neutral',
                   }}
-                  metrics={[
+                  fields={[
                     { label: 'Contact', value: tenant.email },
                     { label: 'Property', value: tenant.propertyAddress || '—' },
                     { label: 'Status', value: getReferencingStatusLabel(status) },
@@ -933,7 +935,7 @@ function RequestReferencing({
                   label: request.status || 'sent',
                   variant: request.status === 'completed' ? 'success' : 'neutral',
                 }}
-                metrics={[
+                fields={[
                   { label: 'Email', value: request.tenantEmail },
                   { label: 'Sent Date', value: request.createdAt ? new Date(request.createdAt).toLocaleDateString('en-GB') : '—' },
                 ]}
@@ -947,7 +949,7 @@ function RequestReferencing({
 }
 
 export function ReferencingPage({
-  tenants,
+  tenants = [],
   userProfile,
   onViewTenant,
   onOpenMessages,
@@ -1031,7 +1033,8 @@ export function ReferencingPage({
   }, []);
 
   useEffect(() => {
-    const active = tenants.filter((t) => !isTenantDeleted(t.id, t.email));
+    const list = Array.isArray(tenants) ? tenants : [];
+    const active = list.filter((t) => !isTenantDeleted(t.id, t.email));
     if (!active.length) {
       setLoadingStatuses(false);
       return;

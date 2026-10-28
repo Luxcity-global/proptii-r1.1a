@@ -2646,7 +2646,7 @@ export function AppContent() {
       case 'referencing':
         return (
           <ReferencingPage
-            tenants={tenants}
+            tenants={tenants || []}
             userProfile={userProfile}
             onViewTenant={(tenant) => {
               selectTenant(tenant);
