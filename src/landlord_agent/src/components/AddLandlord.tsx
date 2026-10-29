@@ -29,6 +29,7 @@ import {
   Star,
   Target
 } from 'lucide-react';
+import { uploadToFirebaseStorage } from '../../../services/storageService';
 
 interface LandlordFormData {
   // Personal Information
@@ -235,7 +236,7 @@ export function AddLandlord({ onSave, onBack }: { onSave: (landlord: any) => voi
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
     const landlord = {
@@ -284,14 +285,27 @@ export function AddLandlord({ onSave, onBack }: { onSave: (landlord: any) => voi
         notableAchievements: formData.notableAchievements || undefined
       },
       notes: formData.notes || undefined,
-      documents: formData.documentsUploaded.map((file, index) => ({
-        id: `doc-${index}`,
-        name: file.name,
-        type: 'other' as const,
-        url: URL.createObjectURL(file),
-        issueDate: new Date(),
-        status: 'valid' as const
-      }))
+      documents: await Promise.all(
+        formData.documentsUploaded.map(async (file, index) => {
+          let storageUrl = '';
+          try {
+            const uploadRes = await uploadToFirebaseStorage(file, 'landlord_documents');
+            if (uploadRes.success && uploadRes.url) {
+              storageUrl = uploadRes.url;
+            }
+          } catch (e) {
+            console.warn('Document storage upload failed:', e);
+          }
+          return {
+            id: `doc-${index}`,
+            name: file.name,
+            type: 'other' as const,
+            url: storageUrl,
+            issueDate: new Date(),
+            status: 'valid' as const
+          };
+        })
+      )
     };
 
     onSave(landlord);

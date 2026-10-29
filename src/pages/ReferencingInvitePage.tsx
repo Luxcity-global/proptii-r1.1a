@@ -191,12 +191,15 @@ export const ReferencingInvitePage: React.FC = () => {
     setUploadingSection(`${section}_${field}`);
     try {
       const uploadRes = await uploadToFirebaseStorage(file, `referencing_documents/${section}`);
+      if (!uploadRes.success || !uploadRes.url) {
+        throw new Error(uploadRes.error || `Failed to upload "${file.name}" to storage`);
+      }
       const fileData = {
         name: file.name,
         type: file.type,
         size: file.size,
-        url: uploadRes.url || '',
-        dataUrl: uploadRes.url || '',
+        url: uploadRes.url,
+        dataUrl: uploadRes.url,
         lastModified: file.lastModified
       };
 
@@ -218,38 +221,30 @@ export const ReferencingInvitePage: React.FC = () => {
   const runAIExtract = async (file: File) => {
     setAiExtracting(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result as string;
-        try {
-          const res = await fetch(`${API}/referencing/ai-extract`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ base64Data, mimeType: file.type })
-          });
-          const json = await res.json();
-          if (json.success && json.data) {
-            const d = json.data;
-            setFormData(prev => ({
-              ...prev,
-              identity: {
-                ...prev.identity,
-                firstName: d.firstName || prev.identity.firstName,
-                lastName: d.lastName || prev.identity.lastName,
-                dateOfBirth: d.dateOfBirth || prev.identity.dateOfBirth,
-                nationality: d.nationality || prev.identity.nationality,
-              }
-            }));
-            toast.success('Information extracted from document!');
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${API}/referencing/ai-extract`, {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        const d = json.data;
+        setFormData(prev => ({
+          ...prev,
+          identity: {
+            ...prev.identity,
+            firstName: d.firstName || prev.identity.firstName,
+            lastName: d.lastName || prev.identity.lastName,
+            dateOfBirth: d.dateOfBirth || prev.identity.dateOfBirth,
+            nationality: d.nationality || prev.identity.nationality,
           }
-        } catch {
-          // non-blocking
-        } finally {
-          setAiExtracting(false);
-        }
-      };
-      reader.readAsDataURL(file);
+        }));
+        toast.success('Information extracted from document!');
+      }
     } catch {
+      // non-blocking
+    } finally {
       setAiExtracting(false);
     }
   };

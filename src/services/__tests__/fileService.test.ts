@@ -22,14 +22,12 @@ describe('Tenant fileService ("Your Files" Dashboard)', () => {
     fileService.setCurrentUser(null);
   });
 
-  it('getFiles returns default contract files when no user is logged in', async () => {
+  it('getFiles returns empty files list when no user is logged in and no files exist', async () => {
     const files = await fileService.getFiles();
-    expect(files.length).toBeGreaterThan(0);
-    expect(files[0].category).toBe('Contracts');
-    expect(files[0].name).toContain('Tenancy_Agreement');
+    expect(files).toEqual([]);
   });
 
-  it('getFiles merges contract files and user-specific uploaded files from Firestore', async () => {
+  it('getFiles returns user-specific uploaded files from Firestore', async () => {
     fileService.setCurrentUser('tenant_user_456');
 
     const mockUserFiles = [
@@ -63,7 +61,6 @@ describe('Tenant fileService ("Your Files" Dashboard)', () => {
     expect(firestoreService.getUserFiles).toHaveBeenCalledWith('tenant_user_456');
     expect(allFiles.some(f => f.name === 'Passport_Copy.pdf' && f.category === 'Identity')).toBe(true);
     expect(allFiles.some(f => f.name === 'Employment_Letter.pdf' && f.category === 'Employment')).toBe(true);
-    expect(allFiles.some(f => f.category === 'Contracts')).toBe(true);
   });
 
   it('uploadFiles reads file and persists to Firestore under current user', async () => {

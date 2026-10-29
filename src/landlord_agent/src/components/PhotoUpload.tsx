@@ -3,8 +3,9 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Upload, X, GripVertical, Image, ArrowRight } from 'lucide-react';
+import { Upload, X, GripVertical, Image, ArrowRight, Loader2 } from 'lucide-react';
 import { Property, PropertyPhoto } from '../App';
+import { uploadToFirebaseStorage } from '../../../services/storageService';
 
 interface PhotoUploadProps {
   property: Property | null;
@@ -15,6 +16,7 @@ interface PhotoUploadProps {
 export function PhotoUpload({ property, onPhotosComplete, onSkip }: PhotoUploadProps) {
   const [photos, setPhotos] = useState<PropertyPhoto[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const roomTypes = [
@@ -29,25 +31,33 @@ export function PhotoUpload({ property, onPhotosComplete, onSkip }: PhotoUploadP
     'Other'
   ];
 
-  const handleFileSelect = (files: FileList | null) => {
-    if (!files) return;
+  const handleFileSelect = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
 
-    Array.from(files).forEach((file, index) => {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
+    try {
+      const fileArr = Array.from(files).filter(f => f.type.startsWith('image/'));
+      for (let i = 0; i < fileArr.length; i++) {
+        const file = fileArr[i];
+        const uploadRes = await uploadToFirebaseStorage(file, 'property_photos');
+        if (uploadRes.success && uploadRes.url) {
           const newPhoto: PropertyPhoto = {
-            id: Date.now().toString() + index,
-            url: e.target?.result as string,
+            id: `${Date.now()}_${i}`,
+            url: uploadRes.url,
             filename: file.name,
-            isCover: photos.length === 0 && index === 0,
+            isCover: photos.length === 0 && i === 0,
             room: undefined
           };
           setPhotos(prev => [...prev, newPhoto]);
-        };
-        reader.readAsDataURL(file);
+        } else {
+          console.error('Failed to upload property photo to cloud storage:', uploadRes.error);
+        }
       }
-    });
+    } catch (err) {
+      console.error('Error during photo upload:', err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -253,9 +263,18 @@ export function PhotoUpload({ property, onPhotosComplete, onSkip }: PhotoUploadP
             <Button
               onClick={() => onPhotosComplete(photos)}
               size="lg"
-              disabled={photos.length === 0}
+              disabled={photos.length === 0 || isUploading}
             >
-              {photos.length === 0 ? 'Add Photos First' : `Continue with ${photos.length} photo${photos.length !== 1 ? 's' : ''}`}
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <span>Uploading to Storage…</span>
+                </>
+              ) : photos.length === 0 ? (
+                'Add Photos First'
+              ) : (
+                `Continue with ${photos.length} photo${photos.length !== 1 ? 's' : ''}`
+              )}
             </Button>
           </div>
         </Card>

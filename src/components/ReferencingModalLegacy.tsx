@@ -35,6 +35,7 @@ import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
 import { firestoreService } from '../services/firestoreService';
+import { uploadToFirebaseStorage } from '../services/storageService';
 import { toast } from 'sonner';
 import QuickFillBanner from './referencing/ui/QuickFillBanner';
 import { ExtractedData } from '../services/openRouterService';
@@ -194,30 +195,20 @@ function sanitizeForLocalStorage(obj: any): any {
   return result;
 }
 
-const fileToStoredFile = async (file: File): Promise<StoredFile> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    const timeout = setTimeout(() => {
-      reader.abort();
-      reject(new Error('File reading timeout'));
-    }, 8000);
-
-    reader.onload = () => {
-      clearTimeout(timeout);
-      resolve({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        lastModified: file.lastModified,
-        dataUrl: reader.result as string
-      });
-    };
-    reader.onerror = () => {
-      clearTimeout(timeout);
-      reject(new Error('File reading failed'));
-    };
-    reader.readAsDataURL(file);
-  });
+const fileToStoredFile = async (file: File, folderSection = 'referencing'): Promise<StoredFile> => {
+  const uploadRes = await uploadToFirebaseStorage(file, `referencing_documents/${folderSection}`);
+  if (!uploadRes.success || !uploadRes.url) {
+    throw new Error(uploadRes.error || `Failed to upload "${file.name}" to cloud storage`);
+  }
+  return {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    lastModified: file.lastModified,
+    url: uploadRes.url,
+    dataUrl: uploadRes.url,
+    storagePath: uploadRes.fileName || file.name,
+  };
 };
 
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ 
@@ -416,12 +407,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     setStepStatus(newStatus);
   }, [formData]);
 
-  const processFileUpload = async (file: File): Promise<StoredFile> => {
-    const cacheKey = `${file.name}_${file.size}_${file.lastModified}`;
+  const processFileUpload = async (file: File, folderSection = 'referencing'): Promise<StoredFile> => {
+    const cacheKey = `${folderSection}_${file.name}_${file.size}_${file.lastModified}`;
     if (fileCache.has(cacheKey)) {
       return fileCache.get(cacheKey)!;
     }
-    const storedFile = await fileToStoredFile(file);
+    const storedFile = await fileToStoredFile(file, folderSection);
     setFileCache(prev => new Map(prev.set(cacheKey, storedFile)));
     return storedFile;
   };
@@ -432,33 +423,49 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
 
     if ('identityProof' in data && (data as any).identityProof instanceof File) {
       fileProcessingPromises.push(
-        processFileUpload((data as any).identityProof).then(result => {
-          processedData.identityProof = result;
-        })
+        processFileUpload((data as any).identityProof, 'identity')
+          .then(result => {
+            processedData.identityProof = result;
+          })
+          .catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Failed to upload identity document');
+          })
       );
     }
 
     if ('proofDocument' in data && (data as any).proofDocument instanceof File) {
       fileProcessingPromises.push(
-        processFileUpload((data as any).proofDocument).then(result => {
-          processedData.proofDocument = result;
-        })
+        processFileUpload((data as any).proofDocument, String(step))
+          .then(result => {
+            processedData.proofDocument = result;
+          })
+          .catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Failed to upload proof document');
+          })
       );
     }
 
     if ('identityDocument' in data && (data as any).identityDocument instanceof File) {
       fileProcessingPromises.push(
-        processFileUpload((data as any).identityDocument).then(result => {
-          processedData.identityDocument = result;
-        })
+        processFileUpload((data as any).identityDocument, 'guarantor')
+          .then(result => {
+            processedData.identityDocument = result;
+          })
+          .catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Failed to upload guarantor document');
+          })
       );
     }
 
     if ('proofOfIncomeDocument' in data && (data as any).proofOfIncomeDocument instanceof File) {
       fileProcessingPromises.push(
-        processFileUpload((data as any).proofOfIncomeDocument).then(result => {
-          processedData.proofOfIncomeDocument = result;
-        })
+        processFileUpload((data as any).proofOfIncomeDocument, 'financial')
+          .then(result => {
+            processedData.proofOfIncomeDocument = result;
+          })
+          .catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Failed to upload income document');
+          })
       );
     }
 

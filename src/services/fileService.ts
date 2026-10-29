@@ -29,18 +29,8 @@ class FileService {
   private currentUserId: string | null = null;
 
   constructor() {
-    this.files = [
-      {
-        id: 11,
-        name: 'Tenancy_Agreement Signed.pdf',
-        category: 'Contracts',
-        type: 'application/pdf',
-        size: 5.2 * 1024,
-        uploadDate: '01/05/2024',
-        url: '/files/tenancy-agreement-signed.pdf'
-      }
-    ];
-    this.nextId = 12;
+    this.files = [];
+    this.nextId = 1;
   }
 
   // Set current user ID for user-specific file management

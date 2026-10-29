@@ -577,11 +577,11 @@ export function ContractsPage({
         const full = await contractService.getContract(contract.id);
         const record = (full || contract) as Contract & { fileBase64?: string; documentUrl?: string; base64Data?: string };
         const sources = [
-          record.fileBase64,
-          record.base64Data,
           record.fileUrl,
           record.documentUrl,
           contract.fileUrl,
+          record.fileBase64,
+          record.base64Data,
         ];
         for (const source of sources) {
           if (!source) continue;

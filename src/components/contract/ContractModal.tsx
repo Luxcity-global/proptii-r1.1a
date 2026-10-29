@@ -19,7 +19,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useBillingStatus } from '../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../utils/planAccess';
 import { getPlanById, type PlanId } from '../../config/plans';
-import { isMockTestUserId } from '../../data/mockTestUsers';
 
 type TemplateActionResult = { success: boolean; error?: string };
 const LOCAL_ACTION_OK: TemplateActionResult = { success: true };
@@ -39,52 +38,11 @@ interface Template {
   uploadDate: string;
   fileUrl: string;
   imagePreview: string | null;
-  file?: File; // Store the actual file object
-  fileData?: string; // Base64 encoded file data for storage
-  fileSize?: number; // File size in bytes
-  firestoreId?: string; // Firestore document ID
+  file?: File;
+  fileData?: string;
+  fileSize?: number;
+  firestoreId?: string;
 }
-
-// Older templates saved the PDF inside the Firestore row. New uploads use a storage URL.
-const convertBase64ToFile = (base64: string, fileName: string, fileType: string): File => {
-  try {
-    console.log('🔄 Converting base64 to file:', fileName);
-    console.log('🔄 Base64 length:', base64.length);
-    console.log('🔄 Base64 preview (first 100 chars):', base64.substring(0, 100));
-    
-    // Clean the base64 string - remove any data URL prefix if present
-    let cleanBase64 = base64;
-    if (base64.includes(',')) {
-      cleanBase64 = base64.split(',')[1];
-      console.log('🔄 Removed data URL prefix, clean length:', cleanBase64.length);
-    }
-    
-    // Validate base64 string
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
-      console.error('❌ Invalid base64 string format');
-      throw new Error('Invalid base64 string format');
-    }
-    
-    console.log('🔄 Decoding base64...');
-    const binaryString = atob(cleanBase64);
-    console.log('🔄 Binary string length:', binaryString.length);
-    
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    
-    console.log('🔄 Created Uint8Array, length:', bytes.length);
-    const file = new File([bytes], fileName, { type: fileType });
-    console.log('✅ Successfully converted base64 to file:', fileName, 'Size:', file.size);
-    
-    return file;
-  } catch (error) {
-    console.error('❌ Error converting base64 to file:', error);
-    console.error('❌ Base64 string:', base64.substring(0, 200) + '...');
-    throw new Error(`Failed to convert base64 to file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
 
 function receivedContractName(contract: any): string {
   const raw = contract?.fileName || contract?.documentName || contract?.title || contract?.contractName || 'contract';
@@ -113,15 +71,6 @@ async function fileFromSource(source: string, name: string): Promise<File | null
   if (!value || value === '#' || value === 'null' || value === 'undefined') return null;
 
   try {
-    if (value.startsWith('data:') || (!/^https?:\/\//i.test(value) && value.length > 80)) {
-      const mime = value.startsWith('data:')
-        ? (value.match(/^data:([^;]+);/)?.[1] || 'application/pdf')
-        : 'application/pdf';
-      if (mime === 'text/html') return null;
-      const file = convertBase64ToFile(value, name, mime === 'application/octet-stream' ? 'application/pdf' : mime);
-      return (await fileIsPdf(file)) ? file : null;
-    }
-
     if (!/^https?:\/\//i.test(value)) return null;
     const res = await fetch(value);
     if (!res.ok) return null;
@@ -213,8 +162,6 @@ type LibraryRow = {
 const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialTab, openContractId, locked = false }) => {
   const { user } = useAuth();
   const { isDemoMode } = useOnboardingSession();
-  // Dev test personas have no real Firebase session, so the API rejects their storage and template calls.
-  const isLocalTestSession = import.meta.env.DEV && isMockTestUserId(user?.id);
   const { plan, status: planStatus, loading: billingLoading, error: billingError } = useBillingStatus();
   const isLocked =
     locked || (!billingLoading && !billingError && !canAccessSection('tenant-contracts', plan, planStatus));
@@ -297,20 +244,17 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
               let file: File;
               let fileUrl = '';
               
-              if (contract.fileUrl) {
-                console.log('🔄 Fetching template file from Firebase Storage URL:', contract.fileUrl);
-                const response = await fetch(contract.fileUrl);
-                if (!response.ok) {
-                  throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
-                }
-                const blob = await response.blob();
-                file = new File([blob], contract.name, { type: contract.fileType });
-                fileUrl = URL.createObjectURL(file);
-              } else {
-                console.log('🔄 Using legacy base64 in Firestore document');
-                file = convertBase64ToFile(contract.fileData, contract.name, contract.fileType);
-                fileUrl = URL.createObjectURL(file);
+              if (!contract.fileUrl) {
+                continue;
               }
+              console.log('🔄 Fetching template file from Firebase Storage URL:', contract.fileUrl);
+              const response = await fetch(contract.fileUrl);
+              if (!response.ok) {
+                throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
+              }
+              const blob = await response.blob();
+              file = new File([blob], contract.name, { type: contract.fileType });
+              fileUrl = URL.createObjectURL(file);
               
               templates.push({
                 id: contract.id,
@@ -352,19 +296,17 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
               let file: File;
               let fileUrl = '';
               
-              if (contract.fileUrl) {
-                console.log('🔄 Fetching deleted template file from Firebase Storage URL:', contract.fileUrl);
-                const response = await fetch(contract.fileUrl);
-                if (!response.ok) {
-                  throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
-                }
-                const blob = await response.blob();
-                file = new File([blob], contract.name, { type: contract.fileType });
-                fileUrl = URL.createObjectURL(file);
-              } else {
-                file = convertBase64ToFile(contract.fileData, contract.name, contract.fileType);
-                fileUrl = URL.createObjectURL(file);
+              if (!contract.fileUrl) {
+                continue;
               }
+              console.log('🔄 Fetching deleted template file from Firebase Storage URL:', contract.fileUrl);
+              const response = await fetch(contract.fileUrl);
+              if (!response.ok) {
+                throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
+              }
+              const blob = await response.blob();
+              file = new File([blob], contract.name, { type: contract.fileType });
+              fileUrl = URL.createObjectURL(file);
               
               deleted.push({
                 id: contract.id,
@@ -514,9 +456,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
   // Handle Delete (Move to Deleted Templates)
   const handleDelete = async (templateId: string) => {
     try {
-      const result: TemplateActionResult = isLocalTestSession
-        ? LOCAL_ACTION_OK
-        : await contractService.deleteContractTemplate(templateId);
+      const result: TemplateActionResult = await contractService.deleteContractTemplate(templateId);
       if (result.success) {
         const templateToDelete = uploadedTemplates.find((t) => t.id === templateId);
         if (templateToDelete) {
@@ -539,9 +479,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
   // Handle Restore (Move to Uploaded Templates)
   const handleRestore = async (templateId: string) => {
     try {
-      const result: TemplateActionResult = isLocalTestSession
-        ? LOCAL_ACTION_OK
-        : await contractService.restoreContractTemplate(templateId);
+      const result: TemplateActionResult = await contractService.restoreContractTemplate(templateId);
       if (result.success) {
         const restoredTemplate = deletedTemplates.find(template => template.id === templateId);
         if (restoredTemplate) {
@@ -562,9 +500,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
   // Handle Permanent Delete (Remove from Deleted Templates)
   const handleDeletePermanently = async (templateId: string) => {
     try {
-      const result: TemplateActionResult = isLocalTestSession
-        ? LOCAL_ACTION_OK
-        : await contractService.permanentlyDeleteContractTemplate(templateId);
+      const result: TemplateActionResult = await contractService.permanentlyDeleteContractTemplate(templateId);
       if (result.success) {
         setDeletedTemplates(deletedTemplates.filter(template => template.id !== templateId));
         setConfirmDelete(null);
@@ -639,24 +575,6 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
       } catch (previewError) {
         console.warn("Failed to generate preview, continuing without preview:", previewError);
         // Continue without preview - this is not critical
-      }
-
-      if (isLocalTestSession) {
-        const localTemplate: Template = {
-          id: `local-${Date.now()}`,
-          name: file.name,
-          uploadDate: new Date().toLocaleDateString(),
-          fileUrl,
-          imagePreview,
-          file,
-          fileSize: file.size,
-        };
-        setUploadedTemplates((prev) => [...prev, localTemplate]);
-        setSelectedTemplateId(localTemplate.id);
-        setActiveTab('uploaded');
-        setNotice(`"${file.name}" added for this test session only (test personas can't save to the server).`);
-        event.target.value = '';
-        return;
       }
 
       const uploadRes = await uploadToFirebaseStorage(file, `contractTemplates/${userId}`);

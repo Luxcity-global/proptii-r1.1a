@@ -1,5 +1,4 @@
 import { getAccessTokenForApiRequest } from './msalAccessToken';
-import { isMockTestUserId } from '../data/mockTestUsers';
 
 export interface ReferencingFormData {
   identity: {
@@ -146,42 +145,12 @@ import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
 const API_BASE = getResolvedApiBaseUrl().replace(/\/api$/, '');
 
-// Dev Login personas use mock tokens that hosted backends reject, so their referencing form lives in localStorage.
-const demoReferencingKey = (userId: string, propertyId: string) => `referencing_demo_form_${userId}_${propertyId}`;
-
-function readDemoReferencingForm(userId: string, propertyId: string): ReferencingDocument | undefined {
-  try {
-    const raw = localStorage.getItem(demoReferencingKey(userId, propertyId));
-    return raw ? (JSON.parse(raw) as ReferencingDocument) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function writeDemoReferencingForm(userId: string, propertyId: string, record: Record<string, any>): boolean {
-  const key = demoReferencingKey(userId, propertyId);
-  try {
-    localStorage.setItem(key, JSON.stringify(record));
-    return true;
-  } catch {
-    try {
-      const withoutFileData = JSON.parse(JSON.stringify(record, (k, v) => (k === 'dataUrl' ? undefined : v)));
-      localStorage.setItem(key, JSON.stringify(withoutFileData));
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
-
 async function authHeaders(): Promise<Record<string, string>> {
   let token = null;
   try {
     token = await getAccessTokenForApiRequest();
   } catch (err) {
-    console.warn('Could not get actual token, falling back to mock or empty', err);
-    token = localStorage.getItem('mock_token');
+    console.warn('Could not get access token for API request', err);
   }
   
   if (!token) {
@@ -259,21 +228,6 @@ class FirestoreService {
       console.log('✅ Referencing form saved successfully');
       return { success: true };
     } catch (error: any) {
-      if (isMockTestUserId(userId)) {
-        const existing = readDemoReferencingForm(userId, propertyId);
-        const now = new Date().toISOString();
-        const saved = writeDemoReferencingForm(userId, propertyId, {
-          userId,
-          propertyId,
-          formData: this.cleanFormData(formData),
-          currentStep,
-          stepStatus,
-          isSubmitted: false,
-          createdAt: existing?.createdAt || now,
-          updatedAt: now,
-        });
-        if (saved) return { success: true };
-      }
       console.error('❌ Error saving referencing form:', error);
       return { success: false, error: error.message };
     }
@@ -316,9 +270,6 @@ class FirestoreService {
       
       return { success: true, data: undefined };
     } catch (error: any) {
-      if (isMockTestUserId(userId)) {
-        return { success: true, data: readDemoReferencingForm(userId, propertyId) };
-      }
       console.error('❌ Error getting referencing form:', error);
       return { success: false, error: error.message };
     }

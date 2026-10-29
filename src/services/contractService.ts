@@ -26,16 +26,6 @@ export interface ContractStats {
   totalSize: number;
 }
 
-const base64ToBlob = (base64: string, mimeType: string): Blob => {
-  const byteCharacters = atob(base64);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  return new Blob([byteArray], { type: mimeType });
-};
-
 type SubscriberCallback<T> = (data: T) => void;
 type SubscriberErrorCallback = (error: Error) => void;
 
@@ -122,48 +112,8 @@ class ContractService {
         return { success: false, error: 'Device is offline.' };
       }
 
-      let fileUrl = '';
-      let fileDataPlaceholder = templateData.fileData;
-
-      // Upload the contract file through the v2-backend storage endpoint
-      // instead of directly to Firebase Storage client SDK.
-      if (templateData.fileData && !templateData.fileData.startsWith('stored_')) {
-        try {
-          const apiBase = getResolvedApiBaseUrl();
-          // Convert base64 → Blob → File for the multipart upload
-          const blob = base64ToBlob(templateData.fileData, templateData.fileType);
-          const templateId = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          const file = new File([blob], `${templateId}.pdf`, { type: templateData.fileType });
-
-          const form = new FormData();
-          form.append('file', file);
-          form.append('folder', `contractTemplates/${userId}`);
-
-          const token = await getAccessTokenForApiRequest().catch(() => null);
-          const headers: Record<string, string> = {};
-          if (token) headers['Authorization'] = `Bearer ${token}`;
-
-          const res = await fetch(`${apiBase}/storage/upload`, {
-            method: 'POST',
-            headers,
-            body: form,
-          });
-
-          if (!res.ok) {
-            const errText = await res.text().catch(() => '');
-            throw new Error(`Storage upload failed (${res.status}): ${errText}`);
-          }
-          const json = await res.json();
-          if (!json?.url) throw new Error('Storage upload returned no URL');
-
-          fileUrl = json.url as string;
-          fileDataPlaceholder = 'stored_via_backend_storage';
-        } catch (storageError) {
-          console.error('❌ Failed to upload contract via backend storage:', storageError);
-          // Re-throw — we must not silently save a contract without a file URL
-          throw storageError;
-        }
-      }
+      const fileUrl = templateData.fileUrl || '';
+      const fileDataPlaceholder = templateData.fileData || 'stored_via_backend_storage';
 
       const response = await apiService.post<{templateId: string}>('/contracts/templates', {
         ...templateData,

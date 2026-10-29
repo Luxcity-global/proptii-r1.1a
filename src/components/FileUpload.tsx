@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { uploadToFirebaseStorage } from '../services/storageService';
 
 interface StoredFile {
     name: string;
     type: string;
     size: number;
     lastModified: number;
+    url?: string;
     dataUrl: string;
 }
 
@@ -16,82 +18,62 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [preview, setPreview] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState<boolean>(false);
 
     // Load file from formData on mount
     useEffect(() => {
-        if (formData?.identity?.identityProof?.dataUrl) {
-            setPreview(formData.identity.identityProof.dataUrl);
+        const proof = formData?.identity?.identityProof;
+        if (proof?.url || proof?.dataUrl) {
+            setPreview(proof.url || proof.dataUrl);
         }
     }, [formData]);
 
-    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files && event.target.files[0]) {
-            const file = event.target.files[0];
+    const handleUploadProcess = async (file: File) => {
+        // Check file size (25MB limit)
+        if (file.size > 25 * 1024 * 1024) {
+            alert('File size must be less than 25MB');
+            return;
+        }
 
-            // Check file size (5MB limit)
-            if (file.size > 5 * 1024 * 1024) {
-                alert('File size must be less than 5MB');
-                return;
-            }
+        setSelectedFile(file);
+        setIsUploading(true);
 
-            setSelectedFile(file);
-
-            // Convert file to base64 for storage
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const dataUrl = reader.result as string;
-                setPreview(dataUrl);
-
-                // Create StoredFile object
+        try {
+            const uploadRes = await uploadToFirebaseStorage(file, 'referencing_documents/identity');
+            if (uploadRes.success && uploadRes.url) {
+                setPreview(uploadRes.url);
                 const storedFile: StoredFile = {
                     name: file.name,
                     type: file.type,
                     size: file.size,
                     lastModified: file.lastModified,
-                    dataUrl: dataUrl
+                    url: uploadRes.url,
+                    dataUrl: uploadRes.url
                 };
-
-                // Update form data with stored file
                 updateFormData("identity", { identityProof: storedFile });
-            };
-            reader.readAsDataURL(file);
+            } else {
+                alert(uploadRes.error || 'Failed to upload document to storage');
+            }
+        } catch (err: any) {
+            console.error('File upload failed:', err);
+            alert(err?.message || 'Upload error');
+        } finally {
+            setIsUploading(false);
         }
     };
 
-    const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files[0]) {
+            await handleUploadProcess(event.target.files[0]);
+        }
+    };
+
+    const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
         event.stopPropagation();
 
         if (event.dataTransfer.files && event.dataTransfer.files[0]) {
-            const file = event.dataTransfer.files[0];
-
-            // Check file size (5MB limit)
-            if (file.size > 5 * 1024 * 1024) {
-                alert('File size must be less than 5MB');
-                return;
-            }
-
-            setSelectedFile(file);
-
-            // Convert file to base64 for storage
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const dataUrl = reader.result as string;
-                setPreview(dataUrl);
-
-                // Create StoredFile object
-                const storedFile: StoredFile = {
-                    name: file.name,
-                    type: file.type,
-                    size: file.size,
-                    lastModified: file.lastModified,
-                    dataUrl: dataUrl
-                };
-
-                // Update form data with stored file
-                updateFormData("identity", { identityProof: storedFile });
-            };
-            reader.readAsDataURL(file);
+            await handleUploadProcess(event.dataTransfer.files[0]);
         }
     };
 

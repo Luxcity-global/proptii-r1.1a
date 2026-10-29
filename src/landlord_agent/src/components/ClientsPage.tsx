@@ -1735,6 +1735,57 @@ export function ClientsPage({
                             </div>
                           </div>
                         </div>
+
+                        {(() => {
+                          const form = drawerReferencingDoc.formData || (drawerReferencingDoc as any);
+                          const docs = [
+                            { label: 'Identity Proof / Passport', doc: form?.identity?.identityProof },
+                            { label: 'Proof of Employment', doc: form?.employment?.proofDocument },
+                            { label: 'Proof of Address', doc: form?.residential?.proofDocument },
+                            { label: 'Proof of Income', doc: form?.financial?.proofOfIncomeDocument },
+                            { label: 'Guarantor Document', doc: form?.guarantor?.identityDocument },
+                          ].filter(item => Boolean(item.doc && (item.doc.url || item.doc.dataUrl || typeof item.doc === 'string')));
+
+                          if (docs.length === 0) return null;
+
+                          return (
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card">
+                              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-heading mb-3">
+                                VERIFIED REFERENCING DOCUMENTS
+                              </h4>
+                              <div className="space-y-2">
+                                {docs.map((item, idx) => {
+                                  const url = typeof item.doc === 'string' ? item.doc : (item.doc.url || item.doc.dataUrl);
+                                  const name = typeof item.doc === 'object' && item.doc.name ? item.doc.name : item.label;
+                                  return (
+                                    <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 hover:bg-slate-100/60 transition-colors">
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-sky-50 text-[#136C9E] flex items-center justify-center shrink-0">
+                                          <FileText className="w-4 h-4" />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="text-xs font-semibold text-slate-800 truncate">{name}</p>
+                                          <p className="text-[10px] text-slate-400 uppercase tracking-wider">{item.label}</p>
+                                        </div>
+                                      </div>
+                                      {url ? (
+                                        <a
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#136C9E] hover:bg-sky-50 transition-colors shrink-0"
+                                        >
+                                          <span>View</span>
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div className="bg-white rounded-2xl p-8 border border-slate-200/80 shadow-card text-center space-y-3">
