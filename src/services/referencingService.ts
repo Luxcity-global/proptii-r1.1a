@@ -3,15 +3,6 @@ import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
 import { uploadToFirebaseStorage } from './storageService';
 
-/** Read a File as a base64 data URL fallback. */
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('FileReader failed'));
-    reader.readAsDataURL(file);
-  });
-}
 
 /**
  * Resolves the path prefix for referencing routes.
@@ -158,7 +149,7 @@ class ReferencingService {
       console.warn(`[ReferencingService] Backend upload failed for (${section}/${field}):`, backendError?.message);
     }
 
-    // 2. Direct client Firebase Storage upload fallback
+    // 2. Direct client Cloud Storage upload fallback (always store in real cloud storage)
     try {
       const storageResult = await uploadToFirebaseStorage(
         file,
@@ -177,24 +168,10 @@ class ReferencingService {
           },
         };
       }
+      return { success: false, error: storageResult.error || 'Failed to upload document to cloud storage' };
     } catch (fbError: any) {
-      console.warn(`[ReferencingService] Firebase Storage fallback failed for (${section}/${field}):`, fbError?.message);
-    }
-
-    // 3. Last-resort fallback: read as data URL so referencing form is never blocked
-    try {
-      const dataUrl = await readAsDataUrl(file);
-      if (onProgress) onProgress(100);
-      return {
-        success: true,
-        data: {
-          fileUrl: dataUrl,
-          storagePath: file.name,
-        },
-      };
-    } catch (readError: any) {
-      console.error(`Error processing document (${section}/${field}):`, readError);
-      return { success: false, error: readError?.message || 'Failed to process document' };
+      console.error(`[ReferencingService] Cloud Storage upload failed for (${section}/${field}):`, fbError);
+      return { success: false, error: fbError?.message || 'Cloud storage upload failed' };
     }
   }
 
