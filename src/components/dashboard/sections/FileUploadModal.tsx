@@ -108,6 +108,9 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
         onClose();
       }, 800);
     } catch (error) {
+      const errStatus: Record<string, 'error'> = {};
+      selectedFiles.forEach((file) => { errStatus[file.name] = 'error'; });
+      setUploadStatus(errStatus);
       setErrors([`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`]);
     } finally {
       setUploading(false);
@@ -129,8 +132,8 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
       <div className="tn-modal tn-modal-lg" role="dialog" aria-labelledby="tn-upload-title">
         <div className="tn-modal-head">
           <div>
-            <h3 id="tn-upload-title">Upload Document</h3>
-            <p>Add documents directly to your secure file vault.</p>
+            <h3 id="tn-upload-title">Upload File</h3>
+            <p>Add files directly to your secure file storage.</p>
           </div>
           <button type="button" className="tn-modal-x" onClick={handleClose} aria-label="Close">✕</button>
         </div>
@@ -224,7 +227,7 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
             onClick={handleUpload}
             disabled={selectedFiles.length === 0 || uploading}
           >
-            {uploading ? 'Uploading...' : 'Upload & Secure'}
+            {uploading ? 'Uploading...' : 'Upload File'}
           </button>
         </div>
       </div>

@@ -308,7 +308,7 @@ export function MainLayout({
   const screenTitleMap: Record<NavigationScreen, string> = {
     dashboard: 'Dashboard',
     properties: 'Properties',
-    documents: 'Documents',
+    documents: 'Files',
     viewings: 'Viewings',
     contracts: 'Contracts',
     clients: 'Clients',
@@ -322,7 +322,7 @@ export function MainLayout({
   const navigationItems: NavItem[] = [
     { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard' },
     { id: 'properties', icon: Building2, label: 'Properties' },
-    { id: 'documents', icon: FileText, label: 'Documents' },
+    { id: 'documents', icon: FileText, label: 'Files' },
     { id: 'viewings', icon: CalendarDays, label: 'Viewings' },
     { id: 'contracts', icon: FileSignature, label: 'Contracts', hasNotification: true },
     { id: 'clients', icon: Users, label: 'Clients' },

@@ -232,18 +232,24 @@ const YourFiles: React.FC = () => {
       setUploading(true);
       setError(null);
 
+      fileService.setCurrentUser(user?.id || null);
+
       const results = await fileService.uploadFiles(uploadFiles, category);
 
-      const failedUploads = results.filter(r => !r.success);
+      const failedUploads = results.filter((r) => !r.success);
       if (failedUploads.length > 0) {
-        setError(`Failed to upload ${failedUploads.length} file(s)`);
+        const errorMsg = failedUploads[0].error || `Failed to upload ${failedUploads.length} file(s)`;
+        setError(errorMsg);
+        throw new Error(errorMsg);
       }
 
       await loadFiles();
       await loadReferencingFiles();
-    } catch (err) {
-      setError('Upload failed');
+    } catch (err: any) {
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      setError(msg);
       console.error('Upload error:', err);
+      throw err;
     } finally {
       setUploading(false);
     }
@@ -356,7 +362,7 @@ const YourFiles: React.FC = () => {
       <TenantPageHeader
         title="Your Files"
         subtitle="Manage, preview, and audit uploaded verification documents, contracts, and compliance evidence."
-        primaryLabel={uploading ? 'Uploading...' : 'Upload Document'}
+        primaryLabel={uploading ? 'Uploading...' : 'Upload File'}
         primaryIcon={uploading ? <Loader className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
         onPrimary={() => setIsUploadModalOpen(true)}
         primaryDisabled={uploading}
@@ -728,20 +734,20 @@ const YourFiles: React.FC = () => {
               <div className="tn-drawer-head-main">
                 <span className="tn-modal-ico blue">📊</span>
                 <div>
-                  <h3 id="tn-vault-insights">Document Vault Insights</h3>
+                  <h3 id="tn-vault-insights">File Storage Insights</h3>
                 </div>
               </div>
               <button type="button" className="tn-modal-x" onClick={() => setIsInsightsOpen(false)} aria-label="Close">✕</button>
             </div>
             <div className="tn-modal-body">
               <p style={{ margin: 0, color: '#64748b', lineHeight: 1.6 }}>
-                File counts and storage for the documents currently in your vault.
+                File counts and storage usage for the files currently in your secure storage.
               </p>
               <div className="tn-insights-grid">
                 <div className="tn-insights-card">
                   <span>Total files</span>
                   <p>{allFiles.length}</p>
-                  <em>In your vault</em>
+                  <em>In your file storage</em>
                 </div>
                 <div className="tn-insights-card">
                   <span>Referencing files</span>

@@ -303,6 +303,7 @@ const DashboardInner: React.FC = () => {
         <div className="fixed top-0 left-0 right-0 z-50 bg-white">
           <MobileHeaderTopBar
             userName={user?.name || user?.givenName || 'Tenant User'}
+            userPhoto={user?.photoURL}
             userRole="tenant"
             title={DASHBOARD_SECTIONS.find((s) => s.id === activeSection)?.label || 'Dashboard'}
             onOpenSidebar={() => setMobileSidebarOpen(true)}

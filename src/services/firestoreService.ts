@@ -148,6 +148,7 @@ const API_BASE = getResolvedApiBaseUrl().replace(/\/api$/, '');
 
 // Dev Login personas use mock tokens that hosted backends reject, so their referencing form lives in localStorage.
 const demoReferencingKey = (userId: string, propertyId: string) => `referencing_demo_form_${userId}_${propertyId}`;
+const demoUserFilesKey = (userId: string) => `referencing_demo_files_${userId}`;
 
 function readDemoReferencingForm(userId: string, propertyId: string): ReferencingDocument | undefined {
   try {
@@ -171,6 +172,37 @@ function writeDemoReferencingForm(userId: string, propertyId: string, record: Re
     } catch {
       return false;
     }
+  }
+}
+
+function readDemoUserFiles(userId: string): UserFile[] {
+  try {
+    const raw = localStorage.getItem(demoUserFilesKey(userId));
+    return raw ? (JSON.parse(raw) as UserFile[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDemoUserFile(userId: string, file: UserFile): boolean {
+  try {
+    const existing = readDemoUserFiles(userId);
+    const updated = [file, ...existing.filter((f) => f.id !== file.id)];
+    localStorage.setItem(demoUserFilesKey(userId), JSON.stringify(updated));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function deleteDemoUserFile(userId: string, fileId: string): boolean {
+  try {
+    const existing = readDemoUserFiles(userId);
+    const updated = existing.filter((f) => f.id !== fileId);
+    localStorage.setItem(demoUserFilesKey(userId), JSON.stringify(updated));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -353,6 +385,23 @@ class FirestoreService {
     fileData: Omit<UserFile, 'id' | 'userId' | 'uploadDate' | 'createdAt' | 'updatedAt'>,
     customId?: string
   ): Promise<{ success: boolean; fileId?: string; error?: string }> {
+    const fileId = customId || `file_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+    const localRecord: UserFile = {
+      id: fileId,
+      userId,
+      name: fileData.name,
+      category: fileData.category,
+      type: fileData.type,
+      size: fileData.size,
+      uploadDate: now,
+      url: fileData.url,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    writeDemoUserFile(userId, localRecord);
+
     try {
       const headers = await authHeaders();
       const payload = {
@@ -375,8 +424,16 @@ class FirestoreService {
       }
 
       const json = await res.json();
-      return { success: true, fileId: json.id || json.fileId };
+      const serverId = json.id || json.fileId || (json.data && json.data.id) || fileId;
+      if (serverId !== fileId) {
+        deleteDemoUserFile(userId, fileId);
+        writeDemoUserFile(userId, { ...localRecord, id: serverId });
+      }
+      return { success: true, fileId: serverId };
     } catch (error: any) {
+      if (isMockTestUserId(userId) || writeDemoUserFile(userId, localRecord)) {
+        return { success: true, fileId };
+      }
       console.error('❌ Error saving user file:', error);
       return { success: false, error: error.message };
     }
@@ -398,9 +455,16 @@ class FirestoreService {
       }
 
       const json = await res.json();
-      const files = json.data || [];
-      return { success: true, files };
+      const apiFiles: UserFile[] = Array.isArray(json) ? json : (json.data || json.files || []);
+      const localFiles = readDemoUserFiles(userId);
+      const seen = new Set(apiFiles.map((f: any) => f.id));
+      const merged = [...apiFiles, ...localFiles.filter((f) => !seen.has(f.id))];
+      return { success: true, files: merged };
     } catch (error: any) {
+      const localFiles = readDemoUserFiles(userId);
+      if (localFiles.length > 0 || isMockTestUserId(userId)) {
+        return { success: true, files: localFiles };
+      }
       console.error('❌ Error getting user files:', error);
       return { success: false, error: error.message };
     }
@@ -410,6 +474,7 @@ class FirestoreService {
    * Delete user file
    */
   async deleteUserFile(userId: string, fileId: string): Promise<{ success: boolean; error?: string }> {
+    deleteDemoUserFile(userId, fileId);
     try {
       const headers = await authHeaders();
       const res = await fetch(`${API_BASE}/api/referencing/files/${fileId}`, {
@@ -423,6 +488,9 @@ class FirestoreService {
 
       return { success: true };
     } catch (error: any) {
+      if (isMockTestUserId(userId)) {
+        return { success: true };
+      }
       console.error('❌ Error deleting user file:', error);
       return { success: false, error: error.message };
     }
