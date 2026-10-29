@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   CheckCircle,
   Clock,
@@ -10,6 +10,7 @@ import {
   Share2,
   Shield,
   Eye,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
@@ -116,6 +117,7 @@ const TenantReferencing: React.FC = () => {
   const { plan, status, loading: billingLoading } = useBillingStatus();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState<FormData | null>(null);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({});
   const [shares, setShares] = useState<ReferencingShareItem[]>([]);
@@ -129,6 +131,20 @@ const TenantReferencing: React.FC = () => {
   const [referencingStep, setReferencingStep] = useState(1);
   const [singleSectionOnly, setSingleSectionOnly] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'shared'>('details');
+
+  useEffect(() => {
+    const handleOpenRef = () => {
+      setReferencingStep(1);
+      setIsReferencingModalOpen(true);
+    };
+    window.addEventListener('open-tenant-referencing', handleOpenRef);
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'referencing') {
+      setReferencingStep(1);
+      setIsReferencingModalOpen(true);
+    }
+    return () => window.removeEventListener('open-tenant-referencing', handleOpenRef);
+  }, [location.search]);
 
   const loadReferencingData = async () => {
     const userId = user?.id || (isAuthenticated ? (user as any)?.uid || 'current_user' : null);
@@ -420,10 +436,13 @@ const TenantReferencing: React.FC = () => {
   const referencingHeader = (
     <TenantPageHeader
       title="Referencing"
-      subtitle="Manage and track your property lease agreements and legal documents."
-      primaryLabel="Request Viewing"
-      primaryIcon={<Eye className="w-4 h-4" />}
-      onPrimary={() => setIsBookViewingOpen(true)}
+      subtitle="Manage your referencing passport, verification details, and landlord sharing."
+      primaryLabel={started ? 'Update Passport' : 'Start Referencing'}
+      primaryIcon={<FileText className="w-4 h-4" />}
+      onPrimary={() => {
+        setReferencingStep(1);
+        setIsReferencingModalOpen(true);
+      }}
     />
   );
 

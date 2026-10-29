@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileText,
   Download,
@@ -59,6 +59,7 @@ const YourFiles: React.FC = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedFilter, setSelectedFilter] = useState('All Files');
   const [searchQuery, setSearchQuery] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -77,6 +78,16 @@ const YourFiles: React.FC = () => {
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
   const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    const handleOpenUpload = () => setIsUploadModalOpen(true);
+    window.addEventListener('open-file-upload', handleOpenUpload);
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'upload') {
+      setIsUploadModalOpen(true);
+    }
+    return () => window.removeEventListener('open-file-upload', handleOpenUpload);
+  }, [location.search]);
 
   useEffect(() => {
     loadFiles();

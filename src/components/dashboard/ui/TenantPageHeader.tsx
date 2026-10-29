@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Bell, Plus } from 'lucide-react';
+import { Settings, Bell, Sparkles } from 'lucide-react';
 import { useMessagingContext } from '../../../contexts/MessagingContext';
 import { useIsMobile } from './use-mobile';
 import '../../../styles/tenantPageHeader.css';
@@ -41,10 +41,22 @@ const TenantPageHeader: React.FC<TenantPageHeaderProps> = ({
           <p>{subtitle}</p>
         </div>
         <div className="tn-ph-actions">
+          {onInsights && (
+            <button
+              type="button"
+              className="tn-ph-icon"
+              title="Portfolio Insights"
+              aria-label="Portfolio Insights"
+              onClick={onInsights}
+            >
+              <Sparkles size={18} />
+            </button>
+          )}
           <button
             type="button"
             className="tn-ph-icon"
             title="Settings"
+            aria-label="Settings"
             onClick={() => navigate('/dashboard/settings')}
           >
             <Settings size={18} />
@@ -53,20 +65,11 @@ const TenantPageHeader: React.FC<TenantPageHeaderProps> = ({
             type="button"
             className="tn-ph-icon"
             title="Notifications"
+            aria-label="Notifications"
             onClick={() => navigate('/dashboard/messages')}
           >
             <Bell size={18} />
             {unreadCount > 0 && <span className="tn-ph-dot" />}
-          </button>
-          <button
-            type="button"
-            className="tn-ph-insights"
-            onClick={() => (onInsights ? onInsights() : navigate('/dashboard#tenant-insights'))}
-          >
-            <span className="tn-ph-insights-icon">
-              <Plus size={14} strokeWidth={2.5} />
-            </span>
-            Portfolio Insights
           </button>
           {extraActions}
           <button
@@ -76,7 +79,7 @@ const TenantPageHeader: React.FC<TenantPageHeaderProps> = ({
             disabled={primaryDisabled}
           >
             {primaryIcon}
-            {primaryLabel}
+            <span>{primaryLabel}</span>
           </button>
         </div>
       </div>

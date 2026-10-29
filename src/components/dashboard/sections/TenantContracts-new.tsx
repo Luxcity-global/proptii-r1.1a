@@ -49,6 +49,16 @@ const TenantContracts: React.FC = () => {
     setContractToSign(signContractId);
     setIsContractModalOpen(true);
   }, [signContractId]);
+
+  useEffect(() => {
+    const handleOpenSign = () => openContractWorkspace();
+    window.addEventListener('open-sign-contract', handleOpenSign);
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'sign') {
+      openContractWorkspace();
+    }
+    return () => window.removeEventListener('open-sign-contract', handleOpenSign);
+  }, [location.search]);
   const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
   const [viewingProperties, setViewingProperties] = useState<RequestViewingProperty[]>([]);
 
@@ -407,12 +417,6 @@ const TenantContracts: React.FC = () => {
       primaryLabel="Sign & Send"
       primaryIcon={<PenLine className="w-4 h-4" />}
       onPrimary={() => openContractWorkspace()}
-      extraActions={
-        <button type="button" className="tn-ct-btn-outline" onClick={() => setIsBookViewingOpen(true)}>
-          <Eye className="w-4 h-4" />
-          Request Viewing
-        </button>
-      }
     />
   );
 

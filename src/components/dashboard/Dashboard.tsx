@@ -518,6 +518,22 @@ const DashboardInner: React.FC = () => {
             onNavigate={(id, path) => {
               if (path) navigate(path);
             }}
+            onQuickAction={(actionId) => {
+              setCommandSheetOpen(false);
+              if (actionId === 'request-viewing') {
+                navigate('/dashboard/viewings?action=request-viewing');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-request-viewing')), 50);
+              } else if (actionId === 'upload-doc') {
+                navigate('/dashboard/your-files?action=upload');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-file-upload')), 50);
+              } else if (actionId === 'tenant-passport') {
+                navigate('/dashboard/tenant-referencing?action=referencing');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-tenant-referencing')), 50);
+              } else if (actionId === 'view-contracts') {
+                navigate('/dashboard/tenant-contracts?action=sign');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-sign-contract')), 50);
+              }
+            }}
           />
         </>
       )}

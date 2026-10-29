@@ -236,6 +236,16 @@ const Viewings: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const handleOpen = () => openBookViewing();
+    window.addEventListener('open-request-viewing', handleOpen);
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'request-viewing') {
+      openBookViewing();
+    }
+    return () => window.removeEventListener('open-request-viewing', handleOpen);
+  }, [location.search]);
+
   // Load viewing data from Firestore
   useEffect(() => {
     if (!user?.id) {

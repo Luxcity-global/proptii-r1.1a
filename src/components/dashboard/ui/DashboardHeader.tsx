@@ -80,15 +80,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <div
-              className="bg-white rounded-lg border border-gray-200 px-4 py-2 cursor-pointer transition-all duration-300 flex items-center justify-center flex-1"
-              style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}
+              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-xs flex-1 cursor-pointer"
             >
-              <div className="flex items-center space-x-2">
-                <Sparkles className="w-4 h-4" style={{ color: '#136C9E' }} />
-                <span className="text-sm font-medium" style={{ color: '#374957' }}>PropWise</span>
-              </div>
+              <Sparkles className="w-3.5 h-3.5 text-[#136C9E]" />
+              <span className="text-xs font-semibold">PropWise</span>
             </div>
             <PlanBadgePopover />
           </div>
@@ -148,33 +145,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
           </div>
           
           {/* Right Column - PropWise + Plan Badge */}
-          <div className="flex justify-end items-center gap-3">
+          <div className="flex justify-end items-center gap-2.5">
             <div
-              className="bg-white rounded-2xl border border-gray-200 px-6 py-4 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
-              style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 248, 220, 0.6), 0 4px 10px rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.background = 'linear-gradient(135deg, #F3FFDD 0%, #EEFFFF 100%)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.transform = 'translateY(0px)';
-                e.currentTarget.style.background = 'white';
-              }}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50 shadow-xs transition-all cursor-pointer"
             >
-              <div className="flex items-center space-x-3">
-                <div className="text-left">
-                  <p className="text-sm leading-tight font-medium" style={{ color: '#374957' }}>PropWise</p>
-                  <p className="text-xs leading-tight" style={{ color: '#717182' }}>AI Powered</p>
-                </div>
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: '#136C9E' }}
-                >
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-              </div>
+              <Sparkles className="w-4 h-4 text-[#136C9E]" />
+              <span className="text-xs font-semibold">PropWise</span>
             </div>
             <PlanBadgePopover />
           </div>

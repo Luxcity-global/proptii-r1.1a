@@ -162,13 +162,14 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
         if (onQuickAction) {
           onQuickAction('request-viewing');
         } else {
-          onNavigate?.('viewings', '/dashboard/viewings');
+          onNavigate?.('viewings', '/dashboard/viewings?action=request-viewing');
+          window.dispatchEvent(new CustomEvent('open-request-viewing'));
         }
       },
     },
     {
       id: 'view-contracts',
-      title: 'View Contracts',
+      title: 'Sign Contracts',
       desc: 'Agreements & terms',
       cardColor: 'orange',
       icon: (
@@ -182,7 +183,8 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
         if (onQuickAction) {
           onQuickAction('view-contracts');
         } else {
-          onNavigate?.('tenant-contracts', '/dashboard/tenant-contracts');
+          onNavigate?.('tenant-contracts', '/dashboard/tenant-contracts?action=sign');
+          window.dispatchEvent(new CustomEvent('open-sign-contract'));
         }
       },
     },
@@ -202,14 +204,15 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
         if (onQuickAction) {
           onQuickAction('tenant-passport');
         } else {
-          onNavigate?.('tenant-referencing', '/dashboard/tenant-referencing');
+          onNavigate?.('tenant-referencing', '/dashboard/tenant-referencing?action=referencing');
+          window.dispatchEvent(new CustomEvent('open-tenant-referencing'));
         }
       },
     },
     {
       id: 'upload-doc',
-      title: 'Your Files',
-      desc: 'Upload documents',
+      title: 'Upload File',
+      desc: 'Add file to vault',
       cardColor: 'sky',
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0284C7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -223,7 +226,8 @@ export const MobileCommandSheet: React.FC<MobileCommandSheetProps> = ({
         if (onQuickAction) {
           onQuickAction('upload-doc');
         } else {
-          onNavigate?.('your-files', '/dashboard/your-files');
+          onNavigate?.('your-files', '/dashboard/your-files?action=upload');
+          window.dispatchEvent(new CustomEvent('open-file-upload'));
         }
       },
     },
