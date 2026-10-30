@@ -1,10 +1,6 @@
 /** Canonical production search service (property scraper on Render). */
-export const PROD_SEARCH_BACKEND_URL = (
-  (import.meta as any)?.env?.VITE_SEARCH_BACKEND_URL ||
-  (import.meta as any)?.env?.VITE_SEARCH_API_URL ||
-  (import.meta as any)?.env?.VITE_SEARCH_URL ||
-  'https://proptii-listings-api.onrender.com'
-).trim().replace(/\/$/, '');
+export const CANONICAL_SEARCH_BACKEND_URL = 'https://proptii-listings-api.onrender.com';
+export const PROD_SEARCH_BACKEND_URL = CANONICAL_SEARCH_BACKEND_URL;
 
 const LOCAL_SEARCH_BACKEND_URL = (
   (import.meta as any)?.env?.VITE_LOCAL_SEARCH_URL ||
@@ -12,13 +8,14 @@ const LOCAL_SEARCH_BACKEND_URL = (
 ).trim().replace(/\/$/, '');
 
 /**
- * Hosts that belong to the main Nest API or invalid ports, not the search scraper.
- * Using them for /api/v1/search causes ERR_NAME_NOT_RESOLVED or 404.
+ * Hosts that belong to the main Nest API, suspended services, or invalid ports.
+ * Using them for /api/v1/search causes ERR_NAME_NOT_RESOLVED, 503, or 404.
  */
 const NON_SEARCH_API_HOST_FRAGMENTS = [
   'railway.app',
   'proptii-r1-1a-new-backend.onrender.com',
   'proptii-r1-1a-1.onrender.com',
+  'proptii-r1-1a-q95f.onrender.com', // Suspended Render service
   'api.proptii.com',
   'api-staging.proptii.com',
   'localhost:5000',

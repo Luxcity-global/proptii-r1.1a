@@ -427,8 +427,8 @@ export function usePropertyFilters(
   const counts: FilterCounts = useMemo(() => {
     let active = 0;
     if (filters.minPrice !== null || filters.maxPrice !== null) active++;
-    if (filters.bedrooms !== 'any' && filters.bedrooms.length > 0) active++;
-    if (filters.propertyTypes.length > 0) active++;
+    if (filters.bedrooms !== 'any' && Array.isArray(filters.bedrooms) && filters.bedrooms.length > 0) active++;
+    if (Array.isArray(filters.propertyTypes) && filters.propertyTypes.length > 0) active++;
     if (filters.furnishing !== 'any') active++;
     if (filters.hasParking) active++;
     if (filters.hasBalconyOrGarden) active++;

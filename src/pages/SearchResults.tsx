@@ -65,13 +65,15 @@ const SearchResults: React.FC = () => {
   const { setActiveConversationId } = useMessagingContext();
   const { enabled: govDataEnabled, audience, setAudience } = useGovDataLayer();
   const {
-    results,
+    results: rawResults,
     isLoading,
     error,
     searchProperties,
     resolvedLocation,
     clearCache,
   } = useSearchBackend();
+
+  const results = useMemo(() => (Array.isArray(rawResults) ? rawResults : []), [rawResults]);
 
   const { classification, isClassifying } = useClassifyQuery({
     enabled: Boolean(searchQuery.trim().length >= 2),
@@ -310,7 +312,7 @@ const SearchResults: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error && results.length === 0) {
     const isNetworkError =
       error.includes('Network connection') ||
       error.includes('Failed to fetch') ||

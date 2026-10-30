@@ -340,10 +340,6 @@ export const useSearchBackend = () => {
       
       const finalResults = [...proptiiResults, ...uniqueScraped];
       
-      if (finalResults.length === 0) {
-        throw new Error('No properties found. Please try a different search.');
-      }
-
       const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
       const macroSig = `${searchQuery.trim().toLowerCase()}|${type}|beds:${urlParams.get('beds') || ''}|minP:${urlParams.get('minPrice') || ''}|maxP:${urlParams.get('maxPrice') || ''}|types:${urlParams.get('types') || ''}|tenure:${urlParams.get('tenure') || ''}|loc:${filters.location || ''}`;
 

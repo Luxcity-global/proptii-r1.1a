@@ -400,8 +400,16 @@ export async function fetchBatchedPropertyFacts(input: {
   listingIds: string[];
   uprns?: string[];
 }): Promise<BatchedFactsResponse> {
-  const listingIds = input.listingIds.filter(Boolean);
-  if (listingIds.length === 0) return {};
+  const listingIds = (input.listingIds || [])
+    .filter(Boolean)
+    .map(String)
+    .slice(0, 50);
+  const uprns = (input.uprns || [])
+    .filter(Boolean)
+    .map(String)
+    .slice(0, 50);
+
+  if (listingIds.length === 0 && uprns.length === 0) return {};
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FACTS_TIMEOUT_MS);
@@ -418,7 +426,7 @@ export async function fetchBatchedPropertyFacts(input: {
         },
         body: JSON.stringify({
           listingIds,
-          uprns: input.uprns?.filter(Boolean) ?? [],
+          uprns,
         }),
       },
       { retryOnNotFound: true },
