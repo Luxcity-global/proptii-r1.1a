@@ -38,6 +38,27 @@ class FileService {
     this.currentUserId = userId;
   }
 
+  // Safely parse any date value returned by the API into a localised date string.
+  // Handles: Firestore Timestamps (.toDate()), serialised Timestamps ({_seconds}),
+  // ISO strings, numeric epoch ms, and plain Date objects.
+  private parseDateField(value: any): string {
+    if (!value) return new Date().toLocaleDateString();
+    // Native Firestore Timestamp (SDK object)
+    if (typeof value?.toDate === 'function') {
+      return value.toDate().toLocaleDateString();
+    }
+    // Serialised Firestore Timestamp from REST: { _seconds, _nanoseconds }
+    if (typeof value?._seconds === 'number') {
+      return new Date(value._seconds * 1000).toLocaleDateString();
+    }
+    // ISO string or numeric epoch
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
+    }
+    return new Date().toLocaleDateString();
+  }
+
   // Get all files (contract files + user-specific files from Firestore)
   async getFiles(): Promise<FileItem[]> {
     try {
@@ -53,15 +74,12 @@ class FileService {
             category: firestoreFile.category || firestoreFile.section || 'Identity',
             type: firestoreFile.type || firestoreFile.contentType || 'application/pdf',
             size: firestoreFile.size || 0,
-            uploadDate: firestoreFile.uploadDate?.toDate
-              ? firestoreFile.uploadDate.toDate().toLocaleDateString()
-              : firestoreFile.createdAt?.toDate
-                ? firestoreFile.createdAt.toDate().toLocaleDateString()
-                : firestoreFile.uploadDate
-                  ? new Date(firestoreFile.uploadDate).toLocaleDateString()
-                  : firestoreFile.createdAt
-                    ? new Date(firestoreFile.createdAt).toLocaleDateString()
-                    : new Date().toLocaleDateString(),
+            uploadDate: this.parseDateField(
+              firestoreFile.uploadDate ??
+              firestoreFile.createdAt ??
+              firestoreFile.uploadedAt ??
+              firestoreFile.created_at
+            ),
             url: firestoreFile.url,
             firestoreId: firestoreFile.id,
           }));
