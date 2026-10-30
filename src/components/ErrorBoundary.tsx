@@ -52,12 +52,20 @@ class ErrorBoundary extends Component<Props, State> {
             {errorCode && (
               <p className="text-xs text-gray-400 font-mono mb-4">Error code: {errorCode}</p>
             )}
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-primary text-white px-6 py-2 rounded-full hover:bg-opacity-90 transition-all"
-            >
-              Reload Page
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-primary text-white px-5 py-2 rounded-full hover:bg-opacity-90 transition-all text-sm font-medium"
+              >
+                Reload Page
+              </button>
+              <button
+                onClick={() => { window.location.href = '/'; }}
+                className="bg-gray-100 text-gray-700 px-5 py-2 rounded-full hover:bg-gray-200 transition-all text-sm font-medium border border-gray-200"
+              >
+                Go to Home
+              </button>
+            </div>
           </div>
         </div>
       );

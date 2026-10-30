@@ -63,7 +63,7 @@ const SearchResults: React.FC = () => {
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
   const { isAuthenticated, user, login } = useAuth();
   const { setActiveConversationId } = useMessagingContext();
-  const { govDataEnabled, audience, setAudience } = useGovDataLayer();
+  const { enabled: govDataEnabled, audience, setAudience } = useGovDataLayer();
   const {
     results,
     isLoading,
@@ -96,13 +96,9 @@ const SearchResults: React.FC = () => {
 
   const [showMap, setShowMap] = useState(false);
 
-  const uprnList = useMemo(
-    () => (govDataEnabled ? results.map((p) => p.uprn).filter(Boolean) as string[] : []),
-    [results, govDataEnabled]
-  );
   const { getFlagsFor, getHintFor, isFactsLoading, isUnresolved } = useBatchedPropertyFacts(
-    uprnList,
-    audience
+    Boolean(govDataEnabled),
+    results
   );
 
   useEffect(() => {
