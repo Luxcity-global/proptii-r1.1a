@@ -105,6 +105,20 @@ const DashboardHome: React.FC = () => {
   const { savedProperties } = useSavedProperties();
   const { signedContracts } = useSignedContracts();
 
+  const [avatarImgError, setAvatarImgError] = useState(false);
+  const profilePhoto = user?.photoURL || null;
+  const userInitials = (() => {
+    const raw = user?.name || [user?.givenName, user?.familyName].filter(Boolean).join(' ') || '';
+    if (!raw.trim()) return 'U';
+    const parts = raw.trim().split(/\s+/);
+    return parts.length >= 2
+      ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+      : raw.trim().slice(0, 2).toUpperCase();
+  })();
+
+  // Reset error flag whenever the photo URL changes
+  React.useEffect(() => { setAvatarImgError(false); }, [profilePhoto]);
+
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [referencingStep, setReferencingStep] = useState(1);
   const selectedPropertyId = user?.id ? `general_${user.id}` : null;
@@ -439,7 +453,16 @@ const DashboardHome: React.FC = () => {
                     <div className="tn-dash-profile-info">
                       <div className="tn-dash-avatar-wrap">
                         <div className="tn-dash-avatar">
-                          <User size={28} />
+                          {profilePhoto && !avatarImgError ? (
+                            <img
+                              src={profilePhoto}
+                              alt="Profile"
+                              className="tn-dash-avatar-img"
+                              onError={() => setAvatarImgError(true)}
+                            />
+                          ) : (
+                            <span className="tn-dash-avatar-initials">{userInitials}</span>
+                          )}
                         </div>
                         <div className="tn-dash-avatar-badge">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5">
