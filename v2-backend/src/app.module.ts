@@ -1,90 +1,25 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { Reflector } from '@nestjs/core';
-import { SubscriptionGuard } from './guards/subscription.guard';
+import { APP_GUARD, Reflector } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
-import { LoggingMiddleware } from './middleware/logging.middleware';
-import { GovDataModule } from './gov-data/gov-data.module';
-
-// ── Existing controllers ──────────────────────────────────────────────────────
-import { AuthController } from './controllers/auth.controller';
-import { NativePropertiesController } from './controllers/native-properties.controller';
-import { SavedPropertiesController } from './controllers/saved-properties.controller';
-import { TenantDashboardController } from './controllers/tenant-dashboard.controller';
-import { ViewingRequestController } from './controllers/viewing-request.controller';
-import { ReferencingController } from './controllers/referencing.controller';
-import { CommunicationController } from './controllers/communication.controller';
-import { GuestEnquiryController } from './controllers/guest-enquiry.controller';
-import { ContractController } from './controllers/contract.controller';
-import { BillingController } from './controllers/billing.controller';
-import { UserProfileController } from './controllers/user-profile.controller';
-import { HealthController } from './controllers/health.controller';
-import { AdminDashboardController } from './controllers/admin-dashboard.controller';
-
-// ── New controllers (gap-fill) ────────────────────────────────────────────────
-import { LandlordsController } from './controllers/landlords.controller';
-import { PropertySelectionsController } from './controllers/property-selections.controller';
-import { HomeownerController } from './controllers/homeowner.controller';
-import { AlertsController } from './controllers/alerts.controller';
-import { InsightsController } from './controllers/insights.controller';
-import { SheetsController } from './controllers/sheets.controller';
-import { RefereeGuarantorController } from './controllers/referee-guarantor.controller';
-import { TenantsController } from './controllers/tenants.controller';
-import { PaymentsController } from './controllers/payments.controller';
-import { EmailController } from './controllers/email.controller';
-import { TenantInvitationsController } from './controllers/tenant-invitations.controller';
-import { TenantsService } from './services/tenants.service';
-import { NotificationSchedulerService } from './services/notification-scheduler.service';
-
-// ── R1.4 — Search Classifier (Sprint 1.3) ────────────────────────────────────
-import { ClassifierController } from './search/classifier.controller';
-import { ClassifierService }    from './search/classifier.service';
-
-// ── R1.4 — Runtime Flag (Sprint 2.1) ─────────────────────────────────────
-import { FlagsController }        from './controllers/flags.controller';
-
-// ── R1.4 — Property Facts (Sprint 2.2 + 3.1) ─────────────────────────────
-import { PropertyFactsController } from './controllers/property-facts.controller';
-import { ReportController }        from './controllers/report.controller';
-
-// ── Existing services ─────────────────────────────────────────────────────────
-import { NativePropertiesService } from './services/native-properties.service';
-import { SavedPropertiesService } from './services/saved-properties.service';
-import { ViewingRequestService } from './services/viewing-request.service';
-import { ReferencingService } from './services/referencing.service';
-import { CommunicationService } from './services/communication.service';
-import { GuestEnquiryService } from './services/guest-enquiry.service';
-import { ContractService } from './services/contract.service';
-import { BillingService } from './services/billing.service';
-import { UserProfileService } from './services/user-profile.service';
-import { AdminDashboardService } from './services/admin-dashboard.service';
-
-// ── New services (gap-fill) ───────────────────────────────────────────────────
-import { LandlordsService } from './services/landlords.service';
-import { PropertySelectionsService } from './services/property-selections.service';
-import { HomeownerService } from './services/homeowner.service';
-import { AlertsService } from './services/alerts.service';
-import { InsightsService } from './services/insights.service';
-import { SheetsService } from './services/sheets.service';
-import { RefereeGuarantorService } from './services/referee-guarantor.service';
-import { EmailService } from './services/email.service';
-import { EventsService } from './services/events.service';
-import { StorageService } from './services/storage.service';
-import { StorageController } from './controllers/storage.controller';
-
-import { DocumentsController } from './controllers/documents.controller';
-import { DocumentsService }    from './services/documents.service';
-
-// ── Campaign Lead Capture ─────────────────────────────────────────────────────
-import { LeadsModule } from './leads/leads.module';
-
-// ── Rate Limiting (ThrottlerModule) ──────────────────────────────────────────
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-
-// ── Static File Serving (campaign + welcome pages) ───────────────────────────
 import { ServeStaticModule } from '@nestjs/serve-static';
 import * as path from 'path';
 import * as fs from 'fs';
+
+import { LoggingMiddleware } from './middleware/logging.middleware';
+import { CorrelationIdMiddleware } from './middleware/correlation-id.middleware';
+import { SecurityHeadersMiddleware } from './middleware/security-headers.middleware';
+import { validateEnv } from './config/env.validation';
+
+// ── 7 Domain Modules + Shared Module ──────────────────────────────────────────
+import { SharedModule } from './modules/shared/shared.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { PropertiesModule } from './modules/properties/properties.module';
+import { ReferencingModule } from './modules/referencing/referencing.module';
+import { ContractsModule } from './modules/contracts/contracts.module';
+import { CommunicationModule } from './modules/communication/communication.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 function resolvePublicFolder(folder: string): string {
   const inDist = path.join(__dirname, 'public', folder);
@@ -94,17 +29,32 @@ function resolvePublicFolder(folder: string): string {
   return path.join(__dirname, '..', 'public', folder);
 }
 
+// Validate environment secrets at module definition time
+validateEnv(process.env);
+
 @Module({
   imports: [
-    GovDataModule,
-    LeadsModule,
+    // Cross-cutting core
+    SharedModule,
     ScheduleModule.forRoot(),
-    // Global rate limiter (120 req / 1 min default per client IP; per-endpoint overrides via @Throttle)
-    ThrottlerModule.forRoot([{
-      name: 'default',
-      ttl: 60000,
-      limit: 120,
-    }]),
+    // Tiered rate limiter: burst protection (15/s), medium flow (60/10s), baseline (120/min)
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,
+        limit: 15,
+      },
+      {
+        name: 'medium',
+        ttl: 10000,
+        limit: 60,
+      },
+      {
+        name: 'default',
+        ttl: 60000,
+        limit: 120,
+      },
+    ]),
     // Serve static campaign pages at /campaign/* and /welcome/*
     ServeStaticModule.forRoot(
       {
@@ -118,85 +68,29 @@ function resolvePublicFolder(folder: string): string {
         serveStaticOptions: { index: 'index.html', fallthrough: false },
       },
     ),
+    // 7 Domain Modules
+    AuthModule,
+    PropertiesModule,
+    ReferencingModule,
+    ContractsModule,
+    CommunicationModule,
+    BillingModule,
+    AdminModule,
   ],
-  controllers: [
-    HealthController,
-    AuthController,
-    NativePropertiesController,
-    SavedPropertiesController,
-    TenantDashboardController,
-    ViewingRequestController,
-    ReferencingController,
-    CommunicationController,
-    GuestEnquiryController,
-    ContractController,
-    BillingController,
-    UserProfileController,
-    AdminDashboardController,
-    // Gap-fill controllers
-    LandlordsController,
-    PropertySelectionsController,
-    HomeownerController,
-    AlertsController,
-    InsightsController,
-    SheetsController,
-    RefereeGuarantorController,
-    TenantsController,
-    PaymentsController,
-    EmailController,
-    StorageController,
-    TenantInvitationsController,
-    // R1.4 Sprint 1.3
-    ClassifierController,
-    // R1.4 Sprint 2.1
-    FlagsController,
-    // R1.4 Sprint 2.2 + 3.1
-    PropertyFactsController,
-    ReportController,
-    // Document Vault
-    DocumentsController,
-  ],
+  controllers: [],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    EventsService,      // SSE Central Event Broadcaster
-    EmailService,       // must be before any service that injects it
-    StorageService,     // Firebase Cloud Storage uploader
-    NativePropertiesService,
-    SavedPropertiesService,
-    ViewingRequestService,
-    ReferencingService,  // injects EmailService — declared after it above
-    CommunicationService,
-    GuestEnquiryService,
-    ContractService,
-    BillingService,
     Reflector,
-    SubscriptionGuard,
-    UserProfileService,
-    AdminDashboardService,
-    // Gap-fill services
-    LandlordsService,
-    PropertySelectionsService,
-    HomeownerService,
-    AlertsService,
-    InsightsService,
-    SheetsService,
-    RefereeGuarantorService,
-    TenantsService,
-    // R1.4 Sprint 1.3
-    ClassifierService,
-    // Document Vault
-    DocumentsService,
-    // Notification Scheduler (24h unread reminders)
-    NotificationSchedulerService,
   ],
-  exports: [EventsService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply HTTP request/response logging to every route
-    consumer.apply(LoggingMiddleware).forRoutes('*');
+    // Apply Correlation ID, Security Headers, and HTTP logging to every route
+    consumer
+      .apply(CorrelationIdMiddleware, SecurityHeadersMiddleware, LoggingMiddleware)
+      .forRoutes('*');
   }
 }

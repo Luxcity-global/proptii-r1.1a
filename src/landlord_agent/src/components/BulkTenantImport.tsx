@@ -308,7 +308,6 @@ export function BulkTenantImport({ properties, existingTenants, userProfile, use
         updated[i] = { ...row, _status: 'error', _resultMessage: err?.message || 'Import failed' };
       }
       setRows([...updated]);
-      if (i < updated.length - 1) await new Promise(r => setTimeout(r, 50));
     }
 
     setIsImporting(false);

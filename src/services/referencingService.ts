@@ -1,11 +1,14 @@
 import apiService from './api';
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
+import { uploadToFirebaseStorage } from './storageService';
+
+
 /**
  * Resolves the path prefix for referencing routes.
  * If VITE_API_URL already ends with /api the prefix is empty; otherwise /api is prepended.
  */
-function referencingPath(suffix: string): string {
+export function referencingPath(suffix: string): string {
   const raw = getResolvedApiBaseUrl().replace(/\/$/, '');
   const prefix = raw.endsWith('/api') ? '' : '/api';
   return `${prefix}/referencing/${suffix}`;
@@ -48,7 +51,7 @@ class ReferencingService {
    * Generic section save — called from ReferencingContext.saveFormData().
    * Maps to POST /referencing/{section} which the backend handles for all sections.
    */
-  async saveSectionData(userId: string, section: string, data: any) {
+  async saveSectionData(userId: string, section: string, data: any): Promise<any> {
     try {
       const response = await apiService.post(referencingPath(section), data);
       return response.data ?? { success: true };
@@ -65,7 +68,7 @@ class ReferencingService {
    * Load a saved referencing application by its userId/applicationId.
    * Maps to GET /referencing/:userId
    */
-  async getApplication(applicationId: string) {
+  async getApplication(applicationId: string): Promise<any> {
     try {
       const response = await apiService.get(referencingPath(applicationId));
       const data = response.data;
@@ -121,11 +124,14 @@ class ReferencingService {
     field: string,
     onProgress?: (progress: number) => void,
   ) {
+    // 1. Try backend API multipart upload
     try {
       const additionalData = {
         section,
         field,
         userId: applicationId,
+        name: file.name,
+        fileName: file.name,
       };
 
       const response = await apiService.uploadFile(
@@ -139,10 +145,33 @@ class ReferencingService {
       if (data?.url) {
         return { success: true, data: { fileUrl: data.url, storagePath: data.storagePath } };
       }
-      return { success: false, error: 'Upload succeeded but no URL returned' };
-    } catch (error: any) {
-      console.error(`Error uploading document (${section}/${field}):`, error);
-      return { success: false, error: error?.message || 'Failed to upload document' };
+    } catch (backendError: any) {
+      console.warn(`[ReferencingService] Backend upload failed for (${section}/${field}):`, backendError?.message);
+    }
+
+    // 2. Direct client Cloud Storage upload fallback (always store in real cloud storage)
+    try {
+      const storageResult = await uploadToFirebaseStorage(
+        file,
+        `referencing/${applicationId || 'general'}/${section}/${field}`,
+        (progress) => {
+          if (onProgress) onProgress(progress.percentage);
+        }
+      );
+
+      if (storageResult.success && storageResult.url) {
+        return {
+          success: true,
+          data: {
+            fileUrl: storageResult.url,
+            storagePath: storageResult.fileName || file.name,
+          },
+        };
+      }
+      return { success: false, error: storageResult.error || 'Failed to upload document to cloud storage' };
+    } catch (fbError: any) {
+      console.error(`[ReferencingService] Cloud Storage upload failed for (${section}/${field}):`, fbError);
+      return { success: false, error: fbError?.message || 'Cloud storage upload failed' };
     }
   }
 
@@ -150,7 +179,7 @@ class ReferencingService {
    * Save the current form state as a named draft.
    * Maps to POST /referencing/forms/:formId with the full form payload.
    */
-  async saveDraft(applicationId: string, name: string, data: any) {
+  async saveDraft(applicationId: string, name: string, data: any): Promise<any> {
     try {
       const response = await apiService.post(referencingPath(`forms/${applicationId}`), {
         ...data,
@@ -166,7 +195,7 @@ class ReferencingService {
 
   // ── Passport sharing ────────────────────────────────────────────────────────
 
-  async sharePassport(data: any) {
+  async sharePassport(data: any): Promise<any> {
     try {
       const response = await apiService.post(referencingPath('shares'), data);
       return response.data;
@@ -176,7 +205,7 @@ class ReferencingService {
     }
   }
 
-  async getShares() {
+  async getShares(): Promise<any> {
     try {
       const response = await apiService.get(referencingPath('shares'));
       return response.data;
@@ -186,7 +215,7 @@ class ReferencingService {
     }
   }
 
-  async deleteShare(shareId: string) {
+  async deleteShare(shareId: string): Promise<any> {
     try {
       const response = await apiService.delete(referencingPath(`shares/${shareId}`));
       return response.data;
@@ -196,12 +225,44 @@ class ReferencingService {
     }
   }
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
+  async loadDraft(propertyId: string, draftId: string): Promise<any> {
+    try {
+      const response = await apiService.get(referencingPath(`forms/${draftId || propertyId}`));
+      return response.data ?? { success: true, data: null };
+    } catch (error) {
+      console.error('Error loading draft:', error);
+      return { success: false, error: 'Failed to load draft' };
+    }
+  }
+
+  async deleteDraft(propertyId: string, draftId: string): Promise<any> {
+    try {
+      const response = await apiService.delete(referencingPath(`forms/${draftId || propertyId}`));
+      return response.data ?? { success: true };
+    } catch (error) {
+      console.error('Error deleting draft:', error);
+      return { success: false, error: 'Failed to delete draft' };
+    }
+  }
+
+  async getFormData(userId: string): Promise<any> {
+    return this.getApplication(userId);
+  }
+
+  async getDrafts(applicationId: string): Promise<any> {
+    try {
+      const response = await apiService.get(referencingPath('forms/all'));
+      return response.data ?? { success: true, data: [] };
+    } catch (error) {
+      console.error('Error fetching drafts:', error);
+      return { success: false, data: [] };
+    }
+  }
 
   /** Allow longer timeout — backend runs file uploads + Firestore writes on submit. */
   private static readonly SUBMIT_TIMEOUT_MS = 120_000;
 
-  async submitApplication(userId: string, data: any) {
+  async submitApplication(userId: string, data: any): Promise<any> {
     try {
       const response = await apiService.post(
         referencingPath(`${userId}/submit`),
@@ -216,4 +277,32 @@ class ReferencingService {
   }
 }
 
-export default new ReferencingService();
+const serviceInstance = new ReferencingService();
+
+export const saveIdentityData = (data: any) => serviceInstance.saveIdentityData(data);
+export const saveEmploymentData = (data: any) => serviceInstance.saveEmploymentData(data);
+export const saveResidentialData = (data: any) => serviceInstance.saveResidentialData(data);
+export const saveFinancialData = (data: any) => serviceInstance.saveFinancialData(data);
+export const saveGuarantorData = (data: any) => serviceInstance.saveGuarantorData(data);
+export const saveAgentDetailsData = (data: any) => serviceInstance.saveAgentDetailsData(data);
+export const saveSectionData = (userId: string, section: string, data: any) => serviceInstance.saveSectionData(userId, section, data);
+export const getFormData = (userId: string) => serviceInstance.getFormData(userId);
+export const getApplication = (applicationId: string) => serviceInstance.getApplication(applicationId);
+export const createApplication = (propertyId: string) => serviceInstance.createApplication(propertyId);
+export const uploadDocument = (
+  applicationId: string,
+  section: string,
+  file: File,
+  field: string,
+  onProgress?: (progress: number) => void,
+) => serviceInstance.uploadDocument(applicationId, section, file, field, onProgress);
+export const saveDraft = (applicationId: string, name: string, data: any) => serviceInstance.saveDraft(applicationId, name, data);
+export const loadDraft = (propertyId: string, draftId: string) => serviceInstance.loadDraft(propertyId, draftId);
+export const deleteDraft = (propertyId: string, draftId: string) => serviceInstance.deleteDraft(propertyId, draftId);
+export const getDrafts = (applicationId: string) => serviceInstance.getDrafts(applicationId);
+export const sharePassport = (data: any) => serviceInstance.sharePassport(data);
+export const getShares = () => serviceInstance.getShares();
+export const deleteShare = (shareId: string) => serviceInstance.deleteShare(shareId);
+export const submitApplication = (userId: string, data: any) => serviceInstance.submitApplication(userId, data);
+
+export default serviceInstance;

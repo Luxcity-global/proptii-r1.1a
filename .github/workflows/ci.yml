@@ -1,0 +1,78 @@
+name: Proptii CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-quality-and-tests:
+    name: Backend Build & Vitest Suites
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./v2-backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './v2-backend/package-lock.json'
+
+      - name: Install backend dependencies
+        run: npm ci || npm install
+
+      - name: Build backend application
+        run: npm run build
+        env:
+          FIREBASE_PROJECT_ID: proptii-test
+          JWT_SECRET: test_secret_key_at_least_32_characters_long_12345
+          STRIPE_SECRET_KEY: sk_test_mock
+          STRIPE_WEBHOOK_SECRET: whsec_test_mock
+
+      - name: Execute Vitest test suite
+        run: npm run test
+        env:
+          NODE_ENV: test
+          FIREBASE_PROJECT_ID: proptii-test
+          JWT_SECRET: test_secret_key_at_least_32_characters_long_12345
+          STRIPE_SECRET_KEY: sk_test_mock
+          STRIPE_WEBHOOK_SECRET: whsec_test_mock
+
+  frontend-build-and-validate:
+    name: Frontend Build & Asset Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './package-lock.json'
+
+      - name: Install frontend dependencies
+        run: npm ci || npm install
+
+      - name: Validate TypeScript types
+        run: npx tsc --noEmit
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Validate production bundle integrity
+        run: node scripts/validate-build.cjs

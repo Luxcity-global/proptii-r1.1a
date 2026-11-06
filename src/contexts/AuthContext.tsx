@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   onAuthStateChanged,
   signInWithPopup,
-  signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
   signOut,
@@ -10,14 +9,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
-
-// Safari (and all iOS browsers) block cross-origin storage in popups due to ITP.
-// signInWithPopup silently fails because firebaseapp.com != app domain → IndexedDB
-// write is dropped. signInWithRedirect uses a full-page navigation and avoids this.
-const isSafari = (): boolean => {
-  const ua = navigator.userAgent;
-  return /Safari/.test(ua) && !/Chrome/.test(ua) && !/Chromium/.test(ua);
-};
 import { auth } from '../config/firebaseConfig';
 import SessionManager from '../services/SessionManager';
 import { notifyAuthReady } from '../services/authReady';
@@ -39,6 +30,7 @@ export interface User {
   phone?: string;
   photoURL?: string;
   roles: string[];
+  role?: string;
   roleResolved: boolean;
 }
 
@@ -103,9 +95,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     let cancelled = false;
 
-    // On Safari, signInWithRedirect causes a full-page navigation to Google then
-    // back to this page. onAuthStateChanged handles the success case automatically,
-    // but errors during the redirect return are only surfaced via getRedirectResult.
+    // Surfaces errors for any redirect-based sign-in that was still in flight
+    // (e.g. a user mid-redirect when an older build was replaced).
     getRedirectResult(auth).catch((err) => {
       if (cancelled) return;
       // auth/cancelled-popup-request and auth/popup-closed-by-user are user actions, not errors
@@ -132,6 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               email: mockUser.email,
               phone: mockUser.phone,
               roles: [mockUser.role],
+              role: mockUser.role,
               roleResolved: true,
             });
             setIsAuthenticated(true);
@@ -203,7 +195,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const { resolveRole } = await import('../services/roleService');
           const role = await resolveRole(userId, email);
           if (role && !cancelled) {
-            setUser((prev) => (prev ? { ...prev, roles: [role], roleResolved: true } : prev));
+            setUser((prev) => (prev ? { ...prev, roles: [role], role: role, roleResolved: true } : prev));
           } else if (!cancelled) {
             setUser((prev) => (prev ? { ...prev, roleResolved: true } : prev));
           }
@@ -252,16 +244,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      if (isSafari()) {
-        // Safari: use redirect flow to avoid ITP killing cross-origin popup storage
-        await signInWithRedirect(auth, provider);
-        // Page will navigate away — no code runs after this on Safari
-      } else {
-        await signInWithPopup(auth, provider);
-      }
-    } catch (err) {
+      // Popup on every browser: signInWithRedirect cannot read its result back on
+      // Safari / iOS / iPadOS (and other browsers that partition third-party storage)
+      // because authDomain (firebaseapp.com) differs from the app's domain.
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
       console.error('[Auth] Login failed:', err);
       window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: false } }));
+      if (err?.code === 'auth/popup-blocked') {
+        const blocked = new Error(
+          'Your browser blocked the Google sign-in window. Please allow pop-ups for this site and try again.',
+        ) as Error & { code?: string };
+        blocked.code = err.code;
+        throw blocked;
+      }
       throw err;
     }
   };
@@ -308,6 +304,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginAsMockUser = (id: string, role: string) => {
+    if (import.meta.env.PROD) {
+      console.error('[Auth] Mock login is disabled in production environments.');
+      return;
+    }
     const mockUser = resolveMockTestUser(id);
     const resolvedRole = mockUser.role || role;
     localStorage.setItem('mock_token', `mock-token-${id}`);
@@ -319,6 +319,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       email: mockUser.email,
       phone: mockUser.phone,
       roles: [resolvedRole],
+      role: resolvedRole,
       roleResolved: true,
     });
     setIsAuthenticated(true);

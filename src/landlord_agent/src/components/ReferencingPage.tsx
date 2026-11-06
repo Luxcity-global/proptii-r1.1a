@@ -23,9 +23,9 @@ import {
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 import { referencingService } from '../services/referencingService';
+import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import { Tenant, UserProfile } from '../App';
 import {
-  getAgentDummyReceivedShares,
   isAgentTestAccount,
   mergeById,
   type PassportStep,
@@ -586,15 +586,17 @@ function RequestReferencing({
     }
   };
 
-  const activeTenants = tenants.filter((t) => !isTenantDeleted(t.id, t.email));
-  const activeSentRequests = sentRequests.filter((req) => !isTenantDeleted(undefined, req.tenantEmail));
+  const list = Array.isArray(tenants) ? tenants : [];
+  const reqList = Array.isArray(sentRequests) ? sentRequests : [];
+  const activeTenants = list.filter((t) => !isTenantDeleted(t.id, t.email));
+  const activeSentRequests = reqList.filter((req) => !isTenantDeleted(undefined, req.tenantEmail));
 
   const filteredTenants = activeTenants.filter((t) => {
-    const q = search.toLowerCase();
+    const q = (search || '').toLowerCase();
     return (
-      t.name?.toLowerCase().includes(q) ||
-      t.email?.toLowerCase().includes(q) ||
-      t.propertyAddress?.toLowerCase().includes(q)
+      (t.name || '').toLowerCase().includes(q) ||
+      (t.email || '').toLowerCase().includes(q) ||
+      (t.propertyAddress || '').toLowerCase().includes(q)
     );
   });
 
@@ -700,7 +702,7 @@ function RequestReferencing({
         </div>
 
         <div className="ll-ref-table-wrap">
-          <table className="ll-ref-table">
+          <table className="ll-ref-table hidden md:table">
             <thead>
               <tr>
                 <th>Tenant</th>
@@ -797,6 +799,71 @@ function RequestReferencing({
               )}
             </tbody>
           </table>
+
+          {/* MOBILE ACCORDION DISCLOSURE VIEW (< md) */}
+          <div className="mob-accordion-container md:hidden">
+            {filteredTenants.map((tenant) => {
+              const status = statuses.get(tenant.email)
+                || statuses.get(tenant.email.trim().toLowerCase())
+                || 'not-started';
+              const reqState = requestStates[tenant.email];
+              const isLoading = reqState?.loading;
+              const sentAlready = activeSentRequests.some(
+                (request) => request.tenantEmail.trim().toLowerCase() === tenant.email.trim().toLowerCase(),
+              );
+              const isSent = reqState?.success || sentAlready;
+
+              return (
+                <MobileAccordionCard
+                  key={tenant.id}
+                  id={tenant.id}
+                  initials={initials(tenant.name)}
+                  title={tenant.name}
+                  subtitle={tenant.propertyAddress || '—'}
+                  statusBadge={{
+                    label: getReferencingStatusLabel(status),
+                    variant: status === 'complete' ? 'success' : status === 'in-progress' ? 'warning' : 'neutral',
+                  }}
+                  fields={[
+                    { label: 'Contact', value: tenant.email },
+                    { label: 'Property', value: tenant.propertyAddress || '—' },
+                    { label: 'Status', value: getReferencingStatusLabel(status) },
+                    { label: 'Last Activity', value: timeAgo(tenant.leaseStart) },
+                  ]}
+                  actions={
+                    <div className="flex items-center gap-2 w-full pt-1">
+                      {onViewTenant && (
+                        <button
+                          type="button"
+                          className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center gap-1.5"
+                          onClick={() => onViewTenant(tenant)}
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+                      )}
+                      {!isSent && status !== 'complete' && (
+                        <button
+                          type="button"
+                          className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-[#DC5F12]/10 text-[#DC5F12] flex items-center justify-center gap-1.5"
+                          disabled={isLoading}
+                          onClick={() => sendRequest(tenant.email, tenant.name, tenant.propertyAddress || '')}
+                        >
+                          {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send size={14} />}
+                          {isLoading ? 'Sending…' : 'Send Request'}
+                        </button>
+                      )}
+                      {isSent && (
+                        <div className="flex-1 py-2 px-3 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg flex items-center justify-center gap-1">
+                          <CheckCircle2 size={14} /> Request sent
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              );
+            })}
+          </div>
         </div>
         <div className="ll-ref-table-foot">
           <span>
@@ -818,7 +885,7 @@ function RequestReferencing({
           </div>
         </div>
         <div className="ll-ref-table-wrap">
-          <table className="ll-ref-table">
+          <table className="ll-ref-table hidden md:table">
             <thead>
               <tr>
                 <th>Tenant</th>
@@ -856,6 +923,25 @@ function RequestReferencing({
               )}
             </tbody>
           </table>
+
+          <div className="mob-accordion-container md:hidden space-y-3">
+            {activeSentRequests.map((request) => (
+              <MobileAccordionCard
+                key={request.id}
+                initials={initials(request.tenantName || 'TN')}
+                title={request.tenantName || 'Tenant'}
+                subtitle={request.propertyAddress || 'No Property'}
+                statusBadge={{
+                  label: request.status || 'sent',
+                  variant: request.status === 'completed' ? 'success' : 'neutral',
+                }}
+                fields={[
+                  { label: 'Email', value: request.tenantEmail },
+                  { label: 'Sent Date', value: request.createdAt ? new Date(request.createdAt).toLocaleDateString('en-GB') : '—' },
+                ]}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -863,7 +949,7 @@ function RequestReferencing({
 }
 
 export function ReferencingPage({
-  tenants,
+  tenants = [],
   userProfile,
   onViewTenant,
   onOpenMessages,
@@ -882,15 +968,8 @@ export function ReferencingPage({
   const inviteEmailRef = useRef<HTMLInputElement>(null);
 
   const loadShares = async () => {
-    const agentPersona = isAgentTestAccount((userProfile as { id?: string } | null)?.id, userProfile?.email);
-    if (agentPersona) {
-      setShares(getAgentDummyReceivedShares());
-      setSharesError(null);
-      setLoadingShares(false);
-    } else {
-      setLoadingShares(true);
-      setSharesError(null);
-    }
+    setLoadingShares(true);
+    setSharesError(null);
     try {
       const token = await getAccessTokenForApiRequest();
       const res = await fetch(`${API}/referencing/received`, {
@@ -905,15 +984,10 @@ export function ReferencingPage({
           steps: derivePassportSteps(share.formData, share.passportStatus || 'in-progress'),
         };
       });
-      const merged = agentPersona ? mergeById(getAgentDummyReceivedShares(), live) : live;
-      setShares(merged.filter((share) => !isTenantDeleted(share.id, share.tenantEmail)));
+      setShares(live.filter((share) => !isTenantDeleted(share.id, share.tenantEmail)));
     } catch {
-      if (agentPersona) {
-        setShares(getAgentDummyReceivedShares().filter((share) => !isTenantDeleted(share.id, share.tenantEmail)));
-        setSharesError(null);
-      } else {
-        setSharesError('Could not load received referencings.');
-      }
+      setShares([]);
+      setSharesError('Could not load received referencings.');
     } finally {
       setLoadingShares(false);
     }
@@ -959,7 +1033,8 @@ export function ReferencingPage({
   }, []);
 
   useEffect(() => {
-    const active = tenants.filter((t) => !isTenantDeleted(t.id, t.email));
+    const list = Array.isArray(tenants) ? tenants : [];
+    const active = list.filter((t) => !isTenantDeleted(t.id, t.email));
     if (!active.length) {
       setLoadingStatuses(false);
       return;
@@ -984,6 +1059,7 @@ export function ReferencingPage({
     });
     return {
       sent: validSent.length,
+      received: validShares.length,
       pending: pendingShares + pendingTenants,
       completed: completedShares + completedTenants,
     };
@@ -1004,18 +1080,18 @@ export function ReferencingPage({
           </div>
           <div className="ll-ref-header-actions">
             {onViewSettings && (
-              <button type="button" className="ll-ref-header-icon" title="Referencing settings" onClick={onViewSettings}>
+              <button type="button" className="ll-ref-header-icon hidden lg:inline-flex" title="Referencing settings" onClick={onViewSettings}>
                 <Settings size={18} />
               </button>
             )}
             {onViewNotifications && (
-              <button type="button" className="ll-ref-header-icon" title="Notifications" onClick={onViewNotifications}>
+              <button type="button" className="ll-ref-header-icon hidden lg:inline-flex" title="Notifications" onClick={onViewNotifications}>
                 <Bell size={18} />
                 <span className="ll-ref-header-dot" />
               </button>
             )}
             {onViewInsights && (
-              <button type="button" className="ll-ref-btn-insights" onClick={onViewInsights}>
+              <button type="button" className="ll-ref-btn-insights hidden lg:inline-flex" onClick={onViewInsights}>
                 <span className="ll-ref-insights-icon">
                   <Sparkles size={12} />
                 </span>
@@ -1032,35 +1108,21 @@ export function ReferencingPage({
 
       <div className="ll-ref-inner ll-ref-body">
         <section className="ll-ref-kpi-grid">
-          <article className="ll-ref-kpi">
-            <div className="ll-ref-kpi-top">
-              <div className="ll-ref-kpi-icon indigo">
-                <Send size={16} />
+          {[
+            { label: 'Sent Requests', value: kpis.sent, hint: 'Invitations sent to tenants', tone: 'indigo', icon: <Send size={16} /> },
+            { label: 'Reports Received', value: kpis.received, hint: 'Shared with you by tenants', tone: 'blue', icon: <ShieldCheck size={16} /> },
+            { label: 'Pending Checks', value: kpis.pending, hint: 'Awaiting tenant action', tone: 'amber', icon: <Clock size={16} /> },
+            { label: 'Completed Checks', value: kpis.completed, hint: 'Ready to review', tone: 'green', icon: <CheckCircle2 size={16} /> },
+          ].map((card) => (
+            <article key={card.label} className="ll-ref-kpi">
+              <div className="ll-ref-kpi-top">
+                <span className="ll-ref-kpi-label">{card.label}</span>
+                <div className={`ll-ref-kpi-icon ${card.tone}`}>{card.icon}</div>
               </div>
-            </div>
-            <div className="ll-ref-kpi-label">Sent Requests</div>
-            <div className="ll-ref-kpi-value">{kpis.sent}</div>
-          </article>
-          <article className="ll-ref-kpi">
-            <div className="ll-ref-kpi-top">
-              <div className="ll-ref-kpi-icon amber">
-                <Clock size={16} />
-              </div>
-              <span className="ll-ref-kpi-chip amber">Pending</span>
-            </div>
-            <div className="ll-ref-kpi-label">Pending Checks</div>
-            <div className="ll-ref-kpi-value">{kpis.pending}</div>
-          </article>
-          <article className="ll-ref-kpi">
-            <div className="ll-ref-kpi-top">
-              <div className="ll-ref-kpi-icon green">
-                <CheckCircle2 size={16} />
-              </div>
-              <span className="ll-ref-kpi-chip green">Completed</span>
-            </div>
-            <div className="ll-ref-kpi-label">Completed Checks</div>
-            <div className="ll-ref-kpi-value">{kpis.completed}</div>
-          </article>
+              <div className="ll-ref-kpi-value">{card.value}</div>
+              <div className="ll-ref-kpi-hint">{card.hint}</div>
+            </article>
+          ))}
         </section>
 
         <div className="ll-ref-tabs">
@@ -1069,7 +1131,6 @@ export function ReferencingPage({
             className={`ll-ref-tab${activeTab === 'received' ? ' is-active' : ''}`}
             onClick={() => setActiveTab('received')}
           >
-            <ShieldCheck size={16} />
             Received Passports
             <span className="ll-ref-tab-count">{shares.length}</span>
           </button>
@@ -1078,7 +1139,6 @@ export function ReferencingPage({
             className={`ll-ref-tab${activeTab === 'request' ? ' is-active' : ''}`}
             onClick={() => setActiveTab('request')}
           >
-            <Send size={16} />
             Request Referencing
             <span className="ll-ref-tab-count">{tenants.length}</span>
           </button>

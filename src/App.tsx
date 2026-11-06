@@ -117,7 +117,7 @@ function ScrollToTop() {
 
 export const App: React.FC = () => {
   return (
-    <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
+    <ErrorBoundary>
       <CssBaseline />
       <AuthProvider>
         <GovDataLayerProvider>

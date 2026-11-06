@@ -18,9 +18,11 @@ import { contractService } from '../../../services/contractService';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import { viewingService, ViewingStats, ViewingBooking } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
+import TenantRescheduleModal from './TenantRescheduleModal';
 import { trackEvent } from '../../../utils/analytics';
 import AgentQuotaWidget from '../AgentQuotaWidget';
 import TenantPageHeader from '../ui/TenantPageHeader';
+import { isReferencingStepComplete, isReferencingStepOptional } from '../../../utils/referencingProgress';
 import '../../../styles/tenantDashboard.css';
 
 const REF_PILLARS = [
@@ -104,6 +106,20 @@ const DashboardHome: React.FC = () => {
   const { savedProperties } = useSavedProperties();
   const { signedContracts } = useSignedContracts();
 
+  const [avatarImgError, setAvatarImgError] = useState(false);
+  const profilePhoto = user?.photoURL || null;
+  const userInitials = (() => {
+    const raw = user?.name || [user?.givenName, user?.familyName].filter(Boolean).join(' ') || '';
+    if (!raw.trim()) return 'U';
+    const parts = raw.trim().split(/\s+/);
+    return parts.length >= 2
+      ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+      : raw.trim().slice(0, 2).toUpperCase();
+  })();
+
+  // Reset error flag whenever the photo URL changes
+  React.useEffect(() => { setAvatarImgError(false); }, [profilePhoto]);
+
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [referencingStep, setReferencingStep] = useState(1);
   const selectedPropertyId = user?.id ? `general_${user.id}` : null;
@@ -121,6 +137,7 @@ const DashboardHome: React.FC = () => {
     total: 0,
   });
   const [upcomingViewings, setUpcomingViewings] = useState<ViewingBooking[]>([]);
+  const [rescheduleViewing, setRescheduleViewing] = useState<ViewingBooking | null>(null);
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
   const [referencingStartedAt, setReferencingStartedAt] = useState<string | null>(null);
   const [propertyFilter, setPropertyFilter] = useState<PropertyFilter>('all');
@@ -219,7 +236,7 @@ const DashboardHome: React.FC = () => {
           type: contract.fileType,
           size: contract.fileSize,
           uploadDate: contract.uploadDate,
-          url: contract.fileUrl || `data:${contract.fileType};base64,${contract.fileData}`,
+          url: contract.fileUrl || '',
           firestoreId: contract.id,
         }));
         setContractFiles(contractFilesList);
@@ -273,12 +290,12 @@ const DashboardHome: React.FC = () => {
     }
   };
 
-  const REFERENCING_STEPS = [1, 2, 3, 4, 5] as const;
-  const totalSections = REFERENCING_STEPS.length;
-  const completedCount = completedSections.size;
+  const requiredPillars = REF_PILLARS.filter((pillar) => !isReferencingStepOptional(pillar.step));
+  const totalSections = requiredPillars.length;
+  const completedCount = requiredPillars.filter((pillar) => completedSections.has(pillar.key)).length;
   const allCompleted = completedCount === totalSections;
   const referencingPercent = Math.round((completedCount / totalSections) * 100);
-  const referencingStarted = Boolean(referencingStartedAt) || completedCount > 0;
+  const referencingStarted = Boolean(referencingStartedAt) || completedSections.size > 0;
 
   React.useEffect(() => {
     const loadFormStatus = async () => {
@@ -295,26 +312,12 @@ const DashboardHome: React.FC = () => {
             if (ts) setReferencingStartedAt(ts.toISOString());
           }
 
-          const completed = new Set<string>();
-          if (formData.identity?.firstName && formData.identity?.lastName && formData.identity?.email) {
-            completed.add('identity');
-          }
-          if (formData.employment?.employmentStatus) {
-            completed.add('employment');
-          }
-          if (formData.residential?.currentAddress) {
-            completed.add('residential');
-          }
-          if (formData.financial?.proofOfIncomeType?.trim()) {
-            completed.add('financial');
-          }
-          if (
-            formData.guarantor?.firstName?.trim() &&
-            formData.guarantor?.lastName?.trim() &&
-            formData.guarantor?.email?.trim()
-          ) {
-            completed.add('guarantor');
-          }
+          const stepStatus = (firestoreResult.data as any).stepStatus || {};
+          const completed = new Set<string>(
+            REF_PILLARS.filter((pillar) => isReferencingStepComplete(formData, stepStatus, pillar.step)).map(
+              (pillar) => pillar.key
+            )
+          );
           setCompletedSections(completed);
         }
       } catch (error) {
@@ -335,7 +338,7 @@ const DashboardHome: React.FC = () => {
     setIsReferencingModalOpen(false);
   };
 
-  const nextPillar = REF_PILLARS.find((p) => !completedSections.has(p.key));
+  const nextPillar = requiredPillars.find((p) => !completedSections.has(p.key));
 
   const allFiles = [...files, ...referencingFiles, ...contractFiles];
   const recentFiles = useMemo(
@@ -372,11 +375,7 @@ const DashboardHome: React.FC = () => {
   }, [savedProperties]);
 
   const openSavedProperty = (property: SavedProperty) => {
-    if (property.id) {
-      navigate(`/search?propertyId=${encodeURIComponent(property.id)}`);
-      return;
-    }
-    navigate('/dashboard/saved-searches');
+    navigate('/dashboard/saved-searches', property.id ? { state: { openSavedProperty: property } } : undefined);
   };
 
   const cyclePropertyImage = (property: SavedProperty) => {
@@ -456,7 +455,16 @@ const DashboardHome: React.FC = () => {
                     <div className="tn-dash-profile-info">
                       <div className="tn-dash-avatar-wrap">
                         <div className="tn-dash-avatar">
-                          <User size={28} />
+                          {profilePhoto && !avatarImgError ? (
+                            <img
+                              src={profilePhoto}
+                              alt="Profile"
+                              className="tn-dash-avatar-img"
+                              onError={() => setAvatarImgError(true)}
+                            />
+                          ) : (
+                            <span className="tn-dash-avatar-initials">{userInitials}</span>
+                          )}
                         </div>
                         <div className="tn-dash-avatar-badge">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5">
@@ -518,7 +526,7 @@ const DashboardHome: React.FC = () => {
                         <div className="tn-dash-ref-pct">
                           {referencingPercent}<span>%</span>
                         </div>
-                        <div className="tn-dash-ref-sub">{completedCount} out of {totalSections} completed</div>
+                        <div className="tn-dash-ref-sub">{completedCount} out of {totalSections} required completed</div>
                       </div>
                       <div className="tn-dash-ref-track">
                         <div className="tn-dash-ref-fill" style={{ width: `${referencingPercent}%` }} />
@@ -533,6 +541,7 @@ const DashboardHome: React.FC = () => {
                               key={pillar.key}
                               type="button"
                               className={`tn-dash-ref-pill ${state}`}
+                              title={isReferencingStepOptional(pillar.step) ? 'Optional — does not affect your completion score' : undefined}
                               onClick={() => openReferencingModal(pillar.step)}
                             >
                               <span>
@@ -915,7 +924,7 @@ const DashboardHome: React.FC = () => {
                               </div>
                               <div className="tn-dash-viewing-addr">{viewingAddress(booking)}</div>
                               <div className="tn-dash-viewing-actions">
-                                <button type="button" className="tn-dash-pill-btn" onClick={() => navigate('/dashboard/viewings')}>
+                                <button type="button" className="tn-dash-pill-btn" onClick={() => setRescheduleViewing(booking)}>
                                   Reschedule
                                 </button>
                                 <button type="button" className="tn-dash-pill-btn cancel" onClick={() => navigate('/dashboard/viewings')}>
@@ -1037,6 +1046,8 @@ const DashboardHome: React.FC = () => {
         isOpen={isReferencingModalOpen}
         onClose={closeReferencingModal}
         initialStep={referencingStep}
+        propertyId={userId ? `general_${userId}` : 'default-property'}
+        applicationId={userId ? `general_${userId}` : undefined}
       />
 
       <FilePreviewModal
@@ -1047,6 +1058,21 @@ const DashboardHome: React.FC = () => {
         }}
         file={selectedFile}
         onDownload={handleDownload}
+      />
+
+      <TenantRescheduleModal
+        viewing={rescheduleViewing}
+        onClose={() => setRescheduleViewing(null)}
+        onRescheduled={(viewingId, date, time) => {
+          setUpcomingViewings((prev) =>
+            prev.map((item) =>
+              item.id === viewingId
+                ? { ...item, status: 'rescheduled', viewingDetails: { ...item.viewingDetails, date, time } }
+                : item
+            )
+          );
+          loadViewingStats();
+        }}
       />
     </div>
   );

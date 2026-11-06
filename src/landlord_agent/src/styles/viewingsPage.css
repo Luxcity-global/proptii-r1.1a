@@ -569,6 +569,18 @@
   box-shadow: 0 1px 3px rgba(19, 108, 158, 0.25);
 }
 
+/* Table view: scroll horizontally instead of squashing columns on narrow screens */
+.ll-vw-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1023px) {
+  .ll-vw-table-inner {
+    min-width: 880px;
+  }
+}
+
 /* Content panel */
 .ll-vw-panel {
   background: #fff;
@@ -666,7 +678,7 @@
 .ll-vw-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 1100;
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(2px);
   display: flex;
@@ -1396,21 +1408,23 @@
     gap: 8px;
   }
 
-  .ll-vw-header-icon {
-    flex: 0 0 auto;
-  }
-
+  .ll-vw-header-icon,
   .ll-vw-btn-insights {
-    flex: 1 1 auto;
-    min-width: 130px;
-    justify-content: center;
-    white-space: nowrap;
+    display: none !important;
   }
 
   .ll-vw-btn-cta {
     flex: 1 1 100%;
+    min-height: 44px;
+    border-radius: 12px;
     justify-content: center;
     white-space: nowrap;
+  }
+
+  @media (max-width: 480px) {
+    .ll-vw-header p {
+      display: none !important;
+    }
   }
 
   /* Filters: stack */
@@ -1474,22 +1488,116 @@
     font-size: 24px;
   }
 
-  /* Toolbar right: stack controls vertically, full width */
+  /* Toolbar right: filter select and view toggle share one row */
   .ll-vw-toolbar-right {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     width: 100%;
     gap: 8px;
+  }
+
+  .ll-vw-filter-wrap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .ll-vw-display {
+    flex: 1 1 0;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .ll-vw-display-btn {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  .ll-vw-display-btn span.hide-sm {
+    display: inline;
   }
 
   /* Select + search input: full width */
   .ll-vw-select,
   .ll-vw-search input {
     width: 100%;
+    min-width: 0;
   }
 
   /* Calendar: reduce padding on mobile */
   .ll-vw-calendar {
     padding: 12px;
+  }
+
+  /* Viewings modal: bottom sheet */
+  .ll-vw-modal-backdrop {
+    align-items: flex-end !important;
+    padding: 0 !important;
+    z-index: 1100 !important;
+  }
+
+  .ll-vw-modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 24px 24px 0 0 !important;
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.2) !important;
+    padding-bottom: 0 !important;
+  }
+
+  .ll-vw-modal::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 9999px;
+    background: #cbd5e1;
+    margin: 8px auto 4px;
+    flex-shrink: 0;
+  }
+
+  .ll-vw-modal-head {
+    flex-shrink: 0 !important;
+    padding: 14px 20px !important;
+    background: #fff !important;
+  }
+
+  .ll-vw-modal-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 16px 20px 24px !important;
+  }
+
+  .ll-vw-modal-footer {
+    flex-shrink: 0 !important;
+    position: sticky !important;
+    bottom: 0 !important;
+    background: #fff !important;
+    z-index: 20 !important;
+    border-top: 1px solid #f1f5f9 !important;
+    padding: 12px 16px max(18px, env(safe-area-inset-bottom, 18px)) !important;
+    display: flex !important;
+    gap: 10px !important;
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.05) !important;
+  }
+
+  .ll-vw-modal-footer .ll-vw-modal-secondary,
+  .ll-vw-modal-footer .ll-vw-modal-primary,
+  .ll-vw-modal-footer .ll-vw-modal-cta,
+  .ll-vw-modal-footer .ll-vw-modal-danger {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    height: 44px !important;
+    font-size: 13px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
   }
 }
 
@@ -1503,5 +1611,29 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
+  }
+}
+
+/* KPI cards: 2-column grid on phones, icon above label */
+@media (max-width: 639px) {
+  .ll-vw-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ll-vw-kpi {
+    min-width: 0;
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .ll-vw-kpi-top {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-vw-kpi-value {
+    font-size: 24px;
   }
 }

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { uploadToFirebaseStorage } from '../services/storageService';
 import { firestoreService } from '../services/firestoreService';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export const GuarantorReferencePage: React.FC = () => {
   const [searchParams] = useSearchParams();

@@ -172,6 +172,13 @@
   }
 }
 
+@media (max-width: 1023px) {
+  .ll-st-header-icon,
+  .ll-st-btn-insights {
+    display: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   .ll-st-header {
     position: static;

@@ -41,60 +41,26 @@ import { Card } from './ui/card';
 import { trackEvent } from '../../../utils/analytics';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { Property, UserProfile } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
 import {
-  getAgentDummyViewingRequests,
-  getAgentDummyViewings,
   isAgentTestAccount,
   mergeById,
 } from '../data/agentTestPersona';
 import '../styles/viewingsPage.css';
-
-type RowAction = {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  onSelect: () => void;
-  disabled?: boolean;
-  tone?: RowActionTone;
-};
-
-type RowActionTone = 'success' | 'accent' | 'danger' | 'neutral';
-
-const ROW_ACTION_TONES: Record<RowActionTone, string> = {
-  success: 'text-green-700 focus:bg-green-50 focus:text-green-700 [&_svg]:!text-green-600',
-  accent: 'text-[#136C9E] focus:bg-[#136C9E]/10 focus:text-[#136C9E] [&_svg]:!text-[#136C9E]',
-  danger: 'text-red-600 focus:bg-red-50 focus:text-red-700 [&_svg]:!text-red-600',
-  neutral: 'text-gray-700 focus:bg-gray-100 focus:text-gray-900',
-};
-
-function RowActionsMenu({ actions }: { actions: RowAction[] }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-          title="Actions"
-          aria-label="Actions"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[170px] bg-white">
-        {actions.map(({ label, icon: Icon, onSelect, disabled, tone }) => (
-          <DropdownMenuItem
-            key={label}
-            disabled={disabled}
-            onSelect={onSelect}
-            className={`cursor-pointer ${ROW_ACTION_TONES[tone ?? 'neutral']}`}
-          >
-            <Icon className="mr-2 h-4 w-4" />
-            {label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+import {
+  ViewingCalendar,
+  startOfWeekMonday,
+  addDays,
+  toDateKey,
+  sameDateKey,
+  parseViewingHour,
+  formatHourLabel,
+  calendarEventColor,
+  CALENDAR_HOURS,
+  CALENDAR_EVENT_COLORS,
+} from './viewings/ViewingCalendar';
+import { ViewingTable, RowActionsMenu, type RowAction, type RowActionTone } from './viewings/ViewingTable';
+import { RescheduleModal, type RescheduleFormState } from './viewings/RescheduleModal';
 
 function bookingForTable(booking: ViewingBooking, managerEmail?: string | null): ViewingBooking {
   const withApplicant = applyRememberedApplicant(booking) as ViewingBooking;
@@ -129,6 +95,8 @@ interface ViewingsPageProps {
   onViewSettings?: () => void;
   onViewNotifications?: () => void;
   onViewInsights?: () => void;
+  openRequestOnMount?: boolean;
+  onRequestOpenedOnMount?: () => void;
 }
 
 interface ScheduleFormState {
@@ -138,12 +106,6 @@ interface ScheduleFormState {
   tenantName: string;
   tenantEmail: string;
   tenantPhone: string;
-}
-
-interface RescheduleFormState {
-  date: string;
-  time: string;
-  message: string;
 }
 
 interface RequestViewingFormState {
@@ -191,9 +153,6 @@ const VIEWING_TIME_SLOTS = [
   { value: '18:00', label: '06:00 PM – 06:45 PM (Evening)' },
 ];
 
-const CALENDAR_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-const CALENDAR_EVENT_COLORS = ['#136C9E', '#7c3aed', '#DC5F12', '#059669', '#0369a1'];
-
 function propertyStreet(address?: string): string {
   if (!address) return 'Property';
   return (address.split(',')[0] || address).trim();
@@ -230,63 +189,7 @@ function formatLongDate(date: string) {
   }
 }
 
-function startOfWeekMonday(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
 
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function toDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function sameDateKey(a: string | undefined, b: string): boolean {
-  if (!a) return false;
-  const normalized = a.includes('T') ? a.slice(0, 10) : a.slice(0, 10);
-  return normalized === b;
-}
-
-function parseViewingHour(time?: string): number | null {
-  if (!time) return null;
-  const trimmed = time.trim();
-  const twentyFour = trimmed.match(/^(\d{1,2}):(\d{2})/);
-  if (twentyFour) {
-    const hour = Number(twentyFour[1]);
-    if (Number.isFinite(hour)) return hour;
-  }
-  const twelve = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
-  if (twelve) {
-    let hour = Number(twelve[1]);
-    const meridiem = twelve[3].toUpperCase();
-    if (meridiem === 'PM' && hour < 12) hour += 12;
-    if (meridiem === 'AM' && hour === 12) hour = 0;
-    return hour;
-  }
-  return null;
-}
-
-function formatHourLabel(hour: number): string {
-  if (hour === 0) return '12 AM';
-  if (hour < 12) return `${hour} AM`;
-  if (hour === 12) return '12 PM';
-  return `${hour - 12} PM`;
-}
-
-function calendarEventColor(index: number): string {
-  return CALENDAR_EVENT_COLORS[index % CALENDAR_EVENT_COLORS.length];
-}
 
 function formatDate(date: string) {
   if (!date) return 'TBD';
@@ -327,6 +230,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   onViewSettings,
   onViewNotifications,
   onViewInsights,
+  openRequestOnMount = false,
+  onRequestOpenedOnMount,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -342,6 +247,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isEventDetailOpen, setIsEventDetailOpen] = useState(false);
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (openRequestOnMount) {
+      setIsRequestModalOpen(true);
+      onRequestOpenedOnMount?.();
+    }
+    const handleOpen = () => setIsRequestModalOpen(true);
+    window.addEventListener('open-book-viewing', handleOpen);
+    return () => window.removeEventListener('open-book-viewing', handleOpen);
+  }, [openRequestOnMount, onRequestOpenedOnMount]);
   const [selectedRequest, setSelectedRequest] = useState<BookViewingRequest | null>(null);
   const [selectedViewing, setSelectedViewing] = useState<ViewingBooking | null>(null);
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(initialScheduleForm);
@@ -356,14 +271,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const isAuthenticatedUser = Boolean(userProfile);
-  const showAsTable = displayStyle === 'table' && !isMobile;
+  const [mobileDisplayStyle, setMobileDisplayStyle] = useState<DisplayStyle>('grid');
+  const activeDisplayStyle = isMobile ? mobileDisplayStyle : displayStyle;
+  const changeDisplayStyle = (style: DisplayStyle) => (isMobile ? setMobileDisplayStyle(style) : setDisplayStyle(style));
+  const showAsTable = activeDisplayStyle === 'table';
   const isAgentPersona = isAgentTestAccount(managerId, managerEmail);
-
-  const withAgentDummyRequests = (live: BookViewingRequest[]) =>
-    isAgentPersona ? mergeById(getAgentDummyViewingRequests(), live) : live;
-
-  const withAgentDummyBookings = (live: ViewingBooking[]) =>
-    isAgentPersona ? mergeById(getAgentDummyViewings(), live) : live;
 
   const viewingStatus = (status?: string) => String(status || '').trim().toLowerCase();
 
@@ -397,7 +309,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const [calendarWeekStart, setCalendarWeekStart] = useState<Date>(() => startOfWeekMonday(new Date()));
   
   const ITEMS_PER_PAGE = 10;
-  const ownedAddresses = (properties || []).map((property) => property.address).filter(Boolean).join('\n');
+  const activeProperties = useMemo(() => (properties || []).filter((p) => !isPropertyArchived(p)), [properties]);
+  const ownedAddresses = activeProperties.map((property) => property.address).filter(Boolean).join('\n');
 
   useEffect(() => {
     let unsubscribeBookings: (() => void) | undefined;
@@ -434,14 +347,6 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         }
 
         if (!managerEmail) {
-          if (isAgentPersona) {
-            const dummyBookings = getAgentDummyViewings();
-            setRequests(getAgentDummyViewingRequests());
-            setBookings(dummyBookings);
-            setStats(statsFromBookings(dummyBookings));
-            setLoading(false);
-            return;
-          }
           setError('Unable to determine your email. Please sign in again.');
           setLoading(false);
           return;
@@ -504,8 +409,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           bookingsMap.set(item.id, item);
         });
 
-        const mergedRequests = withAgentDummyRequests(Array.from(requestsMap.values()));
-        const mergedBookings = withAgentDummyBookings(Array.from(bookingsMap.values()));
+        const mergedRequests = Array.from(requestsMap.values());
+        const mergedBookings = Array.from(bookingsMap.values());
 
         // Calculate stats from merged bookings
         const stats = statsFromBookings(mergedBookings);
@@ -546,7 +451,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   prevBookings.forEach(b => merged.set(b.id, b));
                   // Add/update with ID-based bookings
                   items.forEach(b => merged.set(b.id, b));
-                  return withAgentDummyBookings(Array.from(merged.values()));
+                  return Array.from(merged.values());
                 });
               },
               (err) => {
@@ -576,7 +481,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   prevRequests.forEach(r => merged.set(r.id, r));
                   // Add/update with ID-based requests
                   items.forEach(r => merged.set(r.id, r));
-                  return withAgentDummyRequests(Array.from(merged.values()));
+                  return Array.from(merged.values());
                 });
               },
               (err) => console.error('Viewing requests subscription error (ID-based):', err)
@@ -598,7 +503,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   prevBookings.forEach(b => merged.set(b.id, b));
                   // Add/update with email-based bookings
                   items.forEach(b => merged.set(b.id, b));
-                  return withAgentDummyBookings(Array.from(merged.values()));
+                  return Array.from(merged.values());
                 });
               },
               (err) => {
@@ -634,7 +539,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   prevRequests.forEach(r => merged.set(r.id, r));
                   // Add/update with email-based requests
                   items.forEach(r => merged.set(r.id, r));
-                  return withAgentDummyRequests(Array.from(merged.values()));
+                  return Array.from(merged.values());
                 });
               },
               (err) => console.error('Viewing requests subscription error (email-based):', err)
@@ -656,15 +561,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         };
       } catch (err) {
         console.error('Error loading manager viewings:', err);
-        if (isAgentPersona) {
-          const dummyBookings = getAgentDummyViewings();
-          setError(null);
-          setRequests(getAgentDummyViewingRequests());
-          setBookings(dummyBookings);
-          setStats(statsFromBookings(dummyBookings));
-        } else {
-          setError('Failed to load viewings data. Please try again later.');
-        }
+        setError('Failed to load viewings data. Please try again later.');
         setLoading(false);
       }
     };
@@ -1081,7 +978,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       }
 
       if (scheduleForm.tenantEmail) {
-        await emailService.sendEmail({
+        const emailResult = await emailService.sendEmail({
           to: scheduleForm.tenantEmail,
           subject: `Viewing Scheduled - ${selectedRequest.property.street}`,
           formData: {
@@ -1099,6 +996,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           attachments: [],
           emailType: 'viewing-confirmed'
         });
+        if (!emailResult.success) {
+          setFeedback({
+            type: 'error',
+            message: `Viewing scheduled, but email to ${scheduleForm.tenantEmail} did not send: ${emailResult.error || 'Unknown error'}`
+          });
+          setIsScheduleModalOpen(false);
+          setSelectedRequest(null);
+          setScheduleForm(initialScheduleForm);
+          return;
+        }
       }
 
       trackEvent('landlord_viewing_scheduled');
@@ -1143,7 +1050,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       const tenantEmail = viewing.viewingDetails?.userDetails?.email;
       if (tenantEmail) {
         try {
-          await emailService.sendEmail({
+          const emailResult = await emailService.sendEmail({
             to: tenantEmail,
             subject: `Viewing Confirmed - ${viewing.property.street}`,
             formData: {
@@ -1161,8 +1068,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             attachments: [],
             emailType: 'viewing-user'
           });
-        } catch (emailError) {
+          if (!emailResult.success) {
+            setFeedback({
+              type: 'error',
+              message: `Viewing confirmed, but email to ${tenantEmail} did not send: ${emailResult.error || 'Unknown error'}`
+            });
+            return;
+          }
+        } catch (emailError: any) {
           console.error('Viewing was confirmed, but the tenant email failed:', emailError);
+          setFeedback({
+            type: 'error',
+            message: `Viewing confirmed, but email to ${tenantEmail} did not send: ${emailError?.message || 'Unknown error'}`
+          });
+          return;
         }
       }
 
@@ -1196,7 +1115,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
     propertyId?: string,
     slot?: { date?: string; time?: string },
   ) => {
-    const list = properties || [];
+    const list = activeProperties;
     setRequestForm({
       ...initialRequestForm,
       propertyId: propertyId || list[0]?.id || '',
@@ -1207,7 +1126,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   };
 
   const handleRequestViewingSubmit = async () => {
-    const property = (properties || []).find((p) => p.id === requestForm.propertyId);
+    const property = activeProperties.find((p) => p.id === requestForm.propertyId);
     if (!property) {
       setFeedback({ type: 'error', message: 'Please select a property for the viewing.' });
       return;
@@ -1302,6 +1221,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
           let emailSent = false;
+          let emailErrorMsg = '';
           try {
             const emailResult = await emailService.sendEmail({
               to: applicantEmail,
@@ -1331,14 +1251,19 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               emailType: 'viewing-user',
             });
             emailSent = emailResult.success;
-            if (emailSent) emailedAddress = applicantEmail;
-          } catch (emailError) {
+            if (emailSent) {
+              emailedAddress = applicantEmail;
+            } else if (emailResult.error) {
+              emailErrorMsg = emailResult.error;
+            }
+          } catch (emailError: any) {
             console.error('Viewing email was not sent:', emailError);
+            emailErrorMsg = emailError?.message || String(emailError);
           }
           if (!emailSent) {
             setFeedback({
               type: 'error',
-              message: `Viewing scheduled, but the email to ${applicantEmail} did not send.`,
+              message: `Viewing scheduled, but the email to ${applicantEmail} did not send: ${emailErrorMsg || 'Unknown error'}`,
             });
             setIsRequestModalOpen(false);
             setRequestForm(initialRequestForm);
@@ -1423,7 +1348,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           emailType: 'viewing-reschedule'
         });
         if (!emailResult.success) {
-          setFeedback({ type: 'error', message: 'The viewing was rescheduled, but the email to the tenant did not send.' });
+          setFeedback({ type: 'error', message: `The viewing was rescheduled, but the email to the tenant did not send: ${emailResult.error || 'Unknown error'}` });
           setIsRescheduleModalOpen(false);
           setSelectedViewing(null);
           setRescheduleForm(initialRescheduleForm);
@@ -1465,7 +1390,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
       trackEvent('landlord_viewing_cancelled');
       const tenantEmail = selectedViewing.viewingDetails?.userDetails?.email;
       if (tenantEmail) {
-        await emailService.sendEmail({
+        const emailResult = await emailService.sendEmail({
           to: tenantEmail,
           subject: `Viewing Cancelled - ${selectedViewing.property.street}`,
           formData: {
@@ -1486,6 +1411,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           attachments: [],
           emailType: 'viewing-cancel'
         });
+        if (!emailResult.success) {
+          setFeedback({
+            type: 'error',
+            message: `Viewing cancelled, but email to tenant did not send: ${emailResult.error || 'Unknown error'}`
+          });
+          setIsCancelModalOpen(false);
+          setSelectedViewing(null);
+          setCancelMessage('');
+          return;
+        }
       }
 
       setFeedback({ type: 'success', message: 'Viewing cancelled and tenant notified.' });
@@ -1643,7 +1578,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
           <div className="ll-vw-header-actions">
             <button
               type="button"
-              className={`ll-vw-header-icon${isRefreshing ? ' refreshing' : ''}`}
+              className={`ll-vw-header-icon hidden lg:inline-flex${isRefreshing ? ' refreshing' : ''}`}
               title="Refresh Portfolio Data"
               onClick={handleHeaderRefresh}
             >
@@ -1651,7 +1586,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             </button>
             <button
               type="button"
-              className="ll-vw-header-icon"
+              className="ll-vw-header-icon hidden lg:inline-flex"
               title="Settings"
               onClick={onViewSettings}
             >
@@ -1659,7 +1594,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             </button>
             <button
               type="button"
-              className="ll-vw-header-icon"
+              className="ll-vw-header-icon hidden lg:inline-flex"
               title="Notifications"
               onClick={onViewNotifications}
             >
@@ -1668,7 +1603,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             </button>
             <button
               type="button"
-              className="ll-vw-btn-insights"
+              className="ll-vw-btn-insights hidden lg:inline-flex"
               onClick={() => setIsInsightsModalOpen(true)}
             >
               <span className="ll-vw-insights-icon">
@@ -1680,7 +1615,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               type="button"
               className="ll-vw-btn-cta"
               onClick={() => handleOpenRequestModal()}
-              disabled={(properties || []).length === 0}
+              disabled={activeProperties.length === 0}
             >
               <Eye size={16} />
               Request Viewing
@@ -1834,16 +1769,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                 <div className="ll-vw-display" role="group" aria-label="Display style">
                   <button
                     type="button"
-                    className={`ll-vw-display-btn${displayStyle === 'grid' ? ' is-active' : ''}`}
-                    onClick={() => setDisplayStyle('grid')}
+                    className={`ll-vw-display-btn${activeDisplayStyle === 'grid' ? ' is-active' : ''}`}
+                    onClick={() => changeDisplayStyle('grid')}
+                    aria-pressed={activeDisplayStyle === 'grid'}
+                    aria-label="Grid view"
                   >
                     <LayoutGrid size={14} />
                     <span className="hide-sm">Grid</span>
                   </button>
                   <button
                     type="button"
-                    className={`ll-vw-display-btn${displayStyle === 'table' ? ' is-active' : ''}`}
-                    onClick={() => setDisplayStyle('table')}
+                    className={`ll-vw-display-btn${activeDisplayStyle === 'table' ? ' is-active' : ''}`}
+                    onClick={() => changeDisplayStyle('table')}
+                    aria-pressed={activeDisplayStyle === 'table'}
+                    aria-label="Table view"
                   >
                     <List size={14} />
                     <span className="hide-sm">Table</span>
@@ -1868,7 +1807,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               <>
                 {/* Desktop Table View */}
                 {showAsTable && (
-                  <>
+                  <div className="ll-vw-table-scroll"><div className="ll-vw-table-inner">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                       <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
@@ -2034,7 +1973,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div></div>
                 )}
 
                 {/* Mobile Card View */}
@@ -2223,7 +2162,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     ? 'Try adjusting your search filters'
                     : 'Scheduled viewings will appear here once you confirm requests.'}
                 </p>
-                {!filterQuery && (properties || []).length > 0 && (
+                {!filterQuery && activeProperties.length > 0 && (
                   <button
                     type="button"
                     className="ll-vw-btn-cta"
@@ -2239,7 +2178,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               <>
                 {/* Desktop Table View */}
                 {showAsTable && (
-                  <>
+                  <div className="ll-vw-table-scroll"><div className="ll-vw-table-inner">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                       <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
@@ -2351,7 +2290,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div></div>
                 )}
 
                 {/* Mobile Card View */}
@@ -2491,7 +2430,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               <>
                 {/* Desktop Table View */}
                 {showAsTable && (
-                  <>
+                  <div className="ll-vw-table-scroll"><div className="ll-vw-table-inner">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                       <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
@@ -2592,7 +2531,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div></div>
                 )}
 
                 {/* Mobile Card View */}
@@ -2686,128 +2625,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         )}
 
         {activeTab === 'calendar' && (
-          <div className="ll-vw-calendar">
-            <div className="ll-vw-calendar-head">
-              <h2>{calendarMonthLabel}</h2>
-              <div className="ll-vw-calendar-nav">
-                <button
-                  type="button"
-                  aria-label="Previous week"
-                  onClick={() => setCalendarWeekStart((prev) => addDays(prev, -7))}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="is-today"
-                  onClick={() => setCalendarWeekStart(startOfWeekMonday(new Date()))}
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next week"
-                  onClick={() => setCalendarWeekStart((prev) => addDays(prev, 7))}
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div className="ll-vw-calendar-scroll">
-              <div className="ll-vw-calendar-grid">
-                <div className="ll-vw-calendar-weekdays">
-                  <div className="ll-vw-calendar-time-label">Time</div>
-                  {calendarDays.map((day) => {
-                    const key = toDateKey(day);
-                    const isToday = key === toDateKey(new Date());
-                    return (
-                      <div key={key} className="ll-vw-calendar-weekday">
-                        <span>{day.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                        <strong className={isToday ? 'is-today' : undefined}>
-                          {day.getDate()}
-                        </strong>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="ll-vw-calendar-hours">
-                  {CALENDAR_HOURS.map((hour) => (
-                    <div key={hour} className="ll-vw-calendar-row">
-                      <div className="ll-vw-calendar-hour">{formatHourLabel(hour)}</div>
-                      {calendarDays.map((day) => {
-                        const dayKey = toDateKey(day);
-                        const slotEvents = calendarWeekEvents.filter((viewing) => {
-                          const viewingHour = parseViewingHour(viewing.viewingDetails?.time);
-                          return (
-                            sameDateKey(viewing.viewingDetails?.date, dayKey) &&
-                            viewingHour === hour
-                          );
-                        });
-                        return (
-                          <div
-                            key={`${dayKey}-${hour}`}
-                            className="ll-vw-calendar-cell"
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              if (slotEvents[0]) {
-                                handleOpenEventDetail(slotEvents[0]);
-                                return;
-                              }
-                              handleOpenRequestModal(undefined, {
-                                date: dayKey,
-                                time: `${String(hour).padStart(2, '0')}:00`,
-                              });
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                if (slotEvents[0]) {
-                                  handleOpenEventDetail(slotEvents[0]);
-                                  return;
-                                }
-                                handleOpenRequestModal(undefined, {
-                                  date: dayKey,
-                                  time: `${String(hour).padStart(2, '0')}:00`,
-                                });
-                              }
-                            }}
-                          >
-                            {slotEvents.map((viewing, index) => (
-                              <button
-                                key={viewing.id}
-                                type="button"
-                                className="ll-vw-calendar-event"
-                                style={{ background: calendarEventColor(index + hour) }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEventDetail(viewing);
-                                }}
-                              >
-                                <strong>{viewing.property.street}</strong>
-                                <em>
-                                  <Clock size={11} />
-                                  {formatTime(viewing.viewingDetails?.time || '')}
-                                </em>
-                              </button>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {calendarWeekEvents.length === 0 && (
-              <p className="ll-vw-calendar-empty">
-                No viewings scheduled this week. Click an empty slot to request a viewing.
-              </p>
-            )}
-          </div>
+          <ViewingCalendar
+            calendarMonthLabel={calendarMonthLabel}
+            calendarWeekStart={calendarWeekStart}
+            setCalendarWeekStart={setCalendarWeekStart}
+            calendarDays={calendarDays}
+            calendarWeekEvents={calendarWeekEvents}
+            onOpenEventDetail={handleOpenEventDetail}
+            onOpenRequestModal={handleOpenRequestModal}
+            formatTime={formatTime}
+          />
         )}
       </div>
       </div>
@@ -2919,101 +2746,19 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
         </div>
       )}
 
-      {/* Reschedule Modal */}
-      {isRescheduleModalOpen && selectedViewing && (
-        <div className="ll-vw-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="ll-vw-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ll-vw-modal-head is-amber">
-              <div className="ll-vw-modal-head-copy">
-                <div className="ll-vw-modal-icon is-amber">
-                  <Clock size={16} />
-                </div>
-                <div>
-                  <h3>Propose Alternative Time</h3>
-                  <p>Suggest a revised slot for this viewing request</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="ll-vw-modal-close"
-                onClick={() => {
-                  setIsRescheduleModalOpen(false);
-                  setSelectedViewing(null);
-                  setRescheduleForm(initialRescheduleForm);
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="ll-vw-modal-body">
-              <div className="ll-vw-modal-info">
-                <span>Applicant & Property</span>
-                <strong>
-                  {selectedViewing.viewingDetails?.userDetails?.fullName || 'Applicant'} ·{' '}
-                  {selectedViewing.property.street}
-                </strong>
-              </div>
-              <label className="ll-vw-field">
-                <span>Proposed New Date</span>
-                <input
-                  type="date"
-                  value={rescheduleForm.date}
-                  onChange={(e) => setRescheduleForm((prev) => ({ ...prev, date: e.target.value }))}
-                />
-              </label>
-              <label className="ll-vw-field">
-                <span>Proposed Time Slot</span>
-                <select
-                  value={rescheduleForm.time}
-                  onChange={(e) => setRescheduleForm((prev) => ({ ...prev, time: e.target.value }))}
-                >
-                  <option value="">Select a time</option>
-                  {VIEWING_TIME_SLOTS.map((slot) => (
-                    <option key={slot.value} value={slot.value}>
-                      {slot.label}
-                    </option>
-                  ))}
-                  {rescheduleForm.time &&
-                    !VIEWING_TIME_SLOTS.some((slot) => slot.value === rescheduleForm.time) && (
-                      <option value={rescheduleForm.time}>{rescheduleForm.time}</option>
-                    )}
-                </select>
-              </label>
-              <label className="ll-vw-field">
-                <span>Message to Applicant</span>
-                <textarea
-                  rows={2}
-                  placeholder="I have another viewing booked then, would this alternative work for you?"
-                  value={rescheduleForm.message}
-                  onChange={(e) => setRescheduleForm((prev) => ({ ...prev, message: e.target.value }))}
-                />
-              </label>
-            </div>
-            <div className="ll-vw-modal-footer is-split">
-              <button
-                type="button"
-                className="ll-vw-modal-secondary"
-                onClick={() => {
-                  setIsRescheduleModalOpen(false);
-                  setSelectedViewing(null);
-                  setRescheduleForm(initialRescheduleForm);
-                }}
-                disabled={isProcessing}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="ll-vw-modal-cta"
-                onClick={handleRescheduleSubmit}
-                disabled={isProcessing}
-              >
-                {isProcessing ? 'Sending…' : 'Send Proposal'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RescheduleModal
+        isOpen={isRescheduleModalOpen}
+        viewing={selectedViewing}
+        form={rescheduleForm}
+        onFormChange={setRescheduleForm}
+        onSubmit={handleRescheduleSubmit}
+        onClose={() => {
+          setIsRescheduleModalOpen(false);
+          setSelectedViewing(null);
+          setRescheduleForm(initialRescheduleForm);
+        }}
+        isProcessing={isProcessing}
+      />
 
       {/* Cancel Modal */}
       {isCancelModalOpen && selectedViewing && (
@@ -3120,7 +2865,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                   <option value="" disabled>
                     Choose a property
                   </option>
-                  {(properties || []).map((property) => (
+                  {activeProperties.map((property) => (
                     <option key={property.id} value={property.id}>
                       {propertyStreet(property.address)} — {property.address} (£
                       {property.rent.toLocaleString()}/mo)
@@ -3416,8 +3161,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
             <div className="ll-vw-modal-body">
               <div className="ll-vw-insights-banner">
                 <strong>
-                  {(properties || [])[0]
-                    ? `${propertyStreet((properties || [])[0].address)} is generating elevated inquiry volume`
+                  {activeProperties[0]
+                    ? `${propertyStreet(activeProperties[0].address)} is generating elevated inquiry volume`
                     : 'Viewing demand is tracking above baseline'}
                 </strong>{' '}
                 this month, with {incomingRequests.length} open request

@@ -100,4 +100,9 @@ describe('TenantsController & TenantsService', () => {
     const result = await controller.deleteTenant('t-123');
     expect(result.success).toBe(true);
   });
+
+  it('has @Roles("landlord", "agent") metadata configured on TenantsController', () => {
+    const roles = Reflect.getMetadata('roles', TenantsController);
+    expect(roles).toEqual(['landlord', 'agent']);
+  });
 });

@@ -29,7 +29,7 @@ import {
  * meaning the predicate should actively drop non-matching results.
  */
 function isHardConstraint(source: FilterSource | undefined): boolean {
-  return source === 'user' || source === 'url';
+  return source === 'user' || source === 'url' || source === 'ai' || source === undefined;
 }
 
 /**
@@ -65,7 +65,7 @@ export const INITIAL_FILTER_STATE: PropertyFilterState = {
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function usePropertyFilters(
-  properties: Property[],
+  properties: Property[] = [],
   classifiedEntities?: ClassifyEntities | null,
 ) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -427,8 +427,8 @@ export function usePropertyFilters(
   const counts: FilterCounts = useMemo(() => {
     let active = 0;
     if (filters.minPrice !== null || filters.maxPrice !== null) active++;
-    if (filters.bedrooms !== 'any' && filters.bedrooms.length > 0) active++;
-    if (filters.propertyTypes.length > 0) active++;
+    if (filters.bedrooms !== 'any' && Array.isArray(filters.bedrooms) && filters.bedrooms.length > 0) active++;
+    if (Array.isArray(filters.propertyTypes) && filters.propertyTypes.length > 0) active++;
     if (filters.furnishing !== 'any') active++;
     if (filters.hasParking) active++;
     if (filters.hasBalconyOrGarden) active++;
@@ -438,12 +438,12 @@ export function usePropertyFilters(
     if (filters.sortBy !== 'recommended') active++;
 
     return {
-      total: properties.length,
+      total: (properties || []).length,
       filtered: filteredProperties.length,
       hasActiveFilters: active > 0,
       activeFilterCount: active,
     };
-  }, [properties.length, filteredProperties.length, filters]);
+  }, [(properties || []).length, filteredProperties.length, filters]);
 
   // ─── Granular user actions — always mark source as 'user' ─────────────────
 
@@ -675,5 +675,6 @@ export function usePropertyFilters(
     removeFilter,
     promoteAiFilter,
     isPetRelaxed,
+    setInitialProperties: () => {},
   };
 }

@@ -1,9 +1,21 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Optional,
+  HttpException,
+  InternalServerErrorException,
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
 import { renderProptiiEmail } from '../utils/emailLayout';
 import { ComplianceTransformService } from '../gov-data/services/compliance-transform.service';
+import { validateFileContent } from '../utils/file-content-validator';
 import {
   getSignedDownloadUrl,
   uploadBase64ToStorage,
@@ -94,9 +106,25 @@ export class ReferencingService {
       if (!rawDataUri) continue;
 
       try {
-        const ext = rawDataUri.split(';')[0].split('/')[1] || 'bin';
-        const storagePath = `referencing/${userId}/${section}/${field}/${randomUUID()}.${ext}`;
-        const uploaded = await uploadBase64ToStorage(rawDataUri, storagePath);
+        const match = rawDataUri.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const declaredMime = match[1];
+        const buffer = Buffer.from(match[2], 'base64');
+        if (buffer.length > 25 * 1024 * 1024) {
+          this.logger.warn(`File for ${section}.${field} exceeds 25MB limit`);
+          continue;
+        }
+        const validation = validateFileContent(buffer, undefined, declaredMime);
+        if (!validation.valid) {
+          this.logger.warn(`File for ${section}.${field} prohibited content: ${validation.error}`);
+          continue;
+        }
+        const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safeSection = section.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safeField = field.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const ext = (validation.detectedType.includes('/') ? validation.detectedType.split('/')[1] : declaredMime.split('/')[1] || 'bin').replace(/[^a-z0-9]/g, '');
+        const storagePath = `referencing/${safeUserId}/${safeSection}/${safeField}/${randomUUID()}.${ext}`;
+        const uploaded = await uploadBase64ToStorage(rawDataUri, storagePath, `${safeSection}_${safeField}.${ext}`);
 
         // Replace raw base64 with metadata object preserving existing fields
         result[field] = {
@@ -241,8 +269,8 @@ export class ReferencingService {
       await col.doc(formId).set(payload, { merge: true });
       return { success: true };
     } catch (err: any) {
-      this.logger.warn(`saveFormData failed for ${formId}: ${err?.message || err}`);
-      return { success: false, error: err?.message };
+      this.logger.error(`saveFormData failed for ${formId}: ${err?.message || err}`);
+      throw new InternalServerErrorException(`Failed to save referencing draft: ${err?.message || err}`);
     }
   }
 
@@ -274,14 +302,63 @@ export class ReferencingService {
       updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    if (!col) return { success: true, message: 'Application submitted successfully', status: 'submitted' };
+    if (!col) {
+      this.logger.error(`submitApplication failed for ${userId}: Database connection unavailable`);
+      throw new InternalServerErrorException('Database service is unavailable');
+    }
+
+    // Merge existing stored sections on the document with submitted payload
+    let existingData: any = {};
+    try {
+      const existingDoc = await col.doc(userId).get();
+      if (existingDoc && existingDoc.exists) {
+        existingData = existingDoc.data() || {};
+      }
+    } catch {}
+
+    const merged = { ...existingData, ...safeFormData };
+    const missing: string[] = [];
+
+    const identity = merged?.identity || merged?.formData?.identity || {};
+    if (!identity.fullName && !identity.firstName && !identity.name) missing.push('identity.fullName');
+    if (!identity.email && !merged.email) missing.push('identity.email');
+    if (!identity.dateOfBirth && !identity.dob) missing.push('identity.dateOfBirth');
+    if (!identity.identityProof && !identity.proofDocument && !identity.idDocument) missing.push('identity.identityProof');
+
+    const residential = merged?.residential || merged?.formData?.residential || {};
+    if (!residential.currentAddress && !residential.address && !residential.street) missing.push('residential.currentAddress');
+    if (!residential.residentialStatus && !residential.status) missing.push('residential.residentialStatus');
+    if (!residential.proofDocument && !residential.proofOfAddress) missing.push('residential.proofDocument');
+
+    const employment = merged?.employment || merged?.formData?.employment || {};
+    if (!employment.employmentStatus && !employment.status) missing.push('employment.employmentStatus');
+    if (!employment.employerName && !employment.companyName && !employment.accountantName) missing.push('employment.employerName');
+    if (!employment.annualIncome && !employment.salary && !employment.income) missing.push('employment.annualIncome');
+    if (!employment.proofDocument && !employment.payslip && !employment.employmentContract) missing.push('employment.proofDocument');
+
+    const financial = merged?.financial || merged?.formData?.financial || {};
+    if (!financial.monthlyIncome && !financial.annualIncome && !financial.income && !financial.bankName) missing.push('financial.incomeDetails');
+    if (!financial.proofOfIncomeDocument && !financial.proofDocument && !financial.bankStatement) missing.push('financial.proofOfIncomeDocument');
+
+    const requiresGuarantor = merged?.requiresGuarantor || merged?.hasGuarantor || identity?.requiresGuarantor;
+    const guarantor = merged?.guarantor || merged?.formData?.guarantor;
+    if (requiresGuarantor && !guarantor?.name && !guarantor?.fullName && !guarantor?.email) {
+      missing.push('guarantor.details (guarantor required)');
+    }
+
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Referencing application is incomplete. All 5 stages and required documents must be provided before submission: ${missing.join(', ')}`,
+      );
+    }
 
     try {
       await col.doc(userId).set(payload, { merge: true });
       return { success: true, message: 'Application submitted successfully', status: 'submitted' };
     } catch (err: any) {
-      this.logger.warn(`submitApplication failed for ${userId}: ${err?.message || err}`);
-      return { success: true, message: 'Application submitted successfully', status: 'submitted' };
+      if (err instanceof BadRequestException) throw err;
+      this.logger.error(`submitApplication failed for ${userId}: ${err?.message || err}`);
+      throw new InternalServerErrorException(`Failed to submit referencing application: ${err?.message || err}`);
     }
   }
 
@@ -497,42 +574,79 @@ export class ReferencingService {
     let storageResult: any = null;
 
     if (file) {
-      const section  = fileData?.section  || 'general';
-      const field    = fileData?.field    || 'document';
-      const ext      = file.originalname.split('.').pop() || 'bin';
-      const storagePath = `referencing/${userId}/${section}/${field}/${randomUUID()}.${ext}`;
+      if (!file.buffer || file.buffer.length === 0) {
+        throw new BadRequestException('Uploaded file is empty');
+      }
+      if (file.size > 25 * 1024 * 1024) {
+        throw new BadRequestException('File exceeds maximum size limit of 25MB');
+      }
+      const validation = validateFileContent(file.buffer, file.originalname, file.mimetype);
+      if (!validation.valid) {
+        this.logger.warn(`saveUserFile prohibited upload for ${userId}: ${validation.error}`);
+        throw new BadRequestException(validation.error || 'Prohibited or unsupported file format');
+      }
+
+      const safeOriginalName = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_') || 'document';
+      const rawExt = path.extname(safeOriginalName).replace(/^\./, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ext = rawExt || (validation.detectedType.includes('/') ? validation.detectedType.split('/')[1] : 'bin');
+      const section = (fileData?.section || fileData?.category || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const field = (fileData?.field || 'document').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const storagePath = `referencing/${safeUserId}/${section}/${field}/${randomUUID()}.${ext}`;
 
       try {
-        storageResult = await uploadBufferToStorage(file.buffer, storagePath, file.mimetype);
+        storageResult = await uploadBufferToStorage(file.buffer, storagePath, validation.detectedType || file.mimetype, safeOriginalName);
       } catch (err: any) {
         this.logger.error(`saveUserFile upload failed for ${userId}: ${err?.message || err}`);
       }
-    } else if (isBase64DataUri(fileData.base64 || fileData.fileData || fileData.content || fileData.dataUrl)) {
+    } else if (isBase64DataUri(fileData?.base64 || fileData?.fileData || fileData?.content || fileData?.dataUrl || fileData?.url)) {
       // Fallback for old base64 payloads if still used anywhere internally
-      const raw = fileData.base64 || fileData.fileData || fileData.content || fileData.dataUrl;
-      const section  = fileData.section  || 'general';
-      const field    = fileData.field    || 'document';
-      const ext      = raw.split(';')[0].split('/')[1] || 'bin';
-      const storagePath = `referencing/${userId}/${section}/${field}/${randomUUID()}.${ext}`;
+      const raw = fileData.base64 || fileData.fileData || fileData.content || fileData.dataUrl || fileData.url;
+      const match = typeof raw === 'string' ? raw.match(/^data:([^;]+);base64,(.+)$/) : null;
+      if (!match) {
+        throw new BadRequestException('Invalid base64 document format');
+      }
+      const declaredMime = match[1];
+      const buffer = Buffer.from(match[2], 'base64');
+      if (buffer.length > 25 * 1024 * 1024) {
+        throw new BadRequestException('Uploaded file exceeds maximum limit of 25MB');
+      }
+      const safeOriginalName = path.basename(fileData?.fileName || fileData?.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const validation = validateFileContent(buffer, safeOriginalName, declaredMime);
+      if (!validation.valid) {
+        this.logger.warn(`saveUserFile base64 prohibited upload for ${userId}: ${validation.error}`);
+        throw new BadRequestException(validation.error || 'Prohibited or unsupported file format');
+      }
+
+      const rawExt = path.extname(safeOriginalName).replace(/^\./, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ext = rawExt || (validation.detectedType.includes('/') ? validation.detectedType.split('/')[1] : 'bin');
+      const section = (fileData?.section || fileData?.category || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const field = (fileData?.field || 'document').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const storagePath = `referencing/${safeUserId}/${section}/${field}/${randomUUID()}.${ext}`;
 
       try {
-        storageResult = await uploadBase64ToStorage(raw, storagePath);
+        storageResult = await uploadBase64ToStorage(raw, storagePath, safeOriginalName);
       } catch (err: any) {
         this.logger.error(`saveUserFile upload failed for ${userId}: ${err?.message || err}`);
       }
     }
 
     // Build the Firestore metadata record — never store raw bytes
+    const cleanFileName = (file?.originalname ? path.basename(file.originalname) : (fileData?.fileName || fileData?.name || 'document')).replace(/[^a-zA-Z0-9._-]/g, '_');
     const payload: any = {
       id: docId,
       userId,
-      section:     fileData.section     || 'general',
-      field:       fileData.field       || 'document',
-      fileName:    file?.originalname   || fileData.fileName    || fileData.name || 'document',
-      contentType: file?.mimetype       || fileData.contentType || fileData.mimeType || storageResult?.contentType || 'application/octet-stream',
-      size:        file?.size           || fileData.size        || storageResult?.size || 0,
-      url:         storageResult?.downloadUrl || fileData.url || '',
-      storagePath: storageResult?.storagePath || fileData.storagePath || '',
+      section:     fileData?.section     || fileData?.category    || 'general',
+      category:    fileData?.category    || fileData?.section     || 'general',
+      field:       fileData?.field       || 'document',
+      fileName:    cleanFileName,
+      name:        cleanFileName,
+      contentType: file?.mimetype       || fileData?.contentType || fileData?.type || fileData?.mimeType || storageResult?.contentType || 'application/octet-stream',
+      type:        file?.mimetype       || fileData?.contentType || fileData?.type || fileData?.mimeType || storageResult?.contentType || 'application/octet-stream',
+      size:        file?.size           || fileData?.size        || storageResult?.size || 0,
+      url:         storageResult?.downloadUrl || (fileData?.url && !isBase64DataUri(fileData.url) ? fileData.url : '') || '',
+      storagePath: storageResult?.storagePath || fileData?.storagePath || '',
       createdAt:   admin.firestore.FieldValue.serverTimestamp(),
     };
 
@@ -584,14 +698,14 @@ export class ReferencingService {
    */
   async refreshFileDownloadUrl(userId: string, fileId: string) {
     const col = this.filesCollection;
-    if (!col) return { success: false, error: 'Service unavailable' };
+    if (!col) throw new ServiceUnavailableException('Database service is unavailable');
 
     try {
       const doc = await col.doc(fileId).get();
-      if (!doc.exists) return { success: false, error: 'File not found' };
+      if (!doc.exists) throw new NotFoundException('File not found');
 
       const data = doc.data() as any;
-      if (!data?.storagePath) return { success: false, error: 'No storage path on record' };
+      if (!data?.storagePath) throw new NotFoundException('No storage path on record');
 
       const { getSignedDownloadUrl } = await import('../utils/firebase-storage');
       const url = await getSignedDownloadUrl(data.storagePath);
@@ -601,8 +715,9 @@ export class ReferencingService {
 
       return { success: true, url, fileName: data.fileName, contentType: data.contentType };
     } catch (err: any) {
-      this.logger.warn(`refreshFileDownloadUrl failed for ${fileId}: ${err?.message || err}`);
-      return { success: false, error: err?.message || 'Failed to generate URL' };
+      if (err instanceof NotFoundException || err instanceof ServiceUnavailableException) throw err;
+      this.logger.error(`refreshFileDownloadUrl failed for ${fileId}: ${err?.message || err}`);
+      throw new InternalServerErrorException(`Failed to generate signed download URL: ${err?.message || err}`);
     }
   }
 
@@ -676,13 +791,13 @@ export class ReferencingService {
     };
 
     if (!col) {
-      return { success: false, error: 'Could not save this referencing link. Please try again.' };
+      throw new ServiceUnavailableException('Could not save this referencing link. Database unavailable.');
     }
     try {
       await col.doc(shareId).set(payload);
     } catch (err: any) {
       this.logger.warn(`shareReferencingPassport Firestore write failed: ${err?.message || err}`);
-      return { success: false, error: 'Could not save this referencing link. Please try again.' };
+      throw new InternalServerErrorException('Could not save this referencing link. Please try again.');
     }
 
     this.emailService.sendReferencingShareNotification({
@@ -881,19 +996,19 @@ export class ReferencingService {
   async claimShare(claimToken: string, landlordId: string, landlordEmail: string) {
     const col = this.sharesCollection;
     const db  = this.db;
-    if (!col || !db) return { success: false, error: 'Service unavailable' };
+    if (!col || !db) throw new ServiceUnavailableException('Service unavailable');
 
     try {
       const snap = await col.where('claimToken', '==', claimToken).limit(1).get();
-      if (snap.empty) return { success: false, error: 'Invalid claim token' };
+      if (snap.empty) throw new NotFoundException('Invalid claim token');
 
       const shareDoc  = snap.docs[0];
       const shareData = shareDoc.data() as any;
 
       if (shareData.expiresAt && new Date(shareData.expiresAt) < new Date()) {
-        return { success: false, error: 'This invitation has expired' };
+        throw new BadRequestException('This invitation has expired');
       }
-      if (shareData.claimedBy) return { success: false, error: 'Already claimed' };
+      if (shareData.claimedBy) throw new ConflictException('Already claimed');
 
       await shareDoc.ref.set({
         claimedBy:    landlordId,
@@ -957,8 +1072,11 @@ export class ReferencingService {
         propertyAddress: shareData.propertyAddress || '',
       };
     } catch (err: any) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
       this.logger.warn(`claimShare error: ${err?.message || err}`);
-      return { success: false, error: err?.message || 'Failed to claim share' };
+      throw new InternalServerErrorException(err?.message || 'Failed to claim share');
     }
   }
 
@@ -1211,8 +1329,15 @@ export class ReferencingService {
     let cleanMimeType = 'image/jpeg';
 
     if (file && file.buffer) {
+      if (file.buffer.length === 0) {
+        return { success: false, error: 'Document file is empty' };
+      }
+      const validation = validateFileContent(file.buffer, file.originalname, file.mimetype);
+      if (!validation.valid) {
+        return { success: false, error: validation.error || 'Prohibited or unsupported file format' };
+      }
       cleanBase64 = file.buffer.toString('base64');
-      cleanMimeType = file.mimetype || 'image/jpeg';
+      cleanMimeType = validation.detectedType || file.mimetype || 'image/jpeg';
     } else if (body?.base64Data || body?.fileData || body?.base64) {
       const raw = body.base64Data || body.fileData || body.base64;
       if (typeof raw === 'string' && raw.includes(',')) {
@@ -1222,6 +1347,14 @@ export class ReferencingService {
         cleanBase64 = raw;
         cleanMimeType = body?.mimeType || 'image/jpeg';
       }
+      if (cleanBase64) {
+        const buffer = Buffer.from(cleanBase64, 'base64');
+        const validation = validateFileContent(buffer, undefined, cleanMimeType);
+        if (!validation.valid) {
+          return { success: false, error: validation.error || 'Prohibited or unsupported file format' };
+        }
+        cleanMimeType = validation.detectedType || cleanMimeType;
+      }
     }
 
     if (!cleanBase64) {
@@ -1230,6 +1363,15 @@ export class ReferencingService {
 
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     const openRouterKey = process.env.OPENROUTER_API_KEY;
+
+    let geminiBusy = false;
+    if (geminiKey) {
+      const interactionsResult = await this.extractWithGeminiInteractions(geminiKey, cleanBase64, cleanMimeType);
+      if (interactionsResult.data) {
+        return { success: true, data: interactionsResult.data };
+      }
+      geminiBusy = interactionsResult.busy;
+    }
 
     if (geminiKey) {
       const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
@@ -1285,6 +1427,9 @@ Return strictly a valid JSON object matching this structure (use empty strings f
               this.logger.log(`AI Document Extraction succeeded with model ${model}`);
               return { success: true, data: parsed };
             }
+          } else {
+            const detail = await response.text().catch(() => '');
+            this.logger.warn(`Gemini AI extraction HTTP ${response.status} with model ${model}: ${detail.slice(0, 300)}`);
           }
         } catch (err: any) {
           this.logger.warn(`Gemini AI extraction error with model ${model}: ${err?.message || err}`);
@@ -1332,28 +1477,118 @@ Return strictly a valid JSON object matching this structure (use empty strings f
               return { success: true, data: parsed };
             }
           }
+        } else {
+          const detail = await response.text().catch(() => '');
+          this.logger.warn(`OpenRouter AI extraction HTTP ${response.status}: ${detail.slice(0, 300)}`);
         }
       } catch (err: any) {
         this.logger.warn(`OpenRouter AI extraction error: ${err?.message || err}`);
       }
     }
 
-    // Default graceful response
-    return {
-      success: true,
-      data: {
-        firstName: '',
-        lastName: '',
-        email: '',
-        phoneNumber: '',
-        dateOfBirth: '',
-        nationality: '',
-        employmentStatus: '',
-        jobPosition: '',
-        companyDetails: '',
-        currentAddress: '',
-        monthlyIncome: ''
-      }
+    if (!geminiKey && !openRouterKey) {
+      this.logger.warn('AI extraction skipped: no GEMINI_API_KEY, GOOGLE_API_KEY or OPENROUTER_API_KEY is configured');
+      return { success: false, error: 'AI auto-fill is not configured on the server' };
+    }
+
+    if (geminiBusy) {
+      return { success: false, error: 'The AI service is busy right now. Please try again in a minute' };
+    }
+
+    return { success: false, error: 'AI could not read this document' };
+  }
+
+  /**
+   * Gemini Interactions API (POST /v1beta/interactions). New API keys can no longer use
+   * gemini-2.x via :generateContent, so this is tried first. Models are tried in order
+   * because individual models intermittently return 503 under high demand.
+   */
+  private async extractWithGeminiInteractions(
+    apiKey: string,
+    base64: string,
+    mimeType: string,
+  ): Promise<{ data: Record<string, string> | null; busy: boolean }> {
+    // busy stays true only if every attempt failed due to overload, rate limiting or timeout.
+    let busy = true;
+    const configured = (process.env.GEMINI_MODEL || '').split(',').map((m) => m.trim()).filter(Boolean);
+    const models = configured.length
+      ? configured
+      : [
+          'gemini-3.8-flash',
+          'gemini-3.5-flash',
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-flash-lite',
+          'gemini-2.5-flash-lite',
+          'gemini-flash-latest',
+        ];
+    // Stay under the frontend's 90s request timeout.
+    const deadline = Date.now() + 75000;
+
+    const fields = [
+      'firstName', 'lastName', 'email', 'phoneNumber', 'dateOfBirth', 'nationality',
+      'employmentStatus', 'jobPosition', 'companyDetails', 'currentAddress', 'monthlyIncome',
+    ];
+    const schema = {
+      type: 'object',
+      properties: Object.fromEntries(fields.map((f) => [f, { type: 'string' }])),
     };
+    const mediaType = mimeType === 'application/pdf' ? 'document' : 'image';
+    const prompt = `Analyze this uploaded applicant document (passport, UK driving licence, national ID, payslip, P60, bank statement, utility bill, council tax bill, tenancy agreement, or employment contract) and extract any recognizable applicant referencing details.
+Use empty strings for anything not present. Format dateOfBirth as YYYY-MM-DD. employmentStatus must be one of "Employed", "Self-Employed", "Student", "Retired" or empty. monthlyIncome is the gross monthly amount as digits only. currentAddress is the full postal address on one line.`;
+
+    for (const model of models) {
+      const remaining = deadline - Date.now();
+      if (remaining < 5000) {
+        this.logger.warn('Gemini Interactions: time budget exhausted before trying all models');
+        break;
+      }
+      try {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+            'Api-Revision': '2026-05-20',
+          },
+          body: JSON.stringify({
+            model,
+            store: false,
+            input: [
+              { type: mediaType, data: base64, mime_type: mimeType },
+              { type: 'text', text: prompt },
+            ],
+            response_format: { type: 'text', mime_type: 'application/json', schema },
+          }),
+          signal: AbortSignal.timeout(Math.min(45000, remaining)),
+        });
+
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          this.logger.warn(`Gemini Interactions HTTP ${response.status} with model ${model}: ${detail.slice(0, 300)}`);
+          if (response.status !== 503 && response.status !== 429) busy = false;
+          continue;
+        }
+
+        const json: any = await response.json();
+        const outputs = (json.steps || []).filter((s: any) => s?.type === 'model_output');
+        const text = outputs.length
+          ? (outputs[outputs.length - 1].content || []).find((c: any) => c?.type === 'text')?.text
+          : undefined;
+        if (!text) {
+          this.logger.warn(`Gemini Interactions returned no text with model ${model}`);
+          busy = false;
+          continue;
+        }
+
+        const parsed = JSON.parse(text);
+        this.logger.log(`AI Document Extraction succeeded with model ${model} (Interactions API)`);
+        return { data: parsed, busy: false };
+      } catch (err: any) {
+        this.logger.warn(`Gemini Interactions error with model ${model}: ${err?.message || err}`);
+        if (err?.name !== 'TimeoutError') busy = false;
+      }
+    }
+
+    return { data: null, busy };
   }
 }

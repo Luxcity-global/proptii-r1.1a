@@ -32,6 +32,7 @@ import type { Property, Tenant } from '../App';
 import { tenantService } from '../services/tenantService';
 import { otherPropertyForPerson } from '../services/otherPropertyForPerson';
 import { ExistingTenancyWarning } from './ExistingTenancyWarning';
+import { isPropertyArchived } from '../utils/portfolioStats';
 import { trackEvent } from '../../../utils/analytics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -137,13 +138,18 @@ export function SelectExistingTenant({
     );
   }, [eligibleTenants, searchTerm]);
 
+  const activeProperties = useMemo(
+    () => (properties || []).filter((p) => !isPropertyArchived(p)),
+    [properties]
+  );
+
   const selectedTenant = existingTenants.find((t) => t.id === selectedTenantId);
-  const selectedProperty = properties.find((p) => p.id === selectedPropertyId);
+  const selectedProperty = activeProperties.find((p) => p.id === selectedPropertyId);
   const canProceed = !!selectedTenantId && !!selectedPropertyId;
 
   function handleProceed() {
     if (!canProceed) return;
-    const prop = properties.find((p) => p.id === selectedPropertyId);
+    const prop = activeProperties.find((p) => p.id === selectedPropertyId);
     setLease((prev) => ({
       ...prev,
       rentAmount: prop?.rent ? String(prop.rent) : prev.rentAmount,
@@ -522,7 +528,7 @@ export function SelectExistingTenant({
               <SelectValue placeholder="Select a property" />
             </SelectTrigger>
             <SelectContent>
-              {properties.map((p) => (
+              {activeProperties.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.address}
                 </SelectItem>

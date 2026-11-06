@@ -25,7 +25,8 @@ const IdentitySection: React.FC = () => {
 
   const handleFileRemove = () => {
     updateFormData('identity', {
-      identityProof: null
+      identityProof: null,
+      identityProofId: null
     });
   };
 

@@ -1,4 +1,5 @@
 import { auth, db } from '../config/firebaseConfig';
+import { collection, getDocs, query, where, doc, setDoc } from 'firebase/firestore';
 
 const APPLICANT_KEY = 'proptii.viewingApplicants.v1';
 const STORAGE_KEY = 'proptii.viewingInbox.v1';
@@ -240,7 +241,6 @@ function isForLandlord(
 
 async function docsWhere(collectionName: string, field: string, value: string): Promise<any[]> {
   if (!value) return [];
-  const { collection, getDocs, query, where } = await import('firebase/firestore');
   const snapshot = await getDocs(query(collection(db, collectionName), where(field, '==', value)));
   return snapshot.docs.map((row) => ({ id: row.id, ...row.data() }));
 }
@@ -361,7 +361,6 @@ export async function publishViewingCopy(item: any): Promise<void> {
   rememberViewings([copy]);
   if (!db || !copy.userId) return;
   try {
-    const { doc, setDoc } = await import('firebase/firestore');
     const payload = JSON.parse(JSON.stringify(copy));
     await setDoc(doc(db, 'viewingBookings', id), payload, { merge: true });
   } catch {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileText,
   Download,
@@ -22,6 +22,7 @@ import { useIsMobile } from '../ui/use-mobile';
 import TenantPageHeader from '../ui/TenantPageHeader';
 import FileUploadModal from './FileUploadModal';
 import FilePreviewModal from './FilePreviewModal';
+import { MobileAccordionCard } from '../../common/MobileAccordionCard';
 import '../../../styles/tenantFiles.css';
 import '../../../styles/tenantModals.css';
 
@@ -54,10 +55,57 @@ function fileIconKind(fileName: string, fileType: string): 'pdf' | 'img' | 'othe
   return 'other';
 }
 
+function vaultStorageKey(userId: string): string {
+  return `proptii_renter_vault_${userId}`;
+}
+
+const memoryVault = new Map<string, FileItem[]>();
+
+function readVaultFiles(userId: string): FileItem[] {
+  const fromMemory = memoryVault.get(userId) || [];
+  try {
+    const raw = localStorage.getItem(vaultStorageKey(userId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    const fromStorage = Array.isArray(parsed) ? parsed : [];
+    return mergeVaultFiles(fromStorage, fromMemory);
+  } catch {
+    return fromMemory;
+  }
+}
+
+function writeVaultFiles(userId: string, next: FileItem[]) {
+  memoryVault.set(userId, next);
+  try {
+    localStorage.setItem(vaultStorageKey(userId), JSON.stringify(next));
+  } catch (err) {
+    console.warn('Could not persist uploaded files locally', err);
+  }
+}
+
+function sameVaultFile(a: FileItem, b: FileItem): boolean {
+  if (a.firestoreId && b.firestoreId && a.firestoreId === b.firestoreId) return true;
+  if (a.url && b.url && a.url === b.url) return true;
+  return a.name === b.name && a.size === b.size && a.category === b.category;
+}
+
+function mergeVaultFiles(primary: FileItem[], extra: FileItem[]): FileItem[] {
+  const merged = [...primary];
+  for (const file of extra) {
+    const index = merged.findIndex((existing) => sameVaultFile(existing, file));
+    if (index === -1) {
+      merged.push(file);
+    } else if (!merged[index].url && file.url) {
+      merged[index] = { ...merged[index], url: file.url };
+    }
+  }
+  return merged;
+}
+
 const YourFiles: React.FC = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedFilter, setSelectedFilter] = useState('All Files');
   const [searchQuery, setSearchQuery] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -74,8 +122,19 @@ const YourFiles: React.FC = () => {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [dropOver, setDropOver] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [queuedUploads, setQueuedUploads] = useState<globalThis.File[]>([]);
 
   const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    const handleOpenUpload = () => setIsUploadModalOpen(true);
+    window.addEventListener('open-file-upload', handleOpenUpload);
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'upload') {
+      setIsUploadModalOpen(true);
+    }
+    return () => window.removeEventListener('open-file-upload', handleOpenUpload);
+  }, [location.search]);
 
   useEffect(() => {
     loadFiles();
@@ -96,7 +155,7 @@ const YourFiles: React.FC = () => {
           type: contract.fileType,
           size: contract.fileSize,
           uploadDate: contract.uploadDate,
-          url: contract.fileUrl || `data:${contract.fileType};base64,${contract.fileData}`,
+          url: contract.fileUrl || '',
           firestoreId: contract.id
         }));
         setContractFiles(contractFilesList);
@@ -113,7 +172,7 @@ const YourFiles: React.FC = () => {
     };
   }, [user?.id]);
 
-  const loadFiles = async () => {
+  const loadFiles = async (extras: FileItem[] = []) => {
     try {
       setLoading(true);
       setError(null);
@@ -121,7 +180,16 @@ const YourFiles: React.FC = () => {
       fileService.setCurrentUser(user?.id || null);
 
       const loadedFiles = await fileService.getFiles();
-      setFiles(loadedFiles);
+      const cached = user?.id ? readVaultFiles(user.id) : [];
+      const retained = mergeVaultFiles(cached, extras).filter((file) => {
+        const loaded = loadedFiles.find((item) => sameVaultFile(item, file));
+        if (!loaded) return true;
+        return !loaded.url && Boolean(file.url);
+      });
+      setFiles(mergeVaultFiles(mergeVaultFiles(loadedFiles, retained), extras));
+      if (user?.id) {
+        writeVaultFiles(user.id, retained);
+      }
 
       if (user?.id) {
         await loadReferencingFiles();
@@ -155,18 +223,27 @@ const YourFiles: React.FC = () => {
         ];
 
         sections.forEach(({ section, field, category }) => {
-          const sectionData = formData[section as keyof ReferencingFormData];
+          const sectionData = formData?.[section as keyof ReferencingFormData];
           if (sectionData && (sectionData as any)[field]) {
             const document = (sectionData as any)[field];
-            if (document && document.name && (document.dataUrl || document.url)) {
+            const fileUrl = typeof document === 'string'
+              ? document
+              : (document.url || document.dataUrl || document.downloadUrl || null);
+            const fileName = typeof document === 'string'
+              ? (document.split('/').pop()?.split('?')[0] || `${category} Document`)
+              : (document.name || document.fileName || (fileUrl ? fileUrl.split('/').pop()?.split('?')[0] : `${category} Document`));
+
+            if (fileUrl || (typeof document === 'object' && document.name)) {
               referencingFilesList.push({
-                id: Date.now() + Math.random(),
-                name: document.name,
+                id: (typeof document === 'object' && document.id) ? document.id : (Date.now() + Math.random()),
+                name: fileName,
                 category,
-                type: document.type || 'application/pdf',
-                size: document.size || 0,
-                uploadDate: new Date(document.lastModified || Date.now()).toLocaleDateString(),
-                url: document.dataUrl || document.url,
+                type: (typeof document === 'object' && (document.type || document.contentType)) || 'application/pdf',
+                size: (typeof document === 'object' && document.size) || 0,
+                uploadDate: (typeof document === 'object' && document.lastModified)
+                  ? new Date(document.lastModified).toLocaleDateString()
+                  : new Date().toLocaleDateString(),
+                url: fileUrl || '',
               });
             }
           }
@@ -200,7 +277,7 @@ const YourFiles: React.FC = () => {
           type: contract.fileType,
           size: contract.fileSize,
           uploadDate: contract.uploadDate,
-          url: contract.fileUrl || `data:${contract.fileType};base64,${contract.fileData}`,
+          url: contract.fileUrl || '',
           firestoreId: contract.id
         }));
 
@@ -222,17 +299,28 @@ const YourFiles: React.FC = () => {
       setUploading(true);
       setError(null);
 
+      fileService.setCurrentUser(user?.id || null);
+
       const results = await fileService.uploadFiles(uploadFiles, category);
 
-      const failedUploads = results.filter(r => !r.success);
-      if (failedUploads.length > 0) {
-        setError(`Failed to upload ${failedUploads.length} file(s)`);
+      const failedUploads = results.filter((r) => !r.success);
+      const uploaded = results.flatMap((result) => (result.success && result.file ? [result.file] : []));
+      if (uploaded.length === 0) {
+        const message = failedUploads.map((result) => result.error).filter(Boolean).join(' ') || 'Upload failed';
+        throw new Error(message);
       }
-
-      await loadFiles();
+      await loadFiles(uploaded);
+      await loadReferencingFiles();
+      if (failedUploads.length > 0) {
+        const errorMsg = failedUploads[0].error || `Failed to upload ${failedUploads.length} file(s)`;
+        setError(errorMsg);
+        throw new Error(errorMsg);
+      }
     } catch (err) {
-      setError('Upload failed');
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      setError(message);
       console.error('Upload error:', err);
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setUploading(false);
     }
@@ -247,12 +335,25 @@ const YourFiles: React.FC = () => {
     }
   };
 
+  const forgetVaultFile = (fileId: number, firestoreId?: string) => {
+    if (!user?.id) return;
+    writeVaultFiles(
+      user.id,
+      readVaultFiles(user.id).filter((file) => {
+        if (file.id === fileId) return false;
+        if (firestoreId && file.firestoreId === firestoreId) return false;
+        return true;
+      })
+    );
+  };
+
   const handleDelete = async (fileId: number, firestoreId?: string) => {
     try {
       const contractFile = contractFiles.find(f => f.id === fileId);
       if (contractFile && contractFile.firestoreId) {
         const result = await contractService.deleteContractTemplate(contractFile.firestoreId);
         if (result.success) {
+          forgetVaultFile(fileId, contractFile.firestoreId);
           setContractFiles(prev => prev.filter(f => f.id !== fileId));
           setDeleteConfirm(null);
           console.log('Contract file deleted from Firestore');
@@ -262,6 +363,7 @@ const YourFiles: React.FC = () => {
       } else {
         const result = await fileService.deleteFile(fileId, firestoreId);
         if (result.success) {
+          forgetVaultFile(fileId, firestoreId);
           setFiles(prev => prev.filter(f => f.id !== fileId));
           setReferencingFiles(prev => prev.filter(f => f.id !== fileId));
           setDeleteConfirm(null);
@@ -309,6 +411,7 @@ const YourFiles: React.FC = () => {
   }, [selectedFilter, searchQuery, allFiles.length]);
 
   const stats = fileService.getFileStats(filteredFiles);
+  const vaultStats = fileService.getFileStats(allFiles);
 
   const pillarCount = (id: string) => {
     if (id === 'All Files') return allFiles.length;
@@ -345,7 +448,7 @@ const YourFiles: React.FC = () => {
       <TenantPageHeader
         title="Your Files"
         subtitle="Manage, preview, and audit uploaded verification documents, contracts, and compliance evidence."
-        primaryLabel={uploading ? 'Uploading...' : 'Upload Document'}
+        primaryLabel={uploading ? 'Uploading...' : 'Upload File'}
         primaryIcon={uploading ? <Loader className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
         onPrimary={() => setIsUploadModalOpen(true)}
         primaryDisabled={uploading}
@@ -359,7 +462,7 @@ const YourFiles: React.FC = () => {
             <span className="tn-fl-kpi-icon blue"><FileText className="w-4 h-4" /></span>
           </div>
           <div className="tn-fl-kpi-value">
-            {loading ? <Loader className="w-6 h-6 animate-spin" /> : referencingFiles.length + contractFiles.length}
+            {loading ? <Loader className="w-6 h-6 animate-spin" /> : allFiles.length}
           </div>
           <div className="tn-fl-kpi-sub">All updated files</div>
         </div>
@@ -369,7 +472,7 @@ const YourFiles: React.FC = () => {
             <span className="tn-fl-kpi-icon purple"><User className="w-4 h-4" /></span>
           </div>
           <div className="tn-fl-kpi-value">
-            {loading ? <Loader className="w-6 h-6 animate-spin" /> : referencingFiles.length}
+            {loading ? <Loader className="w-6 h-6 animate-spin" /> : vaultStats.referencingFiles}
           </div>
           <div className="tn-fl-kpi-sub">Documents uploaded</div>
         </div>
@@ -379,7 +482,7 @@ const YourFiles: React.FC = () => {
             <span className="tn-fl-kpi-icon emerald"><FileText className="w-4 h-4" /></span>
           </div>
           <div className="tn-fl-kpi-value">
-            {loading ? <Loader className="w-6 h-6 animate-spin" /> : contractFiles.length}
+            {loading ? <Loader className="w-6 h-6 animate-spin" /> : vaultStats.contractFiles}
           </div>
           <div className="tn-fl-kpi-sub">Signed contracts</div>
         </div>
@@ -405,6 +508,8 @@ const YourFiles: React.FC = () => {
         onDrop={(e) => {
           e.preventDefault();
           setDropOver(false);
+          const dropped = Array.from(e.dataTransfer.files || []);
+          if (dropped.length > 0) setQueuedUploads(dropped);
           setIsUploadModalOpen(true);
         }}
       >
@@ -516,8 +621,8 @@ const YourFiles: React.FC = () => {
         <>
           <div className="tn-fl-grid">
             {paginatedFiles.map((file) => (
-              <div key={file.id} className="tn-fl-grid-card">
-                <div>
+              <div key={`${file.firestoreId || file.id}-${file.name}`} className="tn-fl-grid-card">
+                <div className="tn-fl-grid-main">
                   <div className="tn-fl-grid-top">
                     {renderFileIcon(file)}
                     <span className={`tn-fl-cat ${categoryClass(file.category)}`}>{file.category}</span>
@@ -540,7 +645,7 @@ const YourFiles: React.FC = () => {
         </>
       ) : (
         <div className="tn-fl-table-wrap">
-          <div className="tn-fl-table-scroll">
+          <div className="tn-fl-table-scroll hidden md:block">
             <table className="tn-fl-table">
               <thead>
                 <tr>
@@ -553,7 +658,7 @@ const YourFiles: React.FC = () => {
               </thead>
               <tbody>
                 {paginatedFiles.map((file) => (
-                  <tr key={file.id}>
+                  <tr key={`${file.firestoreId || file.category}-${file.id}-${file.name}`}>
                     <td>
                       <div className="tn-fl-file">
                         {renderFileIcon(file)}
@@ -577,19 +682,47 @@ const YourFiles: React.FC = () => {
             </table>
           </div>
 
-          <div className="tn-fl-cards">
+          {/* MOBILE ACCORDION DISCLOSURE VIEW (< md) */}
+          <div className="mob-accordion-container md:hidden">
             {paginatedFiles.map((file) => (
-              <div key={`m-${file.id}`} className="tn-fl-grid-card">
-                <div className="tn-fl-grid-top">
-                  {renderFileIcon(file)}
-                  {renderRowActions(file)}
-                </div>
-                <h4 onClick={() => handleView(file)}>{file.name}</h4>
-                <p className="tn-fl-grid-meta">{formatFileSize(file.size)} • {file.uploadDate}</p>
-                <div className="tn-fl-grid-foot">
-                  <span className={`tn-fl-cat ${categoryClass(file.category)}`}>{file.category}</span>
-                </div>
-              </div>
+              <MobileAccordionCard
+                key={`m-${file.firestoreId || file.category}-${file.id}-${file.name}`}
+                id={file.id}
+                title={file.name}
+                subtitle={`${formatFileSize(file.size)} • ${file.uploadDate}`}
+                statusBadge={
+                  <span className={`tn-fl-cat ${categoryClass(file.category)}`}>
+                    {file.category}
+                  </span>
+                }
+                avatar={renderFileIcon(file)}
+                fields={[
+                  { label: 'Category', value: file.category },
+                  { label: 'File Size', value: formatFileSize(file.size) },
+                  { label: 'Uploaded', value: file.uploadDate },
+                  { label: 'File Format', value: file.type.split('/')[1]?.toUpperCase() || 'FILE' },
+                ]}
+                actions={[
+                  {
+                    label: 'View',
+                    variant: 'primary',
+                    icon: <Eye className="w-3.5 h-3.5" />,
+                    onClick: () => handleView(file),
+                  },
+                  {
+                    label: 'Download',
+                    variant: 'secondary',
+                    icon: <Download className="w-3.5 h-3.5" />,
+                    onClick: () => handleDownload(file),
+                  },
+                  {
+                    label: 'Delete',
+                    variant: 'danger',
+                    icon: <Trash2 className="w-3.5 h-3.5" />,
+                    onClick: () => setDeleteConfirm(file.id),
+                  },
+                ]}
+              />
             ))}
           </div>
 
@@ -668,7 +801,11 @@ const YourFiles: React.FC = () => {
 
       <FileUploadModal
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        initialFiles={queuedUploads}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setQueuedUploads([]);
+        }}
         onUpload={handleUpload}
       />
 
@@ -689,24 +826,24 @@ const YourFiles: React.FC = () => {
               <div className="tn-drawer-head-main">
                 <span className="tn-modal-ico blue">📊</span>
                 <div>
-                  <h3 id="tn-vault-insights">Document Vault Insights</h3>
+                  <h3 id="tn-vault-insights">File Storage Insights</h3>
                 </div>
               </div>
               <button type="button" className="tn-modal-x" onClick={() => setIsInsightsOpen(false)} aria-label="Close">✕</button>
             </div>
             <div className="tn-modal-body">
               <p style={{ margin: 0, color: '#64748b', lineHeight: 1.6 }}>
-                File counts and storage for the documents currently in your vault.
+                File counts and storage usage for the files currently in your secure storage.
               </p>
               <div className="tn-insights-grid">
                 <div className="tn-insights-card">
                   <span>Total files</span>
                   <p>{allFiles.length}</p>
-                  <em>In your vault</em>
+                  <em>In your file storage</em>
                 </div>
                 <div className="tn-insights-card">
                   <span>Referencing files</span>
-                  <p>{referencingFiles.length}</p>
+                  <p>{vaultStats.referencingFiles}</p>
                   <em>Identity to guarantor records</em>
                 </div>
                 <div className="tn-insights-card">
@@ -716,7 +853,7 @@ const YourFiles: React.FC = () => {
                 </div>
                 <div className="tn-insights-card">
                   <span>Contract files</span>
-                  <p>{contractFiles.length}</p>
+                  <p>{vaultStats.contractFiles}</p>
                   <em>Signed agreements on file</em>
                 </div>
               </div>

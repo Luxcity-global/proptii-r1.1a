@@ -14,8 +14,23 @@ export interface ExtractedData {
     monthlyIncome?: string;
 }
 
+const LOCAL_AI_EXTRACT_URL = 'http://127.0.0.1:3002/api/referencing/ai-extract';
+
 /**
- * Service to extract data from documents using Gemini 2.5 Flash via OpenRouter
+ * In local dev, AI extraction goes to the local backend even when the rest of the app
+ * uses a remote API (VITE_USE_REMOTE_API=true). Override with VITE_AI_EXTRACT_URL,
+ * or set it to "remote" to use the main API base URL. Production builds are unaffected.
+ */
+function aiExtractUrl(): string {
+    const override = (import.meta.env.VITE_AI_EXTRACT_URL || '').trim();
+    if (override === 'remote') return '/referencing/ai-extract';
+    if (override) return override;
+    const onLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+    return import.meta.env.DEV && onLocalhost ? LOCAL_AI_EXTRACT_URL : '/referencing/ai-extract';
+}
+
+/**
+ * Service to extract data from documents using Gemini via the backend
  */
 class OpenRouterService {
     /**
@@ -25,20 +40,17 @@ class OpenRouterService {
      */
     async extractDataFromDocument(file: File): Promise<ExtractedData | null> {
         try {
-            // Convert file to base64
-            const base64Data = await this.fileToBase64(file);
-            const mimeType = file.type;
+            // Multipart, not base64 JSON: the backend caps JSON bodies at 1MB, which most scans exceed.
+            const formData = new FormData();
+            formData.append('file', file);
 
-            console.log('Sending AI extraction request to backend');
+            const url = aiExtractUrl();
+            console.log('Sending AI extraction request to backend:', url);
 
             const response = await apiService.post<any>(
-                '/referencing/ai-extract',
-                { base64Data, mimeType },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+                url,
+                formData,
+                { timeout: 90000 }
             );
 
             if (response.data && response.data.success) {
@@ -46,7 +58,7 @@ class OpenRouterService {
                 return response.data.data as ExtractedData;
             } else {
                 console.error('Backend returned an unsuccessful response:', response.data);
-                throw new Error('AI extraction failed in backend');
+                throw new Error(response.data?.error || 'AI extraction failed in backend');
             }
         } catch (error: any) {
             console.error('Backend AI Extraction Error:', error);
@@ -55,20 +67,6 @@ class OpenRouterService {
             }
             throw error;
         }
-    }
-
-    private fileToBase64(file: File): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = reader.result as string;
-                // Remove the prefix (e.g., "data:image/jpeg;base64,")
-                const base64 = result.split(',')[1];
-                resolve(base64);
-            };
-            reader.onerror = (error) => reject(error);
-            reader.readAsDataURL(file);
-        });
     }
 }
 

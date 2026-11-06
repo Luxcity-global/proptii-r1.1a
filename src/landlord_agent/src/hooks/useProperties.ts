@@ -51,10 +51,6 @@ export function useProperties({ userId, userEmail }: UsePropertiesOptions): UseP
           email: userEmail || undefined,
         });
 
-        if (isAgentTestAccount(userId, user?.email || userEmail)) {
-          list = mergeAgentDemoProperties(getAgentDummyProperties(), list);
-        }
-
         if (!cancelled) {
           setProperties(list);
           setError(null);

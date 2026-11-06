@@ -7,6 +7,7 @@ import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import { randomUUID } from 'crypto';
 import { setSseTicket, getSseTicketInfo, deleteSseTicket } from '../utils/sse-tickets';
+import { SendMessageDto, EditMessageDto } from '../dto/message.dto';
 
 
 @ApiTags('Communication')
@@ -27,9 +28,9 @@ export class CommunicationController {
   @SkipThrottle()
   @ApiOperation({ summary: 'Exchange Bearer token for a short-lived SSE ticket' })
   @ApiResponse({ status: 200, description: 'One-time SSE ticket valid for 60 seconds' })
-  issueSseTicket(@Req() req: any) {
+  async issueSseTicket(@Req() req: any) {
     const ticket = randomUUID();
-    setSseTicket(ticket, {
+    await setSseTicket(ticket, {
       uid:       req.user.uid,
       email:     req.user.email || '',
       role:      req.user.role  || '',
@@ -41,7 +42,7 @@ export class CommunicationController {
   @Sse('events')
   @SkipThrottle()
   @ApiOperation({ summary: 'Subscribe to real-time communication events stream (SSE)' })
-  sendCommunicationEvents(@Req() req: any, @Query('ticket') ticket?: string): Observable<MessageEvent> {
+  async sendCommunicationEvents(@Req() req: any, @Query('ticket') ticket?: string): Promise<Observable<MessageEvent>> {
     // Accept either ticket-based auth (preferred — token never in URL) or fall
     // back to the legacy req.user populated by FirebaseAuthGuard for backwards compat.
     let uid: string;
@@ -49,11 +50,11 @@ export class CommunicationController {
     let role: string;
 
     if (ticket) {
-      const info = getSseTicketInfo(ticket);
+      const info = await getSseTicketInfo(ticket);
       if (!info || info.expiresAt < Date.now()) {
         throw new UnauthorizedException('SSE ticket is invalid or has expired');
       }
-      deleteSseTicket(ticket); // one-time use
+      await deleteSseTicket(ticket); // one-time use
       uid   = info.uid;
       email = info.email;
       role  = info.role;
@@ -156,7 +157,7 @@ export class CommunicationController {
   @ApiOperation({ summary: 'Send message in conversation' })
   @ApiParam({ name: 'id', description: 'Conversation ID' })
   @ApiResponse({ status: 201, description: 'Created message item' })
-  async sendMessage(@Param('id') conversationId: string, @Body() dto: any, @Req() req: any) {
+  async sendMessage(@Param('id') conversationId: string, @Body() dto: SendMessageDto, @Req() req: any) {
     const userId = req.user.uid;
     const result = await this.communicationService.sendMessage(conversationId, dto, userId, req.user);
 
@@ -221,7 +222,7 @@ export class CommunicationController {
   @ApiOperation({ summary: 'Edit message body' })
   @ApiParam({ name: 'id', description: 'Message ID' })
   @ApiResponse({ status: 200, description: 'Message updated' })
-  async editMessage(@Param('id') messageId: string, @Body() dto: { body: string }, @Req() req: any) {
+  async editMessage(@Param('id') messageId: string, @Body() dto: EditMessageDto, @Req() req: any) {
     const userId = req.user.uid;
     const result = await this.communicationService.editMessage(messageId, dto.body, userId);
 

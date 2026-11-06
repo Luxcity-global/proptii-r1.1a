@@ -20,23 +20,25 @@ interface UseBatchedPropertyFactsResult {
  */
 export function useBatchedPropertyFacts(
   enabled: boolean,
-  results: Property[],
+  results: Property[] = [],
 ): UseBatchedPropertyFactsResult {
   const [factsByListingId, setFactsByListingId] = useState<BatchedFactsResponse>({});
   const [isFactsLoading, setIsFactsLoading] = useState(false);
   const requestedListingIdsRef = useRef<Set<string>>(new Set());
 
+  const safeResults = Array.isArray(results) ? results : [];
+
   // Reset tracked IDs if results are emptied (fresh search)
   useEffect(() => {
-    if (results.length === 0) {
+    if (safeResults.length === 0) {
       requestedListingIdsRef.current.clear();
       setFactsByListingId({});
       setIsFactsLoading(false);
     }
-  }, [results.length]);
+  }, [safeResults.length]);
 
   useEffect(() => {
-    if (!enabled || results.length === 0) {
+    if (!enabled || safeResults.length === 0) {
       return;
     }
 
@@ -44,11 +46,11 @@ export function useBatchedPropertyFacts(
     const unrequestedListingIds: string[] = [];
     const unrequestedUprns: string[] = [];
 
-    results.forEach((p) => {
+    safeResults.forEach((p) => {
       const id = resolveListingId(p);
       if (!requestedListingIdsRef.current.has(id)) {
         unrequestedListingIds.push(id);
-        if (p.uprn) unrequestedUprns.push(p.uprn);
+        if (p?.uprn) unrequestedUprns.push(p.uprn);
       }
     });
 
@@ -90,7 +92,7 @@ export function useBatchedPropertyFacts(
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [enabled, results]);
+  }, [enabled, safeResults]);
 
   const getFlagsFor = (property: Property): FactFlag[] | null => {
     const id = resolveListingId(property);

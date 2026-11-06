@@ -11,6 +11,8 @@
   color: #1e293b;
   background: #f8fafc;
   min-height: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0 0 32px;
 }
 
@@ -32,8 +34,11 @@
 
 .tn-fl-body {
   max-width: 1152px;
+  width: 100%;
+  min-width: 0;
   margin: 0 auto;
   padding: 24px 20px 0;
+  box-sizing: border-box;
 }
 
 @media (min-width: 1024px) {
@@ -556,16 +561,18 @@
 
 .tn-fl-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
 @media (min-width: 640px) {
-  .tn-fl-grid { grid-template-columns: 1fr 1fr; }
+  .tn-fl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (min-width: 1024px) {
-  .tn-fl-grid { grid-template-columns: repeat(3, 1fr); }
+  .tn-fl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 .tn-fl-grid-card {
@@ -577,6 +584,13 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.tn-fl-grid-main {
+  min-width: 0;
 }
 
 .tn-fl-grid-card:hover { box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06); }
@@ -587,10 +601,20 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+  min-width: 0;
+}
+
+.tn-fl-grid-top .tn-fl-cat {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tn-fl-grid-card h4 {
   margin: 0;
+  max-width: 100%;
   font-size: 14px;
   font-weight: 700;
   color: #0f172a;
@@ -606,6 +630,9 @@
   margin-top: 2px;
   font-size: 11px;
   color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tn-fl-grid-foot {
@@ -620,6 +647,7 @@
 
 .tn-fl-grid-preview {
   flex: 1;
+  min-width: 0;
   height: 32px;
   border: 1px solid var(--tn-border);
   border-radius: 8px;
@@ -771,4 +799,33 @@
   .tn-fl-table-scroll { display: none; }
   .tn-fl-cards { display: flex; }
   .tn-fl-header h1 { font-size: 20px; }
+}
+
+/* KPI cards: 2-column grid on phones, icon above label */
+@media (max-width: 639px) {
+  .tn-fl-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .tn-fl-kpi {
+    min-width: 0;
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .tn-fl-kpi-top {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .tn-fl-kpi-label {
+    font-size: 12px;
+  }
+
+  .tn-fl-kpi-value {
+    font-size: 24px;
+  }
 }

@@ -6,9 +6,7 @@ export const LANDLORD_TWO_TEST_EMAIL = 'landlord-two@test.proptii.co';
 const DUMMY_PDF = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
 
 export function isLandlordTwoTestAccount(userId?: string | null, email?: string | null): boolean {
-  const id = (userId || '').trim();
-  const mail = (email || '').trim().toLowerCase();
-  return id === LANDLORD_TWO_TEST_ID || mail === LANDLORD_TWO_TEST_EMAIL;
+  return false;
 }
 
 function daysFromNow(days: number): Date {

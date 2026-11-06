@@ -264,13 +264,23 @@ class EmailService {
           let response: { data?: { success?: boolean; error?: string; messageId?: string } };
           try {
             response = await apiService.post<any>('/email/send', jsonBody, { timeout: 60000 });
-          } catch {
-            const form = new FormData();
-            form.append('to', emailContent.to);
-            form.append('subject', emailContent.subject);
-            form.append('html', html);
-            form.append('emailType', emailContent.emailType);
-            response = await apiService.post<any>('/email/send', form, { timeout: 60000 });
+          } catch (firstErr: any) {
+            try {
+              const form = new FormData();
+              form.append('to', emailContent.to);
+              form.append('subject', emailContent.subject);
+              form.append('html', html);
+              form.append('emailType', emailContent.emailType);
+              response = await apiService.post<any>('/email/send', form, { timeout: 60000 });
+            } catch (secondErr: any) {
+              const serverMsg =
+                secondErr?.response?.data?.error ||
+                secondErr?.response?.data?.message ||
+                firstErr?.response?.data?.error ||
+                firstErr?.response?.data?.message;
+              const errDetail = serverMsg || secondErr?.message || firstErr?.message || 'Unknown error';
+              throw new Error(`Email submission failed: ${errDetail}`);
+            }
           }
 
           const body = response?.data;
@@ -284,8 +294,9 @@ class EmailService {
             messageId: body?.messageId,
           };
         } catch (error: any) {
-          const errMessage = error.message || 'Unknown error';
-          throw new Error(`Email submission failed: ${errMessage}`);
+          const serverMsg = error?.response?.data?.error || error?.response?.data?.message;
+          const errMessage = serverMsg || error?.message || 'Unknown error';
+          throw new Error(errMessage.startsWith('Email submission failed:') ? errMessage : `Email submission failed: ${errMessage}`);
         }
       }
 
@@ -480,6 +491,9 @@ class EmailService {
           emailType: 'viewing-agent'
         });
         results.agent = agentResult.success;
+        if (!agentResult.success && agentResult.error) {
+          results.error = agentResult.error;
+        }
       }
 
       // Send confirmation email to user
@@ -493,6 +507,9 @@ class EmailService {
           emailType: 'viewing-user'
         });
         results.user = userResult.success;
+        if (!userResult.success && userResult.error) {
+          results.error = results.error ? `${results.error}; ${userResult.error}` : userResult.error;
+        }
       }
 
       // Set overall success if at least one email was sent

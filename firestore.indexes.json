@@ -216,6 +216,86 @@
         { "fieldPath": "conversationId", "order": "ASCENDING" },
         { "fieldPath": "sentAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "conversationId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "viewingBookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "landlordId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "requestedDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "viewingBookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "requestedDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "viewingBookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bookViewingRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "landlordId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "requestedDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bookViewingRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "requestedDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contracts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "landlordId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contracts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "landlordId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sentDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contracts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Zap, Upload, Loader2, CheckCircle2 } from 'lucide-react';
 import openRouterService, { ExtractedData } from '../../../services/openRouterService';
 import { uploadToFirebaseStorage } from '../../../services/storageService';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export interface StoredDocument {
     name: string;
@@ -38,11 +38,14 @@ const QuickFillBanner: React.FC<QuickFillBannerProps> = ({
         setIsProcessing(true);
         const toastId = toast.loading('AI is analyzing and attaching your document...');
 
+        let extractionError = null as string | null;
+
         try {
             // 1. Concurrently run AI extraction and Firebase Storage upload
             const [extractedData, uploadResult] = await Promise.all([
                 openRouterService.extractDataFromDocument(file).catch(err => {
                     console.warn('AI Extraction error:', err);
+                    extractionError = err?.message || 'AI service unavailable';
                     return null;
                 }),
                 uploadToFirebaseStorage(file, `referencing_documents/${sectionKey}`).catch(err => {
@@ -65,9 +68,19 @@ const QuickFillBanner: React.FC<QuickFillBannerProps> = ({
 
             setLastUploadedName(file.name);
 
+            const hasExtractedFields = !!extractedData && Object.values(extractedData).some(
+                (value) => typeof value === 'string' ? value.trim() !== '' : value != null
+            );
+
             if (extractedData || attachedDoc.url) {
                 onDataExtracted(extractedData || {}, attachedDoc);
-                toast.success('Document attached & details extracted!', { id: toastId });
+                if (hasExtractedFields) {
+                    toast.success('Document attached & details auto-filled!', { id: toastId });
+                } else if (extractionError) {
+                    toast.warning(`Document attached, but AI auto-fill failed (${extractionError}). Please fill in the details manually.`, { id: toastId });
+                } else {
+                    toast.warning('Document attached, but no details could be read from it. Try a clearer image or fill in the details manually.', { id: toastId });
+                }
             } else {
                 toast.error('Could not process this document. Please enter manually.', { id: toastId });
             }

@@ -13,6 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { StorageService } from '../services/storage.service';
 import { FirebaseAuthGuard, OptionalFirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -37,10 +38,12 @@ export class StorageController {
 
   @Post('upload')
   @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @UseGuards(OptionalFirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file', {
     limits: {
       fileSize: 25 * 1024 * 1024, // 25MB limit
+      files: 1,
     },
   }))
   @ApiOperation({ summary: 'Upload file to Firebase/Cloud Storage in user-scoped directory' })

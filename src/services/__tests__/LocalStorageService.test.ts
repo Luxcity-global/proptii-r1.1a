@@ -1,17 +1,18 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LocalStorageService } from '../LocalStorageService';
 
 describe('LocalStorageService', () => {
   let service: LocalStorageService;
   const mockLocalStorage = {
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
-    clear: jest.fn(),
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
   };
 
   beforeEach(() => {
     // Reset all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     
     // Mock localStorage
     Object.defineProperty(window, 'localStorage', {
@@ -87,14 +88,14 @@ describe('LocalStorageService', () => {
       service.cacheSearchResults('test query', results);
       expect(mockLocalStorage.setItem).toHaveBeenCalled();
       const storedData = JSON.parse(mockLocalStorage.setItem.mock.calls[0][1]);
-      expect(storedData.value).toEqual(results);
+      expect(storedData.data).toEqual(results);
     });
   });
 
   describe('getCachedSearchResults', () => {
     it('should return cached search results', () => {
       const results = [{ id: 1, title: 'Test Property' }];
-      const testData = { value: results, expiry: Date.now() + 1000 };
+      const testData = { data: results, timestamp: Date.now() };
       mockLocalStorage.getItem.mockReturnValue(JSON.stringify(testData));
       const cachedResults = service.getCachedSearchResults('test query');
       expect(cachedResults).toEqual(results);
@@ -107,14 +108,14 @@ describe('LocalStorageService', () => {
       service.cacheSuggestions('test query', suggestions);
       expect(mockLocalStorage.setItem).toHaveBeenCalled();
       const storedData = JSON.parse(mockLocalStorage.setItem.mock.calls[0][1]);
-      expect(storedData.value).toEqual(suggestions);
+      expect(storedData.data).toEqual(suggestions);
     });
   });
 
   describe('getCachedSuggestions', () => {
     it('should return cached suggestions', () => {
       const suggestions = ['suggestion 1', 'suggestion 2'];
-      const testData = { value: suggestions, expiry: Date.now() + 1000 };
+      const testData = { data: suggestions, timestamp: Date.now() };
       mockLocalStorage.getItem.mockReturnValue(JSON.stringify(testData));
       const cachedSuggestions = service.getCachedSuggestions('test query');
       expect(cachedSuggestions).toEqual(suggestions);
@@ -126,16 +127,16 @@ describe('LocalStorageService', () => {
       const expiredData = { value: 'test', expiry: Date.now() - 1000 };
       const validData = { value: 'test', expiry: Date.now() + 1000 };
       
-      mockLocalStorage.getItem
-        .mockReturnValueOnce(JSON.stringify(expiredData))
-        .mockReturnValueOnce(JSON.stringify(validData));
+      (mockLocalStorage as any)['proptii_cache_expired'] = JSON.stringify(expiredData);
+      (mockLocalStorage as any)['proptii_cache_valid'] = JSON.stringify(validData);
 
-      Object.defineProperty(window.localStorage, 'key', {
-        value: (index: number) => index === 0 ? 'proptii_cache_expired' : 'proptii_cache_valid'
-      });
+      mockLocalStorage.getItem
+        .mockImplementation((key: string) => (mockLocalStorage as any)[key] || null);
 
       service.clearExpiredCache();
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('proptii_cache_expired');
+      delete (mockLocalStorage as any)['proptii_cache_expired'];
+      delete (mockLocalStorage as any)['proptii_cache_valid'];
     });
   });
 }); 

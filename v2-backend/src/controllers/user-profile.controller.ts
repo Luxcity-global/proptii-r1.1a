@@ -63,6 +63,17 @@ export class UserProfileController {
     return this.userProfileService.getProfile(req.user.uid);
   }
 
+  /** GET /api/users/check?email= — registration flag for the contract send tab. Does not return the user record. */
+  @Get('users/check')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Check whether an email belongs to a registered user' })
+  @ApiQuery({ name: 'email', required: true, description: 'Email address to check' })
+  @ApiResponse({ status: 200, description: '{ exists, name? } without other profile fields' })
+  async checkRegisteredEmail(@Query('email') email?: string) {
+    return this.userProfileService.checkRegisteredEmail(typeof email === 'string' ? email : '');
+  }
+
   @Get('users/:id')
   @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')

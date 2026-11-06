@@ -11,6 +11,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 import { consumePendingProperty } from '../utils/onboardingSession';
 import apiService from '../services/api';
@@ -362,6 +363,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
         console.error('Failed to delete property from backend:', err);
         setSavedProperties(previousSaved);
         setAllSavedIds(previousIds);
+        toast.error('Failed to remove saved property. Restored.');
         throw err;
       }
     }

@@ -30,16 +30,16 @@ export class HomeownerController {
   @ApiOperation({ summary: 'Update homeowner maintenance task' })
   @ApiParam({ name: 'id', description: 'Task ID' })
   @ApiResponse({ status: 200, description: 'Task updated' })
-  async updateMaintenanceTask(@Param('id') id: string, @Body() body: any) {
-    return this.homeownerService.updateMaintenanceTask(id, body);
+  async updateMaintenanceTask(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.homeownerService.updateMaintenanceTask(id, req.user.uid, body);
   }
 
   @Delete('homeowner-maintenance/:id')
   @ApiOperation({ summary: 'Delete homeowner maintenance task' })
   @ApiParam({ name: 'id', description: 'Task ID' })
   @ApiResponse({ status: 200, description: 'Task deleted' })
-  async deleteMaintenanceTask(@Param('id') id: string) {
-    return this.homeownerService.deleteMaintenanceTask(id);
+  async deleteMaintenanceTask(@Req() req: any, @Param('id') id: string) {
+    return this.homeownerService.deleteMaintenanceTask(id, req.user.uid);
   }
 
   // ── Projects ──────────────────────────────────────────────────────────────
@@ -62,15 +62,15 @@ export class HomeownerController {
   @ApiOperation({ summary: 'Update homeowner project' })
   @ApiParam({ name: 'id', description: 'Project ID' })
   @ApiResponse({ status: 200, description: 'Project updated' })
-  async updateProject(@Param('id') id: string, @Body() body: any) {
-    return this.homeownerService.updateProject(id, body);
+  async updateProject(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.homeownerService.updateProject(id, req.user.uid, body);
   }
 
   @Delete('homeowner-projects/:id')
   @ApiOperation({ summary: 'Delete homeowner project' })
   @ApiParam({ name: 'id', description: 'Project ID' })
   @ApiResponse({ status: 200, description: 'Project deleted' })
-  async deleteProject(@Param('id') id: string) {
-    return this.homeownerService.deleteProject(id);
+  async deleteProject(@Req() req: any, @Param('id') id: string) {
+    return this.homeownerService.deleteProject(id, req.user.uid);
   }
 }

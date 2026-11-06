@@ -1,14 +1,5 @@
 import { firestoreService, UserFile } from './firestoreService';
-
-/** Read a File as a base64 data URL. */
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('FileReader failed'));
-    reader.readAsDataURL(file);
-  });
-}
+import { uploadToFirebaseStorage, deleteFromFirebaseStorage } from './storageService';
 
 export interface FileItem {
   id: number;
@@ -37,25 +28,35 @@ class FileService {
   private nextId = 1;
   private currentUserId: string | null = null;
 
-  // Initialize with only contract file
   constructor() {
-    this.files = [
-      {
-        id: 11,
-        name: 'Tenancy_Agreement Signed.pdf',
-        category: 'Contracts',
-        type: 'application/pdf',
-        size: 5.2 * 1024,
-        uploadDate: '01/05/2024',
-        url: '/files/tenancy-agreement-signed.pdf'
-      }
-    ];
-    this.nextId = 12;
+    this.files = [];
+    this.nextId = 1;
   }
 
   // Set current user ID for user-specific file management
   setCurrentUser(userId: string | null) {
     this.currentUserId = userId;
+  }
+
+  // Safely parse any date value returned by the API into a localised date string.
+  // Handles: Firestore Timestamps (.toDate()), serialised Timestamps ({_seconds}),
+  // ISO strings, numeric epoch ms, and plain Date objects.
+  private parseDateField(value: any): string {
+    if (!value) return new Date().toLocaleDateString();
+    // Native Firestore Timestamp (SDK object)
+    if (typeof value?.toDate === 'function') {
+      return value.toDate().toLocaleDateString();
+    }
+    // Serialised Firestore Timestamp from REST: { _seconds, _nanoseconds }
+    if (typeof value?._seconds === 'number') {
+      return new Date(value._seconds * 1000).toLocaleDateString();
+    }
+    // ISO string or numeric epoch
+    if (typeof value === 'string' || typeof value === 'number') {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
+    }
+    return new Date().toLocaleDateString();
   }
 
   // Get all files (contract files + user-specific files from Firestore)
@@ -64,24 +65,25 @@ class FileService {
       const contractFiles = [...this.files];
       
       if (this.currentUserId) {
-        // Load user-specific files from Firestore
+        // Load user-specific files from database
         const result = await firestoreService.getUserFiles(this.currentUserId);
         if (result.success && result.files) {
-          const userFiles: FileItem[] = result.files.map((firestoreFile: UserFile) => ({
-            id: parseInt(firestoreFile.id.split('_')[2]) || Date.now(),
-            name: firestoreFile.name,
-            category: firestoreFile.category,
-            type: firestoreFile.type,
-            size: firestoreFile.size,
-            uploadDate: firestoreFile.uploadDate?.toDate
-              ? firestoreFile.uploadDate.toDate().toLocaleDateString()
-              : firestoreFile.uploadDate
-                ? new Date(firestoreFile.uploadDate).toLocaleDateString()
-                : new Date().toLocaleDateString(),
+          const userFiles: FileItem[] = result.files.map((firestoreFile: any, index: number) => ({
+            id: parseInt(firestoreFile.id?.split('_')?.[1]) || (Date.now() + index),
+            name: firestoreFile.name || firestoreFile.fileName || 'Untitled File',
+            category: firestoreFile.category || firestoreFile.section || 'Identity',
+            type: firestoreFile.type || firestoreFile.contentType || 'application/pdf',
+            size: firestoreFile.size || 0,
+            uploadDate: this.parseDateField(
+              firestoreFile.uploadDate ??
+              firestoreFile.createdAt ??
+              firestoreFile.uploadedAt ??
+              firestoreFile.created_at
+            ),
             url: firestoreFile.url,
             firestoreId: firestoreFile.id,
           }));
-          
+
           return [...contractFiles, ...userFiles];
         }
       }
@@ -93,7 +95,7 @@ class FileService {
     }
   }
 
-  // Upload files — reads each file as base64 and saves directly to Firestore
+  // Upload files — uploads binary directly to Cloud Storage and saves metadata to database
   async uploadFiles(
     files: File[], 
     category: string,
@@ -103,59 +105,75 @@ class FileService {
 
     for (const file of files) {
       try {
-        // Signal start
         if (onProgress) onProgress(file.name, 10);
 
-        // Read file as base64 data URL — no Azure dependency
-        const dataUrl = await readAsDataUrl(file);
+        // 1. Pre-validation: enforce 25MB ceiling and block dangerous extensions
+        if (file.size > 25 * 1024 * 1024) {
+          throw new Error(`File "${file.name}" exceeds the maximum 25MB limit`);
+        }
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const prohibitedExts = ['exe', 'dll', 'bat', 'cmd', 'sh', 'php', 'html', 'htm', 'js', 'vbs', 'msi', 'com', 'scr'];
+        if (fileExt && prohibitedExts.includes(fileExt)) {
+          throw new Error(`File type ".${fileExt}" is not allowed for security reasons`);
+        }
 
-        if (onProgress) onProgress(file.name, 60);
+        // 2. Upload binary directly to Cloud Storage
+        const safeCategory = (category || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const targetFolder = `documents/${this.currentUserId || 'general'}/${safeCategory}`;
 
+        const storageResult = await uploadToFirebaseStorage(
+          file,
+          targetFolder,
+          (progress) => {
+            if (onProgress) onProgress(file.name, Math.min(95, Math.max(10, progress.percentage)));
+          }
+        );
+
+        if (!storageResult.success || !storageResult.url) {
+          throw new Error(storageResult.error || `Failed to upload "${file.name}" to cloud storage`);
+        }
+
+        const uploadedUrl = storageResult.url;
+        let fileId = `file_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+        // 3. Save metadata to database with cloud storage URL
         if (this.currentUserId) {
-          // Save to backend (Firestore via v2-backend) using the dataUrl as the url field
-          const firestoreResult = await firestoreService.saveUserFile(this.currentUserId, {
+          const fsRes = await firestoreService.saveUserFile(this.currentUserId, {
             name: file.name,
             category,
             type: file.type,
             size: file.size,
-            url: dataUrl,
+            url: uploadedUrl,
           });
 
-          if (onProgress) onProgress(file.name, 100);
-
-          if (firestoreResult.success) {
-            results.push({
-              success: true,
-              file: {
-                id: this.nextId++,
-                name: file.name,
-                category,
-                type: file.type,
-                size: file.size,
-                uploadDate: new Date().toLocaleDateString(),
-                url: dataUrl,
-                firestoreId: firestoreResult.fileId,
-              },
-            });
-          } else {
-            results.push({ success: false, error: firestoreResult.error || 'Failed to save file' });
+          if (!fsRes.success) {
+            throw new Error(fsRes.error || 'Failed to save file metadata to database');
           }
-        } else {
-          // No user — keep in memory only
-          const newFile: FileItem = {
-            id: this.nextId++,
-            name: file.name,
-            category,
-            type: file.type,
-            size: file.size,
-            uploadDate: new Date().toLocaleDateString(),
-            url: dataUrl,
-          };
-          this.files.push(newFile);
-          if (onProgress) onProgress(file.name, 100);
-          results.push({ success: true, file: newFile });
+
+          if (fsRes.fileId) {
+            fileId = fsRes.fileId;
+          }
         }
+
+        if (onProgress) onProgress(file.name, 100);
+
+        const newFile: FileItem = {
+          id: this.nextId++,
+          name: file.name,
+          category,
+          type: file.type,
+          size: file.size,
+          uploadDate: new Date().toLocaleDateString(),
+          url: uploadedUrl,
+          firestoreId: fileId,
+        };
+
+        results.push({
+          success: true,
+          file: newFile,
+        });
       } catch (error) {
+        console.error(`[FileService] Failed to upload ${file.name}:`, error);
         results.push({
           success: false,
           error: error instanceof Error ? error.message : 'Upload failed',
@@ -167,17 +185,20 @@ class FileService {
   }
 
   // Delete file
-  async deleteFile(fileId: number, firestoreId?: string): Promise<FileDeleteResult> {
+  async deleteFile(fileId: number, firestoreId?: string, fileUrl?: string): Promise<FileDeleteResult> {
     try {
-      // Check if it's a contract file (from local files)
+      // Check if it's a contract file (from local template files)
       const contractFileIndex = this.files.findIndex(f => f.id === fileId);
       if (contractFileIndex !== -1) {
         this.files.splice(contractFileIndex, 1);
         return { success: true };
       }
 
-      // If it's a user file with Firestore ID, delete from Firestore
+      // If it's a user file with Firestore ID, delete from database and storage
       if (this.currentUserId && firestoreId) {
+        if (fileUrl) {
+          deleteFromFirebaseStorage(fileUrl).catch(() => null);
+        }
         const result = await firestoreService.deleteUserFile(this.currentUserId, firestoreId);
         if (result.success) {
           return { success: true };
@@ -189,14 +210,6 @@ class FileService {
         }
       }
 
-      // Handle legacy files (uploaded before Firestore implementation)
-      if (this.currentUserId && !firestoreId) {
-        // For legacy files, we'll just remove them from the UI
-        // They weren't stored in Firestore anyway, so this is safe
-        console.log('Deleting legacy file (no Firestore ID)');
-        return { success: true };
-      }
-      
       return { success: false, error: 'File not found' };
     } catch (error) {
       return { 
@@ -209,42 +222,17 @@ class FileService {
   // Download file
   async downloadFile(file: FileItem): Promise<void> {
     try {
-      if (file.url) {
-        // Check if it's a data URL (base64) or a regular URL
-        if (file.url.startsWith('data:')) {
-          // Handle data URLs (base64 encoded files)
-          const link = document.createElement('a');
-          link.href = file.url;
-          link.download = file.name;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        } else if (file.url.startsWith('http://') || file.url.startsWith('https://')) {
-          // Handle regular URLs
-          const link = document.createElement('a');
-          link.href = file.url;
-          link.download = file.name;
-          link.target = '_blank';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        } else {
-          // Handle relative URLs or mock URLs
-          console.warn('Mock URL detected, creating a placeholder download');
-          // Create a simple text file as a placeholder
-          const blob = new Blob([`This is a placeholder for ${file.name}\n\nFile details:\n- Name: ${file.name}\n- Type: ${file.type}\n- Size: ${file.size} bytes\n- Category: ${file.category}\n- Upload Date: ${file.uploadDate}\n\nNote: This is a demo file. In a real application, this would be the actual file content.`], { type: 'text/plain' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = file.name.replace(/\.[^/.]+$/, '') + '_demo.txt';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }
-      } else {
+      if (!file.url) {
         throw new Error('File URL not available');
       }
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.download = file.name;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error) {
       throw new Error(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

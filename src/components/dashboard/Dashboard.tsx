@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import DashboardSidebar, { getUnreadBadgeLabel } from './ui/DashboardSidebar';
 import DashboardHeader, { TenantPreviewBanner } from './ui/DashboardHeader';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,6 +9,9 @@ import { Menu, X, Home, User } from 'lucide-react';
 import { trackEvent } from '../../utils/analytics';
 import { MessagingProvider, useMessagingContext } from '../../contexts/MessagingContext';
 import { useMessagingPoller } from '../../hooks/useMessagingPoller';
+import { MobileHeaderTopBar } from '../common/MobileHeaderTopBar';
+import { MobileBottomNav } from '../common/MobileBottomNav';
+import { MobileCommandSheet } from '../common/MobileCommandSheet';
 
 // Define color constants (matching ReferencingModal)
 export const BLUE_COLOR = '#136C9E';
@@ -198,6 +202,7 @@ const DashboardInner: React.FC = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [commandSheetOpen, setCommandSheetOpen] = useState(false);
   const { user, isLoading } = useAuth();
   const isMobile = useIsMobile();
 
@@ -209,13 +214,10 @@ const DashboardInner: React.FC = () => {
   // P1-3: Show a banner if Firebase Auth sync fails (Firestore writes would be blocked)
   useEffect(() => {
     const handleFirebaseSyncFailure = () => {
-      // toast from react-hot-toast is already available in the app
-      import('react-hot-toast').then(({ default: toast }) => {
-        toast.error(
-          'Session sync issue — some features may not save correctly. Please refresh the page.',
-          { duration: 8000, id: 'firebase-sync-failed' }
-        );
-      });
+      toast.error(
+        'Session sync issue — some features may not save correctly. Please refresh the page.',
+        { duration: 8000, id: 'firebase-sync-failed' }
+      );
     };
     window.addEventListener('firebase-auth-sync-failed', handleFirebaseSyncFailure);
     return () => window.removeEventListener('firebase-auth-sync-failed', handleFirebaseSyncFailure);
@@ -296,25 +298,19 @@ const DashboardInner: React.FC = () => {
         fontFamily: 'Archivo, sans-serif'
       }}
     >
-      {/* Mobile Header */}
+      {/* Pattern 1: Mobile Header Top Bar (Avatar Hub) */}
       {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b md:hidden" style={{ borderColor: '#ebebeb' }}>
-          <div className="flex items-center justify-between h-16 px-4">
-            <button
-              onClick={() => setMobileSidebarOpen(true)}
-              className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-              aria-label="Open menu"
-            >
-              <Menu className="w-6 h-6" style={{ color: '#374957' }} />
-            </button>
-            <img
-              src="/images/proptii-logo.png"
-              alt="Proptii Logo"
-              className="h-14 object-contain cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={handleLogoClick}
-            />
-            <div className="w-10" /> {/* Spacer for centering */}
-          </div>
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white">
+          <MobileHeaderTopBar
+            userName={user?.name || user?.givenName || 'Tenant User'}
+            userPhoto={user?.photoURL}
+            userRole="tenant"
+            title={DASHBOARD_SECTIONS.find((s) => s.id === activeSection)?.label || 'Dashboard'}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+            onOpenSettings={() => navigate('/dashboard/settings')}
+            onOpenNotifications={() => navigate('/dashboard/messages')}
+            unreadCount={unreadCount}
+          />
         </div>
       )}
 
@@ -334,14 +330,14 @@ const DashboardInner: React.FC = () => {
           {/* Overlay */}
           {mobileSidebarOpen && (
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+              className="fixed inset-0 bg-black bg-opacity-50 z-[950] md:hidden"
               onClick={() => setMobileSidebarOpen(false)}
             />
           )}
 
           {/* Sidebar */}
           <div
-            className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white border-r transition-transform duration-300 ease-out md:hidden ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            className={`fixed inset-y-0 left-0 z-[960] w-[280px] max-w-[85vw] h-[100dvh] bg-white border-r transition-transform duration-300 ease-out md:hidden ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
               }`}
             style={{ borderColor: '#ebebeb' }}
           >
@@ -445,7 +441,10 @@ const DashboardInner: React.FC = () => {
               )}
 
               {/* Proptii Home Button */}
-              <div className="border-t pt-4 pb-4 px-4" style={{ borderColor: '#ebebeb' }}>
+              <div
+                className="border-t pt-4 px-4"
+                style={{ borderColor: '#ebebeb', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+              >
                 <button
                   onClick={handleLogoClick}
                   className="w-full flex items-center justify-center h-10 px-4 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
@@ -461,15 +460,16 @@ const DashboardInner: React.FC = () => {
 
       {/* Main content — sidebar spacer already offsets layout; no extra marginLeft */}
       <main
-        className="flex-1 min-w-0"
+        className={`flex-1 min-w-0${location.pathname.startsWith('/dashboard/messages') ? ' tn-viewport-height' : ''}`}
         style={{
           backgroundColor: '#F7F7F7',
+          paddingBottom: isMobile ? 'calc(76px + env(safe-area-inset-bottom, 0px))' : undefined,
           ...(location.pathname.startsWith('/dashboard/messages')
-            ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+            ? { overflow: 'hidden', display: 'flex', flexDirection: 'column' }
             : {}),
         }}
       >
-        {isMobile && <div className="h-16" />} {/* Spacer for mobile header */}
+        {isMobile && <div className="h-16 flex-shrink-0" />} {/* Spacer for mobile header */}
         {hideLegacyHeader ? (
           isTenantPreview ? (
             <div className={`${isMobile ? 'mt-4 px-4' : 'mt-4 px-5 lg:px-6'} w-full max-w-6xl mx-auto`}>
@@ -494,7 +494,7 @@ const DashboardInner: React.FC = () => {
           className={
             hideLegacyHeader
               ? location.pathname.startsWith('/dashboard/messages')
-                ? 'w-full h-full overflow-hidden'
+                ? 'w-full flex-1 min-h-0 overflow-hidden flex flex-col'
                 : 'w-full'
               : `${isMobile ? 'px-4 pb-4' : 'px-5 lg:px-6 pb-8'} w-full max-w-6xl mx-auto`
           }
@@ -502,6 +502,44 @@ const DashboardInner: React.FC = () => {
           <Outlet />
         </div>
       </main>
+
+      {/* Pattern 2: Mobile Bottom Command Dock */}
+      {isMobile && (
+        <>
+          <MobileBottomNav
+            activeTab={activeSection}
+            onTabClick={(id, path) => handleNavClick(id, path || `/dashboard/${id}`)}
+            onOpenCommandSheet={() => setCommandSheetOpen(true)}
+            role="tenant"
+          />
+
+          {/* Mobile Command Launcher Sheet */}
+          <MobileCommandSheet
+            isOpen={commandSheetOpen}
+            onClose={() => setCommandSheetOpen(false)}
+            role="tenant"
+            onNavigate={(id, path) => {
+              if (path) navigate(path);
+            }}
+            onQuickAction={(actionId) => {
+              setCommandSheetOpen(false);
+              if (actionId === 'request-viewing') {
+                navigate('/dashboard/viewings?action=request-viewing');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-request-viewing')), 50);
+              } else if (actionId === 'upload-doc') {
+                navigate('/dashboard/your-files?action=upload');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-file-upload')), 50);
+              } else if (actionId === 'tenant-passport') {
+                navigate('/dashboard/tenant-referencing?action=referencing');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-tenant-referencing')), 50);
+              } else if (actionId === 'view-contracts') {
+                navigate('/dashboard/tenant-contracts?action=sign');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-sign-contract')), 50);
+              }
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };

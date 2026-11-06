@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ReferencingController } from './referencing.controller';
 import { RefereeGuarantorController } from './referee-guarantor.controller';
+import { ForbiddenException, BadRequestException } from '@nestjs/common';
 
 describe('Section 11 & 12: Referencing, Passport Sharing & Guarantor Endpoints', () => {
   describe('ReferencingController', () => {
@@ -15,6 +16,7 @@ describe('Section 11 & 12: Referencing, Passport Sharing & Guarantor Endpoints',
         shareReferencingPassport: vi.fn(),
         getPublicPassportByToken: vi.fn(),
         sendReferencingRequest: vi.fn(),
+        saveUserFile: vi.fn(),
       };
       guarantorService = {};
       controller = new ReferencingController(refService, guarantorService as any);
@@ -79,6 +81,57 @@ describe('Section 11 & 12: Referencing, Passport Sharing & Guarantor Endpoints',
       );
       expect(res.success).toBe(true);
     });
+
+    it('[GET /referencing/forms/:formId] blocks unauthorized tenant from reading other applicant data', async () => {
+      const unauthorizedReq = { user: { uid: 'unauthorized-tenant', role: 'tenant' } };
+      await expect(
+        controller.getReferencingForm(unauthorizedReq, 'victim-applicant-id'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('[GET /referencing/forms/:formId] allows owning applicant or landlord/agent to access referencing form', async () => {
+      refService.getFormData = vi.fn().mockResolvedValue({ id: 'tenant-1', currentStep: 2 });
+
+      const ownerReq = { user: { uid: 'tenant-1', role: 'tenant' } };
+      const resOwner = await controller.getReferencingForm(ownerReq, 'tenant-1');
+      expect(resOwner.success).toBe(true);
+
+      const landlordReq = { user: { uid: 'landlord-99', role: 'landlord' } };
+      const resLandlord = await controller.getReferencingForm(landlordReq, 'tenant-1');
+      expect(resLandlord.success).toBe(true);
+    });
+
+    it('[POST /referencing/files/save] enforces verified caller UID and ignores forged body.userId', async () => {
+      refService.saveUserFile.mockResolvedValue({ success: true, fileUrl: 'https://storage/doc.pdf' });
+      const authReq = { user: { uid: 'real-tenant-uid' } };
+      const fakeBody = { userId: 'victim-landlord-uid' };
+      const mockFile = { originalname: 'doc.pdf', buffer: Buffer.from('data') } as any;
+
+      await controller.saveUserFile(authReq, mockFile, fakeBody);
+      expect(refService.saveUserFile).toHaveBeenCalledWith('real-tenant-uid', mockFile, fakeBody);
+      expect(refService.saveUserFile).not.toHaveBeenCalledWith('victim-landlord-uid', mockFile, fakeBody);
+    });
+
+    it('[POST /referencing/files/save] scopes guest guarantor/referee upload to invitation token', async () => {
+      refService.saveUserFile.mockResolvedValue({ success: true, fileUrl: 'https://storage/proof.pdf' });
+      const guestReq = { user: null };
+      const tokenBody = { invitationToken: 'invite-tok-789', userId: 'attacker-trying-override' };
+      const mockFile = { originalname: 'proof.pdf', buffer: Buffer.from('data') } as any;
+
+      await controller.saveUserFile(guestReq, mockFile, tokenBody);
+      expect(refService.saveUserFile).toHaveBeenCalledWith('token_invite-tok-789', mockFile, tokenBody);
+    });
+
+    it('[POST /referencing/files/save] sandboxes anonymous upload to isolated guest ID preventing ID spoofing', async () => {
+      refService.saveUserFile.mockResolvedValue({ success: true, fileUrl: 'https://storage/temp.pdf' });
+      const guestReq = { user: null };
+      const spoofBody = { userId: 'admin-account-id' };
+      const mockFile = { originalname: 'temp.pdf', buffer: Buffer.from('data') } as any;
+
+      await controller.saveUserFile(guestReq, mockFile, spoofBody);
+      expect(refService.saveUserFile).toHaveBeenCalledWith(expect.stringMatching(/^guest_/), mockFile, spoofBody);
+      expect(refService.saveUserFile).not.toHaveBeenCalledWith('admin-account-id', mockFile, spoofBody);
+    });
   });
 
   describe('RefereeGuarantorController', () => {
@@ -90,6 +143,7 @@ describe('Section 11 & 12: Referencing, Passport Sharing & Guarantor Endpoints',
         getResponses: vi.fn(),
         saveResponse: vi.fn(),
         inviteGuarantor: vi.fn(),
+        sendReferencingEmail: vi.fn(),
       };
       controller = new RefereeGuarantorController(service);
     });
@@ -103,12 +157,43 @@ describe('Section 11 & 12: Referencing, Passport Sharing & Guarantor Endpoints',
       expect(res).toHaveLength(1);
     });
 
-    it('[POST /referee-guarantor-responses] saves referee/guarantor questionnaire submission', async () => {
+    it('[POST /referee-guarantor-responses] saves referee/guarantor questionnaire submission with valid identifier', async () => {
       service.saveResponse.mockResolvedValue({ success: true, id: 'resp-1' });
       const body = { applicantId: 'tenant-1', type: 'employer', confirmedSalary: 55000 };
 
       const res = await controller.saveResponse(body);
       expect(service.saveResponse).toHaveBeenCalledWith(body);
+      expect(res.success).toBe(true);
+    });
+
+    it('[POST /referee-guarantor-responses] rejects submission without token or applicant identifier', async () => {
+      await expect(
+        controller.saveResponse({ type: 'employer', confirmedSalary: 55000 }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('[POST /referencing/send-email] strictly blocks phishing open relay on external unapproved formUrl', async () => {
+      const maliciousPayload = {
+        to: 'referee@employer.com',
+        tenantName: 'John',
+        type: 'referee' as const,
+        formUrl: 'https://evil-phishing-site.ru/steal-credentials',
+      };
+      await expect(
+        controller.sendEmail(maliciousPayload),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('[POST /referencing/send-email] allows email dispatch when formUrl belongs to approved Proptii domain', async () => {
+      service.sendReferencingEmail.mockResolvedValue({ success: true });
+      const validPayload = {
+        to: 'referee@employer.com',
+        tenantName: 'John',
+        type: 'referee' as const,
+        formUrl: 'https://proptii.co/referencing/questionnaire?token=tok-12345',
+      };
+      const res = await controller.sendEmail(validPayload);
+      expect(service.sendReferencingEmail).toHaveBeenCalledWith(validPayload);
       expect(res.success).toBe(true);
     });
 

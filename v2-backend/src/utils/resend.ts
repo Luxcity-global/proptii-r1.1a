@@ -20,11 +20,15 @@ export interface ResendEmailPayload {
  * Returns the Resend email ID on success, throws on failure.
  */
 export async function sendEmail(payload: ResendEmailPayload): Promise<string> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM_ADDRESS || 'noreply@mail.proptii.co';
+  const rawKey = (process.env.RESEND_API_KEY || '').trim();
+  const from = (process.env.EMAIL_FROM_ADDRESS || 'noreply@mail.proptii.co').trim();
+
+  // Guard against placeholder keys or leading/trailing whitespace
+  const isPlaceholder = !rawKey || rawKey.includes('your_resend_api') || rawKey.includes('your-resend');
+  const apiKey = isPlaceholder ? '' : rawKey;
 
   if (!apiKey) {
-    throw new Error('RESEND_API_KEY is not set');
+    throw new Error('RESEND_API_KEY is not configured in backend environment variables');
   }
 
   const body = JSON.stringify({
@@ -56,15 +60,16 @@ export async function sendEmail(payload: ResendEmailPayload): Promise<string> {
           if (res.statusCode === 200 || res.statusCode === 201) {
             resolve(parsed.id as string);
           } else {
-            reject(new Error(`Resend API error ${res.statusCode}: ${JSON.stringify(parsed)}`));
+            const detail = parsed?.message || parsed?.error || (typeof parsed === 'string' ? parsed : JSON.stringify(parsed));
+            reject(new Error(`Resend error (${res.statusCode}): ${detail}`));
           }
         } catch (e) {
-          reject(new Error(`Failed to parse Resend response: ${data}`));
+          reject(new Error(`Failed to parse Resend response (HTTP ${res.statusCode}): ${data}`));
         }
       });
     });
 
-    req.on('error', (err) => reject(err));
+    req.on('error', (err) => reject(new Error(`Network error connecting to Resend: ${err.message}`)));
     req.write(body);
     req.end();
   });

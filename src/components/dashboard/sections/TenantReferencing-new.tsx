@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   CheckCircle,
   Clock,
@@ -10,6 +10,7 @@ import {
   Share2,
   Shield,
   Eye,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
@@ -20,8 +21,9 @@ import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess
 import PlanUpgradeWall from '../PlanUpgradeWall';
 import TenantPageHeader from '../ui/TenantPageHeader';
 import BookViewingModal from '../../viewings/BookViewingModal';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { downloadReferencingReportPdf } from '../../../utils/referencingReportPdf';
+import { isReferencingStepComplete, isReferencingStepOptional, getReferencingProgress, REQUIRED_REFERENCING_STEPS } from '../../../utils/referencingProgress';
 import '../../../styles/tenantReferencing.css';
 import '../../../styles/tenantModals.css';
 
@@ -115,6 +117,7 @@ const TenantReferencing: React.FC = () => {
   const { plan, status, loading: billingLoading } = useBillingStatus();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState<FormData | null>(null);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({});
   const [shares, setShares] = useState<ReferencingShareItem[]>([]);
@@ -126,8 +129,21 @@ const TenantReferencing: React.FC = () => {
   const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
   const [previewPillar, setPreviewPillar] = useState<{ title: string; step: number; complete: boolean; description: string } | null>(null);
   const [referencingStep, setReferencingStep] = useState(1);
-  const [singleSectionOnly, setSingleSectionOnly] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'shared'>('details');
+
+  useEffect(() => {
+    const handleOpenRef = () => {
+      setReferencingStep(1);
+      setIsReferencingModalOpen(true);
+    };
+    window.addEventListener('open-tenant-referencing', handleOpenRef);
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'referencing') {
+      setReferencingStep(1);
+      setIsReferencingModalOpen(true);
+    }
+    return () => window.removeEventListener('open-tenant-referencing', handleOpenRef);
+  }, [location.search]);
 
   const loadReferencingData = async () => {
     const userId = user?.id || (isAuthenticated ? (user as any)?.uid || 'current_user' : null);
@@ -202,50 +218,13 @@ const TenantReferencing: React.FC = () => {
     return false;
   };
 
-  const isSectionCompleted = (step: number): boolean => {
-    if (!formData) return false;
-    if (stepStatus[step] === 'complete') return true;
-
-    switch (step) {
-      case 1:
-        return !!(
-          formData.identity?.firstName &&
-          formData.identity?.lastName &&
-          formData.identity?.email &&
-          (formData.identity?.identityProof || formData.identity?.dateOfBirth)
-        );
-      case 2:
-        return !!(
-          formData.employment?.employmentStatus &&
-          (['Unemployed', 'Retired', 'Student'].includes(formData.employment?.employmentStatus) ||
-            formData.employment?.companyDetails ||
-            formData.employment?.jobPosition)
-        );
-      case 3:
-        return !!(formData.residential?.currentAddress && formData.residential?.durationAtCurrentAddress);
-      case 4:
-        return !!(
-          formData.financial?.monthlyIncome ||
-          formData.financial?.proofOfIncomeDocument ||
-          formData.financial?.useOpenBanking
-        );
-      case 5:
-        return (
-          (formData as any)?.guarantor?.verifiedViaLink ||
-          (formData as any)?.guarantorInvitation?.status === 'completed' ||
-          !!(formData.guarantor?.firstName && formData.guarantor?.lastName && formData.guarantor?.email)
-        );
-      default:
-        return false;
-    }
-  };
+  const isSectionCompleted = (step: number): boolean =>
+    isReferencingStepComplete(formData, stepStatus, step);
 
   const calculateProgress = () => {
-    if (!formData) return { overall: 0, completed: 0, pending: 5, documents: 0 };
+    if (!formData) return { overall: 0, completed: 0, total: REQUIRED_REFERENCING_STEPS.length, pending: REQUIRED_REFERENCING_STEPS.length, documents: 0 };
 
-    const steps = [1, 2, 3, 4, 5];
-    const completedSteps = steps.filter(step => isSectionCompleted(step)).length;
-    const totalSteps = 5;
+    const { completed: completedSteps, total: totalSteps, percent } = getReferencingProgress(formData, stepStatus);
 
     const documents = [
       formData.identity?.identityProof,
@@ -263,8 +242,9 @@ const TenantReferencing: React.FC = () => {
     }).length;
 
     return {
-      overall: Math.round((completedSteps / totalSteps) * 100),
+      overall: percent,
       completed: completedSteps,
+      total: totalSteps,
       pending: totalSteps - completedSteps,
       documents
     };
@@ -273,6 +253,7 @@ const TenantReferencing: React.FC = () => {
   const progress = calculateProgress();
   const summaryOverallProgress = isAuthenticated ? progress.overall : 0;
   const summaryCompleted = isAuthenticated ? progress.completed : 0;
+  const summaryTotal = progress.total;
 
   const hasStartedReferencing = () => {
     if (!formData) return false;
@@ -286,17 +267,12 @@ const TenantReferencing: React.FC = () => {
     return hasEmployment || hasResidential || hasFinancial || hasGuarantor || hasIdentityDocs || summaryOverallProgress > 0;
   };
 
-  const openSectionModal = (step: number) => {
+  const openFullPassportModal = (step: number = 1) => {
     setReferencingStep(step);
-    setSingleSectionOnly(true);
     setIsReferencingModalOpen(true);
   };
 
-  const openFullPassportModal = (step: number = 1) => {
-    setReferencingStep(step);
-    setSingleSectionOnly(false);
-    setIsReferencingModalOpen(true);
-  };
+  const openSectionModal = openFullPassportModal;
 
   const closeReferencingModal = () => {
     setIsReferencingModalOpen(false);
@@ -454,10 +430,13 @@ const TenantReferencing: React.FC = () => {
   const referencingHeader = (
     <TenantPageHeader
       title="Referencing"
-      subtitle="Manage and track your property lease agreements and legal documents."
-      primaryLabel="Request Viewing"
-      primaryIcon={<Eye className="w-4 h-4" />}
-      onPrimary={() => setIsBookViewingOpen(true)}
+      subtitle="Manage your referencing passport, verification details, and landlord sharing."
+      primaryLabel={started ? 'Update Passport' : 'Start Referencing'}
+      primaryIcon={<FileText className="w-4 h-4" />}
+      onPrimary={() => {
+        setReferencingStep(1);
+        setIsReferencingModalOpen(true);
+      }}
     />
   );
 
@@ -532,9 +511,9 @@ const TenantReferencing: React.FC = () => {
   const healthState = summaryOverallProgress === 100 ? 'verified' : summaryOverallProgress > 0 ? 'partial' : 'empty';
   const healthLabel = healthState === 'verified' ? 'Fully Verified' : healthState === 'partial' ? 'In Progress' : 'Not Started';
   const healthDesc = healthState === 'verified'
-    ? 'All 5 architecture pillars have been verified. Your digital passport is ready for deployment.'
+    ? `All ${summaryTotal} required architecture pillars have been verified. Your digital passport is ready for deployment.`
     : healthState === 'partial'
-      ? `${summaryCompleted} of 5 architecture pillars complete. Continue verification to share your passport.`
+      ? `${summaryCompleted} of ${summaryTotal} required architecture pillars complete. Continue verification to share your passport.`
       : 'No referencing checks completed yet. Begin identity and employment verification to proceed.';
 
   const pillars = [
@@ -699,7 +678,7 @@ const TenantReferencing: React.FC = () => {
             <List className="w-5 h-5" />
           </div>
           <div>
-            <div className="tn-ref-kpi-big">{summaryCompleted}/5</div>
+            <div className="tn-ref-kpi-big">{summaryCompleted}/{summaryTotal}</div>
             <div className="tn-ref-kpi-sublabel">Steps Cleared</div>
           </div>
         </div>
@@ -746,21 +725,24 @@ const TenantReferencing: React.FC = () => {
                 </button>
               </div>
               <div className="tn-ref-pillars">
-                {pillars.map((pillar) => (
+                {pillars.map((pillar) => {
+                  const optional = isReferencingStepOptional(pillar.step);
+                  const tone = pillar.complete ? 'done' : started && !optional ? 'wait' : 'off';
+                  return (
                   <button
                     key={pillar.step}
                     type="button"
                     className="tn-ref-pillar"
                     onClick={() => openSectionModal(pillar.step)}
                   >
-                    <span className={`tn-ref-pillar-icon ${pillar.complete ? 'done' : started ? 'wait' : 'off'}`}>
+                    <span className={`tn-ref-pillar-icon ${tone}`}>
                       {pillar.complete ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                     </span>
                     <div className="tn-ref-pillar-body">
                       <div className="tn-ref-pillar-title">
                         <h3>{pillar.title}</h3>
-                        <span className={`tn-ref-pillar-status ${pillar.complete ? 'done' : started ? 'wait' : 'off'}`}>
-                          {pillar.complete ? 'Verified' : 'Incomplete'}
+                        <span className={`tn-ref-pillar-status ${tone}`}>
+                          {pillar.complete ? 'Verified' : optional ? 'Optional' : 'Incomplete'}
                         </span>
                       </div>
                       <p className="tn-ref-pillar-desc">{pillar.description}</p>
@@ -778,7 +760,8 @@ const TenantReferencing: React.FC = () => {
                       </div>
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -866,7 +849,8 @@ const TenantReferencing: React.FC = () => {
           isOpen={isReferencingModalOpen}
           onClose={closeReferencingModal}
           initialStep={referencingStep}
-          singleSectionOnly={singleSectionOnly}
+          propertyId={user?.id ? `general_${user.id}` : 'default-property'}
+          applicationId={user?.id ? `general_${user.id}` : undefined}
           onSubmissionComplete={() => {
             loadReferencingData();
           }}
@@ -903,7 +887,7 @@ const TenantReferencing: React.FC = () => {
               <div className="tn-modal-attest">
                 <div>
                   <span>Status</span>
-                  <strong>{previewPillar.complete ? 'Verified' : 'Incomplete'}</strong>
+                  <strong>{previewPillar.complete ? 'Verified' : isReferencingStepOptional(previewPillar.step) ? 'Optional' : 'Incomplete'}</strong>
                 </div>
                 <div>
                   <span>Document type</span>

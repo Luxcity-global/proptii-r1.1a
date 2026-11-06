@@ -140,7 +140,7 @@ export default defineConfig(({ mode = 'development' }) => {
       },
       proxy: {
         '/api/search-backend': {
-          target: viteSearchBackendUrl || 'https://proptii-r1-1a-q95f.onrender.com',
+          target: viteSearchBackendUrl || 'https://proptii-listings-api.onrender.com',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/search-backend/, ''),
           secure: false,
@@ -156,13 +156,13 @@ export default defineConfig(({ mode = 'development' }) => {
               }
             });
             proxy.on('error', (err, req, res: any) => {
-              const dest = viteSearchBackendUrl || 'https://proptii-r1-1a-q95f.onrender.com';
+              const dest = viteSearchBackendUrl || 'https://proptii-listings-api.onrender.com';
               console.error(`[Vite Search Proxy] Could not connect to search backend at ${dest}:`, err.message);
               if (res && !res.headersSent) {
                 res.writeHead(502, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                   error: 'Search backend unavailable',
-                  message: `Cannot connect to search backend at ${dest}. If running locally, ensure proptii-search is running on port 3001. Otherwise configure VITE_SEARCH_BACKEND_URL to https://proptii-r1-1a-q95f.onrender.com.`,
+                  message: `Cannot connect to search backend at ${dest}. If running locally, ensure proptii-search is running on port 3001. Otherwise configure VITE_SEARCH_BACKEND_URL to https://proptii-listings-api.onrender.com.`,
                   code: (err as any).code,
                 }));
               }
@@ -180,14 +180,9 @@ export default defineConfig(({ mode = 'development' }) => {
         interval: 500,
         ignored: [
           '**/node_modules/**',
-          // Explicitly exclude the landlord sub-app's node_modules — the glob above
-          // does not match paths nested inside src/ with chokidar, so without this
-          // entry all ~20k files there are polled on every interval.
-          '**/src/landlord_agent/node_modules/**',
           '**/.git/**',
           '**/dist/**',
           '**/api/**',
-          '**/proptii-backend/**',
           '**/proptii-search/**',
           '**/public/landlord/**',
           '**/coverage/**',
@@ -274,6 +269,9 @@ export default defineConfig(({ mode = 'development' }) => {
         },
       } : undefined,
     },
+    esbuild: {
+      drop: isProduction ? ['console', 'debugger'] : [],
+    },
     optimizeDeps: {
       // Pre-bundle every bare-package import found in src/ so Vite never has to
       // discover and recompile deps on-demand (which causes browser reloads and
@@ -290,7 +288,7 @@ export default defineConfig(({ mode = 'development' }) => {
         'react-dom/client',
         'react-router-dom',
         'react-hook-form',
-        'react-hot-toast',
+        'sonner',
         'react-dropzone',
 
         // ── MUI + Emotion (must stay together — MUI has Emotion peer dep) ──

@@ -5,9 +5,10 @@ import BookViewingModal from '../../viewings/BookViewingModal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useIsMobile } from '../ui/use-mobile';
 import { trackEvent } from '../../../utils/analytics';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import communicationService from '../../../services/communicationService';
 import TenantPageHeader from '../ui/TenantPageHeader';
+import ProptiiSearchModal from '../ui/ProptiiSearchModal';
 import '../../../styles/tenantSaved.css';
 import '../../../styles/tenantModals.css';
 
@@ -47,6 +48,7 @@ const SavedProperties: React.FC = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -62,9 +64,6 @@ const SavedProperties: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-  const [searchCity, setSearchCity] = useState('');
-  const [searchBudget, setSearchBudget] = useState('3000');
-  const [searchBeds, setSearchBeds] = useState('2');
   const [imageIndexById, setImageIndexById] = useState<Record<string, number>>({});
 
   const handleMessageClick = async (property: any) => {
@@ -383,6 +382,14 @@ const SavedProperties: React.FC = () => {
     });
   };
 
+  useEffect(() => {
+    const requested = (location.state as { openSavedProperty?: SavedProperty } | null)?.openSavedProperty;
+    if (!requested?.id) return;
+    const match = savedProperties.find((p) => p.id === requested.id) || requested;
+    openDetails(match);
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [location.state]);
+
   const handleBookViewing = (property: SavedProperty) => {
     const locationParts = property.location?.split(',').map((s: string) => s.trim()) || [];
     const agent = property.agent || ({} as SavedProperty['agent']);
@@ -428,16 +435,6 @@ const SavedProperties: React.FC = () => {
       ...prev,
       [property.id]: ((prev[property.id] || 0) + 1) % count,
     }));
-  };
-
-  const runProptiiSearch = () => {
-    const city = searchCity.trim();
-    const beds = searchBeds ? `${searchBeds} bedroom` : '';
-    const place = city || 'UK';
-    let q = `${beds} property to rent in ${place}`.replace(/\s+/g, ' ').trim();
-    if (searchBudget) q += ` under ${searchBudget}pcm`;
-    setIsSearchModalOpen(false);
-    navigate(`/search?q=${encodeURIComponent(q)}`);
   };
 
   const showEmpty = !isLoading && savedProperties.length === 0;
@@ -823,66 +820,7 @@ const SavedProperties: React.FC = () => {
         </div>
       )}
 
-      {isSearchModalOpen && (
-        <div className="tn-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setIsSearchModalOpen(false); }}>
-          <div className="tn-modal" role="dialog" aria-labelledby="tn-proptii-search" style={{ maxWidth: 512 }}>
-            <div className="tn-modal-head">
-              <div className="tn-drawer-head-main">
-                <span className="tn-sp-search-modal-ico">
-                  <Search size={16} />
-                </span>
-                <div>
-                  <h3 id="tn-proptii-search">Proptii Property Search</h3>
-                  <p style={{ margin: 0, fontSize: 12, color: '#64748b', fontWeight: 500 }}>
-                    Discover residential lettings across the UK
-                  </p>
-                </div>
-              </div>
-              <button type="button" className="tn-modal-x" onClick={() => setIsSearchModalOpen(false)} aria-label="Close">✕</button>
-            </div>
-            <div className="tn-modal-body">
-              <label className="tn-sp-field" htmlFor="tn-sp-city">Target UK City or Postcode</label>
-              <input
-                id="tn-sp-city"
-                className="tn-sp-input"
-                placeholder="e.g. Manchester, M1 4BT, or Leeds City Centre"
-                value={searchCity}
-                onChange={(e) => setSearchCity(e.target.value)}
-              />
-              <div className="tn-sp-form-grid" style={{ marginTop: 16 }}>
-                <div>
-                  <label className="tn-sp-field" htmlFor="tn-sp-budget">Max Budget (£/month)</label>
-                  <input
-                    id="tn-sp-budget"
-                    className="tn-sp-input"
-                    type="number"
-                    value={searchBudget}
-                    onChange={(e) => setSearchBudget(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="tn-sp-field" htmlFor="tn-sp-beds">Min Bedrooms</label>
-                  <select
-                    id="tn-sp-beds"
-                    className="tn-sp-input"
-                    value={searchBeds}
-                    onChange={(e) => setSearchBeds(e.target.value)}
-                  >
-                    <option value="1">1+ Beds</option>
-                    <option value="2">2+ Beds</option>
-                    <option value="3">3+ Beds</option>
-                    <option value="4">4+ Beds</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="tn-modal-foot">
-              <button type="button" className="tn-modal-cancel" onClick={() => setIsSearchModalOpen(false)}>Cancel</button>
-              <button type="button" className="tn-modal-primary" onClick={runProptiiSearch}>Search Available Listings</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ProptiiSearchModal open={isSearchModalOpen} onClose={() => setIsSearchModalOpen(false)} />
     </div>
   );
 };

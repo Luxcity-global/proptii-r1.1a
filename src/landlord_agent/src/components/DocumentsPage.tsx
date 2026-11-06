@@ -25,6 +25,7 @@ import {
   Eye,
   X,
   Link2,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -38,12 +39,16 @@ import {
 } from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useIsMobile } from './ui/use-mobile';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import { Property, PropertyDocument, UserProfile } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
+import { isPropertyDeleted } from '../utils/deletedProperties';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 import { documentService, LandlordDocument } from '../services/documentService';
+import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import '../styles/documentsPage.css';
 
 interface DocumentsPageProps {
@@ -280,6 +285,8 @@ export function DocumentsPage({
   const [typeFilter, setTypeFilter] = useState<CategoryFilter>('all');
   const [propertyFilter, setPropertyFilter] = useState<string>(initialPropertyId || 'all');
   const [tenantFilter, setTenantFilter] = useState<string>('all');
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState({ property: 'all', tenant: 'all', status: 'all' });
   const [viewScope, setViewScope] = useState<ViewScope>(
     initialPropertyId ? 'property' : ((properties && properties.length > 0) ? 'property' : 'all')
   );
@@ -311,8 +318,12 @@ export function DocumentsPage({
     window.setTimeout(() => setIsRefreshing(false), 700);
   };
 
+  const activeProperties = useMemo(() => {
+    return (properties || []).filter((p) => !isPropertyArchived(p) && !isPropertyDeleted(p.id, p.address));
+  }, [properties]);
+
   const allDocuments = useMemo<DocumentWithProperty[]>(() => {
-    const propDocs: DocumentWithProperty[] = (properties || []).flatMap((property) =>
+    const propDocs: DocumentWithProperty[] = activeProperties.flatMap((property) =>
       (property.documents || []).map((document) => ({
         ...document,
         propertyAddress: property.address,
@@ -322,30 +333,108 @@ export function DocumentsPage({
       })),
     );
 
-    const unassignedMapped: DocumentWithProperty[] = (unassignedDocuments || []).map((doc) => ({
-      id: doc.id,
-      name: doc.name,
-      type: (doc.type as any) || 'other',
-      url: doc.url,
-      issueDate: doc.issueDate instanceof Date ? doc.issueDate : new Date(doc.issueDate as any),
-      expiryDate: doc.expiryDate ? (doc.expiryDate instanceof Date ? doc.expiryDate : new Date(doc.expiryDate as any)) : undefined,
-      status: doc.status || 'valid',
-      propertyAddress: 'Unassigned (Vault)',
-      propertyId: '',
-      tenantName: null,
-      isUnassigned: true,
-    }));
+    const unassignedMapped: DocumentWithProperty[] = (unassignedDocuments || [])
+      .filter((doc) => {
+        if (!doc.propertyId) return true;
+        if (isPropertyDeleted(doc.propertyId)) return false;
+        if ((properties || []).some((p) => p.id === doc.propertyId && isPropertyArchived(p))) return false;
+        return true;
+      })
+      .map((doc) => ({
+        id: doc.id,
+        name: doc.name,
+        type: (doc.type as any) || 'other',
+        url: doc.url,
+        issueDate: doc.issueDate instanceof Date ? doc.issueDate : new Date(doc.issueDate as any),
+        expiryDate: doc.expiryDate ? (doc.expiryDate instanceof Date ? doc.expiryDate : new Date(doc.expiryDate as any)) : undefined,
+        status: doc.status || 'valid',
+        propertyAddress: 'Unassigned (Vault)',
+        propertyId: '',
+        tenantName: null,
+        isUnassigned: true,
+      }));
 
     return [...propDocs, ...unassignedMapped];
-  }, [properties, unassignedDocuments]);
+  }, [activeProperties, unassignedDocuments, properties]);
 
   const tenantOptions = useMemo(() => {
     const names = new Set<string>();
-    (properties || []).forEach((p) => {
+    activeProperties.forEach((p) => {
       if (p.tenant?.name) names.add(p.tenant.name);
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [properties]);
+  }, [activeProperties]);
+
+  type FilterKey = 'property' | 'tenant' | 'status';
+  const activeFilterCount = [propertyFilter, tenantFilter, statusFilter].filter((v) => v !== 'all').length;
+
+  const applyStatusFilter = (nextStatus: string) => {
+    setStatusFilter(nextStatus);
+    if (nextStatus === 'expiring-soon' || nextStatus === 'expired') {
+      setTypeFilter('all');
+    }
+  };
+
+  const openFilterSheet = () => {
+    setDraftFilters({ property: propertyFilter, tenant: tenantFilter, status: statusFilter });
+    setFilterSheetOpen(true);
+  };
+
+  const applyDraftFilters = () => {
+    setPropertyFilter(draftFilters.property);
+    setTenantFilter(draftFilters.tenant);
+    applyStatusFilter(draftFilters.status);
+    setFilterSheetOpen(false);
+  };
+
+  const renderFilterSelects = (
+    values: Record<FilterKey, string>,
+    onChange: (key: FilterKey, value: string) => void,
+  ) => (
+    <>
+      <select
+        className="ll-docs-select"
+        value={values.property}
+        onChange={(e) => onChange('property', e.target.value)}
+        aria-label="Filter by property"
+      >
+        <option value="all">
+          All Properties ({activeProperties.length} Properties)
+        </option>
+        {activeProperties.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.address}
+          </option>
+        ))}
+      </select>
+
+      <select
+        className="ll-docs-select"
+        value={values.tenant}
+        onChange={(e) => onChange('tenant', e.target.value)}
+        aria-label="Filter by tenant"
+      >
+        <option value="all">All Tenants / Clients</option>
+        {tenantOptions.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+
+      <select
+        className="ll-docs-select"
+        value={values.status}
+        onChange={(e) => onChange('status', e.target.value)}
+        aria-label="Filter by status"
+      >
+        <option value="all">All Audit Statuses</option>
+        <option value="valid">Valid</option>
+        <option value="expiring-soon">Expiring Soon</option>
+        <option value="expired">Expired / Action Required</option>
+      </select>
+    </>
+  );
 
   const categoryCounts = useMemo(() => {
     const counts: Record<CategoryFilter, number> = {
@@ -410,15 +499,15 @@ export function DocumentsPage({
       propertyFilter === 'all' &&
       tenantFilter === 'all';
 
-    if (filtersIdle) return properties || [];
+    if (filtersIdle) return activeProperties;
 
-    return (properties || []).filter((p) => {
+    return activeProperties.filter((p) => {
       if (propertyFilter !== 'all' && p.id !== propertyFilter) return false;
       if (tenantFilter !== 'all' && p.tenant?.name !== tenantFilter) return false;
       return ids.has(p.id);
     });
   }, [
-    properties,
+    activeProperties,
     filteredDocuments,
     searchTerm,
     statusFilter,
@@ -485,9 +574,9 @@ export function DocumentsPage({
     const expired = allDocuments.filter((doc) => doc.status === 'expired').length;
     const expiringSoon = allDocuments.filter((doc) => doc.status === 'expiring-soon').length;
     const valid = allDocuments.filter((doc) => doc.status === 'valid').length;
-    const propertiesDocumented = (properties || []).filter((p) => (p.documents || []).length > 0)
+    const propertiesDocumented = activeProperties.filter((p) => (p.documents || []).length > 0)
       .length;
-    const tenantsTracked = (properties || []).filter((p) => p.tenant).length;
+    const tenantsTracked = activeProperties.filter((p) => p.tenant).length;
     const actionsNeeded = expired + expiringSoon;
     const compliancePct =
       total > 0 ? Math.round((valid / total) * 100) : propertiesDocumented > 0 ? 100 : 0;
@@ -502,7 +591,7 @@ export function DocumentsPage({
       actionsNeeded,
       compliancePct,
     };
-  }, [allDocuments, properties]);
+  }, [allDocuments, activeProperties]);
 
   const hasActiveFilters =
     Boolean(searchTerm) ||
@@ -520,7 +609,7 @@ export function DocumentsPage({
   };
 
   const openAttachFlow = (property?: Property) => {
-    const list = properties || [];
+    const list = activeProperties;
     const target =
       property ||
       (propertyFilter && propertyFilter !== 'all' ? list.find((p) => p.id === propertyFilter) : undefined) ||
@@ -635,7 +724,7 @@ export function DocumentsPage({
 
   const openAssignModal = (doc: DocumentWithProperty) => {
     setAssignModalDoc(doc);
-    setAssignTargetPropertyId((properties && properties[0]?.id) || '');
+    setAssignTargetPropertyId((activeProperties && activeProperties[0]?.id) || '');
   };
 
   const closeAssignModal = () => {
@@ -799,194 +888,303 @@ export function DocumentsPage({
     ) : null;
 
   const renderDocumentTable = (docs: DocumentWithProperty[] = filteredDocuments) => (
-    <div className="ll-docs-table-wrap">
-      <div className="ll-docs-table-scroll">
-        <table className="ll-docs-table">
-          <thead>
-            <tr>
-              <th style={{ width: 44 }}>
-                <input
-                  type="checkbox"
-                  className="ll-docs-check"
-                  checked={
-                    docs.length > 0 && docs.every((d) => selectedDocuments.includes(d.id))
-                  }
-                  onChange={() => {
-                    const allSelected = docs.length > 0 && docs.every((d) => selectedDocuments.includes(d.id));
-                    if (allSelected) {
-                      setSelectedDocuments((prev) =>
-                        prev.filter((id) => !docs.some((d) => d.id === id)),
-                      );
-                    } else {
-                      setSelectedDocuments((prev) =>
-                        Array.from(new Set([...prev, ...docs.map((d) => d.id)])),
-                      );
+    <>
+      <div className="ll-docs-table-wrap hidden md:block">
+        <div className="ll-docs-table-scroll">
+          <table className="ll-docs-table">
+            <thead>
+              <tr>
+                <th style={{ width: 44 }}>
+                  <input
+                    type="checkbox"
+                    className="ll-docs-check"
+                    checked={
+                      docs.length > 0 && docs.every((d) => selectedDocuments.includes(d.id))
                     }
-                  }}
-                  aria-label="Select all documents"
-                />
-              </th>
-              <th>Document / File</th>
-              <th>Attached Property</th>
-              <th>Attached Tenant</th>
-              <th>Category</th>
-              <th>Validity / Upload</th>
-              <th>Audit Status</th>
-              <th className="is-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {docs.map((document) => {
-              const property = getPropertyByDocument(document.propertyId);
-              const daysUntilExpiry = getDaysUntilExpiry(document.expiryDate);
-              const isUnassignedDoc = document.isUnassigned || !document.propertyId;
-              return (
-                <tr
-                  key={documentRowKey(document)}
-                  className={selectedDocuments.includes(document.id) ? 'is-selected' : ''}
-                >
-                  <td>
-                    <input
-                      type="checkbox"
-                      className="ll-docs-check"
-                      checked={selectedDocuments.includes(document.id)}
-                      onChange={() => toggleDocumentSelection(document.id)}
-                      aria-label={`Select ${document.name}`}
-                    />
-                  </td>
-                  <td>
-                    <div className="ll-docs-table-doc">
-                      {statusIcon(document.status)}
-                      <span title={document.name}>{document.name}</span>
-                    </div>
-                  </td>
-                  <td>
-                    {isUnassignedDoc ? (
-                      <span
-                        className="ll-docs-chip"
-                        style={{
-                          color: 'var(--amber-11, #d97706)',
-                          background: 'var(--amber-3, #fef3c7)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
-                      >
-                        <Link2 size={12} />
-                        Unassigned Vault
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="ll-docs-prop-btn"
-                        onClick={() => property && onViewProperty(property)}
-                      >
-                        <Building2 size={14} />
-                        <span>{document.propertyAddress}</span>
-                      </button>
-                    )}
-                  </td>
-                  <td>{document.tenantName || '—'}</td>
-                  <td>{formatDocumentType(document.type)}</td>
-                  <td>
-                    <div className="ll-docs-date">
-                      <Calendar size={13} />
-                      <span>{formatDate(document.issueDate)}</span>
-                    </div>
-                    {document.expiryDate && (
-                      <div className="ll-docs-date" style={{ marginTop: 4 }}>
-                        <span
-                          className={
-                            daysUntilExpiry != null && daysUntilExpiry < 0
-                              ? 'is-danger'
-                              : daysUntilExpiry != null && daysUntilExpiry < 30
-                                ? 'is-warn'
-                                : undefined
-                          }
-                        >
-                          Exp {formatDate(document.expiryDate)}
-                          {daysUntilExpiry != null
-                            ? daysUntilExpiry < 0
-                              ? ' (Expired)'
-                              : ` (${daysUntilExpiry}d)`
-                            : ''}
-                        </span>
+                    onChange={() => {
+                      const allSelected = docs.length > 0 && docs.every((d) => selectedDocuments.includes(d.id));
+                      if (allSelected) {
+                        setSelectedDocuments((prev) =>
+                          prev.filter((id) => !docs.some((d) => d.id === id)),
+                        );
+                      } else {
+                        setSelectedDocuments((prev) =>
+                          Array.from(new Set([...prev, ...docs.map((d) => d.id)])),
+                        );
+                      }
+                    }}
+                    aria-label="Select all documents"
+                  />
+                </th>
+                <th>Document / File</th>
+                <th>Attached Property</th>
+                <th>Attached Tenant</th>
+                <th>Category</th>
+                <th>Validity / Upload</th>
+                <th>Audit Status</th>
+                <th className="is-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {docs.map((document) => {
+                const property = getPropertyByDocument(document.propertyId);
+                const daysUntilExpiry = getDaysUntilExpiry(document.expiryDate);
+                const isUnassignedDoc = document.isUnassigned || !document.propertyId;
+                return (
+                  <tr
+                    key={documentRowKey(document)}
+                    className={selectedDocuments.includes(document.id) ? 'is-selected' : ''}
+                  >
+                    <td>
+                      <input
+                        type="checkbox"
+                        className="ll-docs-check"
+                        checked={selectedDocuments.includes(document.id)}
+                        onChange={() => toggleDocumentSelection(document.id)}
+                        aria-label={`Select ${document.name}`}
+                      />
+                    </td>
+                    <td>
+                      <div className="ll-docs-table-doc">
+                        {statusIcon(document.status)}
+                        <span title={document.name}>{document.name}</span>
                       </div>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`ll-docs-status-pill is-${document.status}`}>
-                      {statusLabel(document.status)}
-                    </span>
-                  </td>
-                  <td className="is-right">
-                    <div className="ll-docs-row-actions">
-                      {isUnassignedDoc && onAssignDocument && (
+                    </td>
+                    <td>
+                      {isUnassignedDoc ? (
+                        <span
+                          className="ll-docs-chip"
+                          style={{
+                            color: 'var(--amber-11, #d97706)',
+                            background: 'var(--amber-3, #fef3c7)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <Link2 size={12} />
+                          Unassigned Vault
+                        </span>
+                      ) : (
                         <button
                           type="button"
-                          className="ll-docs-icon-btn"
-                          title="Assign to Property"
-                          style={{ color: 'var(--primary-color, #2563eb)' }}
-                          onClick={() => openAssignModal(document)}
+                          className="ll-docs-prop-btn"
+                          onClick={() => property && onViewProperty(property)}
                         >
-                          <Link2 size={15} />
+                          <Building2 size={14} />
+                          <span>{document.propertyAddress}</span>
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="ll-docs-icon-btn"
-                        title="Inspect document"
-                        onClick={() => openInspectionDrawer(document)}
-                      >
-                        <Eye size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        className="ll-docs-icon-btn"
-                        title="Download"
-                        disabled={
-                          !document.url?.trim() || downloadingKey === documentRowKey(document)
-                        }
-                        onClick={() => handleDownloadDocument(document)}
-                      >
-                        <Download size={15} />
-                      </button>
-                      {!isUnassignedDoc && (
-                        <button
-                          type="button"
-                          className="ll-docs-icon-btn"
-                          title="Manage documents"
-                          onClick={() => {
-                            if (property) {
-                              handleManagePropertyDocuments(property);
+                    </td>
+                    <td>{document.tenantName || '—'}</td>
+                    <td>{formatDocumentType(document.type)}</td>
+                    <td>
+                      <div className="ll-docs-date">
+                        <Calendar size={13} />
+                        <span>{formatDate(document.issueDate)}</span>
+                      </div>
+                      {document.expiryDate && (
+                        <div className="ll-docs-date" style={{ marginTop: 4 }}>
+                          <span
+                            className={
+                              daysUntilExpiry != null && daysUntilExpiry < 0
+                                ? 'is-danger'
+                                : daysUntilExpiry != null && daysUntilExpiry < 30
+                                  ? 'is-warn'
+                                  : undefined
                             }
-                          }}
-                        >
-                          <FolderOpen size={15} />
-                        </button>
+                          >
+                            Exp {formatDate(document.expiryDate)}
+                            {daysUntilExpiry != null
+                              ? daysUntilExpiry < 0
+                                ? ' (Expired)'
+                                : ` (${daysUntilExpiry}d)`
+                              : ''}
+                          </span>
+                        </div>
                       )}
-                      {onDeleteDocuments && (
+                    </td>
+                    <td>
+                      <span className={`ll-docs-status-pill is-${document.status}`}>
+                        {statusLabel(document.status)}
+                      </span>
+                    </td>
+                    <td className="is-right">
+                      <div className="ll-docs-row-actions">
+                        {isUnassignedDoc && onAssignDocument && (
+                          <button
+                            type="button"
+                            className="ll-docs-icon-btn"
+                            title="Assign to Property"
+                            style={{ color: 'var(--primary-color, #2563eb)' }}
+                            onClick={() => openAssignModal(document)}
+                          >
+                            <Link2 size={15} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="ll-docs-icon-btn"
-                          title="Delete document"
-                          style={{ color: '#ef4444' }}
-                          onClick={() => {
-                            setDocumentToDelete({ id: document.id, name: document.name });
-                          }}
+                          title="Inspect document"
+                          onClick={() => openInspectionDrawer(document)}
                         >
-                          <Trash2 size={15} />
+                          <Eye size={15} />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        <button
+                          type="button"
+                          className="ll-docs-icon-btn"
+                          title="Download"
+                          disabled={
+                            !document.url?.trim() || downloadingKey === documentRowKey(document)
+                          }
+                          onClick={() => handleDownloadDocument(document)}
+                        >
+                          <Download size={15} />
+                        </button>
+                        {!isUnassignedDoc && (
+                          <button
+                            type="button"
+                            className="ll-docs-icon-btn"
+                            title="Manage documents"
+                            onClick={() => {
+                              if (property) {
+                                handleManagePropertyDocuments(property);
+                              }
+                            }}
+                          >
+                            <FolderOpen size={15} />
+                          </button>
+                        )}
+                        {onDeleteDocuments && (
+                          <button
+                            type="button"
+                            className="ll-docs-icon-btn"
+                            title="Delete document"
+                            style={{ color: '#ef4444' }}
+                            onClick={() => {
+                              setDocumentToDelete({ id: document.id, name: document.name });
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      <div className="md:hidden mob-accordion-container space-y-3">
+        {docs.map((document) => {
+          const property = getPropertyByDocument(document.propertyId);
+          const daysUntilExpiry = getDaysUntilExpiry(document.expiryDate);
+          const isUnassignedDoc = document.isUnassigned || !document.propertyId;
+          const statusVariant =
+            document.status === 'valid'
+              ? 'success'
+              : document.status === 'expired'
+                ? 'danger'
+                : 'warning';
+
+          return (
+            <MobileAccordionCard
+              key={documentRowKey(document)}
+              initials={initialsFromName(document.name || 'DOC')}
+              title={document.name}
+              subtitle={isUnassignedDoc ? 'Unassigned Vault' : document.propertyAddress || 'No Property'}
+              statusBadge={{
+                label: statusLabel(document.status),
+                variant: statusVariant,
+              }}
+              metrics={[
+                { label: 'Category', value: formatDocumentType(document.type) },
+                { label: 'Issued', value: formatDate(document.issueDate) },
+                {
+                  label: 'Expiry',
+                  value: document.expiryDate
+                    ? `${formatDate(document.expiryDate)}${
+                        daysUntilExpiry != null
+                          ? daysUntilExpiry < 0
+                            ? ' (Expired)'
+                            : ` (${daysUntilExpiry}d)`
+                          : ''
+                      }`
+                    : '—',
+                },
+                { label: 'Tenant', value: document.tenantName || '—' },
+              ]}
+              actions={
+                <div className="flex items-center gap-2 w-full pt-1">
+                  <button
+                    type="button"
+                    className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center gap-1.5"
+                    onClick={() => openInspectionDrawer(document)}
+                  >
+                    <Eye size={14} />
+                    Inspect
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-[#DC5F12]/10 text-[#DC5F12] flex items-center justify-center gap-1.5"
+                    disabled={!document.url?.trim() || downloadingKey === documentRowKey(document)}
+                    onClick={() => handleDownloadDocument(document)}
+                  >
+                    <Download size={14} />
+                    Download
+                  </button>
+                  {isUnassignedDoc && onAssignDocument && (
+                    <button
+                      type="button"
+                      className="py-2 px-3 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center gap-1"
+                      onClick={() => openAssignModal(document)}
+                    >
+                      <Link2 size={14} />
+                      Assign
+                    </button>
+                  )}
+                  {onDeleteDocuments && (
+                    <button
+                      type="button"
+                      className="p-2 text-xs font-semibold rounded-lg bg-red-50 text-red-600 flex items-center justify-center"
+                      onClick={() => setDocumentToDelete({ id: document.id, name: document.name })}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              }
+            >
+              <div className="space-y-2 text-xs text-slate-600 pt-1">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-400">File ID / Code</span>
+                  <span className="font-mono text-slate-700">{ocrCodeForDocument(document)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-400">Verification</span>
+                  <span className="font-medium text-slate-700">{statusBannerCopy(document.status)}</span>
+                </div>
+                {!isUnassignedDoc && property && (
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-400">Property Action</span>
+                    <button
+                      type="button"
+                      className="text-xs text-[#DC5F12] font-semibold hover:underline"
+                      onClick={() => onViewProperty(property)}
+                    >
+                      View Property Details →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </MobileAccordionCard>
+          );
+        })}
+      </div>
+    </>
   );
 
   const renderDocumentGrid = (docs: DocumentWithProperty[] = filteredDocuments) => (
@@ -1284,121 +1482,202 @@ export function DocumentsPage({
   );
 
   const renderPropertyTable = () => (
-    <div className="ll-docs-table-wrap">
-      <div className="ll-docs-table-scroll">
-        <table className="ll-docs-table">
-          <thead>
-            <tr>
-              <th>Property / Address</th>
-              <th>Primary Tenant</th>
-              <th>Rent / Status</th>
-              <th>Compliance Health</th>
-              <th>Attached Files</th>
-              <th>Alert Status</th>
-              <th className="is-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProperties.map((property) => {
-              const allPropDocs = property.documents || [];
-              const docs = filteredDocuments.filter((d) => d.propertyId === property.id);
-              const health = complianceHealth(allPropDocs);
-              const thumb = coverUrl(property);
-              const alertDoc = allPropDocs.find(
-                (d) => d.status === 'expired' || d.status === 'expiring-soon',
-              );
-              return (
-                <tr key={property.id}>
-                  <td>
-                    <div className="ll-docs-card-identity">
-                      {thumb ? (
-                        <img src={thumb} alt="" className="ll-docs-card-thumb" style={{ width: 40, height: 40 }} />
-                      ) : (
-                        <div
-                          className="ll-docs-card-thumb is-placeholder"
-                          style={{ width: 40, height: 40 }}
-                        >
-                          <Building2 size={16} />
+    <>
+      <div className="ll-docs-table-wrap hidden md:block">
+        <div className="ll-docs-table-scroll">
+          <table className="ll-docs-table">
+            <thead>
+              <tr>
+                <th>Property / Address</th>
+                <th>Primary Tenant</th>
+                <th>Rent / Status</th>
+                <th>Compliance Health</th>
+                <th>Attached Files</th>
+                <th>Alert Status</th>
+                <th className="is-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProperties.map((property) => {
+                const allPropDocs = property.documents || [];
+                const docs = filteredDocuments.filter((d) => d.propertyId === property.id);
+                const health = complianceHealth(allPropDocs);
+                const thumb = coverUrl(property);
+                const alertDoc = allPropDocs.find(
+                  (d) => d.status === 'expired' || d.status === 'expiring-soon',
+                );
+                return (
+                  <tr key={property.id}>
+                    <td>
+                      <div className="ll-docs-card-identity">
+                        {thumb ? (
+                          <img src={thumb} alt="" className="ll-docs-card-thumb" style={{ width: 40, height: 40 }} />
+                        ) : (
+                          <div
+                            className="ll-docs-card-thumb is-placeholder"
+                            style={{ width: 40, height: 40 }}
+                          >
+                            <Building2 size={16} />
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>
+                            {propertyName(property.address)}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#94a3b8' }}>{property.address}</div>
                         </div>
-                      )}
-                      <div>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>
-                          {propertyName(property.address)}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{property.address}</div>
                       </div>
-                    </div>
-                  </td>
-                  <td>{property.tenant?.name || '—'}</td>
-                  <td>
-                    <div style={{ fontWeight: 700 }}>£{property.rent.toLocaleString()}/mo</div>
-                    <div style={{ fontSize: 11, color: '#64748b', textTransform: 'capitalize' }}>
-                      {property.status.replace('-', ' ')}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>{health}%</div>
-                    <div className="ll-docs-compliance-track" style={{ width: 80 }}>
-                      <div
-                        className={`ll-docs-compliance-fill ${complianceFillClass(health)}`}
-                        style={{ width: `${health}%` }}
-                      />
-                    </div>
-                  </td>
-                  <td>
-                    {docs.length}
-                    {hasActiveFilters && docs.length !== allPropDocs.length
-                      ? ` / ${allPropDocs.length}`
-                      : ''}
-                  </td>
-                  <td>
-                    {alertDoc ? (
-                      <span className={`ll-docs-status-pill is-${alertDoc.status}`}>
-                        {statusLabel(alertDoc.status)}
-                      </span>
-                    ) : (
-                      <span className="ll-docs-status-pill is-valid">Healthy</span>
-                    )}
-                  </td>
-                  <td className="is-right">
-                    <div className="ll-docs-row-actions">
-                      <button
-                        type="button"
-                        className="ll-docs-icon-btn"
-                        title="Attach document"
-                        onClick={() => openAttachFlow(property)}
-                      >
-                        <Upload size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        className="ll-docs-icon-btn"
-                        title="Manage documents"
-                        onClick={() => {
-                          setPropertyFilter(property.id);
-                          setViewScope('all');
-                          onManageDocuments?.(property);
-                        }}
-                      >
-                        <FolderOpen size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        className="ll-docs-icon-btn"
-                        title="View property"
-                        onClick={() => onViewProperty(property)}
-                      >
-                        <Building2 size={15} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td>{property.tenant?.name || '—'}</td>
+                    <td>
+                      <div style={{ fontWeight: 700 }}>£{property.rent.toLocaleString()}/mo</div>
+                      <div style={{ fontSize: 11, color: '#64748b', textTransform: 'capitalize' }}>
+                        {property.status.replace('-', ' ')}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>{health}%</div>
+                      <div className="ll-docs-compliance-track" style={{ width: 80 }}>
+                        <div
+                          className={`ll-docs-compliance-fill ${complianceFillClass(health)}`}
+                          style={{ width: `${health}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td>
+                      {docs.length}
+                      {hasActiveFilters && docs.length !== allPropDocs.length
+                        ? ` / ${allPropDocs.length}`
+                        : ''}
+                    </td>
+                    <td>
+                      {alertDoc ? (
+                        <span className={`ll-docs-status-pill is-${alertDoc.status}`}>
+                          {statusLabel(alertDoc.status)}
+                        </span>
+                      ) : (
+                        <span className="ll-docs-status-pill is-valid">Healthy</span>
+                      )}
+                    </td>
+                    <td className="is-right">
+                      <div className="ll-docs-row-actions">
+                        <button
+                          type="button"
+                          className="ll-docs-icon-btn"
+                          title="Attach document"
+                          onClick={() => openAttachFlow(property)}
+                        >
+                          <Upload size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          className="ll-docs-icon-btn"
+                          title="Manage documents"
+                          onClick={() => {
+                            setPropertyFilter(property.id);
+                            setViewScope('all');
+                            onManageDocuments?.(property);
+                          }}
+                        >
+                          <FolderOpen size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          className="ll-docs-icon-btn"
+                          title="View property"
+                          onClick={() => onViewProperty(property)}
+                        >
+                          <Building2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      <div className="md:hidden mob-accordion-container space-y-3">
+        {filteredProperties.map((property) => {
+          const allPropDocs = property.documents || [];
+          const docs = filteredDocuments.filter((d) => d.propertyId === property.id);
+          const health = complianceHealth(allPropDocs);
+          const alertDoc = allPropDocs.find(
+            (d) => d.status === 'expired' || d.status === 'expiring-soon',
+          );
+          const statusVariant =
+            alertDoc?.status === 'expired'
+              ? 'danger'
+              : alertDoc?.status === 'expiring-soon'
+                ? 'warning'
+                : 'success';
+
+          return (
+            <MobileAccordionCard
+              key={property.id}
+              initials={initialsFromName(propertyName(property.address))}
+              title={propertyName(property.address)}
+              subtitle={property.address}
+              statusBadge={{
+                label: alertDoc ? statusLabel(alertDoc.status) : 'Healthy',
+                variant: statusVariant,
+              }}
+              metrics={[
+                { label: 'Health', value: `${health}%` },
+                { label: 'Rent', value: `£${property.rent.toLocaleString()}/mo` },
+                { label: 'Tenant', value: property.tenant?.name || 'Vacant' },
+                { label: 'Files', value: `${docs.length} doc${docs.length === 1 ? '' : 's'}` },
+              ]}
+              actions={
+                <div className="flex items-center gap-2 w-full pt-1">
+                  <button
+                    type="button"
+                    className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-[#DC5F12]/10 text-[#DC5F12] flex items-center justify-center gap-1.5"
+                    onClick={() => openAttachFlow(property)}
+                  >
+                    <Upload size={14} />
+                    Attach
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center gap-1.5"
+                    onClick={() => {
+                      setPropertyFilter(property.id);
+                      setViewScope('all');
+                      onManageDocuments?.(property);
+                    }}
+                  >
+                    <FolderOpen size={14} />
+                    Manage
+                  </button>
+                  <button
+                    type="button"
+                    className="p-2 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"
+                    onClick={() => onViewProperty(property)}
+                    title="View property"
+                  >
+                    <Building2 size={14} />
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-1.5 text-xs text-slate-600 pt-1">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-400">Status</span>
+                  <span className="font-semibold text-slate-700 capitalize">{property.status.replace('-', ' ')}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-400">Total Attached Docs</span>
+                  <span className="font-medium text-slate-700">{allPropDocs.length} files</span>
+                </div>
+              </div>
+            </MobileAccordionCard>
+          );
+        })}
+      </div>
+    </>
   );
 
   const renderTenantCards = () => (
@@ -1477,56 +1756,101 @@ export function DocumentsPage({
   );
 
   const renderTenantTable = () => (
-    <div className="ll-docs-table-wrap">
-      <div className="ll-docs-table-scroll">
-        <table className="ll-docs-table">
-          <thead>
-            <tr>
-              <th>Tenant / Applicant</th>
-              <th>Assigned Property</th>
-              <th>Lease Status</th>
-              <th>Attached Files</th>
-              <th className="is-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTenants.map(({ property, tenant, docs }) => (
-              <tr key={`${property.id}-${tenant.id}`}>
-                <td style={{ fontWeight: 700, color: '#0f172a' }}>{tenant.name}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="ll-docs-prop-btn"
-                    onClick={() => onViewProperty(property)}
-                  >
-                    <Building2 size={14} />
-                    <span>{property.address}</span>
-                  </button>
-                </td>
-                <td style={{ textTransform: 'capitalize' }}>{tenant.status}</td>
-                <td>{docs.length}</td>
-                <td className="is-right">
-                  <div className="ll-docs-row-actions">
+    <>
+      <div className="ll-docs-table-wrap hidden md:block">
+        <div className="ll-docs-table-scroll">
+          <table className="ll-docs-table">
+            <thead>
+              <tr>
+                <th>Tenant / Applicant</th>
+                <th>Assigned Property</th>
+                <th>Lease Status</th>
+                <th>Attached Files</th>
+                <th className="is-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTenants.map(({ property, tenant, docs }) => (
+                <tr key={`${property.id}-${tenant.id}`}>
+                  <td style={{ fontWeight: 700, color: '#0f172a' }}>{tenant.name}</td>
+                  <td>
                     <button
                       type="button"
-                      className="ll-docs-icon-btn"
-                      title="Manage documents"
-                      onClick={() => {
-                        setPropertyFilter(property.id);
-                        setViewScope('all');
-                        onManageDocuments?.(property);
-                      }}
+                      className="ll-docs-prop-btn"
+                      onClick={() => onViewProperty(property)}
                     >
-                      <FolderOpen size={15} />
+                      <Building2 size={14} />
+                      <span>{property.address}</span>
                     </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td style={{ textTransform: 'capitalize' }}>{tenant.status}</td>
+                  <td>{docs.length}</td>
+                  <td className="is-right">
+                    <div className="ll-docs-row-actions">
+                      <button
+                        type="button"
+                        className="ll-docs-icon-btn"
+                        title="Manage documents"
+                        onClick={() => {
+                          setPropertyFilter(property.id);
+                          setViewScope('all');
+                          onManageDocuments?.(property);
+                        }}
+                      >
+                        <FolderOpen size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      <div className="md:hidden mob-accordion-container space-y-3">
+        {filteredTenants.map(({ property, tenant, docs }) => (
+          <MobileAccordionCard
+            key={`${property.id}-${tenant.id}`}
+            initials={initialsFromName(tenant.name || 'TN')}
+            title={tenant.name}
+            subtitle={property.address}
+            statusBadge={{
+              label: tenant.status,
+              variant: tenant.status === 'active' ? 'success' : 'neutral',
+            }}
+            metrics={[
+              { label: 'Files', value: `${docs.length} doc${docs.length === 1 ? '' : 's'}` },
+              { label: 'Lease', value: tenant.status },
+            ]}
+            actions={
+              <div className="flex items-center gap-2 w-full pt-1">
+                <button
+                  type="button"
+                  className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center gap-1.5"
+                  onClick={() => {
+                    setPropertyFilter(property.id);
+                    setViewScope('all');
+                    onManageDocuments?.(property);
+                  }}
+                >
+                  <FolderOpen size={14} />
+                  Manage Documents
+                </button>
+                <button
+                  type="button"
+                  className="py-2 px-3 text-xs font-semibold rounded-lg bg-[#DC5F12]/10 text-[#DC5F12] flex items-center justify-center gap-1"
+                  onClick={() => onViewProperty(property)}
+                >
+                  <Building2 size={14} />
+                  View Property
+                </button>
+              </div>
+            }
+          />
+        ))}
+      </div>
+    </>
   );
 
   return (
@@ -1545,7 +1869,7 @@ export function DocumentsPage({
           <div className="ll-docs-header-actions">
             <button
               type="button"
-              className={`ll-docs-header-icon${isRefreshing ? ' refreshing' : ''}`}
+              className={`ll-docs-header-icon hidden lg:inline-flex${isRefreshing ? ' refreshing' : ''}`}
               title="Refresh Portfolio Data"
               onClick={handleRefresh}
             >
@@ -1553,7 +1877,7 @@ export function DocumentsPage({
             </button>
             <button
               type="button"
-              className="ll-docs-header-icon"
+              className="ll-docs-header-icon hidden lg:inline-flex"
               title="Settings"
               onClick={onViewSettings}
             >
@@ -1561,7 +1885,7 @@ export function DocumentsPage({
             </button>
             <button
               type="button"
-              className="ll-docs-header-icon"
+              className="ll-docs-header-icon hidden lg:inline-flex"
               title="Notifications"
               onClick={onViewNotifications}
             >
@@ -1690,11 +2014,35 @@ export function DocumentsPage({
         )}
 
         {documentStats.expiringSoon > 0 && (
-          <div className="ll-docs-alert is-warn" role="status">
-            <Clock size={16} />
-            <div>
-              <strong>{documentStats.expiringSoon} documents are expiring soon</strong> and should be
-              renewed.
+          <div
+            className="ll-docs-alert is-warn cursor-pointer hover:bg-amber-100/70 transition-colors"
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              setTypeFilter('all');
+              setStatusFilter('expiring-soon');
+              setPropertyFilter('all');
+              setTenantFilter('all');
+              setSearchTerm('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setTypeFilter('all');
+                setStatusFilter('expiring-soon');
+                setPropertyFilter('all');
+                setTenantFilter('all');
+                setSearchTerm('');
+              }
+            }}
+          >
+            <Clock size={16} className="shrink-0 text-amber-700" />
+            <div className="flex-1 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <strong>{documentStats.expiringSoon} document{documentStats.expiringSoon > 1 ? 's are' : ' is'} expiring soon</strong> and should be renewed.
+              </div>
+              <span className="text-xs font-bold text-amber-900 underline hover:text-amber-950">
+                View expiring documents →
+              </span>
             </div>
           </div>
         )}
@@ -1775,49 +2123,65 @@ export function DocumentsPage({
               />
             </div>
 
-            <select
-              className="ll-docs-select"
-              value={propertyFilter}
-              onChange={(e) => setPropertyFilter(e.target.value)}
-              aria-label="Filter by property"
-            >
-              <option value="all">
-                All Properties ({(properties || []).length} Properties)
-              </option>
-              {(properties || []).map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.address}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="ll-docs-select"
-              value={tenantFilter}
-              onChange={(e) => setTenantFilter(e.target.value)}
-              aria-label="Filter by tenant"
-            >
-              <option value="all">All Tenants / Clients</option>
-              {tenantOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="ll-docs-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              aria-label="Filter by status"
-            >
-              <option value="all">All Audit Statuses</option>
-              <option value="valid">Valid</option>
-              <option value="expiring-soon">Expiring Soon</option>
-              <option value="expired">Expired / Action Required</option>
-            </select>
+            {isMobile ? (
+              <button
+                type="button"
+                className={`ll-docs-filter-btn${activeFilterCount > 0 ? ' is-active' : ''}`}
+                onClick={openFilterSheet}
+                aria-haspopup="dialog"
+              >
+                <SlidersHorizontal size={15} />
+                Filters
+                {activeFilterCount > 0 ? <span className="ll-docs-filter-count">{activeFilterCount}</span> : null}
+              </button>
+            ) : (
+              renderFilterSelects(
+                { property: propertyFilter, tenant: tenantFilter, status: statusFilter },
+                (key, value) => {
+                  if (key === 'property') setPropertyFilter(value);
+                  else if (key === 'tenant') setTenantFilter(value);
+                  else applyStatusFilter(value);
+                },
+              )
+            )}
           </div>
         </div>
+
+        {isMobile && (
+          <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+            <SheetContent
+              side="bottom"
+              className="ll-docs-filter-sheet z-[960] rounded-t-2xl p-0 gap-0"
+              overlayClassName="z-[950]"
+            >
+              <SheetHeader className="ll-docs-filter-sheet-head">
+                <SheetTitle>Filter documents</SheetTitle>
+                <SheetDescription>Narrow by property, tenant, or audit status.</SheetDescription>
+              </SheetHeader>
+              <div className="ll-docs-filter-sheet-body">
+                {renderFilterSelects(draftFilters, (key, value) =>
+                  setDraftFilters((prev) => ({ ...prev, [key]: value })),
+                )}
+              </div>
+              <div className="ll-docs-filter-sheet-foot">
+                <button
+                  type="button"
+                  className="ll-docs-filter-sheet-btn is-secondary"
+                  onClick={() => setDraftFilters({ property: 'all', tenant: 'all', status: 'all' })}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="ll-docs-filter-sheet-btn is-primary"
+                  onClick={applyDraftFilters}
+                >
+                  Apply
+                </button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
         {vaultEmpty ? (
           <div className="ll-docs-empty">
@@ -1845,11 +2209,31 @@ export function DocumentsPage({
               <Search size={22} />
             </div>
             <h3>No matching documents found</h3>
-            <p>
-              No documents match your active property, tenant, or category filters. Try clearing your
-              filters or attach a new file.
-            </p>
+            {statusFilter === 'expiring-soon' && documentStats.expiringSoon > 0 ? (
+              <p>
+                No expiring documents found in the current category/filter selection. You have {documentStats.expiringSoon} expiring document{documentStats.expiringSoon > 1 ? 's' : ''} in your portfolio.
+              </p>
+            ) : (
+              <p>
+                No documents match your active property, tenant, or category filters. Try clearing your
+                filters or attach a new file.
+              </p>
+            )}
             <div className="ll-docs-empty-actions">
+              {statusFilter === 'expiring-soon' && documentStats.expiringSoon > 0 && typeFilter !== 'all' && (
+                <button
+                  type="button"
+                  className="ll-docs-ghost-btn font-semibold text-[#136C9E] border-[#136C9E]"
+                  onClick={() => {
+                    setTypeFilter('all');
+                    setPropertyFilter('all');
+                    setTenantFilter('all');
+                    setSearchTerm('');
+                  }}
+                >
+                  View All Expiring Documents ({documentStats.expiringSoon})
+                </button>
+              )}
               <button type="button" className="ll-docs-ghost-btn" onClick={resetFilters}>
                 Reset Filters
               </button>
@@ -1868,7 +2252,7 @@ export function DocumentsPage({
                       </span>
                     </div>
                     {renderBulkBar()}
-                    {effectiveDisplay === 'table' && !isMobile
+                    {effectiveDisplay === 'table'
                       ? renderDocumentTable(filteredDocuments)
                       : renderDocumentGrid(filteredDocuments)}
                   </>
@@ -1899,7 +2283,7 @@ export function DocumentsPage({
                           </span>
                         </div>
                         {renderBulkBar()}
-                        {effectiveDisplay === 'table' && !isMobile
+                        {effectiveDisplay === 'table'
                           ? renderDocumentTable(filteredDocuments.filter((d) => d.isUnassigned || !d.propertyId))
                           : renderDocumentGrid(filteredDocuments.filter((d) => d.isUnassigned || !d.propertyId))}
                       </div>
@@ -1919,7 +2303,7 @@ export function DocumentsPage({
                       </span>
                     </div>
                     {renderBulkBar()}
-                    {effectiveDisplay === 'table' && !isMobile
+                    {effectiveDisplay === 'table'
                       ? renderDocumentTable(filteredDocuments)
                       : renderDocumentGrid(filteredDocuments)}
                   </>
@@ -1963,7 +2347,7 @@ export function DocumentsPage({
                   </span>
                 </div>
                 {renderBulkBar()}
-                {effectiveDisplay === 'table' && !isMobile
+                {effectiveDisplay === 'table'
                   ? renderDocumentTable()
                   : renderDocumentGrid()}
               </section>
@@ -2044,7 +2428,7 @@ export function DocumentsPage({
                   <select
                     value={attachForm.propertyId}
                     onChange={(e) => {
-                      const nextProperty = (properties || []).find((p) => p.id === e.target.value);
+                      const nextProperty = activeProperties.find((p) => p.id === e.target.value);
                       setAttachForm((prev) => ({
                         ...prev,
                         propertyId: e.target.value,
@@ -2053,13 +2437,13 @@ export function DocumentsPage({
                     }}
                   >
                     <option value="">Don't assign to a property yet (Save to Vault)</option>
-                    {(properties || []).map((property) => (
+                    {activeProperties.map((property) => (
                       <option key={property.id} value={property.id}>
                         {property.address}
                       </option>
                     ))}
                   </select>
-                  {(!properties || properties.length === 0) && (
+                  {(!activeProperties || activeProperties.length === 0) && (
                     <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>
                       No properties added yet. This document will be saved to your vault so you can assign it later.
                     </p>
@@ -2570,7 +2954,7 @@ export function DocumentsPage({
                 >
                   Select Target Property
                 </label>
-                {(properties && properties.length > 0) ? (
+                {(activeProperties && activeProperties.length > 0) ? (
                   <select
                     className="ll-docs-select"
                     style={{ width: '100%', height: 40 }}
@@ -2579,7 +2963,7 @@ export function DocumentsPage({
                     required
                   >
                     <option value="" disabled>Choose property...</option>
-                    {properties.map((p) => (
+                    {activeProperties.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.address}
                       </option>
@@ -2624,7 +3008,7 @@ export function DocumentsPage({
                 <button
                   type="submit"
                   className="ll-docs-btn-attach"
-                  disabled={isAssigning || !assignTargetPropertyId || (properties || []).length === 0}
+                  disabled={isAssigning || !assignTargetPropertyId || activeProperties.length === 0}
                 >
                   {isAssigning ? 'Assigning...' : 'Confirm Assignment'}
                 </button>

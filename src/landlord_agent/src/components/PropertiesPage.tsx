@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus,
   Eye,
@@ -21,6 +21,8 @@ import {
   Copy,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Calendar,
   Home,
   LayoutGrid,
@@ -43,6 +45,7 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
 import { countPortfolio, isUnitOccupied, isPropertyArchived } from '../utils/portfolioStats';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
@@ -232,6 +235,81 @@ function FilterDropdown({
   );
 }
 
+function ScrollableTabs({ activeKey, children }: { activeKey: string; children: React.ReactNode }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateEdges = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateEdges();
+    el.addEventListener('scroll', updateEdges, { passive: true });
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateEdges) : null;
+    observer?.observe(el);
+    window.addEventListener('resize', updateEdges);
+    return () => {
+      el.removeEventListener('scroll', updateEdges);
+      observer?.disconnect();
+      window.removeEventListener('resize', updateEdges);
+    };
+  }, [updateEdges]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    const active = el?.querySelector<HTMLElement>('.ll-props-tab.active');
+    if (!el || !active) return;
+    const left = active.offsetLeft - el.offsetLeft;
+    const right = left + active.offsetWidth;
+    if (left < el.scrollLeft || right > el.scrollLeft + el.clientWidth) {
+      el.scrollTo({ left: Math.max(0, left - 24), behavior: 'smooth' });
+    }
+  }, [activeKey]);
+
+  const scrollBy = (direction: -1 | 1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * Math.max(120, el.clientWidth * 0.6), behavior: 'smooth' });
+  };
+
+  return (
+    <div
+      className={`ll-props-tabs-wrap${canScrollLeft ? ' can-scroll-left' : ''}${canScrollRight ? ' can-scroll-right' : ''}`}
+    >
+      <button
+        type="button"
+        className="ll-props-tabs-arrow is-left"
+        onClick={() => scrollBy(-1)}
+        aria-label="Scroll filters left"
+        tabIndex={canScrollLeft ? 0 : -1}
+        aria-hidden={!canScrollLeft}
+      >
+        <ChevronLeft size={14} strokeWidth={2.5} />
+      </button>
+      <div className="ll-props-tabs" ref={scrollRef}>
+        {children}
+      </div>
+      <button
+        type="button"
+        className="ll-props-tabs-arrow is-right"
+        onClick={() => scrollBy(1)}
+        aria-label="Scroll filters right"
+        tabIndex={canScrollRight ? 0 : -1}
+        aria-hidden={!canScrollRight}
+      >
+        <ChevronRight size={14} strokeWidth={2.5} />
+      </button>
+    </div>
+  );
+}
+
 export function PropertiesPage({
   properties,
   tenants,
@@ -351,10 +429,12 @@ export function PropertiesPage({
 
   const locations = useMemo(() => {
     const set = new Set<string>();
-    (properties || []).forEach((p) => {
-      const city = cityFromAddress(p.address);
-      if (city) set.add(city);
-    });
+    (properties || [])
+      .filter((p) => !isPropertyArchived(p))
+      .forEach((p) => {
+        const city = cityFromAddress(p.address);
+        if (city) set.add(city);
+      });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [properties]);
 
@@ -786,7 +866,7 @@ export function PropertiesPage({
             </button>
             <button
               type="button"
-              className="ll-props-header-icon"
+              className="ll-props-header-icon hidden lg:inline-flex"
               title="Properties Settings"
               onClick={onViewSettings}
             >
@@ -794,7 +874,7 @@ export function PropertiesPage({
             </button>
             <button
               type="button"
-              className="ll-props-header-icon"
+              className="ll-props-header-icon hidden lg:inline-flex"
               title="Notifications"
               onClick={onViewNotifications}
             >
@@ -802,7 +882,7 @@ export function PropertiesPage({
               <span className="ll-props-header-dot" />
             </button>
             {onViewInsights && (
-              <button type="button" className="ll-props-btn-insights" onClick={onViewInsights}>
+              <button type="button" className="ll-props-btn-insights hidden lg:inline-flex" onClick={onViewInsights}>
                 <span className="ll-props-insights-icon">
                   <Sparkles size={12} />
                 </span>
@@ -812,7 +892,7 @@ export function PropertiesPage({
             {onBulkAssignTenants && (
               <button
                 type="button"
-                className="ll-props-btn-insights"
+                className="ll-props-btn-insights hidden lg:inline-flex"
                 onClick={onBulkAssignTenants}
                 title="Assign multiple tenants to properties at once"
               >
@@ -825,7 +905,7 @@ export function PropertiesPage({
             {onEnrichProperties && (
               <button
                 type="button"
-                className="ll-props-btn-insights"
+                className="ll-props-btn-insights hidden lg:inline-flex"
                 onClick={onEnrichProperties}
                 title="Review and enrich your property listings — add photos, documents and missing details"
               >
@@ -990,7 +1070,7 @@ export function PropertiesPage({
         </section>
 
         <div className="ll-props-toolbar">
-          <div className="ll-props-tabs">
+          <ScrollableTabs activeKey={filterTab}>
             {(
               [
                 ['all', 'All'],
@@ -1010,7 +1090,7 @@ export function PropertiesPage({
                 {label}
               </button>
             ))}
-          </div>
+          </ScrollableTabs>
           
           <div className="ll-props-toolbar-right">
             <FilterDropdown
@@ -1187,7 +1267,7 @@ export function PropertiesPage({
           </div>
         ) : viewMode === 'table' ? (
           <div className="ll-props-table-wrap">
-            <div className="ll-props-table-scroll">
+            <div className="ll-props-table-scroll hidden md:block">
               <table className="ll-props-table">
                 <thead>
                   <tr>
@@ -1270,7 +1350,48 @@ export function PropertiesPage({
                   })}
                 </tbody>
               </table>
-                    </div>
+            </div>
+
+            {/* MOBILE ACCORDION DISCLOSURE VIEW (< md) */}
+            <div className="mob-accordion-container md:hidden">
+              {pagedProperties.map((property) => {
+                const tenant = getTenantForProperty(property);
+                const status = displayStatus(property, tenant);
+                return (
+                  <MobileAccordionCard
+                    key={property.id}
+                    id={property.id}
+                    title={propertyName(property.address)}
+                    subtitle={property.address}
+                    statusBadge={
+                      <span className={`ll-props-status ${status}`}>
+                        <span className="dot" />
+                        {statusLabel(status)}
+                      </span>
+                    }
+                    avatar={
+                      <div className="w-7 h-7 rounded-lg bg-orange-50 text-[#DC5F12] flex items-center justify-center font-bold text-xs border border-orange-200/60">
+                        <Building2 size={15} />
+                      </div>
+                    }
+                    fields={[
+                      { label: 'Tenant', value: tenant ? tenant.name : 'No tenant' },
+                      { label: 'Rent/Month', value: `£${(property.rent || 0).toLocaleString()}` },
+                      { label: 'Lease End', value: tenant ? formatLeaseDate(tenant.leaseEnd) : '—' },
+                      { label: 'Address', value: property.address },
+                    ]}
+                    actions={[
+                      {
+                        label: 'View Property',
+                        variant: 'primary',
+                        icon: <Eye className="w-3.5 h-3.5" />,
+                        onClick: () => onViewProperty(property),
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </div>
             <div className="ll-props-pager">
               <div className="ll-props-pager-left">
                 <span>Show</span>

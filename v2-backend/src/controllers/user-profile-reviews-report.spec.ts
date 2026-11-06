@@ -42,6 +42,15 @@ describe('Section 22 & 23: User Profile, Reviews & Property Report Endpoints', (
       expect(res.success).toBe(true);
     });
 
+    it('[GET /users/check] reports whether an email is registered', async () => {
+      service.checkRegisteredEmail = vi.fn().mockResolvedValue({ exists: true, name: 'Sam' });
+
+      const res = await controller.checkRegisteredEmail('Sam@Example.com');
+      expect(service.checkRegisteredEmail).toHaveBeenCalledWith('Sam@Example.com');
+      expect(res.exists).toBe(true);
+      expect(res.name).toBe('Sam');
+    });
+
     it('[GET /reviews] lists reviews optionally filtered by propertyId', async () => {
       service.getReviews.mockResolvedValue([{ id: 'rev-1', rating: 5 }]);
 

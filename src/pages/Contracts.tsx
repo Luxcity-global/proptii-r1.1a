@@ -4,6 +4,8 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import ContractModal from '../components/contract/ContractModal';
+import { useBillingStatus } from '../hooks/useBillingStatus';
+import { canAccessSection } from '../utils/planAccess';
 import '../styles/typing.css';
 
 // Add preload link for the hero image
@@ -19,6 +21,8 @@ const preloadHeroImage = () => {
 const ContractsPage = () => {
   const { isAuthenticated, login } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { plan, status, loading: billingLoading } = useBillingStatus();
+  const isContractsLocked = !canAccessSection('tenant-contracts', plan, status);
 
   // Preload hero image when component mounts
   useEffect(() => {
@@ -127,7 +131,13 @@ const ContractsPage = () => {
       </section>
 
       {/*Contract Modal */}
-      {isModalOpen && <ContractModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />}
+      {isModalOpen && !billingLoading && (
+        <ContractModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          locked={isContractsLocked}
+        />
+      )}
 
       <FAQSection />
       <Footer />

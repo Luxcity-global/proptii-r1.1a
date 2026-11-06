@@ -1,9 +1,17 @@
 import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException, ForbiddenException, ServiceUnavailableException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
 import { ReferencingService } from '../services/referencing.service';
 import { RefereeGuarantorService } from '../services/referee-guarantor.service';
 import { FirebaseAuthGuard, OptionalFirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import {
+  SubmitInviteApplicationDto,
+  SubmitApplicationDto,
+  ClaimShareDto,
+  RequestReferencingDto,
+} from '../dto/referencing.dto';
 
 @ApiTags('Referencing')
 @Controller()
@@ -18,72 +26,72 @@ export class ReferencingController {
   @Post(['referencing/identity', 'applications/:id/identity'])
   @Put(['applications/:id/identity'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save identity section data for referencing application' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveIdentityData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'identity', data);
   }
 
   @Post(['referencing/employment', 'applications/:id/employment'])
   @Put(['applications/:id/employment'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save employment section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveEmploymentData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'employment', data);
   }
 
   @Post(['referencing/residential', 'applications/:id/residential'])
   @Put(['applications/:id/residential'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save residential history section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveResidentialData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'residential', data);
   }
 
   @Post(['referencing/financial', 'applications/:id/financial'])
   @Put(['applications/:id/financial'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save financial & banking section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveFinancialData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'financial', data);
   }
 
   @Post(['referencing/guarantor', 'applications/:id/guarantor'])
   @Put(['applications/:id/guarantor'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save guarantor details section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveGuarantorData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'guarantor', data);
   }
 
   @Post(['referencing/agentDetails', 'applications/:id/agentDetails'])
   @Put(['applications/:id/agentDetails'])
   @HttpCode(200)
-  @UseGuards(OptionalFirebaseAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Save agent details section data' })
   @ApiResponse({ status: 200, description: 'Section saved successfully' })
   async saveAgentDetailsData(@Req() req: any, @Body() data: any) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (data?.userId || 'guest');
+    const uid = req.user.uid;
     return await this.referencingService.saveSectionData(uid, 'agentDetails', data);
   }
 
@@ -162,9 +170,10 @@ export class ReferencingController {
 
   @Post('referencing/ai-extract')
   @HttpCode(200)
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
   @UseGuards(OptionalFirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file', {
-    limits: { fileSize: 15 * 1024 * 1024 },
+    limits: { fileSize: 25 * 1024 * 1024, files: 1 },
   }))
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'AI document data extraction from uploaded payslip or ID' })
@@ -200,8 +209,14 @@ export class ReferencingController {
 
   @Post(['referencing/files/save', 'applications/:id/upload', 'property/upload-photo', 'property/upload-document'])
   @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @UseGuards(OptionalFirebaseAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: {
+      fileSize: 25 * 1024 * 1024,
+      files: 1,
+    },
+  }))
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Upload and save referencing supporting document or photo' })
   @ApiConsumes('multipart/form-data', 'application/json')
@@ -211,7 +226,21 @@ export class ReferencingController {
     @UploadedFile() file?: Express.Multer.File,
     @Body() body?: any,
   ) {
-    const uid = req.user?.uid && req.user.uid !== 'guest' ? req.user.uid : (body?.userId || 'guest');
+    let uid: string;
+    if (req.user?.uid && req.user.uid !== 'guest') {
+      // 1. Authenticated user: always enforce caller's verified UID, prevent body.userId spoofing
+      uid = req.user.uid;
+    } else if (body?.invitationToken || body?.token) {
+      // 2. Legitimate guest guarantor / referee: scope upload to the verified invite token
+      const token = String(body.invitationToken || body.token).trim();
+      uid = `token_${token}`;
+    } else if (typeof body?.userId === 'string' && body.userId.startsWith('guest_')) {
+      // 3. Isolated guest onboarding session
+      uid = body.userId;
+    } else {
+      // 4. Anonymous guest upload: sandbox in an isolated, unforgeable guest ID
+      uid = `guest_${randomUUID()}`;
+    }
     return await this.referencingService.saveUserFile(uid, file, body);
   }
 
@@ -287,7 +316,7 @@ export class ReferencingController {
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Claim shared referencing passport with claim token' })
   @ApiResponse({ status: 200, description: 'Passport share claimed' })
-  async claimShare(@Req() req: any, @Body() body: { claimToken: string }) {
+  async claimShare(@Req() req: any, @Body() body: ClaimShareDto) {
     return await this.referencingService.claimShare(body.claimToken, req.user.uid, req.user.email || '');
   }
 
@@ -351,12 +380,7 @@ export class ReferencingController {
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Landlord/agent sends referencing invite request email to tenant' })
   @ApiResponse({ status: 200, description: 'Request email sent' })
-  async requestReferencing(@Req() req: any, @Body() body: {
-    tenantEmail: string;
-    tenantName?: string;
-    propertyAddress?: string;
-    landlordName?: string;
-  }) {
+  async requestReferencing(@Req() req: any, @Body() body: RequestReferencingDto) {
     const landlordName = body.landlordName
       || req.user.name
       || req.user.email
@@ -376,7 +400,7 @@ export class ReferencingController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Submit invite-based referencing application without prior account' })
   @ApiResponse({ status: 200, description: 'Application submitted' })
-  async submitInviteApplication(@Body() body: { token?: string; formData: any }) {
+  async submitInviteApplication(@Body() body: SubmitInviteApplicationDto) {
     const userId = body.token || `tenant_${Date.now()}`;
     return await this.referencingService.submitApplication(userId, body.formData);
   }
@@ -388,7 +412,14 @@ export class ReferencingController {
   @ApiOperation({ summary: 'Submit final completed referencing application' })
   @ApiParam({ name: 'userId', description: 'Tenant user ID' })
   @ApiResponse({ status: 200, description: 'Application submission confirmed' })
-  async submitApplication(@Req() req: any, @Param('userId') userId: string, @Body() formData: any) {
+  async submitApplication(@Req() req: any, @Param('userId') userId: string, @Body() body: SubmitApplicationDto) {
+    const callerId = req.user?.uid;
+    const isSelf = callerId === userId;
+    const isAdmin = req.user?.role === 'admin' || req.user?.admin === true;
+    if (!isSelf && !isAdmin) {
+      throw new ForbiddenException('You do not have permission to submit referencing for this user.');
+    }
+    const formData = body?.formData || body;
     return await this.referencingService.submitApplication(userId, formData);
   }
 
@@ -413,6 +444,12 @@ export class ReferencingController {
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'Referencing form document' })
   async getFormData(@Req() req: any, @Param('userId') userId: string) {
+    const callerId = req.user?.uid;
+    const isSelf = callerId === userId;
+    const isStaff = req.user?.role === 'landlord' || req.user?.role === 'agent' || req.user?.role === 'admin' || req.user?.admin === true;
+    if (!isSelf && !isStaff) {
+      throw new ForbiddenException('You do not have permission to view this applicant referencing record');
+    }
     return await this.referencingService.getFormData(userId);
   }
 }

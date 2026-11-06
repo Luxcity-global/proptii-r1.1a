@@ -56,7 +56,6 @@ export const CreditCheckSection: React.FC = () => {
                 checked={formData.creditCheck.hasAgreedToCheck}
                 onChange={(e) => updateFormData('creditCheck', { hasAgreedToCheck: e.target.checked })}
                 color="primary"
-                error={!!errors.creditCheck?.hasAgreedToCheck}
               />
             }
             label={

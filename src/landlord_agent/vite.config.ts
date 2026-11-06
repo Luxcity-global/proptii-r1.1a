@@ -105,7 +105,6 @@ export default defineConfig(({ mode }) => {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       dedupe: ['react', 'react-dom'],
       alias: {
-        'react-hot-toast': path.resolve(__dirname, '../../node_modules/react-hot-toast'),
         '@azure/msal-react': path.resolve(__dirname, '../../node_modules/@azure/msal-react'),
         '@azure/msal-browser': path.resolve(__dirname, '../../node_modules/@azure/msal-browser'),
         'vaul@1.1.2': 'vaul',

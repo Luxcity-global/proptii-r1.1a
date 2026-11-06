@@ -35,27 +35,6 @@ class ContractService {
     }
   }
 
-  async createContractWithBase64(
-    contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'> & { landlordEmail?: string },
-    fileName: string,
-    base64Data: string,
-    ownerUserId: string
-  ): Promise<string> {
-    try {
-      const response = await apiService.post('/contracts/landlord/base64', {
-        contractData: { ...contractData, ownerUserId },
-        fileName,
-        base64Data
-      });
-      const body = apiBody(response);
-      const id = body?.id || body?.contractId;
-      if (!id) throw new Error('Backend did not return a contract ID');
-      return id;
-    } catch (error) {
-      console.error('Error creating contract with base64:', error);
-      throw error;
-    }
-  }
 
   async getContracts(
     filters?: {

@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as crypto from 'crypto';
+import * as path from 'path';
 import { Logger } from '@nestjs/common';
 
 const logger = new Logger('FirebaseStorage');
@@ -90,10 +91,12 @@ export async function getSignedDownloadUrl(
  *
  * @param base64DataUri  Full data URI, e.g. "data:application/pdf;base64,JVBERi..."
  * @param storagePath    Destination path inside the bucket, e.g. "referencing/uid/identity/passport.pdf"
+ * @param originalFileName Optional original filename for safe Content-Disposition attachment header
  */
 export async function uploadBase64ToStorage(
   base64DataUri: string,
   storagePath: string,
+  originalFileName?: string,
 ): Promise<StorageUploadResult> {
   const bucket = getBucket();
 
@@ -108,13 +111,16 @@ export async function uploadBase64ToStorage(
   const file = bucket.file(storagePath);
   const downloadToken = crypto.randomUUID();
   const tokenUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+  const safeFilename = (originalFileName ? path.basename(originalFileName) : path.basename(storagePath)).replace(/[^a-zA-Z0-9._-]/g, '_') || 'document';
 
   await file.save(buffer, {
     metadata: {
       contentType,
+      contentDisposition: `attachment; filename="${encodeURIComponent(safeFilename)}"`,
       metadata: {
         firebaseStorageDownloadTokens: downloadToken,
         uploadedAt: new Date().toISOString(),
+        'x-content-type-options': 'nosniff',
       },
     },
     resumable: false,
@@ -145,23 +151,32 @@ export async function uploadBase64ToStorage(
 
 /**
  * Upload a raw Buffer to Firebase Storage and return a signed download URL.
+ *
+ * @param buffer           File buffer
+ * @param storagePath      Destination path inside the bucket
+ * @param contentType      MIME content type
+ * @param originalFileName Optional original filename for safe Content-Disposition attachment header
  */
 export async function uploadBufferToStorage(
   buffer: Buffer,
   storagePath: string,
   contentType: string,
+  originalFileName?: string,
 ): Promise<StorageUploadResult> {
   const bucket = getBucket();
   const file = bucket.file(storagePath);
   const downloadToken = crypto.randomUUID();
   const tokenUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+  const safeFilename = (originalFileName ? path.basename(originalFileName) : path.basename(storagePath)).replace(/[^a-zA-Z0-9._-]/g, '_') || 'document';
 
   await file.save(buffer, {
     metadata: {
       contentType,
+      contentDisposition: `attachment; filename="${encodeURIComponent(safeFilename)}"`,
       metadata: {
         firebaseStorageDownloadTokens: downloadToken,
         uploadedAt: new Date().toISOString(),
+        'x-content-type-options': 'nosniff',
       },
     },
     resumable: false,

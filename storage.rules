@@ -1,37 +1,76 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Helper function
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function isValidDocType() {
+      return request.resource.contentType.matches('application/pdf|image/(jpeg|png|webp|gif)|text/plain|text/csv|application/vnd.openxmlformats-officedocument.*|application/msword');
+    }
+
+    function isValidImageType() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp|gif|bmp|tiff)');
     }
 
     // Referencing documents folder - strictly scoped to owning tenant or administrator
     match /referencing_documents/{userId}/{allPaths=**} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
       allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true)
-        && request.resource.size < 15 * 1024 * 1024;
+        && request.resource.size < 25 * 1024 * 1024
+        && isValidDocType();
     }
     
-    // Contracts folder - restricted to authenticated users with 15MB limit
+    // Contracts folder - restricted to verified tenant, landlord, or administrator
     match /contracts/{contractId}/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.resource.size < 15 * 1024 * 1024;
+      allow read: if isAuthenticated() && (
+        request.auth.token.admin == true ||
+        resource == null ||
+        resource.metadata.tenantId == request.auth.uid ||
+        resource.metadata.landlordId == request.auth.uid ||
+        resource.metadata.userId == request.auth.uid
+      );
+      allow write: if isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.resource.metadata.tenantId == request.auth.uid ||
+        request.resource.metadata.landlordId == request.auth.uid ||
+        request.resource.metadata.userId == request.auth.uid ||
+        request.auth.token.role == 'landlord' ||
+        request.auth.token.role == 'agent'
+      ) && request.resource.size < 25 * 1024 * 1024
+        && isValidDocType();
     }
     
     // Properties public media folder (images, listing media)
+    // Reads stay public; writes restricted to authenticated landlords/agents/admins
     match /properties/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated() && request.resource.size < 15 * 1024 * 1024;
+      allow write: if isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'landlord' ||
+        request.auth.token.role == 'agent' ||
+        request.resource.metadata.landlordId == request.auth.uid
+      ) && request.resource.size < 25 * 1024 * 1024
+        && (isValidImageType() || isValidDocType());
     }
     
-    // User documents folder - scoped to authenticated user
+    // User documents folder - scoped to authenticated user or admin
     match /documents/{userId}/{allPaths=**} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
       allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true)
-        && request.resource.size < 15 * 1024 * 1024;
+        && request.resource.size < 25 * 1024 * 1024
+        && isValidDocType();
     }
     
+    // Contract templates folder - scoped to the owning user (direct upload fallback)
+    match /contractTemplates/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
+      allow write: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true)
+        && request.resource.size < 15 * 1024 * 1024
+        && isValidDocType();
+    }
+
     // Deny all other unmapped paths
     match /{allPaths=**} {
       allow read: if false;

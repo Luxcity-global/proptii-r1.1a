@@ -44,7 +44,29 @@ export interface ApiError {
   status: number;
 }
 
+// Shared refresh queue promise to prevent concurrent 401 refresh stampedes
+let refreshQueuePromise: Promise<string | null> | null = null;
 
+async function getOrQueueRefreshToken(): Promise<string | null> {
+  if (refreshQueuePromise) {
+    return refreshQueuePromise;
+  }
+
+  refreshQueuePromise = (async () => {
+    try {
+      localStorage.removeItem('auth_token');
+      const token = await getAccessTokenForApiRequest();
+      return token || null;
+    } catch (err) {
+      console.error('[API] Failed to refresh token in queue:', err);
+      return null;
+    } finally {
+      refreshQueuePromise = null;
+    }
+  })();
+
+  return refreshQueuePromise;
+}
 
 class ApiService {
   private api: AxiosInstance;
@@ -71,6 +93,13 @@ class ApiService {
         const token = await getAccessTokenForApiRequest();
         if (token) {
           setBearerAuth(config, token);
+        }
+        // If sending FormData, ensure Content-Type is deleted so Axios / browser can supply multipart boundary
+        if (config.data instanceof FormData && config.headers) {
+          delete config.headers['Content-Type'];
+          if (typeof (config.headers as any).delete === 'function') {
+            (config.headers as any).delete('Content-Type');
+          }
         }
         // Stamp request start time for duration tracking
         (config as any)._t = Date.now();
@@ -131,10 +160,8 @@ class ApiService {
           !originalRequest._retried
         ) {
           originalRequest._retried = true;
-          // Clear the stale token so getAccessTokenForApiRequest() skips the localStorage fallback
-          localStorage.removeItem('auth_token');
           try {
-            const freshToken = await getAccessTokenForApiRequest();
+            const freshToken = await getOrQueueRefreshToken();
             if (freshToken) {
               setBearerAuth(originalRequest, freshToken);
               return this.api.request(originalRequest);
@@ -252,8 +279,9 @@ class ApiService {
       url,
       data: formData,
       headers: {
-        'Content-Type': 'multipart/form-data',
+        'Content-Type': undefined,
       },
+      timeout: 120000,
       ...(onProgress && {
         onUploadProgress: (progressEvent: any) => {
           if (progressEvent.total) {

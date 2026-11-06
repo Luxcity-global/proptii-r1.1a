@@ -1,5 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface SearchResult {
   choices: Array<{
@@ -52,24 +53,21 @@ const SearchResultsModal: React.FC<SearchResultsModalProps> = ({
 
   const sectionContent = extractSection(content, selectedProperty);
 
-  // Convert markdown to HTML safely with HTML escaping and protocol validation
-  const escapeHtml = (unsafe: string) => {
-    return unsafe
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  };
-
   const formatContent = (text: string) => {
-    const sanitized = escapeHtml(text);
-    return sanitized
+    const rawHtml = text
       .replace(/#### (.*)/g, '<h4 class="text-lg font-bold mt-4 mb-2">$1</h4>')
       .replace(/### (.*)/g, '<h3 class="text-xl font-bold mt-6 mb-3">$1</h3>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">$1</a>')
-      .split('\n').map(line => line.trim() ? `<p class="my-2">${line}</p>` : '').join('');
+      .split('\n')
+      .map((line) => (line.trim() ? `<p class="my-2">${line}</p>` : ''))
+      .join('');
+
+    return DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: ['h3', 'h4', 'strong', 'p', 'a'],
+      ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+    });
   };
 
   return (

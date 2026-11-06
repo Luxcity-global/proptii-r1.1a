@@ -87,6 +87,7 @@ export default defineConfig({
             lines: 85,
             statements: 85
         },
-        include: ['src/**/*.{test,spec}.{ts,tsx}']
+        include: ['src/**/*.{test,spec}.{ts,tsx}'],
+        exclude: ['src/test/**', 'node_modules/**', 'v2-backend/**', 'proptii-search/**']
     }
 }); 

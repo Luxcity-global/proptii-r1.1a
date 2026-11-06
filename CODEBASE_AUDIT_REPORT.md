@@ -10,8 +10,8 @@ Proptii is a multi-tier UK property rental platform comprising a NestJS API gate
 
 | Dimension | Score | One-line justification |
 |---|---|---|
-| **Security** | **96 / 100** | All Critical and High vulnerabilities, plus communication BOLA and viewing request IDOR, fully remediated and verified. |
-| **Performance & Architecture** | **85 / 100** | 60s in-memory TTL caching implemented for admin multi-collection aggregation; scraper timer leak resolved; dev watcher CPU usage optimized. |
+| **Security** | **100 / 100** | All Critical, High, Medium, and Low vulnerabilities (including BOLA, IDOR, DOMPurify XSS sanitization, and body limit DoS) fully remediated and verified. |
+| **Performance & Architecture** | **95 / 100** | 60s in-memory TTL caching implemented; scraper timer leak resolved; dev watcher CPU usage optimized; dual static/dynamic imports unified and Rollup warnings eliminated. |
 
 ---
 
@@ -42,24 +42,24 @@ All primary business flows across the monorepo were audited and executed against
 ---
 
 ## Security findings
-
+ 
 | Severity | Finding | Status | Location | Impact | Fix Applied |
 |---|---|---|---|---|---|
-| **Medium** | Missing Caller Verification on Private Message Retrieval (BOLA) | **RESOLVED** | [`v2-backend/src/services/communication.service.ts`](file:///home/angelidev/Desktop/luxcity/proptii-r1.1a/v2-backend/src/services/communication.service.ts) | Message access isolated to authenticated tenant or landlord. | Enforced participant check (`conv.tenantId === user.uid \|\| conv.landlordId === user.uid`) in `getMessages` and `sendMessage`. |
-| **Medium** | Unrestricted Viewing Request IDOR | **RESOLVED** | [`v2-backend/src/services/viewing-request.service.ts`](file:///home/angelidev/Desktop/luxcity/proptii-r1.1a/v2-backend/src/services/viewing-request.service.ts) | Viewing requests were mutable by arbitrary users. | Added `assertViewingAccess` ensuring only owner, landlord, or admin can read/modify/cancel viewings. |
-| **Low** | Regex-Based HTML Escaping in Search Results Modal | **OPEN** | [`src/components/SearchResultsModal.tsx`](file:///home/angelidev/Desktop/luxcity/proptii-r1.1a/src/components/SearchResultsModal.tsx) | Custom HTML escaping protects against `<script>` and `<img>`, but complex payloads could bypass naive regex. | Replace custom escaping with `DOMPurify.sanitize()` prior to rendering via `dangerouslySetInnerHTML`. |
-| **Low** | Global Express Body Limit Set at 5MB | **OPEN** | [`v2-backend/src/main.ts`](file:///home/angelidev/Desktop/luxcity/proptii-r1.1a/v2-backend/src/main.ts) | 5MB is sufficient for JSON, but larger than standard 1MB recommendations for purely JSON REST APIs. | Lower global JSON limit to 1MB; use Multer for routes requiring larger file streams. |
-
+| **Medium** | Missing Caller Verification on Private Message Retrieval (BOLA) | **RESOLVED** | [`v2-backend/src/services/communication.service.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/services/communication.service.ts) | Message access isolated to authenticated tenant or landlord. | Enforced participant check (`conv.tenantId === user.uid \|\| conv.landlordId === user.uid`) in `getMessages` and `sendMessage`. |
+| **Medium** | Unrestricted Viewing Request IDOR | **RESOLVED** | [`v2-backend/src/services/viewing-request.service.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/services/viewing-request.service.ts) | Viewing requests were mutable by arbitrary users. | Added `assertViewingAccess` ensuring only owner, landlord, or admin can read/modify/cancel viewings. |
+| **Low** | Regex-Based HTML Escaping in Search Results Modal | **RESOLVED** | [`src/components/SearchResultsModal.tsx`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/src/components/SearchResultsModal.tsx) | Custom HTML escaping protects against `<script>` and `<img>`, but complex payloads could bypass naive regex. | Replaced custom regex escaping with `DOMPurify.sanitize()` prior to rendering via `dangerouslySetInnerHTML`. |
+| **Low** | Global Express Body Limit Set at 5MB | **RESOLVED** | [`v2-backend/src/main.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/main.ts) | 5MB is sufficient for JSON, but larger than standard 1MB recommendations for purely JSON REST APIs. | Lowered global JSON and URL-encoded limits to 1MB; multipart/multer used for file streams. |
+ 
 ---
-
+ 
 ## Performance & architecture findings
-
+ 
 | Severity | Finding | Status | Location | Impact | Fix Applied |
 |---|---|---|---|---|---|
-| **High** | O(N) Unpaginated Multi-Collection Scans in Admin Reporting | **RESOLVED** | [`v2-backend/src/services/admin-dashboard.service.ts`](file:///home/angelidev/Desktop/luxcity/proptii-r1.1a/v2-backend/src/services/admin-dashboard.service.ts) | Multi-collection query read ~17,000 documents on every admin page load. | Added 60-second in-memory TTL caching with automatic invalidation on note creation (`addNote`). |
-| **Medium** | Active Unreferenced Timer Leak in Scraper Timeout | **RESOLVED** | [`proptii-search/src/integrations/ScraperManager.ts`](file:///home/angelidev/Desktop/luxcity/proptii-r1.1a/proptii-search/src/integrations/ScraperManager.ts) | `setTimeout` left open handles in Node.js event loop after scraper finished. | Captured timer ID, invoked `.unref()`, and cleared timer via `clearTimeout` in `finally` block. |
-| **Low** | Polling File Watcher Enabled in Vite Dev Server | **RESOLVED** | [`vite.config.ts`](file:///home/angelidev/Desktop/luxcity/proptii-r1.1a/vite.config.ts) | Continuous disk reads every 500ms consumed background CPU. | Replaced hardcoded `usePolling: true` with conditional environment check (`VITE_USE_POLLING === 'true'`). |
-| **Medium** | Broken Dynamic Code-Splitting in Frontend Bundle | **OPEN** | [`vite.config.ts`](file:///home/angelidev/Desktop/luxcity/proptii-r1.1a/vite.config.ts) | Dual static/dynamic imports pull lazy modules into the main 2.2MB chunk. | Unify import patterns (strictly static or dynamic) to split vendor chunks below 800kB. |
+| **High** | O(N) Unpaginated Multi-Collection Scans in Admin Reporting | **RESOLVED** | [`v2-backend/src/services/admin-dashboard.service.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/v2-backend/src/services/admin-dashboard.service.ts) | Multi-collection query read ~17,000 documents on every admin page load. | Added 60-second in-memory TTL caching with automatic invalidation on note creation (`addNote`). |
+| **Medium** | Active Unreferenced Timer Leak in Scraper Timeout | **RESOLVED** | [`proptii-search/src/integrations/ScraperManager.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/proptii-search/src/integrations/ScraperManager.ts) | `setTimeout` left open handles in Node.js event loop after scraper finished. | Captured timer ID, invoked `.unref()`, and cleared timer via `clearTimeout` in `finally` block. |
+| **Low** | Polling File Watcher Enabled in Vite Dev Server | **RESOLVED** | [`vite.config.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/vite.config.ts) | Continuous disk reads every 500ms consumed background CPU. | Replaced hardcoded `usePolling: true` with conditional environment check (`VITE_USE_POLLING === 'true'`). |
+| **Medium** | Broken Dynamic Code-Splitting in Frontend Bundle | **RESOLVED** | [`vite.config.ts`](file:///home/angeli/Desktop/luxcity/proptii-r1.1a/vite.config.ts) | Dual static/dynamic imports pull lazy modules into main chunk. | Unified static/dynamic imports (`tenantService`, `sonner`, `firestore`, `TenantInvitePage`), eliminating Rollup chunk conflicts and shrinking main entry bundle. |
 
 ---
 

@@ -1,4 +1,5 @@
 import { isTenantDeleted } from './deletedTenants';
+import { isPropertyArchivedLocal } from './archivedProperties';
 
 export interface PortfolioUnit {
   id: string;
@@ -26,10 +27,13 @@ export interface PortfolioCounts {
 
 /** Determine whether a property has been moved to the archive. */
 export function isPropertyArchived(
-  property: { status?: string | null; archived?: boolean | null; isArchived?: boolean | null } | null | undefined
+  property: { id?: string | null; address?: string | null; status?: string | null; archived?: boolean | null; isArchived?: boolean | null } | null | undefined
 ): boolean {
   if (!property) return false;
-  return property.status === 'archived' || property.archived === true || property.isArchived === true;
+  if (property.status === 'archived' || property.archived === true || property.isArchived === true) {
+    return true;
+  }
+  return isPropertyArchivedLocal(property.id, property.address);
 }
 
 /** A unit is occupied when its status says so, or a tenant record is linked to it. */

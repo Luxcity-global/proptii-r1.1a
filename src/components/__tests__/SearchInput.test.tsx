@@ -31,9 +31,12 @@ describe('SearchInput', () => {
 
   it('shows error message when submitting empty query', async () => {
     render(<SearchInput />);
+    const textarea = screen.getByPlaceholderText('AI-assisted property search...');
     const searchButton = screen.getByRole('button', { name: 'Search' });
 
-    fireEvent.click(searchButton);
+    expect(searchButton).toBeDisabled();
+
+    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
 
     expect(await screen.findByText('Please enter a search query')).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();

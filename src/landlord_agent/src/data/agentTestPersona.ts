@@ -4,6 +4,7 @@ import type { Landlord } from '../hooks/useLandlords';
 import type { ViewingBooking } from '../../../services/viewingService';
 import type { BookViewingRequest } from '../../../services/bookViewingRequestService';
 import { isTenantDeleted } from '../utils/deletedTenants';
+import { isPropertyDeleted } from '../utils/deletedProperties';
 
 export const AGENT_TEST_ID = 'agent-test-001';
 export const AGENT_TEST_EMAIL = 'agent@test.proptii.co';
@@ -22,9 +23,7 @@ export const AGENT_TEST_COMPANY_PROFILE: CompanyProfile = {
 const DUMMY_PDF = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
 
 export function isAgentTestAccount(userId?: string | null, email?: string | null): boolean {
-  const id = (userId || '').trim();
-  const mail = (email || '').trim().toLowerCase();
-  return id === AGENT_TEST_ID || mail === AGENT_TEST_EMAIL;
+  return false;
 }
 
 export function mergeById<T extends { id: string }>(dummy: T[], live: T[]): T[] {
@@ -38,15 +37,18 @@ export function mergeById<T extends { id: string }>(dummy: T[], live: T[]): T[] 
  * tenants when the live record has none (so Documents & Clients stay demo-ready).
  */
 export function mergeAgentDemoProperties(dummy: Property[], live: Property[]): Property[] {
+  const filteredDummy = dummy.filter((item) => !isPropertyDeleted(item.id, item.address));
+  const filteredLive = live.filter((item) => !isPropertyDeleted(item.id, item.address));
+
   const byId = new Map(
-    dummy.map((item) => {
+    filteredDummy.map((item) => {
       if (item.tenant && isTenantDeleted(item.tenant.id, item.tenant.email)) {
         return [item.id, { ...item, status: 'vacant' as const, tenant: undefined, tenantId: undefined }];
       }
       return [item.id, item];
     })
   );
-  live.forEach((liveProp) => {
+  filteredLive.forEach((liveProp) => {
     const base = byId.get(liveProp.id);
     if (!base) {
       if (liveProp.tenant && isTenantDeleted(liveProp.tenant.id, liveProp.tenant.email)) {

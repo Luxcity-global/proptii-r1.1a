@@ -1,6 +1,7 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional, InternalServerErrorException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { dedupeTenants } from '../utils/dedupeTenants';
+import { EventsService } from './events.service';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 15000): Promise<T> {
   return Promise.race([
@@ -29,6 +30,8 @@ function cleanUndefined(obj: any): any {
 @Injectable()
 export class TenantsService {
   private readonly logger = new Logger(TenantsService.name);
+
+  constructor(@Optional() private readonly eventsService?: EventsService) {}
 
   private get db() {
     if (!admin.apps.length) return null;
@@ -97,6 +100,127 @@ export class TenantsService {
         updatedAt: new Date().toISOString(),
       },
     };
+  }
+
+  async bulkCreateTenants(rows: any[], userId?: string) {
+    const col = this.collection;
+    const db = this.db;
+    const effectiveUserId = userId || 'unknown';
+
+    if (!col || !db) {
+      throw new InternalServerErrorException('Database service is unavailable');
+    }
+
+    const total = rows.length;
+
+    // Task 16: If more than 500 rows, run in background queue and notify via SSE when done
+    if (total > 500) {
+      const jobId = `job_import_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      this.logger.log(`[bulkCreateTenants] Large import (${total} rows). Spawning background processing job ${jobId}`);
+
+      setImmediate(async () => {
+        try {
+          const results: { index: number; success: boolean; id?: string; error?: string }[] = [];
+          let succeeded = 0;
+          let failed = 0;
+
+          const CHUNK_SIZE = 400;
+          for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+            const chunk = rows.slice(i, i + CHUNK_SIZE);
+            const batch = db.batch();
+            const chunkMeta: { docId: string; index: number }[] = [];
+
+            for (let j = 0; j < chunk.length; j++) {
+              const row = chunk[j];
+              const docId = row.id || `tenant_${Date.now()}_${i + j}_${Math.random().toString(36).substr(2, 6)}`;
+              const payload = cleanUndefined({
+                ...row,
+                id: docId,
+                userId: effectiveUserId,
+                status: row.status || 'active',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              batch.set(col.doc(docId), payload);
+              chunkMeta.push({ docId, index: i + j });
+            }
+
+            try {
+              await batch.commit();
+              chunkMeta.forEach(({ docId, index }) => {
+                results.push({ index, success: true, id: docId });
+                succeeded++;
+              });
+            } catch (batchErr: any) {
+              chunkMeta.forEach(({ index }) => {
+                results.push({ index, success: false, error: batchErr?.message || 'Batch commit failed' });
+                failed++;
+              });
+            }
+          }
+
+          if (this.eventsService) {
+            this.eventsService.emit({
+              type: 'bulk_import_complete',
+              userId: effectiveUserId,
+              data: { jobId, total, succeeded, failed },
+            });
+          }
+          this.logger.log(`[bulkCreateTenants] Background job ${jobId} finished: succeeded=${succeeded}, failed=${failed}`);
+        } catch (err: any) {
+          this.logger.error(`[bulkCreateTenants] Background job ${jobId} failed: ${err?.message}`);
+        }
+      });
+
+      return {
+        async: true,
+        jobId,
+        total,
+        message: 'Import processing in background (exceeds 500 rows). You will receive an SSE notification upon completion.',
+      };
+    }
+
+    // Task 15: Imports <= 500 rows: process in batches of 400 with NO sleep per row
+    const results: { index: number; success: boolean; id?: string; error?: string }[] = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    const CHUNK_SIZE = 400;
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const batch = db.batch();
+      const chunkMeta: { docId: string; index: number }[] = [];
+
+      for (let j = 0; j < chunk.length; j++) {
+        const row = chunk[j];
+        const docId = row.id || `tenant_${Date.now()}_${i + j}_${Math.random().toString(36).substr(2, 6)}`;
+        const payload = cleanUndefined({
+          ...row,
+          id: docId,
+          userId: effectiveUserId,
+          status: row.status || 'active',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        batch.set(col.doc(docId), payload);
+        chunkMeta.push({ docId, index: i + j });
+      }
+
+      try {
+        await batch.commit();
+        chunkMeta.forEach(({ docId, index }) => {
+          results.push({ index, success: true, id: docId });
+          succeeded++;
+        });
+      } catch (batchErr: any) {
+        chunkMeta.forEach(({ index }) => {
+          results.push({ index, success: false, error: batchErr?.message || 'Batch commit failed' });
+          failed++;
+        });
+      }
+    }
+
+    return { total, succeeded, failed, results };
   }
 
   async getTenants(userId?: string, ownedPropertyIds?: string[], userEmail?: string, extraUserId?: string) {

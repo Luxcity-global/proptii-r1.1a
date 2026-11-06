@@ -1,6 +1,7 @@
 @import 'swiper/css';
 @import 'swiper/css/navigation';
 @import 'swiper/css/pagination';
+@import './styles/mobileResponsive.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -264,4 +265,17 @@ button[data-onboarding-option]:focus-visible {
 
 .gcard-fields-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.5);
+}
+
+/* Tenant messages route: dvh excludes iOS Safari's dynamic toolbar */
+.tn-viewport-height {
+  height: 100vh;
+  max-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  .tn-viewport-height {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
 }

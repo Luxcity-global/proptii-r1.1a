@@ -119,8 +119,10 @@ const AttachmentLoader: React.FC<AttachmentLoaderProps> = ({ attachmentId, conve
             .getAttachment(attachmentId)
             .then((attachment) => {
                 if (cancelled) return;
-                if (attachment?.filename) setFileName(attachment.filename);
-                setUrl(attachment?.blobUrl || null);
+                if (attachment?.fileName || attachment?.filename) {
+                    setFileName(attachment.fileName || attachment.filename || 'Attachment');
+                }
+                setUrl(attachment?.blobUrl || attachment?.downloadUrl || attachment?.blobPath || null);
             })
             .catch(() => { if (!cancelled) setIsError(true); });
         return () => { cancelled = true; };

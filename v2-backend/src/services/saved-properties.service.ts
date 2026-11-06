@@ -18,16 +18,25 @@ async function hydrateSavedPropertyItems(items: any[], db: admin.firestore.Fires
   if (!db || !Array.isArray(items) || items.length === 0) return items;
   try {
     const propIds = Array.from(new Set(items.map((i: any) => i.propertyId || i.id).filter(Boolean)));
-    const propDocs = await Promise.all(
-      propIds.map(async (pid: string) => {
-        try {
-          const doc = await db.collection('properties').doc(pid).get();
-          return doc.exists ? { id: doc.id, ...doc.data() } : null;
-        } catch {
-          return null;
-        }
-      })
-    );
+    if (propIds.length === 0) return items;
+
+    let propDocs: any[] = [];
+    if (typeof db.getAll === 'function') {
+      const refs = propIds.map(pid => db.collection('properties').doc(pid));
+      const snapshots = await db.getAll(...refs);
+      propDocs = snapshots.map(doc => doc.exists ? { id: doc.id, ...doc.data() } : null).filter(Boolean);
+    } else {
+      propDocs = await Promise.all(
+        propIds.map(async (pid: string) => {
+          try {
+            const doc = await db.collection('properties').doc(pid).get();
+            return doc.exists ? { id: doc.id, ...doc.data() } : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+    }
     const propMap = new Map<string, any>();
     propDocs.forEach((p: any) => {
       if (p && p.id) propMap.set(p.id, p);

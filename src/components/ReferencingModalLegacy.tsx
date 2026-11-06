@@ -35,10 +35,12 @@ import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
 import { firestoreService } from '../services/firestoreService';
-import { toast } from 'react-hot-toast';
+import { uploadToFirebaseStorage } from '../services/storageService';
+import { toast } from 'sonner';
 import QuickFillBanner from './referencing/ui/QuickFillBanner';
 import { ExtractedData } from '../services/openRouterService';
 import SendReferencingModal from './referencing/SendReferencingModal';
+import { isReferencingStepComplete, getReferencingProgress } from '../utils/referencingProgress';
 
 interface ReferencingModalProps {
   isOpen: boolean;
@@ -46,6 +48,8 @@ interface ReferencingModalProps {
   onSubmissionComplete?: () => void;
   initialStep?: number;
   singleSectionOnly?: boolean;
+  propertyId?: string;
+  applicationId?: string;
 }
 
 // Form data types for the 5 Referencing Passport steps
@@ -191,30 +195,20 @@ function sanitizeForLocalStorage(obj: any): any {
   return result;
 }
 
-const fileToStoredFile = async (file: File): Promise<StoredFile> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    const timeout = setTimeout(() => {
-      reader.abort();
-      reject(new Error('File reading timeout'));
-    }, 8000);
-
-    reader.onload = () => {
-      clearTimeout(timeout);
-      resolve({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        lastModified: file.lastModified,
-        dataUrl: reader.result as string
-      });
-    };
-    reader.onerror = () => {
-      clearTimeout(timeout);
-      reject(new Error('File reading failed'));
-    };
-    reader.readAsDataURL(file);
-  });
+const fileToStoredFile = async (file: File, folderSection = 'referencing'): Promise<StoredFile> => {
+  const uploadRes = await uploadToFirebaseStorage(file, `referencing_documents/${folderSection}`);
+  if (!uploadRes.success || !uploadRes.url) {
+    throw new Error(uploadRes.error || `Failed to upload "${file.name}" to cloud storage`);
+  }
+  return {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    lastModified: file.lastModified,
+    url: uploadRes.url,
+    dataUrl: uploadRes.url,
+    storagePath: uploadRes.fileName || file.name,
+  };
 };
 
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ 
@@ -299,6 +293,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     4: 'partial',
     5: 'partial'
   });
+  const {
+    completed: completedStepCount,
+    total: requiredStepCount,
+    percent: completionPercent,
+  } = getReferencingProgress(formData, stepStatus);
 
   const [guarantorMode, setGuarantorMode] = useState<'manual' | 'invite'>('manual');
   const [inviteGuarantorName, setInviteGuarantorName] = useState('');
@@ -409,12 +408,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     setStepStatus(newStatus);
   }, [formData]);
 
-  const processFileUpload = async (file: File): Promise<StoredFile> => {
-    const cacheKey = `${file.name}_${file.size}_${file.lastModified}`;
+  const processFileUpload = async (file: File, folderSection = 'referencing'): Promise<StoredFile> => {
+    const cacheKey = `${folderSection}_${file.name}_${file.size}_${file.lastModified}`;
     if (fileCache.has(cacheKey)) {
       return fileCache.get(cacheKey)!;
     }
-    const storedFile = await fileToStoredFile(file);
+    const storedFile = await fileToStoredFile(file, folderSection);
     setFileCache(prev => new Map(prev.set(cacheKey, storedFile)));
     return storedFile;
   };
@@ -425,33 +424,49 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
 
     if ('identityProof' in data && (data as any).identityProof instanceof File) {
       fileProcessingPromises.push(
-        processFileUpload((data as any).identityProof).then(result => {
-          processedData.identityProof = result;
-        })
+        processFileUpload((data as any).identityProof, 'identity')
+          .then(result => {
+            processedData.identityProof = result;
+          })
+          .catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Failed to upload identity document');
+          })
       );
     }
 
     if ('proofDocument' in data && (data as any).proofDocument instanceof File) {
       fileProcessingPromises.push(
-        processFileUpload((data as any).proofDocument).then(result => {
-          processedData.proofDocument = result;
-        })
+        processFileUpload((data as any).proofDocument, String(step))
+          .then(result => {
+            processedData.proofDocument = result;
+          })
+          .catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Failed to upload proof document');
+          })
       );
     }
 
     if ('identityDocument' in data && (data as any).identityDocument instanceof File) {
       fileProcessingPromises.push(
-        processFileUpload((data as any).identityDocument).then(result => {
-          processedData.identityDocument = result;
-        })
+        processFileUpload((data as any).identityDocument, 'guarantor')
+          .then(result => {
+            processedData.identityDocument = result;
+          })
+          .catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Failed to upload guarantor document');
+          })
       );
     }
 
     if ('proofOfIncomeDocument' in data && (data as any).proofOfIncomeDocument instanceof File) {
       fileProcessingPromises.push(
-        processFileUpload((data as any).proofOfIncomeDocument).then(result => {
-          processedData.proofOfIncomeDocument = result;
-        })
+        processFileUpload((data as any).proofOfIncomeDocument, 'financial')
+          .then(result => {
+            processedData.proofOfIncomeDocument = result;
+          })
+          .catch(err => {
+            toast.error(err instanceof Error ? err.message : 'Failed to upload income document');
+          })
       );
     }
 
@@ -548,7 +563,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
           if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
           return 'partial';
         }
-        return 'complete'; // Optional, complete if not needed
+        return 'empty';
       }
 
       default:
@@ -559,7 +574,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
   const renderSidebarNavigation = () => {
     return navigationItems.map(({ label, Icon, step }) => {
       const status = stepStatus[step];
-      let dotColor = status === 'complete' ? 'bg-green-500' : 'bg-orange-500';
+      let dotColor = isReferencingStepComplete(formData, stepStatus, step) ? 'bg-green-500' : 'bg-orange-500';
 
       return (
         <li
@@ -591,6 +606,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
         const result = await firestoreService.getReferencingForm(user.id, propertyId);
         if (result.success && result.data && result.data.formData) {
           setFormData(prev => mergeLoadedFormData(prev, result.data!.formData as any));
+          if (result.data.stepStatus) {
+            setStepStatus(prev => ({ ...prev, ...result.data!.stepStatus }));
+          }
         } else {
           const localData = localStorage.getItem(`referencing_${user.id}_formData`);
           if (localData) {
@@ -638,13 +656,16 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
 
     try {
       const propertyId = `general_${user.id}`;
-      await firestoreService.saveReferencingForm(
+      const saveResult = await firestoreService.saveReferencingForm(
         user.id,
         propertyId,
         formData as any,
         stepToSave,
         newStepStatus
       );
+      if (!saveResult.success) {
+        throw new Error(saveResult.error || 'Failed to save referencing form');
+      }
       setLastSavedSteps(prev => ({ ...prev, [stepToSave]: new Date() }));
       setShowSaveSuccess(true);
       setTimeout(() => setShowSaveSuccess(false), 3000);
@@ -772,12 +793,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
 
       return next;
     });
-
-    toast.success(
-      attachedDoc
-        ? '✨ Document attached & details auto-populated by AI!'
-        : 'AI Extracted document details populated!'
-    );
   };
 
   const handleResetGuarantor = () => {
@@ -1600,13 +1615,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
               </ul>
               <div className="mt-auto pt-4 px-2">
                 <div className="flex justify-between text-xs text-gray-600 mb-2">
-                  <span>Step {currentStep} of 5</span>
-                  <span className="font-semibold">{Math.round((currentStep / 5) * 100)}%</span>
+                  <span>{completedStepCount} of {requiredStepCount} required completed</span>
+                  <span className="font-semibold">{completionPercent}%</span>
                 </div>
                 <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[#136C9E] transition-all duration-300"
-                    style={{ width: `${(currentStep / 5) * 100}%` }}
+                    style={{ width: `${completionPercent}%` }}
                   ></div>
                 </div>
               </div>

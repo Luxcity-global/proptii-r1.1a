@@ -129,4 +129,52 @@ describe('ViewingRequestService delete', () => {
     await expect(service.cancelViewing('secret', landlord.uid, landlord)).rejects.toBeInstanceOf(ForbiddenException);
     expect(h.bucket('viewings').get('secret')?.deleted).toBeUndefined();
   });
+
+  it('strictly prevents an applicant from confirming or completing their own viewing', async () => {
+    h.bucket('viewings').set('viewing-app-1', {
+      id: 'viewing-app-1',
+      tenantId: 'tenant-applicant-1',
+      tenantEmail: 'tenant@test.com',
+      landlordId: 'landlord-1',
+      status: 'requested',
+      propertyTitle: '10 High St',
+    });
+
+    const applicant = { uid: 'tenant-applicant-1', email: 'tenant@test.com', role: 'tenant' };
+    await expect(
+      service.updateViewingStatus('viewing-app-1', applicant.uid, 'confirmed', undefined, applicant),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.updateViewingStatus('viewing-app-1', applicant.uid, 'confirmed', undefined, applicant),
+    ).rejects.toThrow('Applicants may only cancel a viewing request');
+  });
+
+  it('allows an applicant to cancel their own viewing request', async () => {
+    h.bucket('viewings').set('viewing-app-2', {
+      id: 'viewing-app-2',
+      tenantId: 'tenant-applicant-2',
+      tenantEmail: 'applicant2@test.com',
+      landlordId: 'landlord-1',
+      status: 'requested',
+      propertyTitle: '12 High St',
+    });
+
+    const applicant = { uid: 'tenant-applicant-2', email: 'applicant2@test.com', role: 'tenant' };
+    const res = await service.updateViewingStatus('viewing-app-2', applicant.uid, 'cancelled', undefined, applicant);
+    expect(res.status).toBe('cancelled');
+  });
+
+  it('allows landlord or agent to confirm viewing request', async () => {
+    h.bucket('viewings').set('viewing-app-3', {
+      id: 'viewing-app-3',
+      tenantId: 'tenant-applicant-3',
+      tenantEmail: 'applicant3@test.com',
+      landlordId: 'landlord-1',
+      status: 'requested',
+      propertyTitle: '14 High St',
+    });
+
+    const res = await service.updateViewingStatus('viewing-app-3', landlord.uid, 'confirmed', undefined, landlord);
+    expect(res.status).toBe('confirmed');
+  });
 });

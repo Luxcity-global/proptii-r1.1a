@@ -56,6 +56,8 @@ import { trackEvent } from '../../utils/analytics';
 import { useTenants } from './hooks/useTenants';
 import { isPropertyArchived } from './utils/portfolioStats';
 import { recordDeletedTenant } from './utils/deletedTenants';
+import { recordDeletedProperty, isPropertyDeleted } from './utils/deletedProperties';
+import { recordArchivedProperty, recordUnarchivedProperty } from './utils/archivedProperties';
 
 function LandlordMessagingPoller() {
   useMessagingPoller();
@@ -88,277 +90,11 @@ const LazyFallback = () => (
   </div>
 );
 
-export type UserRole = 'landlord' | 'agent';
+export * from './types';
+import type { Tenant, Property } from './types';
 
 /** Azure B2C sign-in URL for guest users in empty state */
 const SIGN_IN_URL = 'https://proptii.b2clogin.com/proptii.onmicrosoft.com/b2c_1_signupandsigninproptii/oauth2/v2.0/authorize?client_id=532e1fa0-18a6-4356-bd78-1f62bd6d5e2f&scope=openid%20profile%20email%20offline_access&redirect_uri=https%3A%2F%2Fproptii.co&client-request-id=019c89da-c0f9-7dde-8814-96ced1d1ac4a&response_mode=fragment&client_info=1&nonce=019c89da-c0fd-7ed4-acf5-ad3b2621c727&state=eyJpZCI6IjAxOWM4OWRhLWMwZmEtNzcwOC1iYjYwLTRiM2MzODZkZmJiZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D&claims=%7B%22id_token%22%3A%7B%22extension_PhoneNumber%22%3Anull%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=4.12.0&response_type=code&code_challenge=YWSXzXu9cBV85rUs9pzakoUBSnweIFd2NW-SzZdpjyI&code_challenge_method=S256';
-
-export interface CompanyProfile {
-  companyName: string;
-  companyDescription?: string;
-  website?: string;
-  officeAddress?: string;
-  officePhone?: string;
-  officeEmail?: string;
-  logo?: string;
-  brandColor?: string;
-  vatNumber?: string;
-  registrationNumber?: string;
-}
-
-export interface UserProfile {
-  name: string;
-  email: string;
-  phone: string;
-  companyName?: string;
-  logo?: string;
-  companyProfile?: CompanyProfile;
-}
-
-export interface Property {
-  id: string;
-  address: string;
-  type: string;
-  bedrooms: number;
-  bathrooms?: number;
-  squareFootage?: number;
-  rent: number;
-  status: 'vacant' | 'occupied' | 'under-renovation' | 'draft' | 'archived';
-  amenities: string[];
-  notes: string;
-  photos: PropertyPhoto[];
-  documents: PropertyDocument[];
-  // Sale-related (optional)
-  isForSale?: boolean;
-  tenureType?: string;
-  annualGroundRent?: number;
-  councilTaxBand?: string;
-  annualServiceCharge?: number;
-  // Shortlet-related (optional)
-  propertyMode?: 'long-term' | 'shortlet'; // Property rental mode
-  nightlyRate?: number; // Nightly rate for shortlets
-  minStay?: number; // Minimum stay in nights
-  maxStay?: number; // Maximum stay in nights
-  currentGuest?: any; // Current guest information
-  calendarDates?: any[]; // Availability calendar
-  pricingRules?: any[]; // Pricing rules for shortlets
-  provisioningChecklist?: any[]; // Property readiness checklist
-  createdAt: Date;
-  tenant?: Tenant;
-  tenantId?: string;
-  userId?: string;
-  archived?: boolean;
-  isArchived?: boolean;
-}
-
-export interface PropertyPhoto {
-  id: string;
-  url: string;
-  filename: string;
-  room?: string;
-  isCover: boolean;
-}
-
-export interface PropertyDocument {
-  id: string;
-  name: string;
-  type: 'epc' | 'gas-cert' | 'tenancy-agreement' | 'insurance' | 'other';
-  url: string;
-  issueDate: Date;
-  expiryDate?: Date;
-  status: 'valid' | 'expiring-soon' | 'expired';
-}
-
-export interface MarketInsight {
-  id: string;
-  type: 'market-trend' | 'regulatory-change' | 'demand-shift' | 'price-change' | 'rental-demand' | 'epc-requirements' | 'property-values';
-  title: string;
-  description: string;
-  severity: 'low' | 'medium' | 'high';
-  actionRequired: boolean;
-  date: Date;
-  area?: string;
-  region?: string;
-  value?: number;
-  unit?: string;
-  trend?: 'up' | 'down' | 'stable';
-  source?: string;
-  link?: string;
-  effectiveDate?: Date;
-  expiryDate?: Date;
-}
-
-export interface Tenant {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  propertyAddress: string;
-  propertyId: string;
-  rentAmount: number;
-  leaseStart: Date;
-  leaseEnd: Date;
-  status: 'active' | 'pending' | 'ended';
-  referencingStatus: 'not-started' | 'in-progress' | 'complete';
-  paymentStatus: 'current' | 'overdue' | 'payment-plan';
-  paymentFrequency?: 'monthly' | 'yearly' | 'fixed-time';
-  firstPaymentDate?: Date;
-  paymentIntervalDays?: number;
-  avatar?: string;
-  notes?: string;
-  emergencyContact?: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  defaultRiskScore?: number;
-  lastPaymentDate?: Date;
-  overdueAmount?: number;
-}
-
-export interface PropertyMarketData {
-  averagePrice: number;
-  priceChange12Months: number;
-  rentalDemandIndex: number;
-  occupancyRate: number;
-  averageRent: number;
-  growthScore: number;
-  demographics: {
-    averageAge: number;
-    averageIncome: number;
-    householdSize: number;
-    rentersRatio: number;
-  };
-  nearbyDevelopments: string[];
-  confidenceLevel: 'high' | 'medium' | 'low';
-}
-
-export interface VacancyRiskAlert {
-  id: string;
-  propertyId: string;
-  propertyAddress: string;
-  riskScore: number;
-  predictedVacancyDate: Date;
-  currentTenantEndDate: Date;
-  factors: {
-    marketTrend: number;
-    seasonality: number;
-    tenantHistory: number;
-    propertyCondition: number;
-  };
-  recommendations: {
-    optimalRentPrice: number;
-    marketingStartDate: Date;
-    urgencyLevel: 'low' | 'medium' | 'high';
-  };
-  status: 'new' | 'pre-marketing' | 'marketing-active' | 'resolved';
-}
-
-export interface ArrearsAlert {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  propertyAddress: string;
-  overdueAmount: number;
-  daysPastDue: number;
-  defaultRiskScore: number;
-  lastPaymentDate: Date;
-  status: 'new' | 'reminder-sent' | 'payment-plan' | 'legal-action' | 'resolved';
-  interventionType?: 'reminder' | 'payment-plan' | 'legal';
-}
-
-export interface TenantMessage {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  propertyAddress: string;
-  subject: string;
-  content: string;
-  timestamp: Date;
-  direction: 'inbound' | 'outbound';
-  status: 'new' | 'read' | 'replied' | 'resolved';
-  category: 'maintenance' | 'lease-query' | 'payment' | 'emergency' | 'general';
-  priority: 'low' | 'medium' | 'high';
-  attachments?: {
-    id: string;
-    name: string;
-    url: string;
-    type: string;
-  }[];
-}
-
-export interface AIMarketingAssets {
-  optimalRentPrice: number;
-  marketingCopy: string;
-  virtualStagingImages: string[];
-  marketData: {
-    comparableProperties: {
-      address: string;
-      rent: number;
-      distance: string;
-    }[];
-    demandScore: number;
-    competitionLevel: 'low' | 'medium' | 'high';
-  };
-}
-
-export type Screen =
-  | 'welcome'
-  | 'role-selection'
-  | 'profile-setup'
-  | 'onboarding-options'
-  | 'company-profile-setup'
-  | 'property-setup-step1'
-  | 'property-type-selection'
-  | 'property-details-selection'
-  | 'amenities-selection'
-  | 'images-notes-selection'
-  | 'property-setup'
-  | 'photo-upload'
-  | 'main-app'
-  | 'property-details'
-  | 'document-management'
-  | 'photo-management'
-  | 'edit-property'
-  | 'portfolio-insights'
-  | 'property-insights'
-  | 'tenant-details'
-  | 'vacancy-prevention'
-  | 'arrears-management'
-  | 'tenant-inbox'
-  | 'property-preview'
-  | 'tenant-selection'
-  | 'add-tenant-from-wizard'
-  | 'add-tenant'
-  | 'edit-tenant'
-  | 'invite-tenant'
-  | 'select-existing-tenant'
-  | 'add-landlord'
-  | 'landlord-details'
-  | 'bulk-import-tenant'
-  | 'bulk-import-property'
-  | 'bulk-assign'
-  | 'property-enrichment-queue'
-  | 'document-management-vault';
-
-// Property setup data interface
-interface PropertySetupData {
-  propertyType: string | null;
-  propertyDetails: {
-    address: string;
-    monthlyRent: string;
-    bedrooms: string;
-    bathrooms: string;
-    squareFootage: string;
-    uploadedDocuments: File[];
-  };
-  amenities: string[];
-  images: string[]; // Blob URLs for preview
-  imageFiles: File[]; // Actual File objects for upload
-  additionalNotes: string;
-  status?: 'vacant' | 'occupied' | 'under-renovation'; // Preserve status when editing
-  pendingTenants?: Omit<Tenant, 'id'>[]; // Tenants added before property is published
-}
 
 // Map URL paths to main-app navigation screens (shared by routing helpers below)
 const PATH_TO_NAV_SCREEN: Record<string, NavigationScreen> = {
@@ -391,15 +127,28 @@ const SCREEN_TO_PATH: Record<NavigationScreen, string> = {
 };
 
 function screenFromPathname(pathname: string): NavigationScreen | null {
-  if (pathname === '/index.html') return 'dashboard';
-  let normalizedPath = pathname.startsWith('/landlord')
-    ? pathname.slice('/landlord'.length) || '/'
-    : pathname;
-  if (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
-    normalizedPath = normalizedPath.slice(0, -1);
+  if (!pathname || pathname === '/' || pathname === '/index.html') return null;
+  let clean = pathname;
+  if (clean.startsWith('/landlord-demo')) {
+    clean = clean.slice('/landlord-demo'.length);
+  } else if (clean.startsWith('/landlord')) {
+    clean = clean.slice('/landlord'.length);
+  } else if (clean.startsWith('/agent')) {
+    clean = clean.slice('/agent'.length);
   }
-  if (!normalizedPath.startsWith('/')) normalizedPath = `/${normalizedPath}`;
-  return PATH_TO_NAV_SCREEN[normalizedPath] ?? null;
+  while (clean.length > 1 && clean.endsWith('/')) {
+    clean = clean.slice(0, -1);
+  }
+  if (!clean.startsWith('/')) clean = `/${clean}`;
+  if (clean === '/' || clean === '') return null;
+  return PATH_TO_NAV_SCREEN[clean] ?? null;
+}
+
+function screenFromHash(hash: string): NavigationScreen | null {
+  if (!hash) return null;
+  const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+  return PATH_TO_NAV_SCREEN[normalized] ?? null;
 }
 
 function isEmbeddedInParent(): boolean {
@@ -414,16 +163,58 @@ function isEmbeddedInParent(): boolean {
 export function AppContent() {
   const location = useLocation();
   const { user: hostUser, isAuthenticated: hostIsAuthenticated, isLoading: hostIsLoading } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
-  const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
+  
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const qpStart = params.get('start');
+      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup') {
+        return qpStart as Screen;
+      }
+      if (qpStart === 'add-tenant') {
+        return 'add-tenant';
+      }
+      const savedScreen = sessionStorage.getItem('proptii_current_screen') as Screen | null;
+      if (savedScreen && savedScreen !== 'welcome') {
+        return savedScreen;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'main-app';
+  });
+
+  const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>(() => {
+    try {
+      const fromPath = screenFromPathname(window.location.pathname);
+      if (fromPath) return fromPath;
+
+      const fromHash = screenFromHash(window.location.hash);
+      if (fromHash) return fromHash;
+
+      const params = new URLSearchParams(window.location.search);
+      const qp = params.get('tab') || params.get('section') || params.get('screen') || params.get('start');
+      if (qp && PATH_TO_NAV_SCREEN[`/${qp}`]) {
+        return PATH_TO_NAV_SCREEN[`/${qp}`];
+      }
+
+      const savedNav = sessionStorage.getItem('proptii_navigation_screen') as NavigationScreen | null;
+      if (savedNav && PATH_TO_NAV_SCREEN[`/${savedNav}`]) {
+        return savedNav;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'dashboard';
+  });
+
+  const [openSendContractOnStart, setOpenSendContractOnStart] = useState(false);
+  const [openClientsAddOnMount, setOpenClientsAddOnMount] = useState(false);
+  const [openViewingsRequestOnMount, setOpenViewingsRequestOnMount] = useState(false);
+
   // Sync URL pathname → navigation state.
-  // Only fires on actual URL changes (e.g. initial load, external navigation).
-  // Does NOT override popstate restorations — those are handled by the
-  // popstate listener above which runs synchronously before React Router
-  // updates location. We guard by checking if the history state already
-  // carries a proptiiScreen so we don't snap a full-screen back to main-app.
   useEffect(() => {
-    const state = window.history.state as { proptiiScreen?: Screen } | null;
+    const state = window.history.state as { proptiiScreen?: Screen; proptiiNavSection?: NavigationScreen } | null;
     // If the current history entry was pushed by us and has a known screen,
     // let the popstate handler deal with it — don't override.
     if (state?.proptiiScreen && state.proptiiScreen !== 'main-app') return;
@@ -431,13 +222,38 @@ export function AppContent() {
     if (targetScreen) {
       setNavigationScreen(targetScreen);
       setCurrentScreen('main-app');
+      try {
+        sessionStorage.setItem('proptii_navigation_screen', targetScreen);
+        sessionStorage.setItem('proptii_current_screen', 'main-app');
+      } catch { /* ignore */ }
     }
   }, [location.pathname]);
+
+  // Sync address bar URL on mount or section switch if at root /landlord
+  useEffect(() => {
+    if (!isEmbeddedInParent() && currentScreen === 'main-app') {
+      const currentPath = window.location.pathname;
+      const expectedPath = `/landlord${navigationScreen === 'dashboard' ? '' : `/${navigationScreen}`}`;
+      if (currentPath === '/landlord' && navigationScreen !== 'dashboard') {
+        window.history.replaceState(
+          { proptiiScreen: 'main-app', proptiiNavSection: navigationScreen },
+          '',
+          expectedPath
+        );
+      }
+    }
+  }, [navigationScreen, currentScreen]);
+
   // Wrapper function to log navigation changes and update URL
   const handleNavigation = useCallback((screen: NavigationScreen) => {
     trackEvent('landlord_nav_click', { section: screen });
     setCurrentScreen('main-app');
     setNavigationScreen(screen);
+
+    try {
+      sessionStorage.setItem('proptii_navigation_screen', screen);
+      sessionStorage.setItem('proptii_current_screen', 'main-app');
+    } catch { /* ignore */ }
 
     const path = SCREEN_TO_PATH[screen] || '/dashboard';
 
@@ -628,7 +444,8 @@ export function AppContent() {
           prev.email === hostUser.email &&
           prev.name === nextName &&
           (prev.phone || '') === nextPhone &&
-          (prev.companyName || '') === nextCompany
+          (prev.companyName || '') === nextCompany &&
+          (prev as any).photoURL === hostUser.photoURL
         ) {
           return prev;
         }
@@ -640,17 +457,9 @@ export function AppContent() {
           companyProfile: nextProfile,
           companyName: nextCompany,
           logo: prev?.logo,
+          photoURL: hostUser.photoURL || (prev as any)?.photoURL,
         } as any;
       });
-
-      if (agentPersona) {
-        setProperties((prev) =>
-          prev.length === 0
-            ? getAgentDummyProperties()
-            : mergeAgentDemoProperties(getAgentDummyProperties(), prev),
-        );
-        setIsPortfolioLoading(false);
-      }
     } else {
       setUserProfile(null);
       setProperties([]);
@@ -747,6 +556,12 @@ export function AppContent() {
         setNavigationScreen('contracts');
         return;
       }
+      if (qpStart === 'send-contract') {
+        setCurrentScreen('main-app');
+        setNavigationScreen('contracts');
+        setOpenSendContractOnStart(true);
+        return;
+      }
       const startScreen = localStorage.getItem('startScreen');
       if (startScreen === 'property-setup-step1') {
         setCurrentScreen('property-setup-step1');
@@ -768,11 +583,16 @@ export function AppContent() {
       if (params.get('start')) return; // Deep link takes priority
       if (params.get('tab') === 'signed') return; // Signed-contract email link
       const savedScreen = sessionStorage.getItem('proptii_current_screen') as Screen | null;
+      const savedNavScreen = sessionStorage.getItem('proptii_navigation_screen') as NavigationScreen | null;
       const savedPreviousScreen = sessionStorage.getItem('proptii_previous_screen') as Screen | null;
       if (savedScreen && savedScreen !== 'main-app' && savedScreen !== 'welcome') {
         console.log('🔄 Restoring screen from sessionStorage:', savedScreen);
         setCurrentScreen(savedScreen);
         if (savedPreviousScreen) setPreviousScreen(savedPreviousScreen);
+      } else if (savedNavScreen && PATH_TO_NAV_SCREEN[`/${savedNavScreen}`]) {
+        console.log('🔄 Restoring navigationScreen from sessionStorage:', savedNavScreen);
+        setNavigationScreen(savedNavScreen);
+        setCurrentScreen('main-app');
       }
     } catch (e) {
       console.warn('Failed to restore screen from sessionStorage:', e);
@@ -1053,20 +873,28 @@ export function AppContent() {
       if (state?.proptiiScreen) {
         // Restore the exact screen the user was on
         setCurrentScreen(state.proptiiScreen);
-        if (state.proptiiNavSection) setNavigationScreen(state.proptiiNavSection);
+        if (state.proptiiNavSection) {
+          setNavigationScreen(state.proptiiNavSection);
+          try { sessionStorage.setItem('proptii_navigation_screen', state.proptiiNavSection); } catch { /* ignore */ }
+        }
         if (state.proptiiScreen === 'main-app') {
           setSelectedProperty(null);
-          try { sessionStorage.removeItem('proptii_current_screen'); } catch { /* ignore */ }
+          try {
+            sessionStorage.removeItem('proptii_current_screen');
+          } catch { /* ignore */ }
         } else {
           try { sessionStorage.setItem('proptii_current_screen', state.proptiiScreen); } catch { /* ignore */ }
         }
       } else {
         // Fallback: derive from URL (sidebar section changes without state)
-        const targetSection = screenFromPathname(window.location.pathname);
+        const targetSection = screenFromPathname(window.location.pathname) || screenFromHash(window.location.hash);
         if (targetSection) {
           setNavigationScreen(targetSection);
           setCurrentScreen('main-app');
-          try { sessionStorage.removeItem('proptii_current_screen'); } catch { /* ignore */ }
+          try {
+            sessionStorage.setItem('proptii_navigation_screen', targetSection);
+            sessionStorage.setItem('proptii_current_screen', 'main-app');
+          } catch { /* ignore */ }
         }
       }
     };
@@ -1117,7 +945,8 @@ export function AppContent() {
     setIsTransitioning(false);
     setSelectedProperty(null);
     try {
-      sessionStorage.removeItem('proptii_current_screen');
+      sessionStorage.setItem('proptii_navigation_screen', section);
+      sessionStorage.setItem('proptii_current_screen', 'main-app');
       sessionStorage.removeItem('proptii_previous_screen');
       sessionStorage.removeItem('proptii_selected_property_id');
     } catch { /* ignore */ }
@@ -1133,6 +962,43 @@ export function AppContent() {
       );
     }
   };
+
+  const handleQuickAction = useCallback((actionId: string) => {
+    switch (actionId) {
+      case 'send-contract':
+        setOpenSendContractOnStart(true);
+        handleNavigation('contracts');
+        window.dispatchEvent(new CustomEvent('open-send-contract'));
+        break;
+
+      case 'add-property':
+        trackEvent('landlord_add_property_clicked', { source: 'mobile_quick_task' });
+        navigateToScreen('property-setup-step1');
+        break;
+
+      case 'add-tenant':
+        setOpenClientsAddOnMount(true);
+        handleNavigation('clients');
+        window.dispatchEvent(new CustomEvent('open-add-tenant'));
+        break;
+
+      case 'book-viewing':
+        setOpenViewingsRequestOnMount(true);
+        handleNavigation('viewings');
+        window.dispatchEvent(new CustomEvent('open-book-viewing'));
+        break;
+
+      case 'upload-doc':
+      case 'upload-document':
+        setOpenDocsUploadOnMount(true);
+        handleNavigation('documents');
+        window.dispatchEvent(new CustomEvent('open-upload-document'));
+        break;
+
+      default:
+        console.warn('Unhandled quick action:', actionId);
+    }
+  }, [handleNavigation, navigateToScreen]);
 
   const completeOnboarding = () => {
     setIsOnboarding(false);
@@ -1165,21 +1031,14 @@ export function AppContent() {
           ...(currentUserId ? { userId: currentUserId } : {}),
           ...(userEmail ? { email: userEmail } : {}),
         });
+        const activeFetched = fetchedProperties.filter(p => !isPropertyDeleted(p.id, p.address));
         if (!cancelled) {
-          setProperties(
-            isAgentTestAccount(currentUserId, userEmail)
-              ? mergeAgentDemoProperties(getAgentDummyProperties(), fetchedProperties)
-              : fetchedProperties
-          );
+          setProperties(activeFetched);
         }
       } catch (error) {
         console.error('Error loading properties:', error);
         if (!cancelled) {
-          setProperties(
-            isAgentTestAccount(currentUserId, userEmail)
-              ? getAgentDummyProperties()
-              : []
-          );
+          setProperties([]);
         }
       } finally {
         if (!cancelled) {
@@ -1501,7 +1360,7 @@ export function AppContent() {
     const bedrooms = parseInt(syncedSetupData.propertyDetails.bedrooms) || 1;
     const bathrooms = parseInt(syncedSetupData.propertyDetails.bathrooms);
     const squareFootage = parseInt(syncedSetupData.propertyDetails.squareFootage);
-    const rent = parseInt(syncedSetupData.propertyDetails.monthlyRent) || 0;
+    const rent = Math.max(0, parseFloat(String(syncedSetupData.propertyDetails.monthlyRent || '').replace(/[^0-9.]/g, '')) || 0);
     const preservedStatus = syncedSetupData.status || 'vacant';
 
     const newProperty: Property = {
@@ -1663,7 +1522,31 @@ export function AppContent() {
 
   const selectTenant = (tenant: Tenant) => {
     setSelectedTenant(tenant);
+    try {
+      if (tenant?.id) {
+        sessionStorage.setItem('proptii_selected_tenant_id', tenant.id);
+      } else {
+        sessionStorage.removeItem('proptii_selected_tenant_id');
+      }
+    } catch { /* ignore */ }
   };
+
+  // Re-hydrate selectedTenant on refresh or tenants load
+  React.useEffect(() => {
+    if (selectedTenant) return;
+    try {
+      const savedTenantId = sessionStorage.getItem('proptii_selected_tenant_id');
+      if (savedTenantId && tenants.length > 0) {
+        const found = tenants.find(t => t.id === savedTenantId);
+        if (found) {
+          console.log('🔄 Restoring selectedTenant from storage:', found.id);
+          setSelectedTenant(found);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore selectedTenant:', e);
+    }
+  }, [tenants, selectedTenant]);
 
   const selectLandlord = (landlord: any) => {
     setSelectedLandlord(landlord);
@@ -1869,8 +1752,12 @@ export function AppContent() {
 
   const deleteProperty = async (property: Property) => {
     try {
-      await propertyService.deleteProperty(property.id);
+      recordDeletedProperty(property.id, property.address);
+      await propertyService.deleteProperty(property.id).catch((err) => {
+        console.warn('Backend property deletion warning:', err);
+      });
       setProperties(prev => prev.filter(p => p.id !== property.id));
+      setUnassignedDocuments(prev => prev.filter(d => (d as any).propertyId !== property.id));
       if (selectedProperty?.id === property.id) {
         setSelectedProperty(null);
       }
@@ -1888,6 +1775,12 @@ export function AppContent() {
         ? ((property.tenant || (property as any).tenantId) ? 'occupied' : 'vacant')
         : 'archived';
       const isArchived = !isCurrentlyArchived;
+
+      if (isArchived) {
+        recordArchivedProperty(property.id, property.address);
+      } else {
+        recordUnarchivedProperty(property.id, property.address);
+      }
 
       await propertyService.updateProperty(property.id, {
         status: nextStatus as any,
@@ -2212,8 +2105,8 @@ export function AppContent() {
             onBulkImportProperties={() => navigateToScreen('bulk-import-property')}
             onBulkAssignTenants={() => navigateToScreen('bulk-assign')}
             onEnrichProperties={() => {
-              // Standalone enrichment — show all properties
-              importedPropertyIdsRef.current = properties.map(p => p.id);
+              // Standalone enrichment — show active properties
+              importedPropertyIdsRef.current = properties.filter(p => !isPropertyArchived(p)).map(p => p.id);
               enrichmentSourceRef.current = 'direct';
               navigateToScreen('property-enrichment-queue');
             }}
@@ -2533,6 +2426,8 @@ export function AppContent() {
             managerEmail={userProfile?.email}
             userProfile={userProfile}
             properties={properties}
+            openRequestOnMount={openViewingsRequestOnMount}
+            onRequestOpenedOnMount={() => setOpenViewingsRequestOnMount(false)}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -2549,6 +2444,7 @@ export function AppContent() {
           <ContractsPage
             tenants={tenants}
             userProfile={userProfile}
+            userRole={userRole}
             properties={properties}
             onViewInsights={() => handleNavigation('insights')}
             onViewSettings={() => handleNavigation('settings')}
@@ -2558,6 +2454,8 @@ export function AppContent() {
               navigateToScreen('property-setup-step1');
             }}
             onBack={() => setNavigationScreen('dashboard')}
+            openSendOnMount={openSendContractOnStart}
+            onSendOpenedOnMount={() => setOpenSendContractOnStart(false)}
           />
         );
 
@@ -2565,10 +2463,12 @@ export function AppContent() {
         return (
           <ClientsPage
             userId={resolveManagerId()}
-            propertyIds={properties.map(p => p.id)}
+            propertyIds={properties.filter(p => !isPropertyArchived(p)).map(p => p.id)}
             properties={properties}
             arrearsAlerts={arrearsAlerts}
             userRole={userRole}
+            openAddOnMount={openClientsAddOnMount}
+            onAddOpenedOnMount={() => setOpenClientsAddOnMount(false)}
             onViewInsights={() => handleNavigation('insights')}
             onViewSettings={() => handleNavigation('settings')}
             onViewNotifications={() => handleNavigation('messages')}
@@ -2593,6 +2493,10 @@ export function AppContent() {
               // Clear any stale wizard sentinel so it doesn't misroute this fresh flow
               setPreviousScreen(null);
               navigateToScreen('tenant-selection');
+            }}
+            onBulkImportTenant={() => {
+              trackEvent('landlord_bulk_import_tenant_clicked', { source: 'clients_page' });
+              navigateToScreen('bulk-import-tenant');
             }}
             onAddLandlord={() => navigateToScreen('add-landlord')}
             onViewLandlord={(landlord) => {
@@ -2742,7 +2646,7 @@ export function AppContent() {
       case 'referencing':
         return (
           <ReferencingPage
-            tenants={tenants}
+            tenants={tenants || []}
             userProfile={userProfile}
             onViewTenant={(tenant) => {
               selectTenant(tenant);
@@ -2990,7 +2894,7 @@ export function AppContent() {
                 const bedrooms = parseInt(syncedSetupData.propertyDetails.bedrooms) || 1;
                 const bathrooms = parseInt(syncedSetupData.propertyDetails.bathrooms);
                 const squareFootage = parseInt(syncedSetupData.propertyDetails.squareFootage);
-                const rent = parseInt(syncedSetupData.propertyDetails.monthlyRent) || 0;
+                const rent = Math.max(0, parseFloat(String(syncedSetupData.propertyDetails.monthlyRent || '').replace(/[^0-9.]/g, '')) || 0);
 
                 const preservedStatus = syncedSetupData.status
                   || (isEditing && selectedProperty ? selectedProperty.status : undefined)
@@ -3095,7 +2999,7 @@ export function AppContent() {
                   // Update any pending tenants
                   if (propertySetupData.pendingTenants?.length) {
                     try {
-                      const { tenantService: ts } = await import('./services/tenantService');
+                      const ts = tenantService;
                       const currentUserId = getCurrentUserId();
                       if (currentUserId) {
                         const allT = await ts.getTenants(currentUserId);
@@ -3165,6 +3069,7 @@ export function AppContent() {
             <MainLayout
               currentScreen={navigationScreen}
               onNavigate={handleNavigation}
+              onQuickAction={handleQuickAction}
               userProfile={userProfile}
               userRole={userRole}
               isAuthenticated={isAuthenticated}

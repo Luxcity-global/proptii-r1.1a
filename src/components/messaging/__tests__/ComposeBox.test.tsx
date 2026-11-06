@@ -21,9 +21,9 @@ vi.mock('../../../services/communicationService', () => ({
     },
 }));
 
-// Mock react-hot-toast
-vi.mock('react-hot-toast', () => ({
-    default: {
+// Mock sonner
+vi.mock('sonner', () => ({
+    toast: {
         error: vi.fn(),
         success: vi.fn(),
     },

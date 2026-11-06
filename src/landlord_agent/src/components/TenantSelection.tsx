@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Mail, UserPlus, Send, CheckCircle, AlertCircle, Loader2, Upload, X } from 'lucide-react';
 import type { Tenant, Property } from '../App';
+import { isPropertyArchived } from '../utils/portfolioStats';
 
 interface TenantSelectionProps {
   existingTenants: Tenant[];
@@ -66,8 +67,10 @@ export function TenantSelection({
       const matches = existingTenants.filter(t => (t.email || '').toLowerCase().trim() === trimmed);
       const attached = matches.find(t => t.propertyId && t.propertyId !== 'setup-property');
       const listed = properties.find(p =>
-        (p.tenant?.email || '').trim().toLowerCase() === trimmed ||
-        matches.some(m => m.id && (p.tenantId === m.id || p.tenant?.id === m.id))
+        !isPropertyArchived(p) && (
+          (p.tenant?.email || '').trim().toLowerCase() === trimmed ||
+          matches.some(m => m.id && (p.tenantId === m.id || p.tenant?.id === m.id))
+        )
       );
       const match = attached
         || (listed && matches[0] ? { ...matches[0], propertyId: listed.id, propertyAddress: listed.address } : null)

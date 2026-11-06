@@ -59,14 +59,15 @@ export const uploadToFirebaseStorage = async (
       }
     );
 
-    if (response.success && response.data?.url) {
+    const rawUrl = response.data?.url || (response.data as any)?.data?.url || (response.data as any)?.fileUrl || (response as any)?.url;
+    if (response.success && rawUrl) {
       if (onProgress) {
         onProgress({ loaded: file.size, total: file.size, percentage: 100 });
       }
       return {
         success: true,
-        url: response.data.url,
-        fileName: response.data.fileName || file.name,
+        url: rawUrl,
+        fileName: response.data?.fileName || file.name,
       };
     }
   } catch (backendError: any) {

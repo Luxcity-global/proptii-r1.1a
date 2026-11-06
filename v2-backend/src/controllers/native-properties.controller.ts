@@ -4,6 +4,7 @@ import { NativePropertiesService } from '../services/native-properties.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
+import { CreatePropertyDto, UpdatePropertyDto } from '../dto/property.dto';
 
 function normaliseForSearch(doc: any): Record<string, any> {
   const locationParts = [doc.address, doc.city, doc.postcode].filter(Boolean);
@@ -77,17 +78,28 @@ export class NativePropertiesController {
   constructor(private readonly propertiesService: NativePropertiesService) {}
 
   @Get('search')
-  @ApiOperation({ summary: 'Public property search across native catalog' })
+  @ApiOperation({ summary: 'Public property search across native catalog with cursor pagination' })
   @ApiQuery({ name: 'q', required: false, description: 'Search term/location' })
   @ApiQuery({ name: 'status', required: false, schema: { default: 'vacant' } })
   @ApiQuery({ name: 'limit', required: false, schema: { default: '50' } })
+  @ApiQuery({ name: 'cursor', required: false, description: 'Cursor document ID for pagination' })
   @ApiResponse({ status: 200, description: 'Matched normalized properties' })
   async search(
     @Query('q') q = '',
     @Query('status') status = 'vacant',
     @Query('limit') limit = '50',
+    @Query('cursor') cursor?: string,
   ) {
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    if (typeof this.propertiesService.searchPublicPaginated === 'function') {
+      const { results, nextCursor, total } = await this.propertiesService.searchPublicPaginated({
+        query: q,
+        status,
+        limit: limitNum,
+        cursor,
+      });
+      return { results: results.map(normaliseForSearch), total, nextCursor, query: q };
+    }
     const results = await this.propertiesService.searchPublic(q, limitNum);
     return { results: results.map(normaliseForSearch), total: results.length, query: q };
   }
@@ -120,8 +132,9 @@ export class NativePropertiesController {
   @ApiBearerAuth('bearer')
   @ApiOperation({ summary: 'Create new native property listing (landlord, agent, homeowner)' })
   @ApiResponse({ status: 201, description: 'Property created' })
+  @ApiResponse({ status: 400, description: 'Validation failed on required fields' })
   @ApiResponse({ status: 403, description: 'Forbidden if not landlord, agent, or homeowner' })
-  async create(@Req() req: any, @Body() body: any) {
+  async create(@Req() req: any, @Body() body: CreatePropertyDto) {
     const email = req.user?.email || '';
     const userId = req.user?.uid;
     return await this.propertiesService.create({
@@ -182,7 +195,8 @@ export class NativePropertiesController {
   @ApiOperation({ summary: 'Update native property listing' })
   @ApiParam({ name: 'id', description: 'Property ID' })
   @ApiResponse({ status: 200, description: 'Property updated' })
-  async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+  @ApiResponse({ status: 400, description: 'Validation failed on update payload' })
+  async update(@Req() req: any, @Param('id') id: string, @Body() body: UpdatePropertyDto) {
     const userId = req.user?.uid;
     const userEmail = (req.user?.email || '').toLowerCase().trim();
     return await this.propertiesService.update(id, userId, userEmail, body);

@@ -59,7 +59,7 @@ const ServicesLayoutV1: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="relative py-16 md:py-24 bg-[#f5efe7] z-20 overflow-hidden font-archive">
+    <section className="relative py-10 md:py-16 bg-[#f5efe7] z-20 overflow-hidden font-archive">
       {/* Background image / blobs */}
       <img
         src="/images/middle-section.png"
@@ -69,19 +69,17 @@ const ServicesLayoutV1: React.FC = () => {
       />
 
       <div className="relative z-10 max-w-[1440px] mx-auto px-4 md:px-8">
-        <div className="rounded-[32px] md:rounded-[40px] bg-[#0B3D5B]/95 text-white px-6 md:px-10 lg:px-16 py-10 md:py-14 lg:py-16 shadow-[0_24px_60px_rgba(0,0,0,0.32)] border border-white/5">
+        <div className="rounded-[28px] md:rounded-[40px] bg-[#0B3D5B]/95 text-white px-5 md:px-10 lg:px-16 py-8 md:py-10 lg:py-12 shadow-[0_24px_60px_rgba(0,0,0,0.32)] border border-white/5">
           {/* Heading */}
-          <div className="text-center mb-10 md:mb-14">
+          <div className="text-center mb-6 md:mb-10">
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-archive font-semibold tracking-tight">
               With us you can...
             </h2>
           </div>
 
           {/* Cards row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10 lg:gap-12 items-center">
-            {SERVICE_CARDS.map((card, index) => {
-              const isMiddle = index === 1;
-
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 lg:gap-10 items-stretch">
+            {SERVICE_CARDS.map((card) => {
               const ImageBlock = (
                 <button
                   type="button"
@@ -93,7 +91,7 @@ const ServicesLayoutV1: React.FC = () => {
                     src={card.imageSrc}
                     alt={card.imageAlt}
                     loading="lazy"
-                    className="w-full aspect-[4/3] object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+                    className="w-full aspect-[16/9] md:aspect-[4/3] object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
                     sizes="(max-width: 768px) 100vw, 33vw"
                   />
                   <div
@@ -112,7 +110,7 @@ const ServicesLayoutV1: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(card.href)}
-                  className="group mt-4 md:mt-6 w-full rounded-full bg-white text-left px-6 md:px-7 lg:px-8 py-4 md:py-4.5 flex items-center justify-between gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.45)] transform transition-all duration-200 ease-out hover:-translate-y-1"
+                  className="group mt-3 md:mt-4 w-full flex-1 rounded-[28px] md:rounded-full bg-white text-left px-5 md:px-7 lg:px-8 py-3.5 md:py-4 flex items-center justify-between gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.45)] transform transition-all duration-200 ease-out hover:-translate-y-1"
                 >
                   <span className="text-sm md:text-base text-slate-800 font-medium leading-relaxed">
                     {card.description}
@@ -139,26 +137,8 @@ const ServicesLayoutV1: React.FC = () => {
 
               return (
                 <div key={card.id} className="flex flex-col items-stretch">
-                  {/* Mobile: always show pill above its image */}
-                  <div className="md:hidden">
-                    {TextBlock}
-                    <div className="mt-5">{ImageBlock}</div>
-                  </div>
-
-                  {/* Desktop: asymmetric layout from Figma */}
-                  <div className="hidden md:block">
-                    {isMiddle ? (
-                      <>
-                        {TextBlock}
-                        <div className="mt-5 md:mt-7">{ImageBlock}</div>
-                      </>
-                    ) : (
-                      <>
-                        {ImageBlock}
-                        {TextBlock}
-                      </>
-                    )}
-                  </div>
+                  {ImageBlock}
+                  {TextBlock}
                 </div>
               );
             })}

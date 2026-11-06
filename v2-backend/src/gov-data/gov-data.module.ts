@@ -68,6 +68,8 @@ import { ReportAssembleService }       from './services/report-assemble.service'
     IngestMetaService,
     LensEngineService,
     ReportAssembleService,
+    HmlrIngestService,
+    EpcIngestService,
   ],
 })
 export class GovDataModule {}

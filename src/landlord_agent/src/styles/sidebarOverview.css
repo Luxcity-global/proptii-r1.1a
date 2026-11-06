@@ -233,6 +233,8 @@
 /* Mobile drawer reuse */
 .ll-sidebar-mobile .ll-sidebar-inner {
   padding: 20px 16px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  min-height: 0;
 }
 
 .ll-sidebar-mobile .ll-sidebar-nav {
@@ -301,5 +303,19 @@
   /* Sidebar takes most but not all of the screen width on very small devices */
   .ll-sidebar {
     width: min(280px, 85vw);
+  }
+}
+
+/* Full-height screens (messages): dvh excludes iOS Safari's dynamic toolbar */
+.ll-viewport-height.ll-viewport-height {
+  height: 100vh;
+  max-height: 100vh;
+  min-height: 0;
+}
+
+@supports (height: 100dvh) {
+  .ll-viewport-height.ll-viewport-height {
+    height: 100dvh;
+    max-height: 100dvh;
   }
 }

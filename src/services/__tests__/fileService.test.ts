@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fileService } from '../fileService';
 import { firestoreService } from '../firestoreService';
+import { uploadToFirebaseStorage } from '../storageService';
 
 vi.mock('../firestoreService', () => ({
   firestoreService: {
@@ -10,20 +11,23 @@ vi.mock('../firestoreService', () => ({
   },
 }));
 
+vi.mock('../storageService', () => ({
+  uploadToFirebaseStorage: vi.fn(),
+  deleteFromFirebaseStorage: vi.fn(),
+}));
+
 describe('Tenant fileService ("Your Files" Dashboard)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fileService.setCurrentUser(null);
   });
 
-  it('getFiles returns default contract files when no user is logged in', async () => {
+  it('getFiles returns empty files list when no user is logged in and no files exist', async () => {
     const files = await fileService.getFiles();
-    expect(files.length).toBeGreaterThan(0);
-    expect(files[0].category).toBe('Contracts');
-    expect(files[0].name).toContain('Tenancy_Agreement');
+    expect(files).toEqual([]);
   });
 
-  it('getFiles merges contract files and user-specific uploaded files from Firestore', async () => {
+  it('getFiles returns user-specific uploaded files from Firestore', async () => {
     fileService.setCurrentUser('tenant_user_456');
 
     const mockUserFiles = [
@@ -57,11 +61,16 @@ describe('Tenant fileService ("Your Files" Dashboard)', () => {
     expect(firestoreService.getUserFiles).toHaveBeenCalledWith('tenant_user_456');
     expect(allFiles.some(f => f.name === 'Passport_Copy.pdf' && f.category === 'Identity')).toBe(true);
     expect(allFiles.some(f => f.name === 'Employment_Letter.pdf' && f.category === 'Employment')).toBe(true);
-    expect(allFiles.some(f => f.category === 'Contracts')).toBe(true);
   });
 
   it('uploadFiles reads file and persists to Firestore under current user', async () => {
     fileService.setCurrentUser('tenant_user_456');
+
+    vi.mocked(uploadToFirebaseStorage).mockResolvedValue({
+      success: true,
+      url: 'https://storage.googleapis.com/documents/Bank_Statement_Jan2026.pdf',
+      fileName: 'Bank_Statement_Jan2026.pdf',
+    });
 
     vi.mocked(firestoreService.saveUserFile).mockResolvedValue({
       success: true,
@@ -78,6 +87,7 @@ describe('Tenant fileService ("Your Files" Dashboard)', () => {
     expect(results[0].success).toBe(true);
     expect(results[0].file?.name).toBe('Bank_Statement_Jan2026.pdf');
     expect(results[0].file?.category).toBe('Financial');
+    expect(results[0].file?.url).toBe('https://storage.googleapis.com/documents/Bank_Statement_Jan2026.pdf');
 
     expect(firestoreService.saveUserFile).toHaveBeenCalledWith(
       'tenant_user_456',

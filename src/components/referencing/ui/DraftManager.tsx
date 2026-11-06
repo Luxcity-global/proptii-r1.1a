@@ -24,7 +24,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useReferencing } from '../context/ReferencingContext';
 import { getDrafts, deleteDraft } from '../../../utils/localStorage';
 import { FormData } from '../../../types/referencing';
-import * as referencingService from '../../../services/referencingService';
+import referencingService from '../../../services/referencingService';
 
 
 interface Draft {

@@ -36,7 +36,7 @@ export interface DocumentUploadProps {
   id: string;
   label: string;
   accept: string;
-  file: File | null | undefined;
+  file: any;
   onFileChange: (file: File | null) => void;
   onUploadComplete?: (url: string, fileName: string) => void;
   error?: string;
@@ -92,6 +92,42 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const labelId = `${id}-label-${uniqueId}`;
   const dropzoneId = `${id}-dropzone-${uniqueId}`;
   const progressId = `${id}-progress-${uniqueId}`;
+
+  const isFilePresent = Boolean(
+    file &&
+    (file instanceof File ||
+      (typeof file === 'string' && file.trim().length > 0) ||
+      (typeof file === 'object' &&
+        Boolean(
+          file.name ||
+          file.fileName ||
+          file.url ||
+          file.dataUrl ||
+          file.storagePath
+        )))
+  );
+
+  const fileName = isFilePresent
+    ? file instanceof File
+      ? file.name
+      : file.name ||
+        file.fileName ||
+        (typeof file === 'string'
+          ? file.split('/').pop()?.split('?')[0]
+          : 'Uploaded Document')
+    : '';
+
+  const fileSize = isFilePresent
+    ? file instanceof File
+      ? file.size
+      : file.size || 0
+    : 0;
+
+  const fileUrl = isFilePresent
+    ? typeof file === 'string'
+      ? file
+      : file.url || file.dataUrl || null
+    : null;
   
   // Handle file selection
   const handleFileChange = async (selectedFile: File | null) => {
@@ -296,7 +332,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         </Typography>
       )}
       
-      {!file ? (
+      {!isFilePresent ? (
         <Paper
           variant="outlined"
           sx={styles.dropzone}
@@ -381,16 +417,30 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               <InsertDriveFileIcon sx={styles.uploadIcon} />
               <Box>
                 <Typography variant="body1" noWrap sx={styles.fileName}>
-                  {file.name}
+                  {fileName}
                 </Typography>
                 <Typography variant="body2" color="textSecondary" sx={styles.fileSize}>
-                  {formatFileSize(file.size)}
+                  {formatFileSize(fileSize)}
                 </Typography>
               </Box>
             </Box>
             
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {!autoUpload && !isUploading && !uploadSuccess && (
+              {fileUrl && (
+                <Button
+                  variant="text"
+                  size="small"
+                  component="a"
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{ mr: 1 }}
+                >
+                  View
+                </Button>
+              )}
+
+              {!autoUpload && !isUploading && !uploadSuccess && file instanceof File && (
                 <Button
                   variant="outlined"
                   size="small"
@@ -416,7 +466,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               
               <IconButton 
                 onClick={handleRemoveFile} 
-                aria-label={`Remove file ${file.name}`}
+                aria-label={`Remove file ${fileName}`}
                 disabled={disabled || isUploading}
               >
                 <DeleteIcon />

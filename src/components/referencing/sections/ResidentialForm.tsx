@@ -27,8 +27,8 @@ const ResidentialForm: React.FC = () => {
   
   // Handle upload complete
   const handleUploadComplete = (url: string, fileName: string) => {
-    console.log(`Residential proof document uploaded successfully: ${fileName} at ${url}`);
-    // You can store the URL in your form data if needed
+    handleFieldChange('proofDocument', { name: fileName, url });
+    handleFieldChange('proofDocumentId', url);
   };
 
   // Check if duration at current address is less than 3 years

@@ -9,7 +9,17 @@ interface ContractEmailParams {
   documentName?: string;
   senderName?: string;
   senderEmail?: string;
+  /** Optional personal note from the sender, shown above the contract details. */
+  message?: string;
 }
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 interface ContractEmailResponse {
   success: boolean;
@@ -19,9 +29,16 @@ interface ContractEmailResponse {
 
 class ContractEmailService {
   private generateContractEmailTemplate(params: ContractEmailParams): string {
-    const { recipientName, contractName, senderName = 'Proptii Team' } = params;
+    const { recipientName, contractName, senderName = 'Proptii Team', message } = params;
     
     const baseUrl = window.location.origin;
+    const note = message?.trim();
+    const noteHtml = note
+      ? `<div class="details">
+          <h3>Message from the sender</h3>
+          <p>${escapeHtml(note).replace(/\n/g, '<br />')}</p>
+        </div>`
+      : '';
 
     return renderProptiiEmail({
       title: 'Signed Contract Ready',
@@ -30,6 +47,7 @@ class ContractEmailService {
       bodyHtml: `
         <p>Hi ${recipientName},</p>
         <p>Great news! Your contract has been successfully signed and is ready for your records.</p>
+        ${noteHtml}
         <div class="details">
           <h3>Contract Details</h3>
           <p><strong>Contract Name:</strong> ${contractName}</p>

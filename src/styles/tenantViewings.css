@@ -796,3 +796,26 @@
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* KPI cards: 2-column grid on phones, icon above label */
+@media (max-width: 639px) {
+  .tn-vw-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .tn-vw-kpi {
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .tn-vw-kpi-top {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .tn-vw-kpi p {
+    font-size: 24px;
+  }
+}

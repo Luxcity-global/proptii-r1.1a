@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   LayoutGrid,
@@ -24,6 +24,9 @@ import LandlordDashboardHeader from './LandlordDashboardHeader';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { useIsMobile } from './ui/use-mobile';
 import { useMessagingContext } from '../../../contexts/MessagingContext';
+import { MobileHeaderTopBar } from '../../../components/common/MobileHeaderTopBar';
+import { MobileBottomNav } from '../../../components/common/MobileBottomNav';
+import { MobileCommandSheet } from '../../../components/common/MobileCommandSheet';
 import '../styles/sidebarOverview.css';
 
 const proptiiLogoSmall = '/images/Proptii ico.png';
@@ -52,6 +55,7 @@ export type NavigationScreen =
 interface MainLayoutProps {
   currentScreen: NavigationScreen;
   onNavigate: (screen: NavigationScreen) => void;
+  onQuickAction?: (actionId: string) => void;
   userProfile: UserProfile | null;
   userRole: UserRole;
   isAuthenticated: boolean;
@@ -260,7 +264,11 @@ function MobileSidebar({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-[280px] p-0 ll-sidebar ll-sidebar-mobile">
+      <SheetContent
+        side="left"
+        className="w-[280px] max-w-[85vw] h-[100dvh] p-0 z-[960] ll-sidebar ll-sidebar-mobile"
+        overlayClassName="z-[950]"
+      >
         <div className="ll-sidebar-inner">
           <SheetHeader className="p-0 space-y-0 text-left">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
@@ -284,19 +292,41 @@ function MobileSidebar({
 export function MainLayout({
   currentScreen,
   onNavigate,
+  onQuickAction,
   userProfile,
   userRole,
   isAuthenticated,
   children,
 }: MainLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [commandSheetOpen, setCommandSheetOpen] = useState(false);
   const isMobile = useIsMobile();
   const { unreadCount } = useMessagingContext();
+
+  useEffect(() => {
+    const handleOpenMobileSidebar = () => setMobileSidebarOpen(true);
+    window.addEventListener('open-mobile-sidebar', handleOpenMobileSidebar);
+    return () => window.removeEventListener('open-mobile-sidebar', handleOpenMobileSidebar);
+  }, []);
+
+  const screenTitleMap: Record<NavigationScreen, string> = {
+    dashboard: 'Dashboard',
+    properties: 'Properties',
+    documents: 'Files',
+    viewings: 'Viewings',
+    contracts: 'Contracts',
+    clients: 'Clients',
+    referencing: 'Referencing',
+    messages: 'Messages',
+    inbox: 'Inbox',
+    insights: 'Analytics',
+    settings: 'Settings',
+  };
 
   const navigationItems: NavItem[] = [
     { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard' },
     { id: 'properties', icon: Building2, label: 'Properties' },
-    { id: 'documents', icon: FileText, label: 'Documents' },
+    { id: 'documents', icon: FileText, label: 'Files' },
     { id: 'viewings', icon: CalendarDays, label: 'Viewings' },
     { id: 'contracts', icon: FileSignature, label: 'Contracts', hasNotification: true },
     { id: 'clients', icon: Users, label: 'Clients' },
@@ -306,43 +336,40 @@ export function MainLayout({
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 
+  const handleMobileNavClick = (id: string) => {
+    onNavigate(id as NavigationScreen);
+  };
+
   return (
     <SidebarProvider>
       <div
-        className="flex min-h-screen w-full overflow-x-hidden"
+        className={`flex min-h-screen w-full overflow-x-hidden${currentScreen === 'messages' || currentScreen === 'inbox' ? ' ll-viewport-height' : ''}`}
         style={
           {
             '--sidebar-width': '250px',
             '--sidebar-width-collapsed': '80px',
             ...(currentScreen === 'messages' || currentScreen === 'inbox'
-              ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+              ? { overflow: 'hidden' }
               : {}),
           } as React.CSSProperties
         }
       >
-        {/* Mobile Header */}
-        <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[#e2e8f0]">
-            <div className="flex items-center justify-between h-16 px-4">
-              <button
-                type="button"
-                onClick={() => setMobileSidebarOpen(true)}
-                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-                aria-label="Open menu"
-              >
-                <Menu className="w-6 h-6" style={{ color: '#334155' }} />
-              </button>
-              <button
-                type="button"
-                className="ll-sidebar-brand"
-                style={{ border: 'none', margin: 0, padding: '4px 8px' }}
-                onClick={() => goHomeOrSignIn(userProfile)}
-              >
-                <img src={proptiiLogoSmall} alt="Proptii" className="ll-sidebar-brand-icon" />
-                <span className="ll-sidebar-brand-title">proptii</span>
-              </button>
-              <div className="w-10" />
-            </div>
+        {/* Pattern 1: Mobile Header Top Bar (Avatar Hub) */}
+        {currentScreen !== 'clients' && (
+          <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white">
+            <MobileHeaderTopBar
+              userName={userProfile?.name || 'Agent User'}
+              userPhoto={userProfile?.photoURL}
+              userRole={userRole}
+              title={screenTitleMap[currentScreen] || 'Dashboard'}
+              showTitle={false}
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+              onOpenSettings={() => onNavigate('settings')}
+              onOpenNotifications={() => onNavigate('messages')}
+              unreadCount={unreadCount}
+            />
           </div>
+        )}
 
         <CustomSidebar
           navigationItems={navigationItems}
@@ -361,7 +388,7 @@ export function MainLayout({
         />
 
         <main
-          className="flex-1 min-w-0 overflow-x-hidden"
+          className={`flex-1 min-w-0 overflow-x-hidden${currentScreen === 'messages' || currentScreen === 'inbox' ? ' ll-viewport-height' : ''}`}
           style={{
             backgroundColor:
               currentScreen === 'dashboard'
@@ -379,10 +406,9 @@ export function MainLayout({
                   : currentScreen === 'contracts'
                     ? '#fbfbfe'
                     : '#F7F7F7',
+            paddingBottom: isMobile ? 'calc(76px + env(safe-area-inset-bottom, 0px))' : undefined,
             ...(currentScreen === 'messages' || currentScreen === 'inbox'
               ? {
-                  height: '100vh',
-                  maxHeight: '100vh',
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
@@ -390,7 +416,9 @@ export function MainLayout({
               : {}),
           }}
         >
-          <div className={`md:hidden h-16${currentScreen === 'messages' || currentScreen === 'inbox' ? ' flex-shrink-0' : ''}`} />
+          {currentScreen !== 'clients' && (
+            <div className={`lg:hidden h-[60px]${currentScreen === 'messages' || currentScreen === 'inbox' ? ' flex-shrink-0' : ''}`} />
+          )}
           {currentScreen !== 'dashboard' &&
             currentScreen !== 'properties' &&
             currentScreen !== 'contracts' &&
@@ -418,6 +446,42 @@ export function MainLayout({
             children
           )}
         </main>
+
+        {/* Pattern 2: Mobile Bottom Command Dock */}
+        <MobileBottomNav
+          activeTab={currentScreen}
+          onTabClick={handleMobileNavClick}
+          onOpenCommandSheet={() => setCommandSheetOpen(true)}
+          role="landlord"
+        />
+
+        {/* Mobile Command Launcher Sheet */}
+        <MobileCommandSheet
+          isOpen={commandSheetOpen}
+          onClose={() => setCommandSheetOpen(false)}
+          role="landlord"
+          onNavigate={(id) => onNavigate(id as NavigationScreen)}
+          onQuickAction={(actionId) => {
+            setCommandSheetOpen(false);
+            if (onQuickAction) {
+              onQuickAction(actionId);
+            } else {
+              if (actionId === 'send-contract') {
+                onNavigate('contracts');
+                window.dispatchEvent(new CustomEvent('open-send-contract'));
+              } else if (actionId === 'add-property') {
+                onNavigate('properties');
+                window.dispatchEvent(new CustomEvent('open-add-property'));
+              } else if (actionId === 'add-tenant') {
+                onNavigate('clients');
+                window.dispatchEvent(new CustomEvent('open-add-tenant'));
+              } else if (actionId === 'book-viewing') {
+                onNavigate('viewings');
+                window.dispatchEvent(new CustomEvent('open-book-viewing'));
+              }
+            }
+          }}
+        />
       </div>
     </SidebarProvider>
   );

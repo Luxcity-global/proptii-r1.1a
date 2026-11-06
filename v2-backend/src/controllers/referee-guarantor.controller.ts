@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { RefereeGuarantorService } from '../services/referee-guarantor.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -23,6 +23,10 @@ export class RefereeGuarantorController {
   @ApiOperation({ summary: 'Submit referee or guarantor response (public link submission)' })
   @ApiResponse({ status: 201, description: 'Response saved' })
   async saveResponse(@Body() body: any) {
+    const token = body?.token || body?.invitationToken || body?.guarantorToken || body?.applicantId || body?.applicantEmail;
+    if (!token || typeof token !== 'string' || token.trim().length < 3) {
+      throw new BadRequestException('A valid invitation token or applicant ID is required to submit a response');
+    }
     return this.service.saveResponse(body);
   }
 
@@ -39,6 +43,18 @@ export class RefereeGuarantorController {
     formUrl: string;
     senderName?: string;
   }) {
+    if (!body.to || !body.to.includes('@')) {
+      throw new BadRequestException('Valid recipient email is required');
+    }
+    // Prevent open phishing relay: enforce approved domains on formUrl
+    const url = body.formUrl || '';
+    const isApprovedDomain = url.startsWith('http://localhost') ||
+      url.startsWith('https://proptii.co') ||
+      url.startsWith('https://proptii.com') ||
+      url.startsWith(process.env.FRONTEND_URL || 'https://proptii.co');
+    if (!isApprovedDomain) {
+      throw new BadRequestException('formUrl must belong to an approved Proptii domain');
+    }
     return this.service.sendReferencingEmail(body);
   }
 

@@ -150,8 +150,7 @@ async function authHeaders(): Promise<Record<string, string>> {
   try {
     token = await getAccessTokenForApiRequest();
   } catch (err) {
-    console.warn('Could not get actual token, falling back to mock or empty', err);
-    token = localStorage.getItem('mock_token');
+    console.warn('Could not get access token for API request', err);
   }
   
   if (!token) {
@@ -308,10 +307,19 @@ class FirestoreService {
   ): Promise<{ success: boolean; fileId?: string; error?: string }> {
     try {
       const headers = await authHeaders();
+      const payload = {
+        ...fileData,
+        fileName: fileData.name,
+        name: fileData.name,
+        section: fileData.category,
+        category: fileData.category,
+        field: 'document',
+        userId,
+      };
       const res = await fetch(`${API_BASE}/api/referencing/files/save`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(fileData)
+        body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
@@ -319,7 +327,8 @@ class FirestoreService {
       }
 
       const json = await res.json();
-      return { success: true, fileId: json.id };
+      const serverId = json.id || json.fileId || (json.data && json.data.id) || customId;
+      return { success: true, fileId: serverId };
     } catch (error: any) {
       console.error('❌ Error saving user file:', error);
       return { success: false, error: error.message };
@@ -342,7 +351,13 @@ class FirestoreService {
       }
 
       const json = await res.json();
-      const files = json.data || [];
+      const files: UserFile[] = Array.isArray(json)
+        ? json
+        : Array.isArray(json?.data)
+          ? json.data
+          : Array.isArray(json?.files)
+            ? json.files
+            : [];
       return { success: true, files };
     } catch (error: any) {
       console.error('❌ Error getting user files:', error);

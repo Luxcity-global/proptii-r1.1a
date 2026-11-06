@@ -95,6 +95,63 @@ export class UserProfileService {
     }
   }
 
+  /**
+   * Whether this address already has a Proptii account.
+   * Auth is checked first (case-insensitive). Firestore covers accounts
+   * that were stored before they had an Auth user, including mixed-case emails.
+   */
+  async checkRegisteredEmail(email: string): Promise<{ exists: boolean; name?: string; uncertain?: boolean }> {
+    const raw = String(email || '').trim();
+    const normalized = raw.toLowerCase();
+    if (!normalized.includes('@') || !normalized.split('@')[1]?.includes('.')) {
+      return { exists: false };
+    }
+
+    let authUnavailable = !admin.apps.length;
+    if (admin.apps.length) {
+      try {
+        const record = await admin.auth().getUserByEmail(normalized);
+        if (record?.uid) {
+          const name = String(record.displayName || '').trim();
+          return { exists: true, name: name || undefined };
+        }
+      } catch (err: any) {
+        const code = String(err?.code || '');
+        const missingAccount = code === 'auth/user-not-found' || code === 'auth/invalid-email';
+        if (!missingAccount) {
+          authUnavailable = true;
+          this.logger.warn(`checkRegisteredEmail auth lookup failed: ${err?.message || err}`);
+        }
+      }
+    }
+
+    const col = this.usersCol;
+    if (!col) {
+      return authUnavailable ? { exists: false, uncertain: true } : { exists: false };
+    }
+
+    const candidates = Array.from(new Set([normalized, raw].filter((value) => value.includes('@'))));
+    let firestoreFailed = false;
+    for (const candidate of candidates) {
+      try {
+        const snap = await col.where('email', '==', candidate).limit(1).get();
+        if (!snap.empty) {
+          const data = snap.docs[0].data() || {};
+          const name = String(data.name || data.displayName || data.fullName || '').trim();
+          return { exists: true, name: name || undefined };
+        }
+      } catch (err: any) {
+        firestoreFailed = true;
+        this.logger.warn(`checkRegisteredEmail firestore lookup failed: ${err?.message || err}`);
+      }
+    }
+
+    if (authUnavailable || firestoreFailed) {
+      return { exists: false, uncertain: true };
+    }
+    return { exists: false };
+  }
+
   async getAllUsers() {
     const col = this.usersCol;
     if (!col) return [];
