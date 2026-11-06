@@ -715,6 +715,15 @@
   color: #94a3b8;
 }
 
+@media (max-width: 640px) {
+  .ll-ct-footer {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 14px 16px;
+  }
+}
+
 .ll-ct-empty {
   padding: 56px 24px;
   text-align: center;
@@ -941,12 +950,6 @@
     }
   }
 
-  /* KPI grid: single column */
-  .ll-ct-kpi-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
   /* Subsection tabs: horizontal scroll instead of wrapping to 2 rows */
   .ll-ct-subtabs {
     width: 100%;
@@ -1023,5 +1026,35 @@
   .ll-ct-btn-send {
     flex: 0 0 auto;
     white-space: nowrap;
+  }
+}
+
+/* KPI cards: 2-column grid on phones, icon above label */
+@media (max-width: 639px) {
+  .ll-ct-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ll-ct-kpi {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .ll-ct-kpi > div:last-child {
+    min-width: 0;
+  }
+
+  .ll-ct-kpi-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  .ll-ct-kpi-value {
+    font-size: 24px;
   }
 }

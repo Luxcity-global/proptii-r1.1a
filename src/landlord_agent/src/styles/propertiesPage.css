@@ -197,13 +197,13 @@
 .ll-props-kpi-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 20px;
+  gap: 16px;
   margin-bottom: 32px;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 640px) {
   .ll-props-kpi-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -524,6 +524,77 @@
 
 .ll-props-tabs::-webkit-scrollbar {
   display: none;
+}
+
+.ll-props-tabs-wrap {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ll-props-tabs-wrap .ll-props-tabs {
+  scroll-padding-inline: 32px;
+  overscroll-behavior-x: contain;
+}
+
+.ll-props-tabs-wrap.can-scroll-right .ll-props-tabs {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+
+.ll-props-tabs-wrap.can-scroll-left .ll-props-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 56px);
+  mask-image: linear-gradient(to right, transparent, #000 56px);
+}
+
+.ll-props-tabs-wrap.can-scroll-left.can-scroll-right .ll-props-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
+
+.ll-props-tabs-arrow {
+  position: absolute;
+  top: calc(50% - 2px);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #136c9e;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.85);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s;
+}
+
+.ll-props-tabs-arrow:hover {
+  background: #e8f3f8;
+}
+
+.ll-props-tabs-arrow:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(19, 108, 158, 0.25);
+}
+
+.ll-props-tabs-arrow.is-left {
+  left: 0;
+}
+
+.ll-props-tabs-arrow.is-right {
+  right: 0;
+}
+
+.ll-props-tabs-wrap.can-scroll-left .ll-props-tabs-arrow.is-left,
+.ll-props-tabs-wrap.can-scroll-right .ll-props-tabs-arrow.is-right {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
 }
 
 .ll-props-tab {
@@ -1686,15 +1757,34 @@
     font-size: 24px;
   }
 
-  /* Pagination: stack controls */
+  /* Pagination: keep page-size on the left and page buttons on the right */
   .ll-props-pager {
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    padding: 12px 14px;
+    gap: 8px;
   }
 
   .ll-props-pager-left {
-    justify-content: center;
+    flex-shrink: 0;
+    gap: 6px;
+  }
+
+  .ll-props-pages {
+    min-width: 0;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ll-props-pages::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ll-props-page {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
   }
 
   /* Bulk actions: full-width rows */

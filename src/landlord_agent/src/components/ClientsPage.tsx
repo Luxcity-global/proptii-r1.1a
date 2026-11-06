@@ -29,7 +29,6 @@ import {
   Building2,
   Bell,
   Settings,
-  Menu,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -646,14 +645,6 @@ export function ClientsPage({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleOpenSidebar}
-                className="p-2 -ml-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 lg:hidden flex items-center justify-center shrink-0 cursor-pointer"
-                aria-label="Open navigation menu"
-              >
-                <Menu className="w-6 h-6" />
-              </button>
               <div>
                 <h1 className="font-heading text-xl sm:text-2xl lg:text-[28px] font-bold text-slate-900 tracking-tight leading-none">
                   Clients
@@ -718,24 +709,23 @@ export function ClientsPage({
               </span>
             </button>
 
-            {/* Invitations Tab (Available when invitations exist or to manage pending invites) */}
-            {invitations.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveMainTab('invitations')}
-                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold font-heading transition-all ${
-                  activeMainTab === 'invitations'
-                    ? 'bg-white border border-[#DC5F12] text-[#DC5F12] shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                }`}
-              >
-                <Mail className="w-4 h-4" />
-                <span>Invitations</span>
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                  {invitations.filter((i) => i.status === 'pending').length}
-                </span>
-              </button>
-            )}
+            {/* Invitations Tab */}
+            <button
+              id="btnTabInvitations"
+              type="button"
+              onClick={() => setActiveMainTab('invitations')}
+              className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs font-bold font-heading transition-all ${
+                activeMainTab === 'invitations'
+                  ? 'bg-white border border-[#DC5F12] text-[#DC5F12] shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              <span>Invitations</span>
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold">
+                {invitations.filter((i) => i.status === 'pending').length}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -749,7 +739,7 @@ export function ClientsPage({
               .map((_, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4"
+                  className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4"
                 >
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl skeleton-box shrink-0" />
                   <div className="flex-1 space-y-2">
@@ -767,9 +757,9 @@ export function ClientsPage({
                   setActiveFilterPill('all');
                   setFilterStatus('all');
                 }}
-                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
               >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#eff6ff] text-[#136C9E] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <User className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -789,9 +779,9 @@ export function ClientsPage({
                   setActiveFilterPill('Paid');
                   setFilterStatus('Paid');
                 }}
-                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
               >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#ecfdf5] text-[#059669] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -809,9 +799,9 @@ export function ClientsPage({
                   setActiveFilterPill('Due Soon');
                   setFilterStatus('Due Soon');
                 }}
-                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
               >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#fff7ed] text-[#f97316] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -819,7 +809,7 @@ export function ClientsPage({
                   <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">
                     {kpiStats.pendingChecks}
                   </div>
-                  <div className="text-[10px] sm:text-[11px] text-amber-600 font-semibold truncate">
+                  <div className="text-[10px] sm:text-[11px] text-[#ea580c] font-semibold truncate">
                     Referencing in progress
                   </div>
                 </div>
@@ -831,9 +821,9 @@ export function ClientsPage({
                   setActiveFilterPill('Overdue');
                   setFilterStatus('Overdue');
                 }}
-                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
               >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#eef2ff] text-[#4f46e5] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -880,6 +870,15 @@ export function ClientsPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {invitations.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-10 px-4 text-center text-slate-500">
+                        <Mail className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                        <div className="font-semibold text-slate-700">No invitations sent yet</div>
+                        <div className="text-[11px] mt-1">Invite a tenant with “Add Tenant” and it will appear here.</div>
+                      </td>
+                    </tr>
+                  )}
                   {invitations.map((inv) => (
                     <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-4 font-semibold text-slate-800">{inv.email}</td>
@@ -911,9 +910,9 @@ export function ClientsPage({
         {/* FILTER & CONTROLS BAR (SEARCH + FILTER BUTTON + FILTER PILLS)             */}
         {/* ========================================================================= */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card space-y-3.5 mb-6">
-          {/* Top Row: Search Input + Filter Drawer Button (Stacked full-width on mobile) */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
-            <div className="relative flex-1 min-w-0 w-full">
+          {/* Top Row: Search Input + Filter Drawer Button (60/40 on mobile) */}
+          <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:flex sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
+            <div className="relative sm:flex-1 min-w-0">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <Search className="w-4 h-4" />
               </div>
@@ -923,7 +922,7 @@ export function ClientsPage({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by name, email, phone, property or unit..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200/90 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all bg-white shadow-xs"
+                className="w-full h-full min-h-[44px] pl-10 pr-4 py-2.5 rounded-xl border border-slate-200/90 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all bg-white shadow-xs"
               />
               {searchTerm && (
                 <button
@@ -940,7 +939,7 @@ export function ClientsPage({
               type="button"
               id="openClientsFilterDrawerBtn"
               onClick={() => setIsFilterDrawerOpen(true)}
-              className="w-full sm:w-auto inline-flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-all shrink-0 active:scale-95 hover:border-slate-300 cursor-pointer min-h-[44px]"
+              className="flex-[2_1_0%] sm:flex-none min-w-0 inline-flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-all active:scale-95 hover:border-slate-300 cursor-pointer min-h-[44px]"
               title="Open Client Filters (Status, Property, Lease Expiry)"
             >
               <Filter className="w-4 h-4 text-[#136C9E]" />

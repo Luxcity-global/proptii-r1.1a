@@ -12,6 +12,7 @@ import MessageThread, { type MessageThreadHandle } from '../../components/messag
 import ComposeBox from '../../components/messaging/ComposeBox';
 import AttachmentPill from '../../components/messaging/AttachmentPill';
 import TenantPageHeader from '../../components/dashboard/ui/TenantPageHeader';
+import ProptiiSearchModal from '../../components/dashboard/ui/ProptiiSearchModal';
 import type { Conversation, Message } from '../../types/messaging';
 import '../../styles/tenantMessages.css';
 import '../../styles/tenantModals.css';
@@ -78,6 +79,7 @@ const TenantMessages: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('inbox');
   const [search, setSearch] = useState('');
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [mobileShowThread, setMobileShowThread] = useState(false);
   const [prefilledDrafts, setPrefilledDrafts] = useState<Record<string, string>>({});
   const pendingConversationRef = useRef<{ id: string; conversation?: Conversation; prefilledMessage?: string } | null>(null);
@@ -286,7 +288,7 @@ const TenantMessages: React.FC = () => {
   ];
 
   return (
-    <div className="tn-msg" data-testid="tenant-messages-page">
+    <div className={`tn-msg${mobileShowThread ? ' is-thread-open' : ''}`} data-testid="tenant-messages-page">
       <TenantPageHeader
         title="Messages"
         subtitle={
@@ -294,9 +296,9 @@ const TenantMessages: React.FC = () => {
             Messages and communication for <span style={{ color: '#136C9E', fontWeight: 600 }}>{userName}</span>
           </>
         }
-        primaryLabel="Find Listing"
+        primaryLabel="Proptii Search"
         primaryIcon={<Search size={16} />}
-        onPrimary={() => navigate('/search')}
+        onPrimary={() => setIsSearchModalOpen(true)}
         onInsights={() => setIsInsightsOpen(true)}
       />
 
@@ -517,6 +519,8 @@ const TenantMessages: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ProptiiSearchModal open={isSearchModalOpen} onClose={() => setIsSearchModalOpen(false)} />
     </div>
   );
 };

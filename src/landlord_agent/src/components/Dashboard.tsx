@@ -1251,7 +1251,7 @@ export function Dashboard({
                       type="button"
                       className="doc-chip ll-doc-chip"
                       onClick={() => onViewDocuments ? onViewDocuments(doc.id) : (doc.property && onManageDocuments(doc.property))}
-                      title={doc.name}
+                      title={doc.type ? `${doc.name} — ${doc.type}` : doc.name}
                     >
                       <div className={`doc-chip-icon ll-doc-icon ${docBadgeClass(doc.type)}`}>
                         {docExtLabel(doc.type, doc.name)}

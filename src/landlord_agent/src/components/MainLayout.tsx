@@ -264,7 +264,11 @@ function MobileSidebar({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-[280px] p-0 ll-sidebar ll-sidebar-mobile">
+      <SheetContent
+        side="left"
+        className="w-[280px] max-w-[85vw] h-[100dvh] p-0 z-[960] ll-sidebar ll-sidebar-mobile"
+        overlayClassName="z-[950]"
+      >
         <div className="ll-sidebar-inner">
           <SheetHeader className="p-0 space-y-0 text-left">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
@@ -339,13 +343,13 @@ export function MainLayout({
   return (
     <SidebarProvider>
       <div
-        className="flex min-h-screen w-full overflow-x-hidden"
+        className={`flex min-h-screen w-full overflow-x-hidden${currentScreen === 'messages' || currentScreen === 'inbox' ? ' ll-viewport-height' : ''}`}
         style={
           {
             '--sidebar-width': '250px',
             '--sidebar-width-collapsed': '80px',
             ...(currentScreen === 'messages' || currentScreen === 'inbox'
-              ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+              ? { overflow: 'hidden' }
               : {}),
           } as React.CSSProperties
         }
@@ -384,7 +388,7 @@ export function MainLayout({
         />
 
         <main
-          className="flex-1 min-w-0 overflow-x-hidden"
+          className={`flex-1 min-w-0 overflow-x-hidden${currentScreen === 'messages' || currentScreen === 'inbox' ? ' ll-viewport-height' : ''}`}
           style={{
             backgroundColor:
               currentScreen === 'dashboard'
@@ -405,8 +409,6 @@ export function MainLayout({
             paddingBottom: isMobile ? 'calc(76px + env(safe-area-inset-bottom, 0px))' : undefined,
             ...(currentScreen === 'messages' || currentScreen === 'inbox'
               ? {
-                  height: '100vh',
-                  maxHeight: '100vh',
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',

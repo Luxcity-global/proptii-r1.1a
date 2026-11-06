@@ -1281,3 +1281,20 @@
     padding: 16px 16px 0;
   }
 }
+
+/* Mid row: let columns shrink below their content's min width so widgets stay on-screen */
+.tn-dash-mid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tn-dash-mid-left,
+.tn-dash-mid-right,
+.tn-dash-mid .tn-dash-box {
+  min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .tn-dash-mid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

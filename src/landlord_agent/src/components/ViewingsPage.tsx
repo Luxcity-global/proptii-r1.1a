@@ -108,12 +108,6 @@ interface ScheduleFormState {
   tenantPhone: string;
 }
 
-interface RescheduleFormState {
-  date: string;
-  time: string;
-  message: string;
-}
-
 interface RequestViewingFormState {
   propertyId: string;
   date: string;
@@ -158,9 +152,6 @@ const VIEWING_TIME_SLOTS = [
   { value: '16:00', label: '04:00 PM – 04:45 PM' },
   { value: '18:00', label: '06:00 PM – 06:45 PM (Evening)' },
 ];
-
-const CALENDAR_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-const CALENDAR_EVENT_COLORS = ['#136C9E', '#7c3aed', '#DC5F12', '#059669', '#0369a1'];
 
 function propertyStreet(address?: string): string {
   if (!address) return 'Property';
@@ -280,7 +271,10 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const isAuthenticatedUser = Boolean(userProfile);
-  const showAsTable = displayStyle === 'table' && !isMobile;
+  const [mobileDisplayStyle, setMobileDisplayStyle] = useState<DisplayStyle>('grid');
+  const activeDisplayStyle = isMobile ? mobileDisplayStyle : displayStyle;
+  const changeDisplayStyle = (style: DisplayStyle) => (isMobile ? setMobileDisplayStyle(style) : setDisplayStyle(style));
+  const showAsTable = activeDisplayStyle === 'table';
   const isAgentPersona = isAgentTestAccount(managerId, managerEmail);
 
   const viewingStatus = (status?: string) => String(status || '').trim().toLowerCase();
@@ -1775,16 +1769,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                 <div className="ll-vw-display" role="group" aria-label="Display style">
                   <button
                     type="button"
-                    className={`ll-vw-display-btn${displayStyle === 'grid' ? ' is-active' : ''}`}
-                    onClick={() => setDisplayStyle('grid')}
+                    className={`ll-vw-display-btn${activeDisplayStyle === 'grid' ? ' is-active' : ''}`}
+                    onClick={() => changeDisplayStyle('grid')}
+                    aria-pressed={activeDisplayStyle === 'grid'}
+                    aria-label="Grid view"
                   >
                     <LayoutGrid size={14} />
                     <span className="hide-sm">Grid</span>
                   </button>
                   <button
                     type="button"
-                    className={`ll-vw-display-btn${displayStyle === 'table' ? ' is-active' : ''}`}
-                    onClick={() => setDisplayStyle('table')}
+                    className={`ll-vw-display-btn${activeDisplayStyle === 'table' ? ' is-active' : ''}`}
+                    onClick={() => changeDisplayStyle('table')}
+                    aria-pressed={activeDisplayStyle === 'table'}
+                    aria-label="Table view"
                   >
                     <List size={14} />
                     <span className="hide-sm">Table</span>
@@ -1809,7 +1807,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               <>
                 {/* Desktop Table View */}
                 {showAsTable && (
-                  <>
+                  <div className="ll-vw-table-scroll"><div className="ll-vw-table-inner">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                       <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
@@ -1975,7 +1973,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div></div>
                 )}
 
                 {/* Mobile Card View */}
@@ -2180,7 +2178,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               <>
                 {/* Desktop Table View */}
                 {showAsTable && (
-                  <>
+                  <div className="ll-vw-table-scroll"><div className="ll-vw-table-inner">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                       <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
@@ -2292,7 +2290,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div></div>
                 )}
 
                 {/* Mobile Card View */}
@@ -2432,7 +2430,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               <>
                 {/* Desktop Table View */}
                 {showAsTable && (
-                  <>
+                  <div className="ll-vw-table-scroll"><div className="ll-vw-table-inner">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                       <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
@@ -2533,7 +2531,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div></div>
                 )}
 
                 {/* Mobile Card View */}

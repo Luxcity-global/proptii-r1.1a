@@ -1,12 +1,12 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Upload, File, AlertCircle, CheckCircle, Loader } from 'lucide-react';
-import { useAuth } from '../../../contexts/AuthContext';
 import '../../../styles/tenantModals.css';
 
 interface FileUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpload: (files: File[], category: string) => Promise<void>;
+  initialFiles?: File[];
 }
 
 const CATEGORIES = [
@@ -18,8 +18,7 @@ const CATEGORIES = [
   { value: 'Contracts', label: 'Contracts (AST, Lease, Signed Agreements)' },
 ];
 
-const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUpload }) => {
-  const { user } = useAuth();
+const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUpload, initialFiles }) => {
   const [selectedCategory, setSelectedCategory] = useState('Identity');
   const [notes, setNotes] = useState('');
   const [dragActive, setDragActive] = useState(false);
@@ -28,10 +27,7 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
   const [uploadStatus, setUploadStatus] = useState<Record<string, 'pending' | 'uploading' | 'success' | 'error'>>({});
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const ownerLabel = user?.name
-    ? `${user.name}${user.email ? ` (${user.email})` : ''}`
-    : user?.email || 'Current tenant';
+  const appliedDropKey = useRef('');
 
   const maxFileSize = 25 * 1024 * 1024;
 
@@ -63,8 +59,26 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
       else newFiles.push(file);
     });
     setErrors(newErrors);
-    if (newFiles.length > 0) setSelectedFiles((prev) => [...prev, ...newFiles]);
+    if (newFiles.length > 0) {
+      setSelectedFiles((prev) => {
+        const existing = new Set(prev.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+        const unique = newFiles.filter((file) => !existing.has(`${file.name}:${file.size}:${file.lastModified}`));
+        return unique.length > 0 ? [...prev, ...unique] : prev;
+      });
+    }
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      appliedDropKey.current = '';
+      return;
+    }
+    if (!initialFiles?.length) return;
+    const key = initialFiles.map((file) => `${file.name}:${file.size}:${file.lastModified}`).join('|');
+    if (appliedDropKey.current === key) return;
+    appliedDropKey.current = key;
+    handleFiles(initialFiles);
+  }, [isOpen, initialFiles]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -75,6 +89,7 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) handleFiles(Array.from(e.target.files));
+    e.target.value = '';
   };
 
   const resetModal = () => {
@@ -129,7 +144,7 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
 
   return (
     <div className="tn-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div className="tn-modal tn-modal-lg" role="dialog" aria-labelledby="tn-upload-title">
+      <div className="tn-modal tn-modal-lg tn-upload-modal" role="dialog" aria-labelledby="tn-upload-title">
         <div className="tn-modal-head">
           <div>
             <h3 id="tn-upload-title">Upload File</h3>
@@ -139,11 +154,6 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
         </div>
 
         <div className="tn-modal-body">
-          <label className="tn-modal-label">
-            Associated Client / Tenant
-            <input type="text" value={ownerLabel} readOnly />
-          </label>
-
           <label className="tn-modal-label">
             Category
             <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
@@ -155,10 +165,8 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
 
           <div className="tn-modal-label">
             <span>Select File (PDF, PNG, JPG)</span>
-            <button
-              type="button"
+            <label
               className={`tn-modal-drop${dragActive ? ' is-over' : ''}`}
-              onClick={() => fileInputRef.current?.click()}
               onDragEnter={handleDrag}
               onDragOver={handleDrag}
               onDragLeave={handleDrag}
@@ -167,15 +175,15 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ isOpen, onClose, onUp
               <Upload className="w-8 h-8" />
               <strong>Click to choose a file or drag here</strong>
               <span>Maximum file size: 25 MB</span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleFileInput}
-              className="hidden"
-            />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/png,image/jpeg"
+                onChange={handleFileInput}
+                className="tn-modal-file-input"
+              />
+            </label>
           </div>
 
           {selectedFiles.length > 0 && (

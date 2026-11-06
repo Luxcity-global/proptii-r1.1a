@@ -38,6 +38,7 @@ import {
 } from 'recharts';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { useAnalytics, AnalyticsData } from '../hooks/useAnalytics';
+import { downloadAnalyticsReportPdf } from '../utils/analyticsReportPdf';
 import '../styles/analyticsPage.css';
 
 interface PortfolioInsightsProps {
@@ -288,7 +289,42 @@ function PortfolioInsightsContent({
     link.click();
     document.body.removeChild(link);
 
-    showToast('Exporting comprehensive Portfolio Performance Report (CSV/PDF)...', 'success');
+    showToast('Exported analytics summary as CSV', 'success');
+  };
+
+  const [isPdfGenerating, setIsPdfGenerating] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (isPdfGenerating) return;
+    setIsPdfGenerating(true);
+    try {
+      const scopeProperty = selectedScope === 'all' ? null : activeProperties.find((p) => p.id === selectedScope);
+      await downloadAnalyticsReportPdf({
+        ownerName: userProfile?.name || 'Landlord',
+        scopeLabel: scopeProperty ? scopeProperty.address : `Entire Portfolio (${activeProperties.length} Properties)`,
+        rangeLabel: currentRange,
+        kpis: [
+          { label: 'Revenue', value: money(displayRevenue), sub: `Range: ${currentRange}` },
+          { label: 'Occupancy Rate', value: `${occupancyPct}%`, sub: `${occupiedCount}/${totalUnits} units active` },
+          { label: 'Net Income', value: money(displayNetIncome), sub: 'After est. operating costs' },
+          { label: 'Active Tenants', value: String(activeTenantsCount), sub: 'Active or pending' },
+        ],
+        summary: [
+          { label: 'Total units', value: String(totalUnits) },
+          { label: 'Occupied units', value: String(occupiedCount) },
+          { label: 'Vacant units', value: String(vacantCount) },
+          { label: 'Monthly rent roll', value: money(baseMonthlyRent) },
+        ],
+        trend: chartData.map((d) => ({ month: d.month, revenue: money(d.revenue), expenses: money(d.expenses) })),
+        yields: yieldRows.map((r) => ({ label: r.label, value: `${r.yieldPct}%` })),
+      });
+      showToast('Downloaded Portfolio Analytics Report (PDF)', 'success');
+    } catch (error) {
+      console.error('Analytics PDF export failed', error);
+      showToast('Could not generate the PDF report. Please try again.', 'warning');
+    } finally {
+      setIsPdfGenerating(false);
+    }
   };
 
   const isSkeleton = isHookLoading;
@@ -326,11 +362,13 @@ function PortfolioInsightsContent({
             <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
               <button
                 type="button"
-                onClick={handleExportReport}
-                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-slate-700 font-semibold text-xs sm:text-sm shadow-subtle hover:bg-slate-50 transition-all min-h-[44px] cursor-pointer active:scale-95"
+                onClick={handleDownloadPdf}
+                disabled={isPdfGenerating}
+                aria-busy={isPdfGenerating}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-[#DC5F12] hover:bg-[#ba4e0b] border border-[#DC5F12] hover:border-[#ba4e0b] rounded-xl text-white font-semibold text-xs sm:text-sm shadow-subtle transition-all min-h-[44px] cursor-pointer active:scale-95 disabled:opacity-70 disabled:cursor-wait"
               >
-                <Download className="w-4 h-4 text-slate-500" />
-                <span>Export PDF</span>
+                <Download className="w-4 h-4 text-white" />
+                <span>{isPdfGenerating ? 'Generating…' : 'Download PDF'}</span>
               </button>
             </div>
           </div>
@@ -395,7 +433,7 @@ function PortfolioInsightsContent({
                 type="button"
                 onClick={handleExportReport}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-all shrink-0 active:scale-95 hover:border-slate-300 cursor-pointer min-h-[44px]"
-                title="Export analytics report"
+                title="Export analytics summary as CSV"
               >
                 <Download className="w-3.5 h-3.5 text-slate-500" />
                 <span>Export</span>
@@ -513,7 +551,7 @@ function PortfolioInsightsContent({
                 Array(4)
                   .fill(0)
                   .map((_, i) => (
-                    <div key={i} className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex items-center gap-3">
+                    <div key={i} className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl skeleton-box shrink-0"></div>
                       <div className="flex-1 space-y-2">
                         <div className="h-3 w-20 skeleton-box rounded"></div>
@@ -524,43 +562,43 @@ function PortfolioInsightsContent({
                   ))
               ) : isEmpty ? (
                 <>
-                  <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                  <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-[#136C9E] flex items-center justify-center shrink-0">
                       <span className="font-bold text-xs">£</span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Monthly Revenue</div>
-                      <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">£0</div>
+                      <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading">Monthly Revenue</div>
+                      <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">£0</div>
                       <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">No revenue recorded</div>
                     </div>
                   </div>
-                  <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                  <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-orange-50 text-[#DC5F12] flex items-center justify-center shrink-0">
                       <Home className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Occupancy Rate</div>
-                      <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0%</div>
+                      <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading">Occupancy Rate</div>
+                      <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">0%</div>
                       <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">0/0 units active</div>
                     </div>
                   </div>
-                  <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                  <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                       <TrendingUp className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Net Income</div>
-                      <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">£0</div>
+                      <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading">Net Income</div>
+                      <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">£0</div>
                       <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">No net income</div>
                     </div>
                   </div>
-                  <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 opacity-60">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                  <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
                       <Users className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] sm:text-xs font-bold text-slate-400 font-heading">Active Tenants</div>
-                      <div className="text-xl sm:text-2xl font-bold text-slate-400 font-heading mt-0.5">0</div>
+                      <div className="text-[11px] sm:text-xs font-bold text-slate-500 font-heading">Active Tenants</div>
+                      <div className="text-xl sm:text-2xl font-bold text-slate-900 font-heading mt-0.5">0</div>
                       <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium">0 units occupied</div>
                     </div>
                   </div>
@@ -570,9 +608,9 @@ function PortfolioInsightsContent({
                   {/* CARD 1: Monthly Revenue */}
                   <div
                     onClick={() => handleTabChange('Revenue')}
-                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
                   >
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform font-bold text-base">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-[#136C9E] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform font-bold text-base">
                       £
                     </div>
                     <div className="min-w-0 flex-1">
@@ -592,7 +630,7 @@ function PortfolioInsightsContent({
                   {/* CARD 2: Occupancy Rate */}
                   <div
                     onClick={() => handleTabChange('Occupancy')}
-                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
                   >
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-orange-50 text-[#DC5F12] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <Home className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -611,7 +649,7 @@ function PortfolioInsightsContent({
                   {/* CARD 3: Net Income */}
                   <div
                     onClick={() => handleTabChange('Revenue')}
-                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
                   >
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -633,7 +671,7 @@ function PortfolioInsightsContent({
                   {/* CARD 4: Active Tenants */}
                   <div
                     onClick={() => handleTabChange('Tenants')}
-                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
+                    className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-card flex flex-col items-start sm:flex-row sm:items-center gap-3 sm:gap-4 hover:border-slate-300 hover:shadow-subtle transition-all cursor-pointer group"
                   >
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <Users className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1263,6 +1301,9 @@ function PortfolioInsightsContent({
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#136C9E] flex items-center justify-center mb-3">
+                  <Home className="w-5 h-5" />
+                </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Occupancy Rate</div>
                 <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">{occupancyPct}%</div>
                 <div className="text-[11px] text-slate-400 font-medium mt-1">
@@ -1270,11 +1311,17 @@ function PortfolioInsightsContent({
                 </div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
+                <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#DC5F12] flex items-center justify-center mb-3">
+                  <Building2 className="w-5 h-5" />
+                </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Vacant Units</div>
                 <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">{vacantCount}</div>
                 <div className="text-[11px] text-[#DC5F12] font-semibold mt-1">Ready for letting</div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+                  <CalendarDays className="w-5 h-5" />
+                </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Avg. Days to Let</div>
                 <div className="mt-1">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
@@ -1284,6 +1331,9 @@ function PortfolioInsightsContent({
                 <div className="text-[11px] text-slate-400 font-medium mt-1.5">Vacancy tracking in development</div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Lease Renewal Rate</div>
                 <div className="mt-1">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
@@ -1332,11 +1382,17 @@ function PortfolioInsightsContent({
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#136C9E] flex items-center justify-center mb-3">
+                  <Users className="w-5 h-5" />
+                </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Active Tenants</div>
                 <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">{activeTenantsCount}</div>
                 <div className="text-[11px] text-slate-400 font-medium mt-1">Verified agreements</div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
+                <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#DC5F12] flex items-center justify-center mb-3">
+                  <Smile className="w-5 h-5" />
+                </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Tenant Satisfaction</div>
                 <div className="mt-1">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
@@ -1346,6 +1402,9 @@ function PortfolioInsightsContent({
                 <div className="text-[11px] text-slate-400 font-medium mt-1.5">Review feedback system</div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+                  <CalendarDays className="w-5 h-5" />
+                </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Avg. Tenancy Length</div>
                 <div className="mt-1">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
@@ -1355,6 +1414,9 @@ function PortfolioInsightsContent({
                 <div className="text-[11px] text-slate-400 font-medium mt-1.5">Historical contract durations</div>
               </div>
               <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-card">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3">
+                  <Wrench className="w-5 h-5" />
+                </div>
                 <div className="text-xs font-bold text-slate-500 font-heading">Open Requests</div>
                 <div className="text-2xl font-bold text-slate-900 font-heading mt-0.5">0</div>
                 <div className="text-[11px] text-emerald-600 font-semibold mt-1">All tickets resolved</div>

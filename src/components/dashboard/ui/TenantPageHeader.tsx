@@ -52,25 +52,30 @@ const TenantPageHeader: React.FC<TenantPageHeaderProps> = ({
               <Sparkles size={18} />
             </button>
           )}
-          <button
-            type="button"
-            className="tn-ph-icon"
-            title="Settings"
-            aria-label="Settings"
-            onClick={() => navigate('/dashboard/settings')}
-          >
-            <Settings size={18} />
-          </button>
-          <button
-            type="button"
-            className="tn-ph-icon"
-            title="Notifications"
-            aria-label="Notifications"
-            onClick={() => navigate('/dashboard/messages')}
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && <span className="tn-ph-dot" />}
-          </button>
+          {/* The mobile top bar already provides Settings and Notifications. */}
+          {!isMobile && (
+            <>
+              <button
+                type="button"
+                className="tn-ph-icon"
+                title="Settings"
+                aria-label="Settings"
+                onClick={() => navigate('/dashboard/settings')}
+              >
+                <Settings size={18} />
+              </button>
+              <button
+                type="button"
+                className="tn-ph-icon"
+                title="Notifications"
+                aria-label="Notifications"
+                onClick={() => navigate('/dashboard/messages')}
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && <span className="tn-ph-dot" />}
+              </button>
+            </>
+          )}
           {extraActions}
           <button
             type="button"

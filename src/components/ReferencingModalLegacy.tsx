@@ -40,7 +40,7 @@ import { toast } from 'sonner';
 import QuickFillBanner from './referencing/ui/QuickFillBanner';
 import { ExtractedData } from '../services/openRouterService';
 import SendReferencingModal from './referencing/SendReferencingModal';
-import { isReferencingStepComplete } from '../utils/referencingProgress';
+import { isReferencingStepComplete, getReferencingProgress } from '../utils/referencingProgress';
 
 interface ReferencingModalProps {
   isOpen: boolean;
@@ -293,10 +293,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     4: 'partial',
     5: 'partial'
   });
-  const completedStepCount = [1, 2, 3, 4, 5].filter((step) =>
-    isReferencingStepComplete(formData, stepStatus, step)
-  ).length;
-  const completionPercent = Math.round((completedStepCount / 5) * 100);
+  const {
+    completed: completedStepCount,
+    total: requiredStepCount,
+    percent: completionPercent,
+  } = getReferencingProgress(formData, stepStatus);
 
   const [guarantorMode, setGuarantorMode] = useState<'manual' | 'invite'>('manual');
   const [inviteGuarantorName, setInviteGuarantorName] = useState('');
@@ -792,12 +793,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
 
       return next;
     });
-
-    toast.success(
-      attachedDoc
-        ? '✨ Document attached & details auto-populated by AI!'
-        : 'AI Extracted document details populated!'
-    );
   };
 
   const handleResetGuarantor = () => {
@@ -1620,7 +1615,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
               </ul>
               <div className="mt-auto pt-4 px-2">
                 <div className="flex justify-between text-xs text-gray-600 mb-2">
-                  <span>{completedStepCount} of 5 completed</span>
+                  <span>{completedStepCount} of {requiredStepCount} required completed</span>
                   <span className="font-semibold">{completionPercent}%</span>
                 </div>
                 <div className="h-2 bg-gray-200 rounded-full overflow-hidden">

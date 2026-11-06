@@ -927,7 +927,7 @@
 .docs-carousel,
 .ll-docs-carousel {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
   position: relative;
   overflow-x: auto;
@@ -942,7 +942,7 @@
 
 .doc-chip,
 .ll-doc-chip {
-  flex: 1;
+  flex: 1 0 180px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -952,8 +952,17 @@
   border-radius: var(--radius-md);
   transition: all 0.2s ease;
   cursor: pointer;
-  min-width: 150px;
+  min-width: 180px;
+  max-width: 260px;
+  height: 58px;
+  box-sizing: border-box;
+  overflow: hidden;
   text-align: left;
+}
+
+.doc-chip-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .doc-chip:hover,
@@ -989,7 +998,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 90px;
+  max-width: 100%;
 }
 
 .doc-meta,
@@ -997,6 +1006,10 @@
   font-size: 10px;
   color: #64748b;
   margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .docs-carousel-next {
@@ -1011,6 +1024,7 @@
   color: #475569;
   cursor: pointer;
   flex-shrink: 0;
+  align-self: center;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
   transition: all 0.2s;
 }

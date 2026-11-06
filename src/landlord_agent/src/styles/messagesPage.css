@@ -546,6 +546,14 @@
   font-family: 'Archivo', sans-serif;
 }
 
+/* Settings, notifications and insights live in the mobile top bar / nav below lg */
+@media (max-width: 1023px) {
+  .ll-msg-header-icon,
+  .ll-msg-btn-portfolio {
+    display: none !important;
+  }
+}
+
 /* Header: unstick + reduce padding at the tablet breakpoint (768px) */
 @media (max-width: 768px) {
   .ll-msg-header {
@@ -653,14 +661,41 @@
   }
   .ll-msg-tabs::-webkit-scrollbar { display: none; }
 
-  /* Toolbar row stacks */
+  /* Toolbar: tabs scroll, Export pinned on the same row */
   .ll-msg-toolbar {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .ll-msg-tabs {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .ll-msg-tab {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 6px 12px;
   }
 
   .ll-msg-export {
-    align-self: flex-end;
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 12px;
+  }
+
+  /* Open conversation: give the thread the full available height */
+  .ll-msg.is-thread-open .ll-msg-header,
+  .ll-msg.is-thread-open .ll-msg-toolbar {
+    display: none;
+  }
+
+  .ll-msg.is-thread-open .ll-msg-body {
+    padding-top: 8px;
   }
 
   /* Thread header: tighter padding to save vertical space */

@@ -18,10 +18,11 @@ import { contractService } from '../../../services/contractService';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import { viewingService, ViewingStats, ViewingBooking } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
+import TenantRescheduleModal from './TenantRescheduleModal';
 import { trackEvent } from '../../../utils/analytics';
 import AgentQuotaWidget from '../AgentQuotaWidget';
 import TenantPageHeader from '../ui/TenantPageHeader';
-import { isReferencingStepComplete } from '../../../utils/referencingProgress';
+import { isReferencingStepComplete, isReferencingStepOptional } from '../../../utils/referencingProgress';
 import '../../../styles/tenantDashboard.css';
 
 const REF_PILLARS = [
@@ -136,6 +137,7 @@ const DashboardHome: React.FC = () => {
     total: 0,
   });
   const [upcomingViewings, setUpcomingViewings] = useState<ViewingBooking[]>([]);
+  const [rescheduleViewing, setRescheduleViewing] = useState<ViewingBooking | null>(null);
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
   const [referencingStartedAt, setReferencingStartedAt] = useState<string | null>(null);
   const [propertyFilter, setPropertyFilter] = useState<PropertyFilter>('all');
@@ -288,12 +290,12 @@ const DashboardHome: React.FC = () => {
     }
   };
 
-  const REFERENCING_STEPS = [1, 2, 3, 4, 5] as const;
-  const totalSections = REFERENCING_STEPS.length;
-  const completedCount = completedSections.size;
+  const requiredPillars = REF_PILLARS.filter((pillar) => !isReferencingStepOptional(pillar.step));
+  const totalSections = requiredPillars.length;
+  const completedCount = requiredPillars.filter((pillar) => completedSections.has(pillar.key)).length;
   const allCompleted = completedCount === totalSections;
   const referencingPercent = Math.round((completedCount / totalSections) * 100);
-  const referencingStarted = Boolean(referencingStartedAt) || completedCount > 0;
+  const referencingStarted = Boolean(referencingStartedAt) || completedSections.size > 0;
 
   React.useEffect(() => {
     const loadFormStatus = async () => {
@@ -336,7 +338,7 @@ const DashboardHome: React.FC = () => {
     setIsReferencingModalOpen(false);
   };
 
-  const nextPillar = REF_PILLARS.find((p) => !completedSections.has(p.key));
+  const nextPillar = requiredPillars.find((p) => !completedSections.has(p.key));
 
   const allFiles = [...files, ...referencingFiles, ...contractFiles];
   const recentFiles = useMemo(
@@ -524,7 +526,7 @@ const DashboardHome: React.FC = () => {
                         <div className="tn-dash-ref-pct">
                           {referencingPercent}<span>%</span>
                         </div>
-                        <div className="tn-dash-ref-sub">{completedCount} out of {totalSections} completed</div>
+                        <div className="tn-dash-ref-sub">{completedCount} out of {totalSections} required completed</div>
                       </div>
                       <div className="tn-dash-ref-track">
                         <div className="tn-dash-ref-fill" style={{ width: `${referencingPercent}%` }} />
@@ -539,6 +541,7 @@ const DashboardHome: React.FC = () => {
                               key={pillar.key}
                               type="button"
                               className={`tn-dash-ref-pill ${state}`}
+                              title={isReferencingStepOptional(pillar.step) ? 'Optional — does not affect your completion score' : undefined}
                               onClick={() => openReferencingModal(pillar.step)}
                             >
                               <span>
@@ -921,7 +924,7 @@ const DashboardHome: React.FC = () => {
                               </div>
                               <div className="tn-dash-viewing-addr">{viewingAddress(booking)}</div>
                               <div className="tn-dash-viewing-actions">
-                                <button type="button" className="tn-dash-pill-btn" onClick={() => navigate('/dashboard/viewings')}>
+                                <button type="button" className="tn-dash-pill-btn" onClick={() => setRescheduleViewing(booking)}>
                                   Reschedule
                                 </button>
                                 <button type="button" className="tn-dash-pill-btn cancel" onClick={() => navigate('/dashboard/viewings')}>
@@ -1055,6 +1058,21 @@ const DashboardHome: React.FC = () => {
         }}
         file={selectedFile}
         onDownload={handleDownload}
+      />
+
+      <TenantRescheduleModal
+        viewing={rescheduleViewing}
+        onClose={() => setRescheduleViewing(null)}
+        onRescheduled={(viewingId, date, time) => {
+          setUpcomingViewings((prev) =>
+            prev.map((item) =>
+              item.id === viewingId
+                ? { ...item, status: 'rescheduled', viewingDetails: { ...item.viewingDetails, date, time } }
+                : item
+            )
+          );
+          loadViewingStats();
+        }}
       />
     </div>
   );

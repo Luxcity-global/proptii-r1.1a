@@ -569,6 +569,18 @@
   box-shadow: 0 1px 3px rgba(19, 108, 158, 0.25);
 }
 
+/* Table view: scroll horizontally instead of squashing columns on narrow screens */
+.ll-vw-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1023px) {
+  .ll-vw-table-inner {
+    min-width: 880px;
+  }
+}
+
 /* Content panel */
 .ll-vw-panel {
   background: #fff;
@@ -1476,17 +1488,39 @@
     font-size: 24px;
   }
 
-  /* Toolbar right: stack controls vertically, full width */
+  /* Toolbar right: filter select and view toggle share one row */
   .ll-vw-toolbar-right {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     width: 100%;
     gap: 8px;
+  }
+
+  .ll-vw-filter-wrap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .ll-vw-display {
+    flex: 1 1 0;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .ll-vw-display-btn {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  .ll-vw-display-btn span.hide-sm {
+    display: inline;
   }
 
   /* Select + search input: full width */
   .ll-vw-select,
   .ll-vw-search input {
     width: 100%;
+    min-width: 0;
   }
 
   /* Calendar: reduce padding on mobile */
@@ -1577,5 +1611,29 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
+  }
+}
+
+/* KPI cards: 2-column grid on phones, icon above label */
+@media (max-width: 639px) {
+  .ll-vw-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ll-vw-kpi {
+    min-width: 0;
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .ll-vw-kpi-top {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ll-vw-kpi-value {
+    font-size: 24px;
   }
 }

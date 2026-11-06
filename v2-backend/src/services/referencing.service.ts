@@ -1364,6 +1364,15 @@ export class ReferencingService {
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     const openRouterKey = process.env.OPENROUTER_API_KEY;
 
+    let geminiBusy = false;
+    if (geminiKey) {
+      const interactionsResult = await this.extractWithGeminiInteractions(geminiKey, cleanBase64, cleanMimeType);
+      if (interactionsResult.data) {
+        return { success: true, data: interactionsResult.data };
+      }
+      geminiBusy = interactionsResult.busy;
+    }
+
     if (geminiKey) {
       const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
       for (const model of candidateModels) {
@@ -1418,6 +1427,9 @@ Return strictly a valid JSON object matching this structure (use empty strings f
               this.logger.log(`AI Document Extraction succeeded with model ${model}`);
               return { success: true, data: parsed };
             }
+          } else {
+            const detail = await response.text().catch(() => '');
+            this.logger.warn(`Gemini AI extraction HTTP ${response.status} with model ${model}: ${detail.slice(0, 300)}`);
           }
         } catch (err: any) {
           this.logger.warn(`Gemini AI extraction error with model ${model}: ${err?.message || err}`);
@@ -1465,28 +1477,118 @@ Return strictly a valid JSON object matching this structure (use empty strings f
               return { success: true, data: parsed };
             }
           }
+        } else {
+          const detail = await response.text().catch(() => '');
+          this.logger.warn(`OpenRouter AI extraction HTTP ${response.status}: ${detail.slice(0, 300)}`);
         }
       } catch (err: any) {
         this.logger.warn(`OpenRouter AI extraction error: ${err?.message || err}`);
       }
     }
 
-    // Default graceful response
-    return {
-      success: true,
-      data: {
-        firstName: '',
-        lastName: '',
-        email: '',
-        phoneNumber: '',
-        dateOfBirth: '',
-        nationality: '',
-        employmentStatus: '',
-        jobPosition: '',
-        companyDetails: '',
-        currentAddress: '',
-        monthlyIncome: ''
-      }
+    if (!geminiKey && !openRouterKey) {
+      this.logger.warn('AI extraction skipped: no GEMINI_API_KEY, GOOGLE_API_KEY or OPENROUTER_API_KEY is configured');
+      return { success: false, error: 'AI auto-fill is not configured on the server' };
+    }
+
+    if (geminiBusy) {
+      return { success: false, error: 'The AI service is busy right now. Please try again in a minute' };
+    }
+
+    return { success: false, error: 'AI could not read this document' };
+  }
+
+  /**
+   * Gemini Interactions API (POST /v1beta/interactions). New API keys can no longer use
+   * gemini-2.x via :generateContent, so this is tried first. Models are tried in order
+   * because individual models intermittently return 503 under high demand.
+   */
+  private async extractWithGeminiInteractions(
+    apiKey: string,
+    base64: string,
+    mimeType: string,
+  ): Promise<{ data: Record<string, string> | null; busy: boolean }> {
+    // busy stays true only if every attempt failed due to overload, rate limiting or timeout.
+    let busy = true;
+    const configured = (process.env.GEMINI_MODEL || '').split(',').map((m) => m.trim()).filter(Boolean);
+    const models = configured.length
+      ? configured
+      : [
+          'gemini-3.8-flash',
+          'gemini-3.5-flash',
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-flash-lite',
+          'gemini-2.5-flash-lite',
+          'gemini-flash-latest',
+        ];
+    // Stay under the frontend's 90s request timeout.
+    const deadline = Date.now() + 75000;
+
+    const fields = [
+      'firstName', 'lastName', 'email', 'phoneNumber', 'dateOfBirth', 'nationality',
+      'employmentStatus', 'jobPosition', 'companyDetails', 'currentAddress', 'monthlyIncome',
+    ];
+    const schema = {
+      type: 'object',
+      properties: Object.fromEntries(fields.map((f) => [f, { type: 'string' }])),
     };
+    const mediaType = mimeType === 'application/pdf' ? 'document' : 'image';
+    const prompt = `Analyze this uploaded applicant document (passport, UK driving licence, national ID, payslip, P60, bank statement, utility bill, council tax bill, tenancy agreement, or employment contract) and extract any recognizable applicant referencing details.
+Use empty strings for anything not present. Format dateOfBirth as YYYY-MM-DD. employmentStatus must be one of "Employed", "Self-Employed", "Student", "Retired" or empty. monthlyIncome is the gross monthly amount as digits only. currentAddress is the full postal address on one line.`;
+
+    for (const model of models) {
+      const remaining = deadline - Date.now();
+      if (remaining < 5000) {
+        this.logger.warn('Gemini Interactions: time budget exhausted before trying all models');
+        break;
+      }
+      try {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+            'Api-Revision': '2026-05-20',
+          },
+          body: JSON.stringify({
+            model,
+            store: false,
+            input: [
+              { type: mediaType, data: base64, mime_type: mimeType },
+              { type: 'text', text: prompt },
+            ],
+            response_format: { type: 'text', mime_type: 'application/json', schema },
+          }),
+          signal: AbortSignal.timeout(Math.min(45000, remaining)),
+        });
+
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          this.logger.warn(`Gemini Interactions HTTP ${response.status} with model ${model}: ${detail.slice(0, 300)}`);
+          if (response.status !== 503 && response.status !== 429) busy = false;
+          continue;
+        }
+
+        const json: any = await response.json();
+        const outputs = (json.steps || []).filter((s: any) => s?.type === 'model_output');
+        const text = outputs.length
+          ? (outputs[outputs.length - 1].content || []).find((c: any) => c?.type === 'text')?.text
+          : undefined;
+        if (!text) {
+          this.logger.warn(`Gemini Interactions returned no text with model ${model}`);
+          busy = false;
+          continue;
+        }
+
+        const parsed = JSON.parse(text);
+        this.logger.log(`AI Document Extraction succeeded with model ${model} (Interactions API)`);
+        return { data: parsed, busy: false };
+      } catch (err: any) {
+        this.logger.warn(`Gemini Interactions error with model ${model}: ${err?.message || err}`);
+        if (err?.name !== 'TimeoutError') busy = false;
+      }
+    }
+
+    return { data: null, busy };
   }
 }

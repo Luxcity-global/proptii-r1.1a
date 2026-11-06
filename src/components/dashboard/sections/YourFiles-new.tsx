@@ -55,6 +55,52 @@ function fileIconKind(fileName: string, fileType: string): 'pdf' | 'img' | 'othe
   return 'other';
 }
 
+function vaultStorageKey(userId: string): string {
+  return `proptii_renter_vault_${userId}`;
+}
+
+const memoryVault = new Map<string, FileItem[]>();
+
+function readVaultFiles(userId: string): FileItem[] {
+  const fromMemory = memoryVault.get(userId) || [];
+  try {
+    const raw = localStorage.getItem(vaultStorageKey(userId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    const fromStorage = Array.isArray(parsed) ? parsed : [];
+    return mergeVaultFiles(fromStorage, fromMemory);
+  } catch {
+    return fromMemory;
+  }
+}
+
+function writeVaultFiles(userId: string, next: FileItem[]) {
+  memoryVault.set(userId, next);
+  try {
+    localStorage.setItem(vaultStorageKey(userId), JSON.stringify(next));
+  } catch (err) {
+    console.warn('Could not persist uploaded files locally', err);
+  }
+}
+
+function sameVaultFile(a: FileItem, b: FileItem): boolean {
+  if (a.firestoreId && b.firestoreId && a.firestoreId === b.firestoreId) return true;
+  if (a.url && b.url && a.url === b.url) return true;
+  return a.name === b.name && a.size === b.size && a.category === b.category;
+}
+
+function mergeVaultFiles(primary: FileItem[], extra: FileItem[]): FileItem[] {
+  const merged = [...primary];
+  for (const file of extra) {
+    const index = merged.findIndex((existing) => sameVaultFile(existing, file));
+    if (index === -1) {
+      merged.push(file);
+    } else if (!merged[index].url && file.url) {
+      merged[index] = { ...merged[index], url: file.url };
+    }
+  }
+  return merged;
+}
+
 const YourFiles: React.FC = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -76,6 +122,7 @@ const YourFiles: React.FC = () => {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [dropOver, setDropOver] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [queuedUploads, setQueuedUploads] = useState<globalThis.File[]>([]);
 
   const ITEMS_PER_PAGE = 10;
 
@@ -125,7 +172,7 @@ const YourFiles: React.FC = () => {
     };
   }, [user?.id]);
 
-  const loadFiles = async () => {
+  const loadFiles = async (extras: FileItem[] = []) => {
     try {
       setLoading(true);
       setError(null);
@@ -133,7 +180,16 @@ const YourFiles: React.FC = () => {
       fileService.setCurrentUser(user?.id || null);
 
       const loadedFiles = await fileService.getFiles();
-      setFiles(loadedFiles);
+      const cached = user?.id ? readVaultFiles(user.id) : [];
+      const retained = mergeVaultFiles(cached, extras).filter((file) => {
+        const loaded = loadedFiles.find((item) => sameVaultFile(item, file));
+        if (!loaded) return true;
+        return !loaded.url && Boolean(file.url);
+      });
+      setFiles(mergeVaultFiles(mergeVaultFiles(loadedFiles, retained), extras));
+      if (user?.id) {
+        writeVaultFiles(user.id, retained);
+      }
 
       if (user?.id) {
         await loadReferencingFiles();
@@ -248,19 +304,23 @@ const YourFiles: React.FC = () => {
       const results = await fileService.uploadFiles(uploadFiles, category);
 
       const failedUploads = results.filter((r) => !r.success);
+      const uploaded = results.flatMap((result) => (result.success && result.file ? [result.file] : []));
+      if (uploaded.length === 0) {
+        const message = failedUploads.map((result) => result.error).filter(Boolean).join(' ') || 'Upload failed';
+        throw new Error(message);
+      }
+      await loadFiles(uploaded);
+      await loadReferencingFiles();
       if (failedUploads.length > 0) {
         const errorMsg = failedUploads[0].error || `Failed to upload ${failedUploads.length} file(s)`;
         setError(errorMsg);
         throw new Error(errorMsg);
       }
-
-      await loadFiles();
-      await loadReferencingFiles();
-    } catch (err: any) {
-      const msg = err instanceof Error ? err.message : 'Upload failed';
-      setError(msg);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      setError(message);
       console.error('Upload error:', err);
-      throw err;
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setUploading(false);
     }
@@ -275,12 +335,25 @@ const YourFiles: React.FC = () => {
     }
   };
 
+  const forgetVaultFile = (fileId: number, firestoreId?: string) => {
+    if (!user?.id) return;
+    writeVaultFiles(
+      user.id,
+      readVaultFiles(user.id).filter((file) => {
+        if (file.id === fileId) return false;
+        if (firestoreId && file.firestoreId === firestoreId) return false;
+        return true;
+      })
+    );
+  };
+
   const handleDelete = async (fileId: number, firestoreId?: string) => {
     try {
       const contractFile = contractFiles.find(f => f.id === fileId);
       if (contractFile && contractFile.firestoreId) {
         const result = await contractService.deleteContractTemplate(contractFile.firestoreId);
         if (result.success) {
+          forgetVaultFile(fileId, contractFile.firestoreId);
           setContractFiles(prev => prev.filter(f => f.id !== fileId));
           setDeleteConfirm(null);
           console.log('Contract file deleted from Firestore');
@@ -290,6 +363,7 @@ const YourFiles: React.FC = () => {
       } else {
         const result = await fileService.deleteFile(fileId, firestoreId);
         if (result.success) {
+          forgetVaultFile(fileId, firestoreId);
           setFiles(prev => prev.filter(f => f.id !== fileId));
           setReferencingFiles(prev => prev.filter(f => f.id !== fileId));
           setDeleteConfirm(null);
@@ -337,6 +411,7 @@ const YourFiles: React.FC = () => {
   }, [selectedFilter, searchQuery, allFiles.length]);
 
   const stats = fileService.getFileStats(filteredFiles);
+  const vaultStats = fileService.getFileStats(allFiles);
 
   const pillarCount = (id: string) => {
     if (id === 'All Files') return allFiles.length;
@@ -387,7 +462,7 @@ const YourFiles: React.FC = () => {
             <span className="tn-fl-kpi-icon blue"><FileText className="w-4 h-4" /></span>
           </div>
           <div className="tn-fl-kpi-value">
-            {loading ? <Loader className="w-6 h-6 animate-spin" /> : referencingFiles.length + contractFiles.length}
+            {loading ? <Loader className="w-6 h-6 animate-spin" /> : allFiles.length}
           </div>
           <div className="tn-fl-kpi-sub">All updated files</div>
         </div>
@@ -397,7 +472,7 @@ const YourFiles: React.FC = () => {
             <span className="tn-fl-kpi-icon purple"><User className="w-4 h-4" /></span>
           </div>
           <div className="tn-fl-kpi-value">
-            {loading ? <Loader className="w-6 h-6 animate-spin" /> : referencingFiles.length}
+            {loading ? <Loader className="w-6 h-6 animate-spin" /> : vaultStats.referencingFiles}
           </div>
           <div className="tn-fl-kpi-sub">Documents uploaded</div>
         </div>
@@ -407,7 +482,7 @@ const YourFiles: React.FC = () => {
             <span className="tn-fl-kpi-icon emerald"><FileText className="w-4 h-4" /></span>
           </div>
           <div className="tn-fl-kpi-value">
-            {loading ? <Loader className="w-6 h-6 animate-spin" /> : contractFiles.length}
+            {loading ? <Loader className="w-6 h-6 animate-spin" /> : vaultStats.contractFiles}
           </div>
           <div className="tn-fl-kpi-sub">Signed contracts</div>
         </div>
@@ -433,6 +508,8 @@ const YourFiles: React.FC = () => {
         onDrop={(e) => {
           e.preventDefault();
           setDropOver(false);
+          const dropped = Array.from(e.dataTransfer.files || []);
+          if (dropped.length > 0) setQueuedUploads(dropped);
           setIsUploadModalOpen(true);
         }}
       >
@@ -544,8 +621,8 @@ const YourFiles: React.FC = () => {
         <>
           <div className="tn-fl-grid">
             {paginatedFiles.map((file) => (
-              <div key={file.id} className="tn-fl-grid-card">
-                <div>
+              <div key={`${file.firestoreId || file.id}-${file.name}`} className="tn-fl-grid-card">
+                <div className="tn-fl-grid-main">
                   <div className="tn-fl-grid-top">
                     {renderFileIcon(file)}
                     <span className={`tn-fl-cat ${categoryClass(file.category)}`}>{file.category}</span>
@@ -581,7 +658,7 @@ const YourFiles: React.FC = () => {
               </thead>
               <tbody>
                 {paginatedFiles.map((file) => (
-                  <tr key={file.id}>
+                  <tr key={`${file.firestoreId || file.category}-${file.id}-${file.name}`}>
                     <td>
                       <div className="tn-fl-file">
                         {renderFileIcon(file)}
@@ -609,7 +686,7 @@ const YourFiles: React.FC = () => {
           <div className="mob-accordion-container md:hidden">
             {paginatedFiles.map((file) => (
               <MobileAccordionCard
-                key={`m-${file.id}`}
+                key={`m-${file.firestoreId || file.category}-${file.id}-${file.name}`}
                 id={file.id}
                 title={file.name}
                 subtitle={`${formatFileSize(file.size)} • ${file.uploadDate}`}
@@ -724,7 +801,11 @@ const YourFiles: React.FC = () => {
 
       <FileUploadModal
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        initialFiles={queuedUploads}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setQueuedUploads([]);
+        }}
         onUpload={handleUpload}
       />
 
@@ -762,7 +843,7 @@ const YourFiles: React.FC = () => {
                 </div>
                 <div className="tn-insights-card">
                   <span>Referencing files</span>
-                  <p>{referencingFiles.length}</p>
+                  <p>{vaultStats.referencingFiles}</p>
                   <em>Identity to guarantor records</em>
                 </div>
                 <div className="tn-insights-card">
@@ -772,7 +853,7 @@ const YourFiles: React.FC = () => {
                 </div>
                 <div className="tn-insights-card">
                   <span>Contract files</span>
-                  <p>{contractFiles.length}</p>
+                  <p>{vaultStats.contractFiles}</p>
                   <em>Signed agreements on file</em>
                 </div>
               </div>

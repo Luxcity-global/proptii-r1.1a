@@ -8,8 +8,6 @@ import signedContractsFirestoreService from '../../../services/signedContractsFi
 
 import { useAuth } from '../../../contexts/AuthContext';
 import TenantPageHeader from '../ui/TenantPageHeader';
-import RequestViewingModal, { RequestViewingProperty } from '../../viewings/RequestViewingModal';
-import { propertySelectionService } from '../../../services/propertySelectionService';
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
 import PlanUpgradeWall from '../PlanUpgradeWall';
@@ -59,8 +57,6 @@ const TenantContracts: React.FC = () => {
     }
     return () => window.removeEventListener('open-sign-contract', handleOpenSign);
   }, [location.search]);
-  const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
-  const [viewingProperties, setViewingProperties] = useState<RequestViewingProperty[]>([]);
 
   const openContractWorkspace = (contractId?: string | null) => {
     setContractToSign(contractId || null);
@@ -177,32 +173,6 @@ const TenantContracts: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [currentContracts.length, activeTab, searchQuery, partyFilter, dateFilter]);
-
-  useEffect(() => {
-    if (!isBookViewingOpen || !user?.id) return;
-    let active = true;
-    propertySelectionService
-      .getUserPropertySelections(user.id)
-      .then((result) => {
-        if (!active || !result.success || !result.selections) return;
-        setViewingProperties(
-          result.selections
-            .map((selection) => ({
-              id: selection.propertyId,
-              street: selection.property?.location?.street || selection.property?.address || selection.property?.title,
-              town: selection.property?.location?.town,
-              city: selection.property?.location?.city,
-              postcode: selection.property?.location?.postcode,
-              agent: selection.property?.agent,
-            }))
-            .filter((property): property is RequestViewingProperty => Boolean(property.street)),
-        );
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [isBookViewingOpen, user?.id]);
 
   if (!canAccessSection('tenant-contracts', plan, status)) {
     return (
@@ -420,18 +390,6 @@ const TenantContracts: React.FC = () => {
     />
   );
 
-  const viewingModal = (
-    <RequestViewingModal
-      open={isBookViewingOpen}
-      onClose={() => setIsBookViewingOpen(false)}
-      userId={user?.id}
-      applicantName={user?.name || [user?.givenName, user?.familyName].filter(Boolean).join(' ')}
-      applicantEmail={user?.email}
-      applicantPhone={user?.phone}
-      properties={viewingProperties}
-    />
-  );
-
   if (isLoading) {
     return (
       <div className="tn-ct">
@@ -445,7 +403,6 @@ const TenantContracts: React.FC = () => {
           </div>
           <div className="tn-ct-skel tn-ct-skel-table" />
         </div>
-        {viewingModal}
       </div>
     );
   }
@@ -811,7 +768,6 @@ const TenantContracts: React.FC = () => {
         initialTab={contractToSign ? 'received' : 'uploaded'}
         openContractId={contractToSign}
       />
-      {viewingModal}
     </div>
   );
 };

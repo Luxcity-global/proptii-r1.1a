@@ -1,5 +1,24 @@
 export type ReferencingStepStatus = { [key: number]: 'empty' | 'partial' | 'complete' };
 
+/** Guarantor (step 5) is optional and does not count towards completeness. */
+export const REQUIRED_REFERENCING_STEPS = [1, 2, 3, 4] as const;
+export const OPTIONAL_REFERENCING_STEPS = [5] as const;
+
+export function isReferencingStepOptional(step: number): boolean {
+  return (OPTIONAL_REFERENCING_STEPS as readonly number[]).includes(step);
+}
+
+export function getReferencingProgress(
+  formData: any,
+  stepStatus: ReferencingStepStatus | undefined
+): { completed: number; total: number; percent: number } {
+  const total = REQUIRED_REFERENCING_STEPS.length;
+  const completed = REQUIRED_REFERENCING_STEPS.filter((step) =>
+    isReferencingStepComplete(formData, stepStatus, step)
+  ).length;
+  return { completed, total, percent: Math.round((completed / total) * 100) };
+}
+
 // The referencing modal used to save an untouched guarantor step as 'complete'.
 function hasGuarantorDetails(formData: any): boolean {
   if (formData.guarantorInvitation?.status === 'completed') return true;

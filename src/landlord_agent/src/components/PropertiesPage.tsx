@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus,
   Eye,
@@ -21,6 +21,8 @@ import {
   Copy,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Calendar,
   Home,
   LayoutGrid,
@@ -230,6 +232,81 @@ function FilterDropdown({
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function ScrollableTabs({ activeKey, children }: { activeKey: string; children: React.ReactNode }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateEdges = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateEdges();
+    el.addEventListener('scroll', updateEdges, { passive: true });
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateEdges) : null;
+    observer?.observe(el);
+    window.addEventListener('resize', updateEdges);
+    return () => {
+      el.removeEventListener('scroll', updateEdges);
+      observer?.disconnect();
+      window.removeEventListener('resize', updateEdges);
+    };
+  }, [updateEdges]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    const active = el?.querySelector<HTMLElement>('.ll-props-tab.active');
+    if (!el || !active) return;
+    const left = active.offsetLeft - el.offsetLeft;
+    const right = left + active.offsetWidth;
+    if (left < el.scrollLeft || right > el.scrollLeft + el.clientWidth) {
+      el.scrollTo({ left: Math.max(0, left - 24), behavior: 'smooth' });
+    }
+  }, [activeKey]);
+
+  const scrollBy = (direction: -1 | 1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * Math.max(120, el.clientWidth * 0.6), behavior: 'smooth' });
+  };
+
+  return (
+    <div
+      className={`ll-props-tabs-wrap${canScrollLeft ? ' can-scroll-left' : ''}${canScrollRight ? ' can-scroll-right' : ''}`}
+    >
+      <button
+        type="button"
+        className="ll-props-tabs-arrow is-left"
+        onClick={() => scrollBy(-1)}
+        aria-label="Scroll filters left"
+        tabIndex={canScrollLeft ? 0 : -1}
+        aria-hidden={!canScrollLeft}
+      >
+        <ChevronLeft size={14} strokeWidth={2.5} />
+      </button>
+      <div className="ll-props-tabs" ref={scrollRef}>
+        {children}
+      </div>
+      <button
+        type="button"
+        className="ll-props-tabs-arrow is-right"
+        onClick={() => scrollBy(1)}
+        aria-label="Scroll filters right"
+        tabIndex={canScrollRight ? 0 : -1}
+        aria-hidden={!canScrollRight}
+      >
+        <ChevronRight size={14} strokeWidth={2.5} />
+      </button>
+    </div>
   );
 }
 
@@ -993,7 +1070,7 @@ export function PropertiesPage({
         </section>
 
         <div className="ll-props-toolbar">
-          <div className="ll-props-tabs">
+          <ScrollableTabs activeKey={filterTab}>
             {(
               [
                 ['all', 'All'],
@@ -1013,7 +1090,7 @@ export function PropertiesPage({
                 {label}
               </button>
             ))}
-          </div>
+          </ScrollableTabs>
           
           <div className="ll-props-toolbar-right">
             <FilterDropdown

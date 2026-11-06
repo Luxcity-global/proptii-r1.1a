@@ -139,6 +139,7 @@
 }
 
 .tn-modal-drop {
+  position: relative;
   width: 100%;
   border: 2px dashed #cbd5e1;
   border-radius: 12px;
@@ -158,6 +159,37 @@
 .tn-modal-drop.is-over {
   border-color: #136c9e;
   background: rgba(231, 242, 255, 0.45);
+}
+
+.tn-modal-label .tn-modal-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  min-height: 0;
+}
+
+.tn-upload-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+}
+
+.tn-upload-modal .tn-modal-head,
+.tn-upload-modal .tn-modal-foot {
+  flex-shrink: 0;
+}
+
+.tn-upload-modal .tn-modal-body {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .tn-modal-drop strong { color: #334155; font-size: 13px; }

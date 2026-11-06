@@ -838,3 +838,29 @@
   .tn-ref-kpi-health-pct { font-size: 36px; }
   .tn-ref-ring { width: 80px; height: 80px; }
 }
+
+/* KPI cards: health card full width, mini cards side by side */
+@media (max-width: 1023px) {
+  .tn-ref-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tn-ref-kpi-health {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 639px) {
+  .tn-ref-kpi-grid {
+    gap: 12px;
+  }
+
+  .tn-ref-kpi-steps,
+  .tn-ref-kpi-shares {
+    min-width: 0;
+    min-height: auto;
+    padding: 16px;
+    gap: 10px;
+    border-radius: 16px;
+  }
+}

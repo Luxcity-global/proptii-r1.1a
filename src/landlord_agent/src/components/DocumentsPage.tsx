@@ -25,6 +25,7 @@ import {
   Eye,
   X,
   Link2,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -38,6 +39,7 @@ import {
 } from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useIsMobile } from './ui/use-mobile';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import { Property, PropertyDocument, UserProfile } from '../App';
 import { isPropertyArchived } from '../utils/portfolioStats';
 import { isPropertyDeleted } from '../utils/deletedProperties';
@@ -283,6 +285,8 @@ export function DocumentsPage({
   const [typeFilter, setTypeFilter] = useState<CategoryFilter>('all');
   const [propertyFilter, setPropertyFilter] = useState<string>(initialPropertyId || 'all');
   const [tenantFilter, setTenantFilter] = useState<string>('all');
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState({ property: 'all', tenant: 'all', status: 'all' });
   const [viewScope, setViewScope] = useState<ViewScope>(
     initialPropertyId ? 'property' : ((properties && properties.length > 0) ? 'property' : 'all')
   );
@@ -360,6 +364,77 @@ export function DocumentsPage({
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b));
   }, [activeProperties]);
+
+  type FilterKey = 'property' | 'tenant' | 'status';
+  const activeFilterCount = [propertyFilter, tenantFilter, statusFilter].filter((v) => v !== 'all').length;
+
+  const applyStatusFilter = (nextStatus: string) => {
+    setStatusFilter(nextStatus);
+    if (nextStatus === 'expiring-soon' || nextStatus === 'expired') {
+      setTypeFilter('all');
+    }
+  };
+
+  const openFilterSheet = () => {
+    setDraftFilters({ property: propertyFilter, tenant: tenantFilter, status: statusFilter });
+    setFilterSheetOpen(true);
+  };
+
+  const applyDraftFilters = () => {
+    setPropertyFilter(draftFilters.property);
+    setTenantFilter(draftFilters.tenant);
+    applyStatusFilter(draftFilters.status);
+    setFilterSheetOpen(false);
+  };
+
+  const renderFilterSelects = (
+    values: Record<FilterKey, string>,
+    onChange: (key: FilterKey, value: string) => void,
+  ) => (
+    <>
+      <select
+        className="ll-docs-select"
+        value={values.property}
+        onChange={(e) => onChange('property', e.target.value)}
+        aria-label="Filter by property"
+      >
+        <option value="all">
+          All Properties ({activeProperties.length} Properties)
+        </option>
+        {activeProperties.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.address}
+          </option>
+        ))}
+      </select>
+
+      <select
+        className="ll-docs-select"
+        value={values.tenant}
+        onChange={(e) => onChange('tenant', e.target.value)}
+        aria-label="Filter by tenant"
+      >
+        <option value="all">All Tenants / Clients</option>
+        {tenantOptions.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+
+      <select
+        className="ll-docs-select"
+        value={values.status}
+        onChange={(e) => onChange('status', e.target.value)}
+        aria-label="Filter by status"
+      >
+        <option value="all">All Audit Statuses</option>
+        <option value="valid">Valid</option>
+        <option value="expiring-soon">Expiring Soon</option>
+        <option value="expired">Expired / Action Required</option>
+      </select>
+    </>
+  );
 
   const categoryCounts = useMemo(() => {
     const counts: Record<CategoryFilter, number> = {
@@ -2048,55 +2123,65 @@ export function DocumentsPage({
               />
             </div>
 
-            <select
-              className="ll-docs-select"
-              value={propertyFilter}
-              onChange={(e) => setPropertyFilter(e.target.value)}
-              aria-label="Filter by property"
-            >
-              <option value="all">
-                All Properties ({activeProperties.length} Properties)
-              </option>
-              {activeProperties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.address}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="ll-docs-select"
-              value={tenantFilter}
-              onChange={(e) => setTenantFilter(e.target.value)}
-              aria-label="Filter by tenant"
-            >
-              <option value="all">All Tenants / Clients</option>
-              {tenantOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="ll-docs-select"
-              value={statusFilter}
-              onChange={(e) => {
-                const nextStatus = e.target.value as StatusFilter;
-                setStatusFilter(nextStatus);
-                if (nextStatus === 'expiring-soon' || nextStatus === 'expired') {
-                  setTypeFilter('all');
-                }
-              }}
-              aria-label="Filter by status"
-            >
-              <option value="all">All Audit Statuses</option>
-              <option value="valid">Valid</option>
-              <option value="expiring-soon">Expiring Soon</option>
-              <option value="expired">Expired / Action Required</option>
-            </select>
+            {isMobile ? (
+              <button
+                type="button"
+                className={`ll-docs-filter-btn${activeFilterCount > 0 ? ' is-active' : ''}`}
+                onClick={openFilterSheet}
+                aria-haspopup="dialog"
+              >
+                <SlidersHorizontal size={15} />
+                Filters
+                {activeFilterCount > 0 ? <span className="ll-docs-filter-count">{activeFilterCount}</span> : null}
+              </button>
+            ) : (
+              renderFilterSelects(
+                { property: propertyFilter, tenant: tenantFilter, status: statusFilter },
+                (key, value) => {
+                  if (key === 'property') setPropertyFilter(value);
+                  else if (key === 'tenant') setTenantFilter(value);
+                  else applyStatusFilter(value);
+                },
+              )
+            )}
           </div>
         </div>
+
+        {isMobile && (
+          <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+            <SheetContent
+              side="bottom"
+              className="ll-docs-filter-sheet z-[960] rounded-t-2xl p-0 gap-0"
+              overlayClassName="z-[950]"
+            >
+              <SheetHeader className="ll-docs-filter-sheet-head">
+                <SheetTitle>Filter documents</SheetTitle>
+                <SheetDescription>Narrow by property, tenant, or audit status.</SheetDescription>
+              </SheetHeader>
+              <div className="ll-docs-filter-sheet-body">
+                {renderFilterSelects(draftFilters, (key, value) =>
+                  setDraftFilters((prev) => ({ ...prev, [key]: value })),
+                )}
+              </div>
+              <div className="ll-docs-filter-sheet-foot">
+                <button
+                  type="button"
+                  className="ll-docs-filter-sheet-btn is-secondary"
+                  onClick={() => setDraftFilters({ property: 'all', tenant: 'all', status: 'all' })}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="ll-docs-filter-sheet-btn is-primary"
+                  onClick={applyDraftFilters}
+                >
+                  Apply
+                </button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
         {vaultEmpty ? (
           <div className="ll-docs-empty">

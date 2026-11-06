@@ -330,14 +330,14 @@ const DashboardInner: React.FC = () => {
           {/* Overlay */}
           {mobileSidebarOpen && (
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+              className="fixed inset-0 bg-black bg-opacity-50 z-[950] md:hidden"
               onClick={() => setMobileSidebarOpen(false)}
             />
           )}
 
           {/* Sidebar */}
           <div
-            className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white border-r transition-transform duration-300 ease-out md:hidden ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            className={`fixed inset-y-0 left-0 z-[960] w-[280px] max-w-[85vw] h-[100dvh] bg-white border-r transition-transform duration-300 ease-out md:hidden ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
               }`}
             style={{ borderColor: '#ebebeb' }}
           >
@@ -441,7 +441,10 @@ const DashboardInner: React.FC = () => {
               )}
 
               {/* Proptii Home Button */}
-              <div className="border-t pt-4 pb-4 px-4" style={{ borderColor: '#ebebeb' }}>
+              <div
+                className="border-t pt-4 px-4"
+                style={{ borderColor: '#ebebeb', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+              >
                 <button
                   onClick={handleLogoClick}
                   className="w-full flex items-center justify-center h-10 px-4 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
@@ -457,16 +460,16 @@ const DashboardInner: React.FC = () => {
 
       {/* Main content — sidebar spacer already offsets layout; no extra marginLeft */}
       <main
-        className="flex-1 min-w-0"
+        className={`flex-1 min-w-0${location.pathname.startsWith('/dashboard/messages') ? ' tn-viewport-height' : ''}`}
         style={{
           backgroundColor: '#F7F7F7',
           paddingBottom: isMobile ? 'calc(76px + env(safe-area-inset-bottom, 0px))' : undefined,
           ...(location.pathname.startsWith('/dashboard/messages')
-            ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+            ? { overflow: 'hidden', display: 'flex', flexDirection: 'column' }
             : {}),
         }}
       >
-        {isMobile && <div className="h-16" />} {/* Spacer for mobile header */}
+        {isMobile && <div className="h-16 flex-shrink-0" />} {/* Spacer for mobile header */}
         {hideLegacyHeader ? (
           isTenantPreview ? (
             <div className={`${isMobile ? 'mt-4 px-4' : 'mt-4 px-5 lg:px-6'} w-full max-w-6xl mx-auto`}>
@@ -491,7 +494,7 @@ const DashboardInner: React.FC = () => {
           className={
             hideLegacyHeader
               ? location.pathname.startsWith('/dashboard/messages')
-                ? 'w-full h-full overflow-hidden'
+                ? 'w-full flex-1 min-h-0 overflow-hidden flex flex-col'
                 : 'w-full'
               : `${isMobile ? 'px-4 pb-4' : 'px-5 lg:px-6 pb-8'} w-full max-w-6xl mx-auto`
           }

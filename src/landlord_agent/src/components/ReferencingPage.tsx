@@ -1059,6 +1059,7 @@ export function ReferencingPage({
     });
     return {
       sent: validSent.length,
+      received: validShares.length,
       pending: pendingShares + pendingTenants,
       completed: completedShares + completedTenants,
     };
@@ -1107,35 +1108,21 @@ export function ReferencingPage({
 
       <div className="ll-ref-inner ll-ref-body">
         <section className="ll-ref-kpi-grid">
-          <article className="ll-ref-kpi">
-            <div className="ll-ref-kpi-top">
-              <div className="ll-ref-kpi-icon indigo">
-                <Send size={16} />
+          {[
+            { label: 'Sent Requests', value: kpis.sent, hint: 'Invitations sent to tenants', tone: 'indigo', icon: <Send size={16} /> },
+            { label: 'Reports Received', value: kpis.received, hint: 'Shared with you by tenants', tone: 'blue', icon: <ShieldCheck size={16} /> },
+            { label: 'Pending Checks', value: kpis.pending, hint: 'Awaiting tenant action', tone: 'amber', icon: <Clock size={16} /> },
+            { label: 'Completed Checks', value: kpis.completed, hint: 'Ready to review', tone: 'green', icon: <CheckCircle2 size={16} /> },
+          ].map((card) => (
+            <article key={card.label} className="ll-ref-kpi">
+              <div className="ll-ref-kpi-top">
+                <span className="ll-ref-kpi-label">{card.label}</span>
+                <div className={`ll-ref-kpi-icon ${card.tone}`}>{card.icon}</div>
               </div>
-            </div>
-            <div className="ll-ref-kpi-label">Sent Requests</div>
-            <div className="ll-ref-kpi-value">{kpis.sent}</div>
-          </article>
-          <article className="ll-ref-kpi">
-            <div className="ll-ref-kpi-top">
-              <div className="ll-ref-kpi-icon amber">
-                <Clock size={16} />
-              </div>
-              <span className="ll-ref-kpi-chip amber">Pending</span>
-            </div>
-            <div className="ll-ref-kpi-label">Pending Checks</div>
-            <div className="ll-ref-kpi-value">{kpis.pending}</div>
-          </article>
-          <article className="ll-ref-kpi">
-            <div className="ll-ref-kpi-top">
-              <div className="ll-ref-kpi-icon green">
-                <CheckCircle2 size={16} />
-              </div>
-              <span className="ll-ref-kpi-chip green">Completed</span>
-            </div>
-            <div className="ll-ref-kpi-label">Completed Checks</div>
-            <div className="ll-ref-kpi-value">{kpis.completed}</div>
-          </article>
+              <div className="ll-ref-kpi-value">{card.value}</div>
+              <div className="ll-ref-kpi-hint">{card.hint}</div>
+            </article>
+          ))}
         </section>
 
         <div className="ll-ref-tabs">
@@ -1144,7 +1131,6 @@ export function ReferencingPage({
             className={`ll-ref-tab${activeTab === 'received' ? ' is-active' : ''}`}
             onClick={() => setActiveTab('received')}
           >
-            <ShieldCheck size={16} />
             Received Passports
             <span className="ll-ref-tab-count">{shares.length}</span>
           </button>
@@ -1153,7 +1139,6 @@ export function ReferencingPage({
             className={`ll-ref-tab${activeTab === 'request' ? ' is-active' : ''}`}
             onClick={() => setActiveTab('request')}
           >
-            <Send size={16} />
             Request Referencing
             <span className="ll-ref-tab-count">{tenants.length}</span>
           </button>

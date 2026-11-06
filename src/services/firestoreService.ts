@@ -351,7 +351,13 @@ class FirestoreService {
       }
 
       const json = await res.json();
-      const files: UserFile[] = Array.isArray(json) ? json : (json.data || json.files || []);
+      const files: UserFile[] = Array.isArray(json)
+        ? json
+        : Array.isArray(json?.data)
+          ? json.data
+          : Array.isArray(json?.files)
+            ? json.files
+            : [];
       return { success: true, files };
     } catch (error: any) {
       console.error('❌ Error getting user files:', error);

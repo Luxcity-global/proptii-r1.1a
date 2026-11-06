@@ -626,12 +626,29 @@
 
 .tn-ct-pager {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
-.tn-ct-pager button {
+.tn-ct-pager > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
   height: 32px;
+  color: #94a3b8;
+}
+
+.tn-ct-pager button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 32px;
+  height: 32px;
+  line-height: 1;
   padding: 0 12px;
   border-radius: 8px;
   border: 1px solid var(--tn-border);
@@ -656,6 +673,22 @@
   background: var(--tn-blue);
   border-color: var(--tn-blue);
   color: #fff;
+}
+
+@media (max-width: 640px) {
+  .tn-ct-footer {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .tn-ct-pager {
+    justify-content: center;
+  }
+
+  .tn-ct-pager button:not(:first-child):not(:last-child) {
+    padding: 0 8px;
+  }
 }
 
 .tn-ct-empty {
@@ -863,5 +896,30 @@
     background: transparent;
     border: none;
     box-shadow: none;
+  }
+}
+
+/* KPI cards: 2-column grid on phones, icon above label */
+@media (max-width: 639px) {
+  .tn-ct-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .tn-ct-kpi {
+    min-width: 0;
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .tn-ct-kpi-top {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .tn-ct-kpi-value {
+    font-size: 24px;
+    margin-top: 8px;
   }
 }

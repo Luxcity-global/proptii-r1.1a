@@ -24,6 +24,14 @@
   box-sizing: border-box;
 }
 
+/* .tn-msg is its own non-scrolling flex column already offset below the
+   mobile top bar, so the shared sticky header offset would overlap the body. */
+.tn-msg > .tn-ph {
+  position: relative;
+  top: 0;
+  flex-shrink: 0;
+}
+
 .tn-msg h1,
 .tn-msg h2,
 .tn-msg h3,
@@ -161,8 +169,8 @@
 
 @media (max-width: 1023px) {
   .tn-msg {
-    height: calc(100vh - 64px);
-    max-height: calc(100vh - 64px);
+    height: 100%;
+    max-height: 100%;
     padding: 0 0 12px;
   }
 
@@ -488,13 +496,6 @@
   font-size: 13px;
 }
 
-@media (max-width: 640px) {
-  .tn-msg-list,
-  .tn-msg-thread {
-    min-height: 420px;
-  }
-}
-
 /* ── Mobile messaging — split-pane navigation ──────────────────────────────── */
 
 .tn-msg-back-to-list {
@@ -538,7 +539,8 @@
   .tn-msg-thread--active-mobile {
     display: flex !important;
     flex-direction: column;
-    min-height: 70vh;
+    height: 100%;
+    min-height: 0;
   }
 
   .tn-msg-back-to-list {
@@ -555,9 +557,41 @@
     display: none;
   }
 
+  /* Toolbar: tabs scroll, Export pinned on the same row */
   .tn-msg-toolbar {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .tn-msg-tabs {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .tn-msg-tab {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 6px 12px;
+  }
+
+  .tn-msg-export {
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 12px;
+  }
+
+  /* Open conversation: give the thread the full available height */
+  .tn-msg.is-thread-open .tn-ph,
+  .tn-msg.is-thread-open .tn-msg-toolbar {
+    display: none;
+  }
+
+  .tn-msg.is-thread-open .tn-msg-body {
+    padding-top: 8px;
   }
 }
 

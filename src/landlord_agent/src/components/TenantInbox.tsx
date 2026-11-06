@@ -266,7 +266,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
   };
 
   return (
-    <div className="ll-msg" data-testid="landlord-messages-page">
+    <div className={`ll-msg${mobileShowThread ? ' is-thread-open' : ''}`} data-testid="landlord-messages-page">
       <header className="ll-msg-header">
         <div className="ll-msg-inner ll-msg-header-inner">
           <div>
@@ -288,7 +288,7 @@ export const TenantInbox: React.FC<TenantInboxProps> = ({
               </button>
             ) : null}
             {onViewInsights ? (
-              <button type="button" className="ll-msg-btn-insights" onClick={onViewInsights}>
+              <button type="button" className="ll-msg-btn-insights ll-msg-btn-portfolio" onClick={onViewInsights}>
                 <span className="ll-msg-insights-icon">
                   <Sparkles size={12} />
                 </span>

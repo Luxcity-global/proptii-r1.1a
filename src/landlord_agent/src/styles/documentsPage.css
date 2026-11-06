@@ -1831,12 +1831,6 @@
     width: 100%;
   }
 
-  /* KPI grid: single column + tighter gap */
-  .ll-docs-kpi-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
   /* Body: reduce top padding on mobile */
   .ll-docs-body {
     padding-top: 16px;
@@ -1983,5 +1977,193 @@
   /* KPI values: smaller on very small screens */
   .ll-docs-kpi-value {
     font-size: 24px;
+  }
+}
+
+/* Grid view: keep cards inside their column regardless of text length */
+.ll-docs-card-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .ll-docs-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .ll-docs-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ll-docs-card {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ll-docs-card-identity {
+  flex: 1;
+}
+
+.ll-docs-card-identity > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.ll-docs-card-identity h3,
+.ll-docs-card-identity p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ll-docs-card-meta .ll-docs-chip {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ll-docs-file-row {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ll-docs-file-row-name {
+  flex: 1;
+}
+
+.ll-docs-card-footer {
+  flex-wrap: wrap;
+}
+
+/* Mobile filters: search + Filters button on one row, selects in a bottom drawer */
+.ll-docs-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ll-docs-filter-btn.is-active {
+  border-color: #dc5f12;
+  color: #dc5f12;
+}
+
+.ll-docs-filter-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc5f12;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 767px) {
+  .ll-docs-toolbar-filters {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
+.ll-docs-filter-sheet {
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ll-docs-filter-sheet-head {
+  padding: 20px 20px 8px;
+}
+
+.ll-docs-filter-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 20px 16px;
+  overflow-y: auto;
+}
+
+.ll-docs-filter-sheet-body .ll-docs-select {
+  width: 100%;
+}
+
+.ll-docs-filter-sheet-foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px 20px max(16px, env(safe-area-inset-bottom));
+  border-top: 1px solid #f1f5f9;
+}
+
+.ll-docs-filter-sheet-btn {
+  height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ll-docs-filter-sheet-btn.is-secondary {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.ll-docs-filter-sheet-btn.is-primary {
+  background: #dc5f12;
+  border: 1px solid #dc5f12;
+  color: #fff;
+}
+
+.ll-docs-filter-sheet-btn.is-primary:hover {
+  background: #ba4e0b;
+}
+
+/* KPI cards: 2-column grid on phones, icon above label */
+@media (max-width: 639px) {
+  .ll-docs-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ll-docs-kpi {
+    min-width: 0;
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .ll-docs-kpi-top {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .ll-docs-kpi-value {
+    font-size: 24px;
+  }
+
+  .ll-docs-kpi-hint {
+    font-size: 11px;
   }
 }
