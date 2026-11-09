@@ -3,6 +3,7 @@ import { useMsal, MsalProvider } from "@azure/msal-react";
 import { IPublicClientApplication, InteractionStatus, AccountInfo } from "@azure/msal-browser";
 import { loginRequest } from '../config/authConfig';
 import { b2cPolicies } from '../config/authConfig';
+import { emitGtmEvent, profileIdFromKey, shouldEmitAccountCreated } from '../lib/gtmEvents';
 
 interface UserProfile {
   email?: string;
@@ -68,6 +69,18 @@ export const AuthProvider: React.FC<{ pca: IPublicClientApplication; children: R
         setIsAuthenticated(true);
         setUser(extractUserProfile(result.account));
         instance.setActiveAccount(result.account);
+        const profileId = profileIdFromKey(
+          result.account.homeAccountId || result.account.username || result.account.localAccountId,
+        );
+        const claims = (result.account.idTokenClaims ?? null) as Record<string, unknown> | null;
+        if (shouldEmitAccountCreated(profileId, claims)) {
+          void emitGtmEvent({
+            name: 'account_created',
+            actor: { profileId, role: 'renter' },
+            subject: { type: 'invite', id: profileId },
+            properties: { role: 'renter', via_invite_id: null },
+          });
+        }
       }
     } catch (error: any) {
       console.error('Login failed:', error);
