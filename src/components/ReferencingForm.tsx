@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { emitGtmEvent, profileIdFromKey } from '../lib/gtmEvents';
 
 interface FormData {
   fullName: string;
@@ -50,6 +51,18 @@ const ReferencingForm = () => {
     
     // Simulate API call
     setTimeout(() => {
+      const profileKey = user?.email || user?.username || formData.email || 'anonymous';
+      const profileId = profileIdFromKey(profileKey);
+      const applicationId = crypto.randomUUID();
+      void emitGtmEvent({
+        name: 'referencing_started',
+        actor: { profileId, role: 'renter' },
+        subject: { type: 'tenancy', id: applicationId },
+        properties: {
+          application_id: applicationId,
+          requested_by: profileId,
+        },
+      });
       setIsSubmitting(false);
       setSubmitSuccess(true);
     }, 2000);
