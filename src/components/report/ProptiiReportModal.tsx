@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ShieldCheck,
   X,
@@ -21,6 +21,15 @@ import {
   FlagState,
   getFreshnessString
 } from '../../data/audienceLensCopy';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  consumeFirstReportFlag,
+  emitGtmEvent,
+  hashAddress,
+  profileIdFromKey,
+  reportIdForAddress,
+  roleFromAudience,
+} from '../../lib/gtmEvents';
 
 export interface ProptiiReportModalProps {
   isOpen: boolean;
@@ -47,9 +56,88 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
   onOpenFactsExport,
   onOpenDisclosureExport
 }) => {
+  const { user } = useAuth();
   const [currentAudience, setCurrentAudience] = useState<AudienceLens>(initialAudience);
   const [showRoleSelectorModal, setShowRoleSelectorModal] = useState(false);
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({});
+  const [shareHint, setShareHint] = useState<string | null>(null);
+  const reportViewEmitted = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      reportViewEmitted.current = false;
+      setShareHint(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (reportViewEmitted.current) return;
+      reportViewEmitted.current = true;
+      void (async () => {
+        const reportId = reportIdForAddress(propertyAddress || propertyTitle);
+        const profileKey = user?.email || user?.username || 'anonymous';
+        const profileId = profileIdFromKey(profileKey);
+        const addressHash = await hashAddress(propertyAddress || propertyTitle);
+        const topRisk = isUnresolved
+          ? 'unresolved_match'
+          : isFlagged
+            ? 'restrictive_covenant'
+            : 'clear';
+        void emitGtmEvent({
+          name: 'report_run',
+          actor: { profileId, role: roleFromAudience(currentAudience) },
+          subject: { type: 'report', id: reportId },
+          properties: {
+            report_id: reportId,
+            address_hash: addressHash,
+            top_risk: topRisk,
+            is_first: consumeFirstReportFlag(),
+          },
+        });
+      })();
+    }, 15_000);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    isOpen,
+    propertyAddress,
+    propertyTitle,
+    user?.email,
+    user?.username,
+    currentAudience,
+    isFlagged,
+    isUnresolved,
+  ]);
+
+  const handleShare = async () => {
+    const reportId = reportIdForAddress(propertyAddress || propertyTitle);
+    const shareId = crypto.randomUUID();
+    const profileKey = user?.email || user?.username || 'anonymous';
+    const profileId = profileIdFromKey(profileKey);
+    const shareUrl = new URL(window.location.href);
+    shareUrl.searchParams.set('report_id', reportId);
+    shareUrl.searchParams.set('share_id', shareId);
+
+    try {
+      await navigator.clipboard.writeText(shareUrl.toString());
+      setShareHint('Link copied');
+    } catch {
+      setShareHint('Share link ready');
+    }
+
+    void emitGtmEvent({
+      name: 'report_shared',
+      actor: { profileId, role: roleFromAudience(currentAudience) },
+      subject: { type: 'report', id: reportId },
+      properties: {
+        report_id: reportId,
+        share_id: shareId,
+        opened_by_new: false,
+      },
+    });
+
+    window.setTimeout(() => setShareHint(null), 2500);
+  };
 
   if (!isOpen) return null;
 
@@ -388,13 +476,26 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-2 rounded-full bg-[#F15A22] hover:bg-[#D54A1A] text-white text-xs font-bold shadow-md transition-all ml-auto"
-          >
-            Done
-          </button>
+          <div className="flex items-center gap-2 ml-auto">
+            {shareHint && (
+              <span className="text-xs font-semibold text-emerald-600">{shareHint}</span>
+            )}
+            <button
+              type="button"
+              onClick={() => { void handleShare(); }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-bold shadow-sm transition-all"
+            >
+              <Share2 className="w-3.5 h-3.5 text-gray-500" />
+              <span>Share link</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 rounded-full bg-[#F15A22] hover:bg-[#D54A1A] text-white text-xs font-bold shadow-md transition-all"
+            >
+              Done
+            </button>
+          </div>
         </div>
 
       </div>
