@@ -16,8 +16,6 @@ import {
 } from 'lucide-react';
 
 import { useState, useEffect, useRef } from 'react';
-import { getPlanById } from '../config/plans';
-
 interface HomeVariantProps {
   /** When true, hide the initial onboarding flow modal (e.g. when showing tenant/landlord options as modal) */
   hideOnboardingModal?: boolean;
@@ -339,9 +337,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
               </Link>
             </div>
             <p className="text-sm md:text-base">
-              After your free month, paid plans start from £
-              {getPlanById('renter_pro')?.monthlyPrice ?? 12}/month. We&apos;ll
-              notify you before any charges.
+              Start free. No commitment. Every new user gets 1 month free.
             </p>
           </div>
 

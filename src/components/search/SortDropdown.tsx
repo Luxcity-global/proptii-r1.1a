@@ -32,13 +32,13 @@ export const SortDropdown: React.FC<SortDropdownProps> = ({ sortBy, onSelect }) 
   const currentLabel = SORT_OPTIONS.find((s) => s.value === sortBy)?.label || 'Sort';
 
   return (
-    <div className="relative inline-block text-left" ref={containerRef}>
+    <div className="relative inline-block max-sm:block max-sm:w-full text-left" ref={containerRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-150 border shadow-xs bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+        className="inline-flex items-center max-sm:w-full max-sm:justify-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-150 border shadow-xs bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
       >
         <span className="text-gray-400 font-normal">Sort:</span>
         <span className="font-semibold text-gray-800">{currentLabel}</span>

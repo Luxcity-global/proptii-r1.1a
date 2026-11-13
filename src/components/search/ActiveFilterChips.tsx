@@ -112,7 +112,7 @@ export const ActiveFilterChips: React.FC<ActiveFilterChipsProps> = ({
 
   return (
     <div className="flex flex-wrap items-center gap-2 pt-3 pb-1 border-t border-gray-100">
-      <div className="text-xs font-semibold text-gray-500 mr-1 flex items-center gap-1.5">
+      <div className="text-xs font-semibold text-gray-500 mr-1 flex items-center gap-1.5 max-sm:w-full">
         <span>Active filters:</span>
         <span className="text-gray-900 font-bold">
           {counts.filtered} of {counts.total} shown
@@ -142,7 +142,7 @@ export const ActiveFilterChips: React.FC<ActiveFilterChipsProps> = ({
       <button
         type="button"
         onClick={onResetAll}
-        className="text-xs font-semibold text-[#E65D24] hover:underline ml-1 transition-all"
+        className="text-xs font-semibold text-[#E65D24] hover:underline ml-1 max-sm:ml-0 transition-all"
       >
         Clear all
       </button>

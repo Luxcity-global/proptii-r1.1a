@@ -1100,7 +1100,7 @@ export function ReferencingPage({
             )}
             <button type="button" className="ll-ref-btn-add" onClick={openRequestTab}>
               <Plus size={16} strokeWidth={2.5} />
-              Add Tenant
+              New Reference
             </button>
           </div>
         </div>

@@ -70,11 +70,11 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   const typesBadge = isTypesActive ? `${filters.propertyTypes.length}` : null;
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-200/80 p-4 transition-all ${className}`}>
+    <div className={`max-sm:relative bg-white rounded-2xl shadow-sm border border-gray-200/80 p-4 transition-all ${className}`}>
       {/* Top Filter Bar Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: Quick Pill Popovers */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
           
           {/* Price Popover */}
           <FilterPillDropdown
@@ -141,7 +141,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                 setFurnishing(filters.furnishing === 'furnished' ? 'any' : 'furnished');
               }
             }}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all shadow-xs ${
+            className={`inline-flex items-center max-sm:flex-auto max-sm:justify-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all shadow-xs ${
               filters.furnishing === 'furnished'
                 ? 'bg-[#136C9E] text-white border border-[#136C9E]'
                 : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
@@ -178,7 +178,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
         </div>
 
         {/* Right: Sort Dropdown */}
-        <div className="ml-auto">
+        <div className="ml-auto max-sm:ml-0 max-sm:w-full">
           <SortDropdown sortBy={filters.sortBy} onSelect={setSortBy} />
         </div>
       </div>

@@ -1,0 +1,232 @@
+/* ─── Motion controls ─────────────────────────────────────────────────────── */
+
+/* Entrance animations are excluded so pausing early can't freeze content while it is still invisible. */
+.offer-motion-paused :is(
+    .gift-box *,
+    .offer-confetti,
+    .offer-halo,
+    .offer-number,
+    .offer-tile,
+    .offer-tile__icon,
+    .offer-shimmer
+  ) {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offer-motion,
+  .offer-motion * {
+    animation: none !important;
+  }
+}
+
+/* ─── Gift box ────────────────────────────────────────────────────────────── */
+
+.gift-box {
+  --gift-cycle: 4s;
+  overflow: visible;
+}
+
+.gift-box__lid,
+.gift-box__base,
+.gift-box__shadow,
+.gift-box__glow,
+.gift-box__coin,
+.gift-box__spark {
+  transform-box: fill-box;
+}
+
+.gift-box__lid {
+  transform-origin: 18% 100%;
+  animation: gift-lid var(--gift-cycle) ease-in-out infinite;
+}
+
+.gift-box__base {
+  transform-origin: 50% 100%;
+  animation: gift-base var(--gift-cycle) ease-in-out infinite;
+}
+
+.gift-box__shadow {
+  transform-origin: 50% 50%;
+  animation: gift-shadow var(--gift-cycle) ease-in-out infinite;
+}
+
+.gift-box__glow {
+  transform-origin: 50% 100%;
+  animation: gift-glow var(--gift-cycle) ease-in-out infinite;
+}
+
+.gift-box__coin {
+  transform-origin: 50% 50%;
+  opacity: 0;
+  animation: gift-coin var(--gift-cycle) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.gift-box__spark {
+  transform-origin: 50% 50%;
+  animation: gift-spark 2.4s ease-in-out infinite;
+}
+
+@keyframes gift-lid {
+  0%, 10% { transform: translate(0, 0) rotate(0deg); }
+  14% { transform: translate(0, -2px) rotate(-5deg); }
+  18% { transform: translate(0, -1px) rotate(5deg); }
+  22% { transform: translate(0, 0) rotate(0deg); }
+  32% { transform: translate(-6px, -28px) rotate(-24deg); }
+  36% { transform: translate(-6px, -24px) rotate(-20deg); }
+  62% { transform: translate(-6px, -26px) rotate(-22deg); }
+  72% { transform: translate(0, 2px) rotate(2deg); }
+  76%, 100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes gift-base {
+  0%, 24% { transform: scale(1, 1); }
+  28% { transform: scale(1.07, 0.9); }
+  33% { transform: scale(0.96, 1.05); }
+  38%, 70% { transform: scale(1, 1); }
+  74% { transform: scale(1.05, 0.94); }
+  80%, 100% { transform: scale(1, 1); }
+}
+
+@keyframes gift-shadow {
+  0%, 24%, 80%, 100% { transform: scale(1); opacity: 0.35; }
+  28% { transform: scale(1.12); opacity: 0.45; }
+  40%, 62% { transform: scale(0.92); opacity: 0.28; }
+}
+
+@keyframes gift-glow {
+  0%, 26% { opacity: 0; transform: scale(0.4, 0.2); }
+  36%, 60% { opacity: 1; transform: scale(1, 1); }
+  70%, 100% { opacity: 0; transform: scale(0.6, 0.3); }
+}
+
+@keyframes gift-coin {
+  0%, 28% { opacity: 0; transform: translate(0, 12px) scale(0.3) rotate(0deg); }
+  40% { opacity: 1; transform: translate(calc(var(--dx) * 0.6), calc(var(--dy) * 0.7)) scale(1.1) rotate(160deg); }
+  58% { opacity: 1; transform: translate(var(--dx), var(--dy)) scale(1) rotate(300deg); }
+  68%, 100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 10px)) scale(0.6) rotate(360deg); }
+}
+
+@keyframes gift-spark {
+  0%, 100% { opacity: 0; transform: scale(0.2) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(45deg); }
+}
+
+/* ─── Modal ───────────────────────────────────────────────────────────────── */
+
+.offer-backdrop {
+  animation: offer-fade 260ms ease-out both;
+}
+
+.offer-card {
+  animation: offer-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.offer-rise {
+  animation: offer-rise 560ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: var(--offer-delay, 0ms);
+}
+
+.offer-confetti {
+  position: absolute;
+  top: -12px;
+  opacity: 0;
+  animation: offer-confetti var(--fall-duration, 4s) linear infinite;
+  animation-delay: var(--fall-delay, 0s);
+}
+
+.offer-number {
+  animation: offer-number-glow 2.4s ease-in-out infinite;
+}
+
+.offer-tile {
+  animation: offer-tile-glow 4.8s ease-in-out infinite;
+  animation-delay: var(--tile-delay, 0s);
+}
+
+.offer-tile__icon {
+  animation: offer-bob 2.4s ease-in-out infinite;
+  animation-delay: var(--tile-delay, 0s);
+}
+
+.offer-shimmer {
+  animation: offer-shimmer 3.2s ease-in-out infinite;
+}
+
+.offer-halo {
+  animation: offer-halo 3.6s ease-in-out infinite;
+}
+
+@keyframes offer-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes offer-pop {
+  from { opacity: 0; transform: translateY(24px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes offer-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes offer-confetti {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--drift, 20px), var(--fall, 300px)) rotate(var(--spin, 540deg)); }
+}
+
+@keyframes offer-number-glow {
+  0%, 100% { text-shadow: 0 0 0 rgba(241, 90, 34, 0); transform: scale(1); }
+  50% { text-shadow: 0 0 28px rgba(241, 90, 34, 0.65); transform: scale(1.06); }
+}
+
+@keyframes offer-tile-glow {
+  0%, 30%, 100% {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+    transform: translateY(0);
+  }
+  10%, 20% {
+    border-color: rgba(241, 90, 34, 0.85);
+    box-shadow: 0 0 22px rgba(241, 90, 34, 0.35);
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes offer-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes offer-shimmer {
+  0% { transform: translateX(-120%) skewX(-20deg); }
+  55%, 100% { transform: translateX(320%) skewX(-20deg); }
+}
+
+@keyframes offer-halo {
+  0%, 100% { opacity: 0.55; transform: translateX(-50%) scale(0.9); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+}
+
+/* ─── Navbar pill ─────────────────────────────────────────────────────────── */
+
+.offer-pill-border {
+  animation: offer-spin 3.5s linear infinite;
+}
+
+.offer-pill-pulse {
+  animation: offer-pill-pulse 2.8s ease-out infinite;
+}
+
+@keyframes offer-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes offer-pill-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(241, 90, 34, 0.45); }
+  70%, 100% { box-shadow: 0 0 0 10px rgba(241, 90, 34, 0); }
+}

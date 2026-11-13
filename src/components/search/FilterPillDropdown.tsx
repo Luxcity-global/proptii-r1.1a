@@ -53,7 +53,8 @@ export const FilterPillDropdown: React.FC<FilterPillDropdownProps> = ({
   }, [isOpen, onClose]);
 
   return (
-    <div className={`relative inline-block text-left ${className}`} ref={containerRef}>
+    // Below sm the wrapper is static so the popover anchors to the nearest positioned ancestor and can span it.
+    <div className={`relative max-sm:static inline-block max-sm:flex-auto text-left ${className}`} ref={containerRef}>
       <button
         ref={buttonRef}
         type="button"
@@ -61,7 +62,7 @@ export const FilterPillDropdown: React.FC<FilterPillDropdownProps> = ({
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label={ariaLabel || label}
-        className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-150 border shadow-xs ${
+        className={`inline-flex items-center max-sm:w-full max-sm:justify-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-150 border shadow-xs ${
           isActive
             ? 'bg-[#136C9E] text-white border-[#0F5A8A] shadow-sm ring-2 ring-[#136C9E]/20'
             : isOpen
@@ -95,7 +96,7 @@ export const FilterPillDropdown: React.FC<FilterPillDropdownProps> = ({
         <div
           role="dialog"
           aria-label={label}
-          className="absolute left-0 mt-2 z-50 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 min-w-[280px] sm:min-w-[320px] animate-in fade-in zoom-in-95 duration-100"
+          className="absolute left-0 max-sm:right-0 mt-2 z-50 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 min-w-[280px] max-sm:min-w-0 sm:min-w-[320px] animate-in fade-in zoom-in-95 duration-100"
         >
           {children}
         </div>

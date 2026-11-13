@@ -80,6 +80,8 @@ const ServicesLayoutV1: React.FC = () => {
           {/* Cards row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 lg:gap-10 items-stretch">
             {SERVICE_CARDS.map((card) => {
+              const textAboveOnDesktop = card.id === 'referencing';
+
               const ImageBlock = (
                 <button
                   type="button"
@@ -110,7 +112,7 @@ const ServicesLayoutV1: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(card.href)}
-                  className="group mt-3 md:mt-4 w-full flex-1 rounded-[28px] md:rounded-full bg-white text-left px-5 md:px-7 lg:px-8 py-3.5 md:py-4 flex items-center justify-between gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.45)] transform transition-all duration-200 ease-out hover:-translate-y-1"
+                  className={`group mt-3 ${textAboveOnDesktop ? 'md:mt-0 md:mb-4' : 'md:mt-4'} w-full flex-1 rounded-[28px] md:rounded-full bg-white text-left px-5 md:px-7 lg:px-8 py-3.5 md:py-4 flex items-center justify-between gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.45)] transform transition-all duration-200 ease-out hover:-translate-y-1`}
                 >
                   <span className="text-sm md:text-base text-slate-800 font-medium leading-relaxed">
                     {card.description}
@@ -136,7 +138,10 @@ const ServicesLayoutV1: React.FC = () => {
               );
 
               return (
-                <div key={card.id} className="flex flex-col items-stretch">
+                <div
+                  key={card.id}
+                  className={`flex flex-col ${textAboveOnDesktop ? 'md:flex-col-reverse' : ''} items-stretch`}
+                >
                   {ImageBlock}
                   {TextBlock}
                 </div>

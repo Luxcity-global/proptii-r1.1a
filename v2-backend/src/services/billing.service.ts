@@ -12,6 +12,13 @@ import {
   complimentaryBillingPayload,
   isComplimentaryAccessEmail,
 } from '../utils/complimentary-access';
+import {
+  freeMonthAudience,
+  freeMonthEndDate,
+  freeMonthPlanForRole,
+  isEligibleForFreeMonth,
+  isTrialExpired,
+} from '../utils/free-month-trial';
 
 // ─── Module-level plans cache (survives hot-reload within the same process) ───
 let _plansCache: any[] | null = null;
@@ -333,9 +340,12 @@ export class BillingService {
         }
       }
 
+      data = await this.applyFreeMonthTrial(userId, email, role, data);
+
       const planId = data?.planId || data?.plan || 'free';
       const status = data?.status || 'active';
-      const isActive = status === 'active' || status === 'trialing';
+      const isActive =
+        status === 'active' || (status === 'trialing' && !isTrialExpired(data?.trialEndsAt));
 
       return {
         dashboard: (role || '').toLowerCase() === 'landlord' || planId.startsWith('landlord') ? 'landlord' : 'consumer',
@@ -355,7 +365,98 @@ export class BillingService {
       };
     } catch (err: any) {
       this.logger.error(`[BillingService] Firestore read failed for ${userId}: ${err?.message || err}`);
+      if (isComplimentaryAccessEmail(email)) {
+        return complimentaryBillingPayload(role);
+      }
       throw new ServiceUnavailableException('Billing service temporarily unavailable');
+    }
+  }
+
+  // ─── Free month (card-free trial for every user) ──────────────────────────
+
+  /**
+   * Grants the one-time free month to eligible users, re-maps the trial plan if the
+   * user's role changed, and on expiry drops consumers to Explorer. Landlords/agents
+   * are left as expired `trialing` so the guards send them to /billing/activate.
+   * Failures are logged and the original billing data is returned unchanged.
+   */
+  private async applyFreeMonthTrial(
+    userId: string,
+    email: string | undefined,
+    role: string | undefined,
+    data: Record<string, any> | null | undefined,
+  ): Promise<Record<string, any> | null | undefined> {
+    const db = this.db;
+    const trialPlan = freeMonthPlanForRole(role);
+    if (!db || !userId || userId === 'guest' || !trialPlan) return data;
+
+    const subRef = db.collection('subscriptions').doc(userId);
+    const userRef = db.collection('users').doc(userId);
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    try {
+      if (data?.freeMonthTrial && data.status === 'trialing') {
+        if (isTrialExpired(data.trialEndsAt)) {
+          if (freeMonthAudience(role) !== 'consumer') return data;
+
+          const downgrade = {
+            planId: 'explorer',
+            plan: 'explorer',
+            status: 'active',
+            freeMonthEndedAt: new Date().toISOString(),
+          };
+          await subRef.set({ ...downgrade, updatedAt: now }, { merge: true });
+          await userRef.set(
+            { subscriptionStatus: 'active', subscriptionTier: 'explorer', plan: 'explorer', isSubscribed: false, updatedAt: now },
+            { merge: true },
+          );
+          await this.syncUserProClaim(userId, false);
+          this.logger.log(`[BillingService] Free month ended for ${userId}; moved to Explorer`);
+          return { ...data, ...downgrade };
+        }
+
+        if (data.planId !== trialPlan) {
+          await subRef.set({ planId: trialPlan, plan: trialPlan, updatedAt: now }, { merge: true });
+          return { ...data, planId: trialPlan, plan: trialPlan };
+        }
+        return data;
+      }
+
+      if (!isEligibleForFreeMonth(data)) return data;
+
+      const granted = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(subRef);
+        const current = snap.exists ? snap.data() : null;
+        if (current && !isEligibleForFreeMonth(current)) return null;
+
+        const record = {
+          userId,
+          email: (email || current?.email || '').trim().toLowerCase(),
+          planId: trialPlan,
+          plan: trialPlan,
+          status: 'trialing',
+          cycle: 'monthly',
+          trialEndsAt: freeMonthEndDate(),
+          cancelAtPeriodEnd: false,
+          freeMonthTrial: true,
+          freeMonthStartedAt: new Date().toISOString(),
+          freeMonthAudience: freeMonthAudience(role),
+        };
+        tx.set(subRef, { ...record, updatedAt: now }, { merge: true });
+        return { ...(current || {}), ...record };
+      });
+      if (!granted) return data;
+
+      await userRef.set(
+        { subscriptionStatus: 'trialing', subscriptionTier: trialPlan, plan: trialPlan, updatedAt: now },
+        { merge: true },
+      );
+      await this.syncUserProClaim(userId, true);
+      this.logger.log(`[BillingService] Free month started for ${userId}: plan=${trialPlan}`);
+      return granted;
+    } catch (err: any) {
+      this.logger.warn(`[BillingService] Free month check failed for ${userId}: ${err?.message || err}`);
+      return data;
     }
   }
 

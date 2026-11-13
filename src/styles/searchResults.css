@@ -197,6 +197,15 @@
   gap: 12px;
 }
 
+/* The vertical padding shorthands above reset .sr-inner's side gutter; restore it on phones. */
+@media (max-width: 639px) {
+  .sr-header-top,
+  .sr-controls-inner {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 .sr-search-row {
   display: flex;
   align-items: center;
@@ -1181,6 +1190,7 @@
   left: 12px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
 }
 

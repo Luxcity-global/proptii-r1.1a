@@ -26,7 +26,7 @@ const WelcomeContent: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { pendingPlan, pendingCycle, status, loading } = useBillingStatus();
+  const { plan: billingPlan, pendingPlan, pendingCycle, status, loading } = useBillingStatus();
   const checkoutStarted = useRef(false);
   const [redirectingToStripe, setRedirectingToStripe] = useState(false);
 
@@ -40,7 +40,9 @@ const WelcomeContent: React.FC = () => {
     'annual';
 
   const plan = usePlan(planId) ?? getPlanById(planId);
-  const planName = plan?.name ?? 'your plan';
+  const trialPlanName =
+    status === 'trialing' && billingPlan ? getPlanById(billingPlan as PlanId)?.name : undefined;
+  const planName = trialPlanName ?? plan?.name ?? 'your plan';
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');

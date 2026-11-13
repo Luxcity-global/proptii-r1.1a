@@ -387,13 +387,14 @@ const DashboardHome: React.FC = () => {
     }));
   };
 
-  const viewingTotal = viewingStats.total || 0;
   const viewingCompleted = viewingStats.completed || 0;
   const viewingUpcoming = viewingStats.upcoming || 0;
-  const completedPct = viewingTotal ? viewingCompleted / viewingTotal : 0;
+  // Headline and pie use completed + incoming only. viewingStats.total also
+  // counts cancelled and rescheduled rows shown on the viewings info cards.
+  const viewingTotal = viewingCompleted + viewingUpcoming;
   const circ = 2 * Math.PI * 72;
-  const completedLen = circ * completedPct;
-  const upcomingLen = circ - completedLen;
+  const completedLen = viewingTotal ? (circ * viewingCompleted) / viewingTotal : 0;
+  const upcomingLen = viewingTotal ? (circ * viewingUpcoming) / viewingTotal : 0;
 
   const listedViewings = upcomingViewings.slice(0, 2);
   const contractAlerts = signedContracts.slice(0, 3);
@@ -401,7 +402,7 @@ const DashboardHome: React.FC = () => {
   const isGloballyEmpty =
     savedProperties.length === 0 &&
     allFiles.length === 0 &&
-    viewingTotal === 0 &&
+    (viewingStats.total || 0) === 0 &&
     signedContracts.length === 0 &&
     !referencingStarted &&
     !filesLoading;
@@ -619,29 +620,33 @@ const DashboardHome: React.FC = () => {
                               : `Completed: ${viewingCompleted} viewings`}
                           </div>
                           <svg viewBox="0 0 200 200">
-                            <circle
-                              cx="100"
-                              cy="100"
-                              r="72"
-                              fill="none"
-                              stroke="#165c40"
-                              strokeWidth="38"
-                              strokeLinecap="round"
-                              strokeDasharray={`${completedLen} ${circ}`}
-                              transform="rotate(-90 100 100)"
-                            />
-                            <circle
-                              cx="100"
-                              cy="100"
-                              r="72"
-                              fill="none"
-                              stroke="#f2fbf7"
-                              strokeWidth="38"
-                              strokeLinecap="round"
-                              strokeDasharray={`${upcomingLen} ${circ}`}
-                              strokeDashoffset={-completedLen}
-                              transform="rotate(-90 100 100)"
-                            />
+                            {upcomingLen > 0 && (
+                              <circle
+                                cx="100"
+                                cy="100"
+                                r="72"
+                                fill="none"
+                                stroke="#d1fae5"
+                                strokeWidth="38"
+                                strokeLinecap="round"
+                                strokeDasharray={`${upcomingLen} ${circ}`}
+                                strokeDashoffset={-completedLen}
+                                transform="rotate(-90 100 100)"
+                              />
+                            )}
+                            {completedLen > 0 && (
+                              <circle
+                                cx="100"
+                                cy="100"
+                                r="72"
+                                fill="none"
+                                stroke="#165c40"
+                                strokeWidth="38"
+                                strokeLinecap="round"
+                                strokeDasharray={`${completedLen} ${circ}`}
+                                transform="rotate(-90 100 100)"
+                              />
+                            )}
                           </svg>
                         </div>
                         <div className="tn-dash-occ-meta">

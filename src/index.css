@@ -152,7 +152,6 @@ input, textarea {
 .animate-marquee-vertical {
   animation: marquee-vertical var(--duration) linear infinite;
 }
-
 @keyframes shine-border-rotate {
   0% {
     transform: rotate(0deg);

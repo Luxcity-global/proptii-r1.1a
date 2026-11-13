@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Zap, Upload, Loader2, CheckCircle2 } from 'lucide-react';
+import { Zap, Upload, Loader2, CheckCircle2, Info } from 'lucide-react';
 import openRouterService, { ExtractedData } from '../../../services/openRouterService';
 import { uploadToFirebaseStorage } from '../../../services/storageService';
 import { toast } from 'sonner';
@@ -25,6 +25,8 @@ const QuickFillBanner: React.FC<QuickFillBannerProps> = ({
 }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [lastUploadedName, setLastUploadedName] = useState<string | null>(null);
+    const [hasAutoFilled, setHasAutoFilled] = useState(false);
+    const [isNoticeCollapsed, setIsNoticeCollapsed] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleButtonClick = () => {
@@ -75,6 +77,8 @@ const QuickFillBanner: React.FC<QuickFillBannerProps> = ({
             if (extractedData || attachedDoc.url) {
                 onDataExtracted(extractedData || {}, attachedDoc);
                 if (hasExtractedFields) {
+                    setHasAutoFilled(true);
+                    setIsNoticeCollapsed(false);
                     toast.success('Document attached & details auto-filled!', { id: toastId });
                 } else if (extractionError) {
                     toast.warning(`Document attached, but AI auto-fill failed (${extractionError}). Please fill in the details manually.`, { id: toastId });
@@ -152,6 +156,39 @@ const QuickFillBanner: React.FC<QuickFillBannerProps> = ({
                     />
                 </div>
             </div>
+
+            {hasAutoFilled && (
+                <div
+                    role="note"
+                    className="relative z-10 mt-4 flex items-start gap-2.5 rounded-xl border border-[#FFD2BD]/50 px-3.5 py-3 text-xs sm:text-sm text-[#FFF1EA]"
+                >
+                    <button
+                        type="button"
+                        onClick={() => setIsNoticeCollapsed((prev) => !prev)}
+                        aria-expanded={!isNoticeCollapsed}
+                        aria-label={isNoticeCollapsed ? 'Expand review notice' : 'Collapse review notice'}
+                        className="mt-0.5 shrink-0 cursor-pointer rounded-full text-[#FFD2BD] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD2BD]/60"
+                    >
+                        <Info size={16} />
+                    </button>
+                    {isNoticeCollapsed ? (
+                        <button
+                            type="button"
+                            onClick={() => setIsNoticeCollapsed(false)}
+                            aria-expanded={false}
+                            className="min-w-0 flex-1 cursor-pointer truncate text-left leading-relaxed hover:text-white focus:outline-none"
+                        >
+                            <span className="font-semibold">Please review the auto-filled details</span>
+                            <span className="ml-1 tracking-widest">.......</span>
+                        </button>
+                    ) : (
+                        <p className="leading-relaxed">
+                            <span className="font-semibold">Please review the auto-filled details.</span>{' '}
+                            AI has populated some referencing fields from your document. Check every value carefully and correct anything that doesn&apos;t match before continuing.
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* Decorative elements */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>

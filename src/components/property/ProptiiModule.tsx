@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   CheckCircle2,
@@ -82,6 +82,7 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
   coordinates,
 }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { isAuthenticated, login } = useAuth();
   const [facts, setFacts] = useState<PropertyFactsResponse | null>(null);
   const [expanded, setExpanded] = useState(true);

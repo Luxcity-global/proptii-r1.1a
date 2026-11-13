@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, ChevronDown, Settings, LogOut, Menu, X, LayoutDashboard } from 'lucide-react';
+import { FreeTrialOffer } from './home/FreeTrialOffer';
 
 interface NavbarProps {
   isAgent?: boolean;
@@ -133,6 +134,12 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   };
 
   const dashboardRoute = isLandlordUser ? '/landlord' : '/dashboard';
+
+  // Waiting on isLoading keeps the offer from flashing at users whose session is still restoring.
+  const shouldAutoOpenOffer =
+    !isLoading &&
+    !isAuthenticated &&
+    !['/signup', '/billing', '/account'].some((prefix) => pathname.startsWith(prefix));
 
   return (
     <nav className="absolute top-0 left-0 right-0 z-20">
@@ -336,20 +343,17 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                 )}
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-3">
                 {loginError && (
                   <div className="absolute right-0 -bottom-16 w-64 bg-red-500 text-white p-2 rounded-md text-sm shadow-lg">
                     {loginError}
                   </div>
                 )}
-                {/* Secondary CTA: Sign In */}
+                <FreeTrialOffer isLight={isLight} autoOpen={shouldAutoOpenOffer} />
+
                 <button
                   onClick={handleLogin}
-                  className={`px-4 py-2 rounded-full font-medium text-sm transition-all flex items-center ${
-                    isLight
-                      ? 'text-[#14385C] hover:text-[#0E2B47] hover:bg-[#14385C]/5'
-                      : 'text-white/90 hover:text-white hover:bg-white/10'
-                  }`}
+                  className="bg-[#F15A22] hover:bg-[#d94e1c] text-white px-5 py-2 rounded-full font-semibold text-sm transition-all flex items-center shadow-md hover:shadow-lg active:scale-[0.98] disabled:opacity-80"
                   disabled={isLoading || loginInProgress}
                 >
                   {isLoading || loginInProgress ? (
@@ -364,20 +368,15 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     'Sign In'
                   )}
                 </button>
-
-                {/* Primary CTA: Sign Up */}
-                <Link
-                  to="/signup"
-                  className="bg-[#F15A22] hover:bg-[#d94e1c] text-white px-5 py-2 rounded-full font-semibold text-sm transition-all flex items-center shadow-md hover:shadow-lg active:scale-[0.98]"
-                >
-                  Sign Up
-                </Link>
               </div>
             )}
           </div>
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center space-x-2">
+            {!isAuthenticated && (
+              <FreeTrialOffer isLight={isLight} compact />
+            )}
             {isAuthenticated && (
               <div className="relative user-dropdown">
                 <button
@@ -563,19 +562,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                       {loginError}
                     </div>
                   )}
-                  {/* Primary CTA: Sign Up */}
-                  <Link
-                    to="/signup"
-                    onClick={closeMobileMenu}
-                    className="w-full bg-[#F15A22] hover:bg-[#d94e1c] text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center shadow-md active:scale-[0.98]"
-                  >
-                    Sign Up
-                  </Link>
-
-                  {/* Secondary CTA: Sign In */}
                   <button
                     onClick={handleLogin}
-                    className="w-full bg-white/10 hover:bg-white/15 text-white border border-white/20 px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center justify-center"
+                    className="w-full bg-[#F15A22] hover:bg-[#d94e1c] text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center shadow-md active:scale-[0.98] disabled:opacity-80"
                     disabled={isLoading || loginInProgress}
                   >
                     {isLoading || loginInProgress ? (
