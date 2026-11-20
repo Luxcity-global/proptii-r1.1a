@@ -9,6 +9,7 @@ import adminDashboardService, {
 } from '../../services/adminDashboardService';
 import { ADMIN_PATH } from './adminAccess';
 import { AdminRoute } from './AdminRoute';
+import { downloadXlsx } from './exportExcel';
 import { SignupsByChannelView } from './SignupsByChannelView';
 import './adminDashboard.css';
 
@@ -33,12 +34,23 @@ function daysSince(value?: string | null) {
   return (Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000);
 }
 
-function exportCsv(rows: AdminCustomerRow[], filename: string) {
+/** How the account arrived (join link channel + code). */
+function formatJoinMode(row: Pick<AdminCustomerRow, 'signupChannelLabel' | 'signupChannel' | 'signupSource'>) {
+  const label = row.signupChannelLabel || row.signupChannel;
+  if (!label && !row.signupSource) return '—';
+  const channel = label || 'Unknown';
+  const code = row.signupSource && row.signupSource !== 'inbound' ? row.signupSource : null;
+  return code ? `${channel} · ${code}` : channel;
+}
+
+function exportCustomersExcel(rows: AdminCustomerRow[], filename: string) {
   const headers = [
     'Name',
     'Email',
     'Role',
     'Tier',
+    'Joined via',
+    'Join code',
     'Signup date',
     'Last active',
     'Reports lifetime',
@@ -47,33 +59,22 @@ function exportCsv(rows: AdminCustomerRow[], filename: string) {
     'Billing status',
     'Flags',
   ];
-  const lines = [
-    headers.join(','),
-    ...rows.map((r) =>
-      [
-        r.name,
-        r.email,
-        r.role || '',
-        r.tier,
-        r.signupDate || '',
-        r.lastActive || '',
-        r.reportsLifetime,
-        r.reportsThisMonth,
-        r.accountStatus,
-        r.billingStatus,
-        r.flags.join('; '),
-      ]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(','),
-    ),
-  ];
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  const dataRows = rows.map((r) => [
+    r.name,
+    r.email,
+    r.role || '',
+    r.tier,
+    r.signupChannelLabel || r.signupChannel || '',
+    r.signupSource || '',
+    r.signupDate || '',
+    r.lastActive || '',
+    r.reportsLifetime,
+    r.reportsThisMonth,
+    r.accountStatus,
+    r.billingStatus,
+    r.flags.join('; '),
+  ]);
+  void downloadXlsx(filename, [{ name: 'Customers', rows: [headers, ...dataRows] }]);
 }
 
 function CustomerList() {
@@ -127,7 +128,7 @@ function CustomerList() {
       if (activity === '7d' && daysSince(r.lastActive) > 7) return false;
       if (activity === '30d' && daysSince(r.lastActive) > 30) return false;
       if (!query) return true;
-      const hay = `${r.name} ${r.email} ${r.tier} ${r.accountStatus} ${r.flags.join(' ')}`.toLowerCase();
+      const hay = `${r.name} ${r.email} ${r.tier} ${r.accountStatus} ${r.flags.join(' ')} ${r.signupChannelLabel || ''} ${r.signupChannel || ''} ${r.signupSource || ''}`.toLowerCase();
       return hay.includes(query);
     });
   }, [rows, q, tier, activity, flaggedOnly, trialExpiring]);
@@ -165,8 +166,8 @@ function CustomerList() {
           <p>Who has signed up, what they are on, and whether they are buying.</p>
         </div>
         <div className="pa-actions">
-          <button type="button" className="pa-btn" onClick={() => exportCsv(sorted, 'proptii-customers.csv')} disabled={!sorted.length}>
-            Export CSV
+          <button type="button" className="pa-btn" onClick={() => exportCustomersExcel(sorted, 'proptii-customers.xlsx')} disabled={!sorted.length}>
+            Export Excel
           </button>
         </div>
       </div>
@@ -181,7 +182,7 @@ function CustomerList() {
       <div className="pa-filters">
         <input
           type="search"
-          placeholder="Search name, email, address flags…"
+          placeholder="Search name, email, join channel, code…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search customers"
@@ -217,6 +218,7 @@ function CustomerList() {
               <tr>
                 <th onClick={() => toggleSort('name')}>Name / Email</th>
                 <th onClick={() => toggleSort('tier')}>Tier</th>
+                <th onClick={() => toggleSort('signupChannelLabel')}>Joined via</th>
                 <th onClick={() => toggleSort('signupDate')}>Signup</th>
                 <th onClick={() => toggleSort('lastActive')}>Last active</th>
                 <th onClick={() => toggleSort('reportsLifetime')}>Reports</th>
@@ -227,7 +229,7 @@ function CustomerList() {
             <tbody>
               {sorted.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="pa-empty">No customers match these filters.</td>
+                  <td colSpan={8} className="pa-empty">No customers match these filters.</td>
                 </tr>
               )}
               {sorted.map((row) => (
@@ -237,6 +239,12 @@ function CustomerList() {
                     <div style={{ color: '#64748b' }}>{row.email}</div>
                   </td>
                   <td><span className="pa-pill">{row.tier}</span></td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{row.signupChannelLabel || row.signupChannel || '—'}</div>
+                    {row.signupSource && row.signupSource !== 'inbound' && (
+                      <div style={{ color: '#64748b' }}><code>{row.signupSource}</code></div>
+                    )}
+                  </td>
                   <td>{formatDate(row.signupDate)}</td>
                   <td>{formatDate(row.lastActive)}</td>
                   <td>{row.reportsLifetime} / {row.reportsThisMonth}</td>
@@ -306,7 +314,9 @@ function CustomerDetail() {
       <div className="pa-header">
         <div>
           <h1>{customer.name}</h1>
-          <p>{customer.email} · {customer.role || 'no role'}</p>
+          <p>
+            {customer.email} · {customer.role || 'no role'} · Joined via {formatJoinMode(customer)}
+          </p>
         </div>
         <div className="pa-actions">
           <span className={`pa-pill ${statusClass(customer.accountStatus)}`}>{customer.accountStatus}</span>
@@ -323,6 +333,9 @@ function CustomerDetail() {
             <dt>Phone</dt><dd>{profile.phone || '—'}</dd>
             <dt>Role</dt><dd>{profile.role || '—'}</dd>
             <dt>Role source</dt><dd>{profile.roleSource || '—'}</dd>
+            <dt>Joined via</dt><dd>{customer.signupChannelLabel || customer.signupChannel || '—'}</dd>
+            <dt>Join code</dt>
+            <dd>{customer.signupSource ? <code>{customer.signupSource}</code> : '—'}</dd>
             <dt>Household</dt><dd>{profile.householdType || '—'}</dd>
             <dt>Risk appetite</dt><dd>{profile.riskAppetite || '—'}</dd>
             <dt>Commute</dt><dd>{profile.commuteTolerance || '—'}</dd>
@@ -488,8 +501,8 @@ function AlertsView() {
           <h1>Abuse / ops alerts</h1>
           <p>Rule-based flags for professional use on a consumer tier, failed payments, and trials about to lapse.</p>
         </div>
-        <button type="button" className="pa-btn" onClick={() => exportCsv(rows, 'proptii-alerts.csv')} disabled={!rows.length}>
-          Export CSV
+        <button type="button" className="pa-btn" onClick={() => exportCustomersExcel(rows, 'proptii-alerts.xlsx')} disabled={!rows.length}>
+          Export Excel
         </button>
       </div>
       {error && <div className="pa-error">{error}</div>}
@@ -544,8 +557,8 @@ function PartnersView() {
           <h1>B2B / partners</h1>
           <p>Landlords, agents, and API-tier accounts, kept separate from consumer signups.</p>
         </div>
-        <button type="button" className="pa-btn" onClick={() => exportCsv(rows, 'proptii-partners.csv')} disabled={!rows.length}>
-          Export CSV
+        <button type="button" className="pa-btn" onClick={() => exportCustomersExcel(rows, 'proptii-partners.xlsx')} disabled={!rows.length}>
+          Export Excel
         </button>
       </div>
       {error && <div className="pa-error">{error}</div>}

@@ -24,6 +24,12 @@ export interface AdminCustomerRow {
   cancelAtPeriodEnd: boolean;
   householdType?: string | null;
   professionalAtOnboarding?: boolean;
+  /** Invite /join code (e.g. pn, broker-acme). */
+  signupSource?: string | null;
+  /** Channel key (e.g. personal_network). */
+  signupChannel?: string | null;
+  /** Human label for the channel. */
+  signupChannelLabel?: string | null;
 }
 
 export interface AdminCustomerDetail {

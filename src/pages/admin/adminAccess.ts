@@ -17,13 +17,15 @@ export function isStaffEmail(email?: string | null): boolean {
   if (extra.includes(lower)) return true;
 
   const domain = lower.split('@')[1];
-  const domains = String(import.meta.env.VITE_ADMIN_EMAIL_DOMAINS || 'proptii.com,proptii.co')
+  const domains = String(
+    import.meta.env.VITE_ADMIN_EMAIL_DOMAINS || 'proptii.com,proptii.co,theluxcity.co.uk',
+  )
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   if (domain && domains.includes(domain)) return true;
 
-  // Local/dev: any signed-in account can open the dashboard (no @proptii.co required).
+  // Local/dev: any signed-in account can open the dashboard (no staff domain required).
   if (import.meta.env.DEV && import.meta.env.VITE_ADMIN_ALLOW_DEV !== 'false') return true;
   return false;
 }

@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { firstIso, toIso } from '../utils/firestore-date';
-import { aggregateSignupsByChannel, type SignupReport } from '../utils/signup-report';
+import { aggregateSignupsByChannel, CHANNEL_LABELS, type SignupReport } from '../utils/signup-report';
 
 const PAID_PLAN_IDS = new Set([
   'renter_pro',
@@ -95,6 +95,12 @@ export interface AdminCustomerRow {
   cancelAtPeriodEnd: boolean;
   householdType?: string | null;
   professionalAtOnboarding?: boolean;
+  /** Invite /join code written once at attribution (e.g. pn, broker-acme). */
+  signupSource: string | null;
+  /** Channel key from signup_channels (e.g. personal_network, broker). */
+  signupChannel: string | null;
+  /** Human label for signupChannel. */
+  signupChannelLabel: string | null;
 }
 
 @Injectable()
@@ -211,6 +217,14 @@ export class AdminDashboardService {
       const notes = notesByUser.get(id) || [];
       const tags = notes.map((n) => n.tag).filter((t): t is string => Boolean(t));
 
+      const signupSourceRaw = data.signupSource != null ? String(data.signupSource).trim() : '';
+      const signupChannelRaw = data.signupChannel != null ? String(data.signupChannel).trim() : '';
+      const signupSource = signupSourceRaw || null;
+      const signupChannel = signupChannelRaw || null;
+      const signupChannelLabel = signupChannel
+        ? CHANNEL_LABELS[signupChannel] || signupChannel
+        : null;
+
       return {
         id,
         name,
@@ -239,6 +253,9 @@ export class AdminDashboardService {
         cancelAtPeriodEnd,
         householdType: (data.householdType as string) || (data.buyerProfile?.householdType as string) || null,
         professionalAtOnboarding: Boolean(data.professionalAtOnboarding || data.buyerProfile?.professional),
+        signupSource,
+        signupChannel,
+        signupChannelLabel,
       };
     });
   }
@@ -424,6 +441,16 @@ export class AdminDashboardService {
 
     const timeline: Array<{ at: string | null; type: string; label: string }> = [];
     if (row.signupDate) timeline.push({ at: row.signupDate, type: 'signup', label: 'Signed up' });
+    if (row.signupChannelLabel || row.signupSource) {
+      const via = row.signupChannelLabel || 'Unknown';
+      const code =
+        row.signupSource && row.signupSource !== 'inbound' ? ` (${row.signupSource})` : '';
+      timeline.push({
+        at: toIso(userData.signupAttributedAt) || row.signupDate,
+        type: 'attribution',
+        label: `Joined via ${via}${code}`,
+      });
+    }
     if (sub?.confirmedAt) timeline.push({ at: toIso(sub.confirmedAt), type: 'billing', label: `Subscription confirmed (${row.tier})` });
     if (sub?.pendingPlanId) timeline.push({ at: toIso(sub.updatedAt), type: 'billing', label: `Pending plan: ${sub.pendingPlanId}` });
     for (const item of saved as Array<{ savedAt?: string; address?: string; title?: string }>) {

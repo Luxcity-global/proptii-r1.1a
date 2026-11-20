@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 
-const DEFAULT_STAFF_DOMAINS = ['proptii.com', 'proptii.co'];
+const DEFAULT_STAFF_DOMAINS = ['proptii.com', 'proptii.co', 'theluxcity.co.uk'];
 
 /**
  * Staff-only gate for the internal admin dashboard.
@@ -8,7 +8,7 @@ const DEFAULT_STAFF_DOMAINS = ['proptii.com', 'proptii.co'];
  *
  * Allow:
  *  - emails listed in ADMIN_EMAILS (comma-separated)
- *  - emails on ADMIN_EMAIL_DOMAINS (default: proptii.com, proptii.co)
+ *  - emails on ADMIN_EMAIL_DOMAINS (default: proptii.com, proptii.co, theluxcity.co.uk)
  *  - local mock tokens when NODE_ENV !== production AND ADMIN_ALLOW_DEV !== 'false'
  */
 export function isStaffEmail(email: string | undefined | null): boolean {

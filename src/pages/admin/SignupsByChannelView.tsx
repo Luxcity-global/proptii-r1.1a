@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import adminDashboardService, { type AdminSignupReport } from '../../services/adminDashboardService';
+import { downloadXlsx } from './exportExcel';
 
 const WEEK_OPTIONS = [4, 12, 26];
 
@@ -21,34 +22,55 @@ function changeLabel(current: number, previous: number) {
   return `${diff >= 0 ? '+' : ''}${diff} (${pct >= 0 ? '+' : ''}${pct}%) vs prior 7 days`;
 }
 
-function downloadCsv(report: AdminSignupReport) {
-  const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines: string[] = [
-    'Sign-ups by channel',
-    ['Channel', 'Sign-ups', 'Share %', 'Last 7 days', 'Landlords', 'Tenants', 'Agents', 'Other'].map(q).join(','),
-    ...report.channels.map((c) =>
-      [c.label, c.count, c.pct, c.last7Days, c.roles.landlord, c.roles.tenant, c.roles.agent, c.roles.other].map(q).join(','),
-    ),
-    '',
-    'Sign-ups by code',
-    ['Code', 'Channel', 'Partner', 'Known code', 'Sign-ups', 'Last 7 days', 'Last sign-up'].map(q).join(','),
-    ...report.codes.map((c) =>
-      [c.code, c.channelLabel, c.partner || '', c.known ? 'yes' : 'no', c.count, c.last7Days, c.lastSignupAt || ''].map(q).join(','),
-    ),
-    '',
-    'Sign-ups by week (week starting Monday, UTC)',
-    ['Week of', 'Total', ...report.channels.map((c) => c.label)].map(q).join(','),
-    ...report.weekly.map((w) =>
-      [w.weekStart, w.total, ...report.channels.map((c) => w.byChannel[c.channel] || 0)].map(q).join(','),
-    ),
-  ];
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `proptii-signups-by-channel-${report.generatedAt.slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+function downloadSignupsExcel(report: AdminSignupReport) {
+  const channelHeaders = ['Channel', 'Sign-ups', 'Share %', 'Last 7 days', 'Landlords', 'Tenants', 'Agents', 'Other'];
+  const codeHeaders = ['Code', 'Channel', 'Partner', 'Known code', 'Sign-ups', 'Last 7 days', 'Last sign-up'];
+  const weekHeaders = ['Week of', 'Total', ...report.channels.map((c) => c.label)];
+
+  void downloadXlsx(`proptii-signups-by-channel-${report.generatedAt.slice(0, 10)}.xlsx`, [
+    {
+      name: 'By channel',
+      rows: [
+        channelHeaders,
+        ...report.channels.map((c) => [
+          c.label,
+          c.count,
+          c.pct,
+          c.last7Days,
+          c.roles.landlord,
+          c.roles.tenant,
+          c.roles.agent,
+          c.roles.other,
+        ]),
+      ],
+    },
+    {
+      name: 'By code',
+      rows: [
+        codeHeaders,
+        ...report.codes.map((c) => [
+          c.code,
+          c.channelLabel,
+          c.partner || '',
+          c.known ? 'yes' : 'no',
+          c.count,
+          c.last7Days,
+          c.lastSignupAt || '',
+        ]),
+      ],
+    },
+    {
+      name: 'By week',
+      rows: [
+        weekHeaders,
+        ...report.weekly.map((w) => [
+          w.weekStart,
+          w.total,
+          ...report.channels.map((c) => w.byChannel[c.channel] || 0),
+        ]),
+      ],
+    },
+  ]);
 }
 
 export function SignupsByChannelView() {
@@ -100,8 +122,8 @@ export function SignupsByChannelView() {
             ))}
           </select>
           <button type="button" className="pa-btn" onClick={load} disabled={loading}>Refresh</button>
-          <button type="button" className="pa-btn" onClick={() => data && downloadCsv(data)} disabled={!data}>
-            Export CSV
+          <button type="button" className="pa-btn" onClick={() => data && downloadSignupsExcel(data)} disabled={!data}>
+            Export Excel
           </button>
         </div>
       </div>

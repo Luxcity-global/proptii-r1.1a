@@ -8,7 +8,7 @@ An internal tool for the Proptii team to see, at a glance and in depth, who has 
 
 **Primary users:** Founder/ops (all access), Customer support (account-level access, notes only — no billing edit), future: partnerships lead (B2B API accounts only).
 
-Staff access is allowlisted: `@proptii.com` / `@proptii.co`, plus `ADMIN_EMAILS` / `VITE_ADMIN_EMAILS`. Access to the dashboard is written to `admin_access_log`.
+Staff access is allowlisted: `@proptii.com` / `@proptii.co` / `@theluxcity.co.uk`, plus optional `ADMIN_EMAILS` / `VITE_ADMIN_EMAILS`. Access to the dashboard is written to `admin_access_log`.
 
 ## 2. Source data this depends on
 
