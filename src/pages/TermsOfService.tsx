@@ -8,7 +8,7 @@ const TermsOfService = () => {
             <Navbar />
             {/* Hero Section */}
             <section
-                className="relative h-[80vh] bg-cover bg-center overflow-hidden"
+                className="relative h-[40vh] bg-cover bg-center overflow-hidden"
                 style={{ backgroundImage: 'url("/images/Terms-of-Service-Hero.png")' }}
             >
                 <div className="absolute inset-0 z-0 overflow-hidden">
@@ -22,7 +22,7 @@ const TermsOfService = () => {
                     />
                     <div className="absolute inset-0 bg-[#0A2342]/80"></div>
                 </div>
-                <div className="relative z-10 container mx-auto px-4 h-screen flex flex-col justify-center items-center text-center">
+                <div className="relative z-10 container mx-auto px-4 h-full flex flex-col justify-center items-center text-center pt-20">
                     <h1 className="text-5xl md:text-7xl font-bold text-white font-archivo">
                         Terms of Service
                     </h1>
@@ -37,7 +37,7 @@ const TermsOfService = () => {
                         <div className="bg-white rounded-lg shadow-sm p-6">
                             <h2 className="text-2xl font-bold text-[#374957] mb-4">1. Introduction</h2>
                             <p className="text-gray-600">
-                                Luxcity is used by a platform that allows users to search for rental properties, book viewings, get verified, and sign tenancy agreements. These Terms apply to all users, including tenants, landlords, agents, and property managers.
+                                Luxcity UK Ltd, trading as Proptii (“we”) provides the Proptii platform, allowing users to search for rental properties, book viewings, get verified, and sign tenancy agreements. These Terms apply to all users, including tenants, landlords, agents, and property managers.
                             </p>
                         </div>
 

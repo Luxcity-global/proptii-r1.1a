@@ -1,9 +1,7 @@
 /** Browser Maps key — set VITE_GOOGLE_MAPS_API_KEY in .env (same GCP project as search). */
 export function getGoogleMapsApiKey(): string {
   const fromEnv = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim();
-  if (fromEnv) return fromEnv;
-  // Fallback matches SearchResults until env is configured.
-  return 'AIzaSyChXxNp1xBJtJB9pC5WxWoZw3__7nT3djU';
+  return fromEnv || '';
 }
 
 /** Embed API key from env only — empty means fall back to OpenStreetMap. */

@@ -7,7 +7,21 @@ declare global {
 
 const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
 
-const isGAEnabled = typeof window !== 'undefined' && typeof GA_MEASUREMENT_ID === 'string' && GA_MEASUREMENT_ID.length > 0;
+const CONSENT_KEY = 'proptii_consent_analytics'; // unused until Next CMP
+
+const hasAnalyticsConsent = (): boolean => {
+  try {
+    return localStorage.getItem(CONSENT_KEY) === 'granted';
+  } catch {
+    return false;
+  }
+};
+
+const isGAEnabled =
+  typeof window !== 'undefined' &&
+  typeof GA_MEASUREMENT_ID === 'string' &&
+  GA_MEASUREMENT_ID.length > 0 &&
+  hasAnalyticsConsent();
 
 const safeGtag = (...args: unknown[]) => {
   if (typeof window === 'undefined') return;

@@ -23,6 +23,10 @@ export const Footer: React.FC = () => {
             Terms of Service
           </Link>
           {' | '}
+          <Link to="/cookie-policy" className="hover:text-primary">
+            Cookie Policy
+          </Link>
+          {' | '}
           <Link to="/contact" className="hover:text-primary">
             Contact Us
           </Link>

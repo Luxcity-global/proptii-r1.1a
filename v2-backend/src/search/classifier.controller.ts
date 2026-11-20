@@ -71,7 +71,7 @@ export class ClassifierController {
     @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: false }))
     dto: ClassifyRequestDto,
   ): Promise<ClassifierResult> {
-    this.logger.debug(`[Classifier] classify request: "${dto.query.slice(0, 80)}"`);
+    this.logger.debug(`[Classifier] classify request (length=${dto.query?.length ?? 0})`);
     return this.classifierService.classify(dto.query);
   }
 }

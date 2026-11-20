@@ -114,6 +114,11 @@ function Footer() {
                       Terms of Service
                     </Link>
                   </li>
+                  <li>
+                    <Link to="/cookie-policy" className="block py-1 hover:underline">
+                      Cookie Policy
+                    </Link>
+                  </li>
                 </ul>
               </div>
             )}
@@ -222,6 +227,11 @@ function Footer() {
                 <li>
                   <Link to="/privacy-policy" className="hover:underline">
                     Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/cookie-policy" className="hover:underline">
+                    Cookie Policy
                   </Link>
                 </li>
               </ul>

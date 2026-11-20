@@ -48,18 +48,12 @@ export default defineConfig(({ mode }) => {
   const rootEnvDir = path.resolve(__dirname, '../..');
   const rootNodeModules = path.resolve(__dirname, '../../node_modules');
   const env = loadEnv(mode, rootEnvDir, '');
-  const measurementId = env.VITE_GA_MEASUREMENT_ID || 'G-88HC0TG6JJ';
+  const measurementId = env.VITE_GA_MEASUREMENT_ID || '';
 
   return {
     plugins: [
       react(),
       pdfjsWorkerUrlPlugin(),
-      {
-        name: 'ga4-html-replace',
-        transformIndexHtml(html: string) {
-          return html.replace(/%VITE_GA_MEASUREMENT_ID%/g, measurementId);
-        },
-      },
       {
         name: 'resolve-from-root-node-modules',
         resolveId(source) {

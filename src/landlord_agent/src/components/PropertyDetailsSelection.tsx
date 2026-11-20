@@ -319,9 +319,14 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
         return;
       }
 
-      const gmapsKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || '';
+      const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+      if (!mapsKey) {
+        console.warn('Google Maps API key is missing; map view will not load.');
+        return;
+      }
+
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${gmapsKey}&libraries=places&callback=initGoogleMaps`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsKey)}&libraries=places&callback=initGoogleMaps`;
       script.async = true;
       script.defer = true;
       

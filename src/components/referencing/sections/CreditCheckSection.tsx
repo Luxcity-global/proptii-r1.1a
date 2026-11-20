@@ -22,31 +22,11 @@ export const CreditCheckSection: React.FC = () => {
       <Grid container spacing={3}>
         <Grid item xs={12}>
           <Alert severity="info" sx={{ mb: 2 }}>
-            We need your consent to perform a credit check as part of the referencing process. This helps us verify your financial history and ability to pay rent.
+            We are not running a credit search yet. No credit reference agency is contracted. Ticking the box means you agree that, when we name an agency and explain whether it is a soft or hard search, we may run that search as part of referencing. We will not run a search until then.
           </Alert>
-        </Grid>
-        
-        <Grid item xs={12}>
           <Typography variant="body1" paragraph>
-            By agreeing to the credit check, you consent to:
+            By ticking below you confirm that the information you have given is accurate, and you consent to a future credit search only after we have named the agency in this form and in our Privacy Policy.
           </Typography>
-          <ul>
-            <li>
-              <Typography variant="body2">
-                A credit check being performed by our approved credit reference agency
-              </Typography>
-            </li>
-            <li>
-              <Typography variant="body2">
-                The credit reference agency keeping a record of our enquiry
-              </Typography>
-            </li>
-            <li>
-              <Typography variant="body2">
-                The credit reference agency sharing your credit history with us
-              </Typography>
-            </li>
-          </ul>
         </Grid>
         
         <Grid item xs={12}>
