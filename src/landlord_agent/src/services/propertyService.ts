@@ -8,8 +8,12 @@ import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../config/firebaseConfig';
+import type { Property, PropertyDocument, PropertyPhoto } from '../types';
 
-const API_BASE = getResolvedApiBaseUrl().replace(/\/api$/, '');
+/** Resolve per call so .env / HMR changes are not stuck at module load. */
+function apiRoot(): string {
+    return getResolvedApiBaseUrl().replace(/\/api$/, '');
+}
 
 async function authHeaders(): Promise<Record<string, string>> {
     const token = await getAccessTokenForApiRequest().catch(() => null);
@@ -23,7 +27,17 @@ function messageFromResponse(status: number, errText: string, fallback: string):
     let errMsg = `${fallback} (HTTP ${status})`;
     try {
         const errJson = JSON.parse(errText);
-        if (errJson.message) errMsg = Array.isArray(errJson.message) ? errJson.message.join(', ') : errJson.message;
+        const raw = errJson.message ?? errJson;
+        // Nest BadRequestException may nest C1 payload: { message, missing, code }
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            const missing = Array.isArray(raw.missing) ? raw.missing.join(', ') : '';
+            const text = typeof raw.message === 'string' ? raw.message : fallback;
+            errMsg = missing ? `${text} Missing: ${missing}` : text;
+        } else if (Array.isArray(raw)) {
+            errMsg = raw.join(', ');
+        } else if (typeof raw === 'string') {
+            errMsg = raw;
+        }
     } catch {
         if (errText) errMsg = errText;
     }
@@ -33,17 +47,22 @@ function messageFromResponse(status: number, errText: string, fallback: string):
 /** The live API rejects a property save when the account has no stored role. */
 async function ensureOwnerRole(role: 'landlord' | 'agent', userId: string): Promise<void> {
     const headers = await authHeaders();
-    const me = await fetch(`${API_BASE}/api/auth/me`, { headers });
+    const root = apiRoot();
+    const me = await fetch(`${root}/api/auth/me`, {
+        headers,
+        signal: AbortSignal.timeout(15000),
+    });
     if (me.ok) {
         const profile = await me.json().catch(() => ({}));
         const current = profile?.role || profile?.data?.role;
         if (current === 'landlord' || current === 'agent' || current === 'homeowner') return;
     }
 
-    const assigned = await fetch(`${API_BASE}/api/auth/role`, {
+    const assigned = await fetch(`${root}/api/auth/role`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ role, source: 'manual_select' }),
+        signal: AbortSignal.timeout(15000),
     });
     if (assigned.ok) return;
 
@@ -88,14 +107,33 @@ function mapFromApi(data: any): Property {
     return {
         id: data.id ?? data._id,
         address: data.address ?? '',
-        type: data.type ?? '',
+        type: data.type ?? data.propertyType ?? '',
         bedrooms: data.bedrooms ?? 1,
         bathrooms: data.bathrooms,
         squareFootage: data.squareFootage,
-        rent: data.rent ?? 0,
+        rent: data.rent ?? data.rentAmount ?? data.price ?? 0,
         status: data.status ?? 'vacant',
         amenities: data.amenities ?? [],
         notes: data.notes ?? '',
+        description: data.description ?? '',
+        amenityDetails: data.amenityDetails ?? [],
+        additionalFeatures: data.additionalFeatures ?? '',
+        propertyClassification: data.propertyClassification ?? undefined,
+        receptionRooms: data.receptionRooms,
+        floorNumber: data.floorNumber,
+        constructionType: data.constructionType,
+        tenure: data.tenure,
+        epcRating: data.epcRating,
+        propertyUse: data.propertyUse,
+        numberOfFloors: data.numberOfFloors,
+        buildingSpecification: data.buildingSpecification,
+        permittedUse: data.permittedUse,
+        businessRates: data.businessRates,
+        landArea: data.landArea,
+        planningStatus: data.planningStatus,
+        landAccess: data.landAccess,
+        landUtilities: data.landUtilities,
+        boundaries: data.boundaries,
         photos: (data.photos ?? []) as PropertyPhoto[],
         documents: (data.documents ?? []).map((doc: any) => ({
             ...doc,
@@ -132,6 +170,8 @@ function mapToApi(property: Omit<Property, 'id' | 'createdAt' | 'tenant'>): Reco
 
     const parsedPostcode = (property as any).postcode || extractUkPostcode(property.address) || 'SW1A 1AA';
 
+    const p = property as any;
+
     return {
         title: property.address || 'Property Listing',
         address: property.address,
@@ -146,11 +186,30 @@ function mapToApi(property: Omit<Property, 'id' | 'createdAt' | 'tenant'>): Reco
         type: property.type || 'Flat',
         amenities: property.amenities ?? [],
         notes: property.notes ?? '',
+        description: p.description ?? '',
+        amenityDetails: p.amenityDetails ?? [],
+        additionalFeatures: p.additionalFeatures ?? '',
+        ...(p.propertyClassification ? { propertyClassification: p.propertyClassification } : {}),
+        ...(p.receptionRooms != null && p.receptionRooms !== '' ? { receptionRooms: p.receptionRooms } : {}),
+        ...(p.floorNumber ? { floorNumber: p.floorNumber } : {}),
+        ...(p.constructionType ? { constructionType: p.constructionType } : {}),
+        ...(p.tenure ? { tenure: p.tenure } : {}),
+        ...(p.epcRating ? { epcRating: p.epcRating } : {}),
+        ...(p.propertyUse ? { propertyUse: p.propertyUse } : {}),
+        ...(p.numberOfFloors != null && p.numberOfFloors !== '' ? { numberOfFloors: p.numberOfFloors } : {}),
+        ...(p.buildingSpecification ? { buildingSpecification: p.buildingSpecification } : {}),
+        ...(p.permittedUse ? { permittedUse: p.permittedUse } : {}),
+        ...(p.businessRates != null && p.businessRates !== '' ? { businessRates: p.businessRates } : {}),
+        ...(p.landArea ? { landArea: p.landArea } : {}),
+        ...(p.planningStatus ? { planningStatus: p.planningStatus } : {}),
+        ...(p.landAccess ? { landAccess: p.landAccess } : {}),
+        ...(p.landUtilities ? { landUtilities: p.landUtilities } : {}),
+        ...(p.boundaries ? { boundaries: p.boundaries } : {}),
         photos,
         documents: property.documents ?? [],
         status: property.status ?? 'vacant',
-        archived: Boolean((property as any).archived ?? (property.status === 'archived')),
-        isArchived: Boolean((property as any).isArchived ?? (property as any).archived ?? (property.status === 'archived')),
+        archived: Boolean(p.archived ?? (property.status === 'archived')),
+        isArchived: Boolean(p.isArchived ?? p.archived ?? (property.status === 'archived')),
     };
 }
 
@@ -168,10 +227,11 @@ class PropertyService {
     ): Promise<string> {
         await ensureOwnerRole(ownerRole, ownerUserId);
         const headers = await authHeaders();
-        const res = await fetch(`${API_BASE}/api/native-properties`, {
+        const res = await fetch(`${apiRoot()}/api/native-properties`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ ...mapToApi(propertyData), userId: ownerUserId, ownerEmail }),
+            signal: AbortSignal.timeout(60000),
         });
         if (!res.ok) {
             const errText = await res.text().catch(() => '');
@@ -194,7 +254,7 @@ class PropertyService {
         if (userId) queryParams.append('userId', userId);
         if (email) queryParams.append('email', email);
 
-        const res = await fetch(`${API_BASE}/api/native-properties?${queryParams.toString()}`);
+        const res = await fetch(`${apiRoot()}/api/native-properties?${queryParams.toString()}`);
         if (!res.ok) throw new Error(`Failed to get properties (${res.status})`);
         const data: any[] = await res.json();
         let results = data.map(mapFromApi);
@@ -204,7 +264,7 @@ class PropertyService {
     }
 
     async getProperty(propertyId: string): Promise<Property | null> {
-        const res = await fetch(`${API_BASE}/api/native-properties/${encodeURIComponent(propertyId)}`);
+        const res = await fetch(`${apiRoot()}/api/native-properties/${encodeURIComponent(propertyId)}`);
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`Failed to get property (${res.status})`);
         return mapFromApi(await res.json());
@@ -230,7 +290,7 @@ class PropertyService {
         if (cleanPayload.type && !cleanPayload.propertyType) {
             cleanPayload.propertyType = cleanPayload.type;
         }
-        const res = await fetch(`${API_BASE}/api/native-properties/${encodeURIComponent(propertyId)}`, {
+        const res = await fetch(`${apiRoot()}/api/native-properties/${encodeURIComponent(propertyId)}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify(cleanPayload),
@@ -250,7 +310,7 @@ class PropertyService {
 
     async deleteProperty(propertyId: string): Promise<void> {
         const headers = await authHeaders();
-        const res = await fetch(`${API_BASE}/api/native-properties/${encodeURIComponent(propertyId)}`, {
+        const res = await fetch(`${apiRoot()}/api/native-properties/${encodeURIComponent(propertyId)}`, {
             method: 'DELETE',
             headers,
         });
@@ -267,7 +327,7 @@ class PropertyService {
     }> {
         const headers = await authHeaders();
         try {
-            const res = await fetch(`${API_BASE}/api/native-properties/bulk`, {
+            const res = await fetch(`${apiRoot()}/api/native-properties/bulk`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
