@@ -5,6 +5,7 @@ import {
   IsPositive,
   IsOptional,
   IsArray,
+  IsBoolean,
   Min,
   IsIn,
 } from 'class-validator';
@@ -258,6 +259,56 @@ export class CreatePropertyDto {
   @IsOptional()
   @IsIn(['vacant', 'occupied', 'under_offer', 'under-renovation', 'draft', 'archived'])
   status?: string;
+
+  @ApiPropertyOptional({
+    example: 'private',
+    enum: ['private', 'public'],
+    description: 'C2 search visibility. New listings default to private; public vacant listings appear in tenant search.',
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['private', 'public'])
+  listingVisibility?: 'private' | 'public';
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'True after the listing has been published at least once (keeps visibility toggle UI when later hidden).',
+  })
+  @IsBoolean()
+  @IsOptional()
+  listingEverPublished?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'yes',
+    enum: ['yes', 'no'],
+    description: 'Whether the landlord will take a tenancy deposit (listing commitment).',
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['yes', 'no'])
+  takesDeposit?: 'yes' | 'no';
+
+  @ApiPropertyOptional({ example: '1500', description: 'Deposit amount in GBP when takesDeposit is yes' })
+  @IsOptional()
+  depositAmount?: string | number;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Landlord confirms deposit will be protected in an approved scheme',
+  })
+  @IsBoolean()
+  @IsOptional()
+  depositProtectionConfirmed?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'landlord',
+    enum: ['landlord', 'agent'],
+    description: 'Who will protect the deposit (optional)',
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['landlord', 'agent'])
+  depositProtectedBy?: 'landlord' | 'agent';
 
   @ApiPropertyOptional({ example: '100023336956', description: 'Unique Property Reference Number (UPRN)' })
   @IsString()
@@ -553,6 +604,45 @@ export class UpdatePropertyDto {
   @IsOptional()
   @IsIn(['vacant', 'occupied', 'under_offer', 'under-renovation', 'draft', 'archived'])
   status?: string;
+
+  @ApiPropertyOptional({
+    example: 'private',
+    enum: ['private', 'public'],
+    description: 'C2 search visibility toggle for tenant property searches.',
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['private', 'public'])
+  listingVisibility?: 'private' | 'public';
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'True after the listing has been published at least once.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  listingEverPublished?: boolean;
+
+  @ApiPropertyOptional({ example: 'yes', enum: ['yes', 'no'] })
+  @IsString()
+  @IsOptional()
+  @IsIn(['yes', 'no'])
+  takesDeposit?: 'yes' | 'no';
+
+  @ApiPropertyOptional({ example: '1500' })
+  @IsOptional()
+  depositAmount?: string | number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsBoolean()
+  @IsOptional()
+  depositProtectionConfirmed?: boolean;
+
+  @ApiPropertyOptional({ example: 'landlord', enum: ['landlord', 'agent'] })
+  @IsString()
+  @IsOptional()
+  @IsIn(['landlord', 'agent'])
+  depositProtectedBy?: 'landlord' | 'agent';
 
   @ApiPropertyOptional({ example: '100023336956' })
   @IsString()

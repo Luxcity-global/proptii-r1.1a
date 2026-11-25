@@ -119,7 +119,7 @@ const PrivacyPolicy = () => {
                 </div>
               </div>
               <p className="text-gray-600 mt-4">
-                We do not currently use Google Analytics. If we introduce analytics later, we will only do so with your consent and will update this notice and the Cookie Policy.
+                We use Google Analytics 4 only if you consent via the cookie notice. You can use Proptii without analytics cookies.
               </p>
               <p className="text-gray-600 mt-2">
                 If you complete referencing, we may in future share data with a named credit reference agency. We will not run a credit search until that agency is contracted and named to you (see the referencing form).
@@ -138,7 +138,7 @@ const PrivacyPolicy = () => {
                   <span className="font-bold text-[#374957]">Legitimate interests:</span> Security logs, fraud prevention, and diagnosing errors via Sentry (we minimise personal data in those reports).
                 </div>
                 <div>
-                  <span className="font-bold text-[#374957]">Consent:</span> Any future analytics or marketing cookies. You can use the site without that consent.
+                  <span className="font-bold text-[#374957]">Consent:</span> Analytics cookies (Google Analytics 4) when you opt in. You can use the site without that consent.
                 </div>
                 <div>
                   <span className="font-bold text-[#374957]">Legal obligation:</span> Where the law requires us to keep or disclose information.

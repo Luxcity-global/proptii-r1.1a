@@ -21,6 +21,7 @@ import { getPropertyDisplayTitle, getPropertyListingDescription } from '../../ut
 import { getPropertyDateInfo } from '../../utils/propertyDates';
 import { getPropertyDynamicFeatures } from '../../utils/propertyFeatures';
 import { maskEmail, maskPhone } from '../../utils/formatters';
+import { getAmenityLabel } from '../../shared/propertyCatalogue';
 
 const PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800';
@@ -132,7 +133,10 @@ export function PropertyDetailsModal({
       .join(', ') || property.location;
   const listingDescription = getPropertyListingDescription(property);
   const rawAmenities = (property.amenities || [])
-    .map((a: any) => (typeof a === 'string' ? a : (a?.description || a?.htmlDescription || a?.title || '')).trim())
+    .map((a: any) => {
+      if (typeof a === 'string') return getAmenityLabel(a).trim();
+      return (a?.description || a?.htmlDescription || a?.title || '').trim();
+    })
     .filter(Boolean);
   const keyFeatures = Array.isArray(extra.keyFeatures) ? extra.keyFeatures.filter(Boolean) : [];
   const featureItems =

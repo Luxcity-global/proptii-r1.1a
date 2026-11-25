@@ -57,6 +57,7 @@ interface SelectedDocumentForm {
   type: string;
   issueDate: string;
   expiryDate: string;
+  epcRating: string;
 }
 
 interface DocumentManagementProps {
@@ -74,12 +75,17 @@ interface DocumentManagementProps {
 }
 
 const DOCUMENT_TYPES = [
-  { value: 'epc',                label: 'EPC Certificate' },
-  { value: 'gas-cert',           label: 'Gas Safety Certificate' },
-  { value: 'tenancy-agreement',  label: 'Tenancy Agreement' },
-  { value: 'insurance',          label: 'Insurance Policy' },
-  { value: 'other',              label: 'Other Document' },
+  { value: 'epc',                 label: 'EPC Certificate' },
+  { value: 'gas-cert',            label: 'Gas Safety Certificate' },
+  { value: 'eicr',                label: 'EICR' },
+  { value: 'deposit-protection',  label: 'Deposit protection + prescribed information' },
+  { value: 'tenancy-agreement',   label: 'Tenancy Agreement' },
+  { value: 'insurance',           label: 'Insurance Policy' },
+  { value: 'other',               label: 'Other Document' },
 ];
+
+/** C1 verification docs must use private documents/{uid}/… — never properties/ (public read). */
+const C1_PRIVATE_DOC_TYPES = new Set(['epc', 'gas-cert', 'eicr', 'deposit-protection']);
 
 function computeStatus(expiryDate?: Date | null): PropertyDocument['status'] {
   if (!expiryDate) return 'valid';
@@ -177,7 +183,14 @@ export function DocumentManagement({
     const files = e.target.files ? Array.from(e.target.files) : [];
     setSelectedForms(prev => [
       ...prev,
-      ...files.map(f => ({ file: f, name: f.name.replace(/\.[^/.]+$/, ''), type: '', issueDate: '', expiryDate: '' })),
+      ...files.map(f => ({
+        file: f,
+        name: f.name.replace(/\.[^/.]+$/, ''),
+        type: '',
+        issueDate: '',
+        expiryDate: '',
+        epcRating: '',
+      })),
     ]);
     e.target.value = '';
   };
@@ -190,6 +203,8 @@ export function DocumentManagement({
     if (!selectedForms.length) { alert('Select at least one document'); return; }
     const incomplete = selectedForms.find(d => !d.name || !d.type || !d.issueDate);
     if (incomplete) { alert('Fill in all required fields for each document'); return; }
+    const missingEpcRating = selectedForms.find(d => d.type === 'epc' && !d.epcRating.trim());
+    if (missingEpcRating) { alert('Enter the EPC rating (e.g. C) for EPC documents'); return; }
 
     setIsUploading(true);
     const apiBase = getResolvedApiBaseUrl();
@@ -199,17 +214,25 @@ export function DocumentManagement({
       for (const form of selectedForms) {
         // 1. Upload file to Firebase Storage via backend
         let url = '';
+        let storagePath = '';
         try {
           const fd = new FormData();
           fd.append('file', form.file, form.file.name);
-          fd.append('folder', 'properties/documents');
+          // C1 private docs → documents/{uid}/properties/{id}/{type}; others keep properties/documents
+          const folder = C1_PRIVATE_DOC_TYPES.has(form.type)
+            ? (property?.id
+                ? `documents/verification/properties/${property.id}/${form.type}`
+                : `documents/verification/${form.type}`)
+            : 'properties/documents';
+          fd.append('folder', folder);
           const token = await getAccessTokenForApiRequest().catch(() => null);
           const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
           const res = await fetch(`${apiBase}/storage/upload`, { method: 'POST', headers, body: fd });
           if (!res.ok) throw new Error(`Storage upload failed (${res.status})`);
           const data = await res.json();
-          if (!data.url) throw new Error('No URL returned from storage');
-          url = data.url;
+          if (!data.url && !data.storagePath && !data.fullPath) throw new Error('No URL returned from storage');
+          url = data.url || '';
+          storagePath = data.storagePath || data.fullPath || '';
         } catch (err) {
           alert(`Upload failed for ${form.file.name}: ${(err as Error).message}`);
           continue;
@@ -238,9 +261,12 @@ export function DocumentManagement({
             name: form.name,
             type: form.type as PropertyDocument['type'],
             url,
+            ...(storagePath ? { storagePath } : {}),
+            ...(form.type === 'epc' ? { epcRating: form.epcRating.trim().toUpperCase() } : {}),
             issueDate,
             expiryDate,
             status,
+            submittedAt: new Date().toISOString(),
           };
           await propertyService.addDocumentToProperty(property!.id, newDoc);
           onDocumentAdd(property!.id, newDoc);
@@ -446,6 +472,19 @@ export function DocumentManagement({
                             </SelectContent>
                           </Select>
                         </div>
+                        {form.type === 'epc' && (
+                          <div className="space-y-1">
+                            <Label htmlFor={`er-${i}`}>EPC rating *</Label>
+                            <Input
+                              id={`er-${i}`}
+                              value={form.epcRating}
+                              onChange={e => updateForm(i, 'epcRating', e.target.value)}
+                              placeholder="e.g. C"
+                              maxLength={2}
+                              required
+                            />
+                          </div>
+                        )}
                         <div className="space-y-1">
                           <Label htmlFor={`di-${i}`}>Issue Date *</Label>
                           <Input id={`di-${i}`} type="date" value={form.issueDate} onChange={e => updateForm(i, 'issueDate', e.target.value)} required />

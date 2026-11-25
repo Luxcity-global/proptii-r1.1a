@@ -6,8 +6,34 @@ import { MessagingProvider } from '../contexts/MessagingContext';
 import { useMessagingPoller } from '../hooks/useMessagingPoller';
 import EditProfileModal from '../components/profile/EditProfileModal';
 
-// Lazy-load the Landlord App component
-const LandlordApp = React.lazy(() => import('../landlord_agent/src/App'));
+// Lazy-load with recovery: after Vite HMR/env reloads the dynamic chunk can
+// fail ("Failed to fetch dynamically imported module") and Suspense hangs forever.
+const LandlordApp = React.lazy(() =>
+  import('../landlord_agent/src/App').catch((err) => {
+    console.error('[LandlordDemo] Failed to load LandlordApp chunk:', err);
+    if (import.meta.env.DEV && !sessionStorage.getItem('landlord_chunk_reload')) {
+      sessionStorage.setItem('landlord_chunk_reload', '1');
+      window.location.reload();
+    }
+    return {
+      default: () => (
+        <div className="min-h-screen flex items-center justify-center p-6 text-center">
+          <div>
+            <p className="text-base text-gray-700 font-medium">Dashboard failed to load.</p>
+            <p className="mt-2 text-sm text-gray-500">Hard-refresh with Cmd+Shift+R, then try again.</p>
+            <button
+              type="button"
+              className="mt-4 px-4 py-2 rounded bg-[#E65D24] text-white text-sm"
+              onClick={() => window.location.reload()}
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      ),
+    };
+  }),
+);
 
 /**
  * Inner component that has access to MessagingContext and starts the poller.

@@ -44,17 +44,23 @@ export async function resolveRole(
   uid: string,
   email: string,
 ): Promise<UserRole | null> {
-  // 1. Backend role resolution via v2-backend REST API (canonical source of truth)
+  // 1. localStorage cache first — instant, survives API timeouts during local dev
+  const cached = localStorage.getItem(`proptii_role_${uid}`);
+  if (cached === 'tenant' || cached === 'landlord' || cached === 'agent') {
+    // Refresh from backend in background; don't block UI on /auth/me
+    void fetchBackendRole(uid, email).then((backendRole) => {
+      if (backendRole && backendRole !== cached) {
+        localStorage.setItem(`proptii_role_${uid}`, backendRole);
+      }
+    });
+    return cached as UserRole;
+  }
+
+  // 2. Backend role resolution via v2-backend REST API (canonical source of truth)
   const backendRole = await fetchBackendRole(uid, email);
   if (backendRole) {
     localStorage.setItem(`proptii_role_${uid}`, backendRole);
     return backendRole;
-  }
-
-  // 2. Fallback to localStorage cache only if offline or network unreachable
-  const cached = localStorage.getItem(`proptii_role_${uid}`);
-  if (cached === 'tenant' || cached === 'landlord' || cached === 'agent') {
-    return cached as UserRole;
   }
 
   // 3. sessionStorage signup intent (set before B2C redirect during onboarding)

@@ -47,6 +47,7 @@ import {
   Mail,
   Phone,
   Eye,
+  EyeOff,
   Camera,
   MapPin,
   ChevronLeft,
@@ -99,6 +100,11 @@ import {
   subtypeLabel,
   resolveClassificationFromStoredType,
 } from "../../../shared/propertyCatalogue";
+import { AccountVerificationPanel } from "./AccountVerificationPanel";
+import {
+  formatMissingVerification,
+  getReadyToPublish,
+} from "../services/verificationService";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -192,6 +198,29 @@ const STATUS_META: Record<
   },
 };
 
+/** UI: only explicitly published vacant listings are treated as live in search. */
+function isPublishedListing(property: Property): boolean {
+  return property.listingVisibility === "public";
+}
+
+/**
+ * After first publish, keep the on/off toggle instead of reverting to Publish CTA.
+ * Never show the toggle while property compliance is incomplete — those listings
+ * stay on the Not published / Manage Compliance path (listingEverPublished alone
+ * is not enough; that flag can be sticky from earlier publishes).
+ */
+function usesVisibilityToggle(property: Property): boolean {
+  if (getPropertyComplianceGaps(property).length > 0) return false;
+  return Boolean(property.listingEverPublished) || isPublishedListing(property);
+}
+
+function isShownInPropertySearch(property: Property): boolean {
+  if (isPropertyArchived(property)) return false;
+  if (property.status === "draft" || property.status === "archived") return false;
+  if (!isPublishedListing(property)) return false;
+  return property.status === "vacant";
+}
+
 function StatusPill({ status }: { status: Property["status"] }) {
   const meta = STATUS_META[status as StatusKey] ?? {
     label: status,
@@ -253,6 +282,97 @@ const COMPLIANCE_UPLOAD_ITEMS: Array<{
 
 const EPC_RATINGS = ["A", "B", "C", "D", "E", "F", "G", "Exempt"];
 const COMPLIANCE_DOC_TYPES = new Set(["gas-cert", "eicr", "epc", "deposit-protection"]);
+function isDepositComplianceOk(property: Property): boolean {
+  const takes = property.takesDeposit;
+  if (takes === "no") return true;
+  if (
+    takes === "yes" &&
+    property.depositProtectionConfirmed === true &&
+    Number(property.depositAmount) > 0
+  ) {
+    return true;
+  }
+  return (property.documents ?? []).some((d) => d.type === "deposit-protection");
+}
+
+/** Property-level compliance required before Publish is offered / accepted. */
+function getPropertyComplianceGaps(property: Property): string[] {
+  const docs = property.documents ?? [];
+  const hasType = (type: string) => docs.some((d) => d.type === type);
+  const gaps: string[] = [];
+  if (!hasType("gas-cert")) gaps.push("gas-cert");
+  if (!hasType("eicr")) gaps.push("eicr");
+  const epcDocs = docs.filter((d) => d.type === "epc");
+  const epc = epcDocs[epcDocs.length - 1];
+  const epcOk =
+    Boolean(epc) &&
+    Boolean(String(epc?.epcRating || property.epcRating || "").trim());
+  if (!epcOk) gaps.push("epc");
+  if (!isDepositComplianceOk(property)) gaps.push("deposit-protection");
+  return gaps;
+}
+
+function ComplianceStatusList({
+  property,
+  latestDocOfType,
+}: {
+  property: Property;
+  latestDocOfType: (type: string) => PropertyDocument | undefined;
+}) {
+  return (
+    <ul className="space-y-2.5 text-left">
+      {COMPLIANCE_UPLOAD_ITEMS.map((item) => {
+        const doc = latestDocOfType(item.key);
+        const hasFile = Boolean(doc);
+        const epcOk =
+          item.key !== "epc" ||
+          Boolean(String(doc?.epcRating || property.epcRating || "").trim());
+        const ok = hasFile && epcOk;
+        const label = !hasFile ? "Missing" : !epcOk ? "Needs rating" : "Uploaded";
+        return (
+          <li key={item.key} className="flex items-center justify-between gap-2">
+            <span className="text-[12.5px] text-[#334155] truncate">{item.title}</span>
+            <span
+              className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
+              style={{
+                background: ok ? "#ecfdf5" : "#f1f5f9",
+                color: ok ? "#047857" : "#64748b",
+                fontFamily: "Archivo,sans-serif",
+              }}
+            >
+              {label}
+            </span>
+          </li>
+        );
+      })}
+      {(() => {
+        const takes = property.takesDeposit;
+        const depositOk = isDepositComplianceOk(property);
+        return (
+          <li className="flex items-center justify-between gap-2">
+            <span className="text-[12.5px] text-[#334155] truncate">Deposit</span>
+            <span
+              className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
+              style={{
+                background: depositOk ? "#ecfdf5" : "#f1f5f9",
+                color: depositOk ? "#047857" : "#64748b",
+                fontFamily: "Archivo,sans-serif",
+              }}
+            >
+              {takes === "no"
+                ? "No deposit"
+                : depositOk
+                  ? "Confirmed"
+                  : takes === "yes"
+                    ? "Incomplete"
+                    : "Not set"}
+            </span>
+          </li>
+        );
+      })()}
+    </ul>
+  );
+}
 
 function DocStatusIcon({ status }: { status: string }) {
   if (status === "valid")
@@ -375,6 +495,69 @@ export function PropertyDetails({
   const [complianceUploadError, setComplianceUploadError] = useState<string | null>(null);
   const [uploadingComplianceKey, setUploadingComplianceKey] = useState<string | null>(null);
   const complianceInputRefs = useRef<Partial<Record<"gas-cert" | "eicr" | "epc", HTMLInputElement | null>>>({});
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
+  const [visibilityError, setVisibilityError] = useState<string | null>(null);
+  const [publishMissing, setPublishMissing] = useState<string[]>([]);
+  const [publishGateEnabled, setPublishGateEnabled] = useState(false);
+  const [visibilityConfirm, setVisibilityConfirm] = useState<"public" | "private" | null>(null);
+
+  const refreshPublishReadiness = useCallback(async () => {
+    if (!property?.id) return;
+    try {
+      const result = await getReadyToPublish(property.id);
+      setPublishMissing(Array.isArray(result.missing) ? result.missing : []);
+      setPublishGateEnabled(Boolean(result.gateEnabled));
+    } catch {
+      /* server still enforces on Publish */
+    }
+  }, [property?.id]);
+
+  useEffect(() => {
+    void refreshPublishReadiness();
+  }, [
+    refreshPublishReadiness,
+    property?.documents,
+    property?.epcRating,
+    property?.takesDeposit,
+    property?.depositProtectionConfirmed,
+  ]);
+
+  async function applyListingVisibility(next: "public" | "private") {
+    if (!property) return;
+    if (next === "public") {
+      const gaps = getPropertyComplianceGaps(property);
+      if (gaps.length > 0) {
+        setVisibilityConfirm(null);
+        setVisibilityError(
+          `Upload required compliance before publishing: ${formatMissingVerification(gaps)}.`,
+        );
+        setActiveTab("documents");
+        return;
+      }
+    }
+    setVisibilitySaving(true);
+    setVisibilityError(null);
+    try {
+      await Promise.resolve(
+        updateProperty(property.id, {
+          listingVisibility: next,
+          listingEverPublished: true,
+        } as Partial<Property>),
+      );
+      if (next === "public") setPublishMissing([]);
+    } catch (err: any) {
+      setVisibilityError(
+        err?.message ||
+          (next === "public"
+            ? "Could not publish listing. Check compliance if required."
+            : "Could not update search visibility."),
+      );
+      if (next === "public") void refreshPublishReadiness();
+    } finally {
+      setVisibilitySaving(false);
+      setVisibilityConfirm(null);
+    }
+  }
 
   async function handleDocUpload(doc: { name: string; type: string; file: File; expiryDate?: string }) {
     if (!property || !onDocumentUpload) return;
@@ -412,7 +595,10 @@ export function PropertyDetails({
         name: file.name.replace(/\.[^/.]+$/, "") || DOC_TYPE_LABELS[key] || key,
         type: key,
         file,
-      });
+        ...(key === "epc" && property.epcRating
+          ? { epcRating: property.epcRating }
+          : {}),
+      } as any);
     } catch (err: any) {
       setComplianceUploadError(err?.message || "Upload failed. Please try again.");
     } finally {
@@ -420,11 +606,25 @@ export function PropertyDetails({
     }
   }
 
-  function patchDeposit(
+  const [depositSaving, setDepositSaving] = useState(false);
+  const [depositError, setDepositError] = useState<string | null>(null);
+
+  async function patchDeposit(
     patch: Partial<Pick<Property, "takesDeposit" | "depositAmount" | "depositProtectionConfirmed" | "depositProtectedBy">>,
   ) {
     if (!property) return;
-    updateProperty(property.id, patch);
+    setDepositSaving(true);
+    setDepositError(null);
+    try {
+      // Avoid sending null for optional enums — Nest ValidationPipe rejects unknown/invalid values.
+      const clean: Record<string, unknown> = { ...patch };
+      if (clean.depositProtectedBy == null) delete clean.depositProtectedBy;
+      await Promise.resolve(updateProperty(property.id, clean as Partial<Property>));
+    } catch (err: any) {
+      setDepositError(err?.message || "Could not save deposit details. Please try again.");
+    } finally {
+      setDepositSaving(false);
+    }
   }
 
   // Sync photos from prop whenever property changes (not during unsaved edits)
@@ -990,7 +1190,7 @@ export function PropertyDetails({
                       <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3" style={{ fontFamily: "Archivo,sans-serif" }}>
                         Property Features
                       </p>
-                      <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
                         {groupAmenitiesForDisplay(property.amenities, property.type).map((group) => (
                           <div key={group.categoryLabel} className="min-w-0">
                             <p className="text-[12px] font-bold text-[#334155] mb-2" style={{ fontFamily: "Archivo,sans-serif" }}>
@@ -1094,7 +1294,13 @@ export function PropertyDetails({
                                 value={entry?.epcRating || property.epcRating || ""}
                                 onChange={(e) => {
                                   const rating = e.target.value;
-                                  updateProperty(property.id, { epcRating: rating });
+                                  const docs = (property.documents ?? []).map((d) =>
+                                    d.type === "epc" ? { ...d, epcRating: rating } : d,
+                                  );
+                                  updateProperty(property.id, {
+                                    epcRating: rating,
+                                    documents: docs,
+                                  } as Partial<Property>);
                                 }}
                                 className="h-10 min-w-[132px] rounded-xl border border-[#e2e8f0] bg-white px-3 text-[12.5px] text-[#1e293b] outline-none focus:border-[#136C9E]"
                                 style={{ fontFamily: "Archivo,sans-serif" }}
@@ -1143,7 +1349,7 @@ export function PropertyDetails({
                 </div>
 
                 {/* Deposit commitment — same layout as Add Property Step 5 */}
-                <div className="rounded-[18px] border border-[#e2e8f0] bg-white px-4 py-5 sm:px-5 space-y-4">
+                <div className="rounded-[18px] border border-[#e2e8f0] bg-white px-4 py-5 sm:px-5 space-y-4 relative z-10">
                   <p className="text-[11.5px] font-semibold uppercase tracking-[0.07em] text-[#64748b] flex items-center gap-2.5 m-0">
                     Deposit
                     <span className="flex-1 h-px bg-[#e3e8ef]" />
@@ -1163,14 +1369,14 @@ export function PropertyDetails({
                           <button
                             key={opt}
                             type="button"
+                            disabled={depositSaving}
                             onClick={() =>
-                              patchDeposit(
+                              void patchDeposit(
                                 opt === "no"
                                   ? {
                                       takesDeposit: "no",
                                       depositAmount: "",
                                       depositProtectionConfirmed: false,
-                                      depositProtectedBy: null,
                                     }
                                   : {
                                       takesDeposit: "yes",
@@ -1178,7 +1384,7 @@ export function PropertyDetails({
                                     },
                               )
                             }
-                            className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-4 py-2 text-[13.5px] font-medium capitalize"
+                            className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-4 py-2 text-[13.5px] font-medium capitalize cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                             style={{
                               borderColor: on ? "#136C9E" : "#d5dde7",
                               background: on ? "#136C9E" : "#fff",
@@ -1186,12 +1392,19 @@ export function PropertyDetails({
                               fontFamily: "Archivo,sans-serif",
                             }}
                           >
-                            {on && <Check size={14} strokeWidth={3} />}
+                            {depositSaving ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              on && <Check size={14} strokeWidth={3} />
+                            )}
                             {opt}
                           </button>
                         );
                       })}
                     </div>
+                    {depositError && (
+                      <p className="mt-2 text-[12.5px] text-[#b91c1c]">{depositError}</p>
+                    )}
                   </div>
 
                   {property.takesDeposit === "yes" && (
@@ -1575,6 +1788,184 @@ export function PropertyDetails({
               </div>
             </SCard>
 
+            {/* Listing publish / search visibility — directly under Quick Actions */}
+            {!isPropertyArchived(property) && (
+              <SCard className="p-4">
+                {!usesVisibilityToggle(property) ? (
+                  (() => {
+                    const complianceGaps = getPropertyComplianceGaps(property);
+                    const complianceComplete = complianceGaps.length === 0;
+                    const needsAccountVerification =
+                      publishMissing.includes("photo_id") ||
+                      publishMissing.includes("proof_of_address");
+                    return (
+                  <div className="text-center py-1">
+                    <div
+                      className="w-12 h-12 rounded-[14px] flex items-center justify-center mx-auto mb-3"
+                      style={{ background: "#f1f5f9" }}
+                    >
+                      <EyeOff size={22} className="text-[#64748b]" />
+                    </div>
+                    <p
+                      className="text-[14px] font-bold text-[#1e293b] mb-1"
+                      style={{ fontFamily: "Archivo,sans-serif" }}
+                    >
+                      Not published
+                    </p>
+                    <p className="text-[12.5px] text-[#64748b] mb-4 leading-relaxed">
+                      Saved privately in your portfolio. Tenants will not see this listing in property
+                      searches until you publish it.
+                    </p>
+                    {!complianceComplete && (
+                      <div className="mb-4 text-left rounded-[12px] border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                        <p
+                          className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-0.5"
+                          style={{ fontFamily: "Archivo,sans-serif" }}
+                        >
+                          Compliance Status
+                        </p>
+                        <ComplianceStatusList
+                          property={property}
+                          latestDocOfType={latestDocOfType}
+                        />
+                      </div>
+                    )}
+                    {visibilityError && (
+                      <p className="text-[12px] text-[#b91c1c] mb-3">{visibilityError}</p>
+                    )}
+                    {complianceComplete && needsAccountVerification && (
+                      <div className="mb-3 text-left">
+                        <AccountVerificationPanel onUpdated={() => void refreshPublishReadiness()} />
+                      </div>
+                    )}
+                    {complianceComplete ? (
+                      <button
+                        type="button"
+                        disabled={visibilitySaving}
+                        onClick={() => setVisibilityConfirm("public")}
+                        className="w-full h-[42px] rounded-[12px] flex items-center justify-center gap-2 text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60"
+                        style={{
+                          background: "#DC5F12",
+                          fontFamily: "Archivo,sans-serif",
+                          boxShadow: "0 3px 10px rgba(220,95,18,0.25)",
+                        }}
+                      >
+                        {visibilitySaving ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                          <CheckCircle size={15} />
+                        )}
+                        {visibilitySaving ? "Publishing…" : "Publish listing"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("documents")}
+                        className="w-full h-[42px] rounded-[12px] flex items-center justify-center gap-2 text-[13px] font-semibold text-white transition-all hover:opacity-90"
+                        style={{
+                          background: "#136C9E",
+                          fontFamily: "Archivo,sans-serif",
+                          boxShadow: "0 3px 10px rgba(19,108,158,0.25)",
+                        }}
+                      >
+                        <ShieldCheck size={15} />
+                        Manage Compliance
+                      </button>
+                    )}
+                  </div>
+                    );
+                  })()
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p
+                          className="text-[14px] font-bold text-[#1e293b] mb-1"
+                          style={{ fontFamily: "Archivo,sans-serif" }}
+                        >
+                          Show in property searches
+                        </p>
+                        <p className="text-[12.5px] text-[#64748b] leading-relaxed">
+                          {isPublishedListing(property)
+                            ? isShownInPropertySearch(property)
+                              ? "This vacant listing is visible to tenants in Proptii search."
+                              : "Visible in search while status is Vacant. Toggle off to hide it anytime."
+                            : "Hidden from tenant search. Toggle on to show this listing again."}
+                        </p>
+                        {isPublishedListing(property) && property.status !== "vacant" && (
+                          <p className="text-[11.5px] text-[#b45309] mt-2">
+                            Mark as Vacant for it to appear in searches.
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isPublishedListing(property)}
+                        disabled={visibilitySaving}
+                        onClick={() => {
+                          if (isPublishedListing(property)) {
+                            setVisibilityConfirm("private");
+                            return;
+                          }
+                          const gaps = getPropertyComplianceGaps(property);
+                          if (gaps.length > 0) {
+                            setVisibilityError(
+                              `Upload required compliance before showing in search: ${formatMissingVerification(gaps)}.`,
+                            );
+                            setActiveTab("documents");
+                            return;
+                          }
+                          setVisibilityConfirm("public");
+                        }}
+                        className="shrink-0 w-[52px] h-[30px] rounded-full relative transition-colors disabled:opacity-60"
+                        style={{
+                          background: isPublishedListing(property) ? "#136C9E" : "#cbd5e1",
+                        }}
+                        aria-label={
+                          isPublishedListing(property)
+                            ? "Hide from property searches"
+                            : "Show in property searches"
+                        }
+                      >
+                        <span
+                          className="absolute top-[3px] w-6 h-6 rounded-full bg-white shadow transition-all flex items-center justify-center"
+                          style={{ left: isPublishedListing(property) ? "22px" : "4px" }}
+                        >
+                          {visibilitySaving ? (
+                            <Loader2 size={12} className="animate-spin text-[#64748b]" />
+                          ) : isPublishedListing(property) ? (
+                            <Eye size={12} className="text-[#136C9E]" />
+                          ) : (
+                            <EyeOff size={12} className="text-[#94a3b8]" />
+                          )}
+                        </span>
+                      </button>
+                    </div>
+                    {!isPublishedListing(property) &&
+                      (publishMissing.includes("photo_id") ||
+                        publishMissing.includes("proof_of_address")) && (
+                        <>
+                          <p className="text-[12px] text-[#b91c1c] text-left leading-relaxed">
+                            Still needed to show in search:{" "}
+                            {formatMissingVerification(
+                              publishMissing.filter(
+                                (m) => m === "photo_id" || m === "proof_of_address",
+                              ),
+                            )}
+                            .
+                          </p>
+                          <AccountVerificationPanel onUpdated={() => void refreshPublishReadiness()} />
+                        </>
+                      )}
+                    {visibilityError && (
+                      <p className="text-[12px] text-[#b91c1c]">{visibilityError}</p>
+                    )}
+                  </div>
+                )}
+              </SCard>
+            )}
+
             {/* Current Tenant */}
             {(property.status === "occupied" || property.tenant) && property.tenant && (
               <SCard className="overflow-hidden">
@@ -1788,61 +2179,14 @@ export function PropertyDetails({
               </SCard>
             )}
 
-            {/* Compliance Status — mirrors Add Property compliance checklist */}
+            {/* Compliance Status — shown here when not already embedded in Not published */}
+            {(usesVisibilityToggle(property) ||
+              getPropertyComplianceGaps(property).length === 0) && (
             <SCard className="p-4">
               <p className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8] mb-3 px-1" style={{ fontFamily: "Archivo,sans-serif" }}>
                 Compliance Status
               </p>
-              <ul className="space-y-2.5">
-                {COMPLIANCE_UPLOAD_ITEMS.map((item) => {
-                  const doc = latestDocOfType(item.key);
-                  const ok = Boolean(doc);
-                  return (
-                    <li key={item.key} className="flex items-center justify-between gap-2">
-                      <span className="text-[12.5px] text-[#334155] truncate">{item.title}</span>
-                      <span
-                        className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                        style={{
-                          background: ok ? "#ecfdf5" : "#f1f5f9",
-                          color: ok ? "#047857" : "#64748b",
-                          fontFamily: "Archivo,sans-serif",
-                        }}
-                      >
-                        {ok ? "Uploaded" : "Missing"}
-                      </span>
-                    </li>
-                  );
-                })}
-                {(() => {
-                  const takes = property.takesDeposit;
-                  const depositOk =
-                    takes === "no" ||
-                    (takes === "yes" &&
-                      Boolean(property.depositProtectionConfirmed) &&
-                      Number(property.depositAmount) > 0);
-                  return (
-                    <li className="flex items-center justify-between gap-2">
-                      <span className="text-[12.5px] text-[#334155] truncate">Deposit</span>
-                      <span
-                        className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                        style={{
-                          background: depositOk ? "#ecfdf5" : "#f1f5f9",
-                          color: depositOk ? "#047857" : "#64748b",
-                          fontFamily: "Archivo,sans-serif",
-                        }}
-                      >
-                        {takes === "no"
-                          ? "No deposit"
-                          : depositOk
-                            ? "Confirmed"
-                            : takes === "yes"
-                              ? "Incomplete"
-                              : "Not set"}
-                      </span>
-                    </li>
-                  );
-                })()}
-              </ul>
+              <ComplianceStatusList property={property} latestDocOfType={latestDocOfType} />
               <button
                 type="button"
                 onClick={() => setActiveTab("documents")}
@@ -1852,6 +2196,7 @@ export function PropertyDetails({
                 Manage compliance →
               </button>
             </SCard>
+            )}
 
             {/* Property Summary */}
             <SCard className="p-4">
@@ -1865,6 +2210,7 @@ export function PropertyDetails({
                   ["Bathrooms", typeof (property as any).bathrooms === "number" ? String((property as any).bathrooms) : "—"],
                   ["Square footage", typeof (property as any).squareFootage === "number" ? `${(property as any).squareFootage} sq ft` : "—"],
                   ["Monthly rent", `£${(property.rent ?? 0).toLocaleString()}`],
+                  ["Search", isShownInPropertySearch(property) ? "Live in search" : "Hidden"],
                   ["Photos", String(validPhotos.length)],
                   ["Documents", String((property.documents ?? []).length)],
                 ].map(([label, value]) => (
@@ -1974,6 +2320,50 @@ export function PropertyDetails({
         onClose={() => { setIsDocUploadOpen(false); setDocUploadError(null); }}
         onUpload={handleDocUpload}
       />
+
+      {/* ── Listing visibility confirm ───────────────────────────────────── */}
+      <Dialog
+        open={visibilityConfirm != null}
+        onOpenChange={(open) => {
+          if (!open && !visibilitySaving) setVisibilityConfirm(null);
+        }}
+      >
+        <DialogContent className="rounded-[20px] max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "Archivo,sans-serif" }}>
+              {visibilityConfirm === "public"
+                ? "Show in property searches?"
+                : "Hide from property searches?"}
+            </DialogTitle>
+            <DialogDescription>
+              {visibilityConfirm === "public"
+                ? "Tenants will be able to find this listing in Proptii search (while status is Vacant)."
+                : "This listing will stay in your portfolio but tenants will no longer see it in search."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              disabled={visibilitySaving}
+              onClick={() => setVisibilityConfirm(null)}
+              className="px-4 py-2 rounded-[10px] border border-[#e2e8f0] text-[13px] font-semibold text-[#64748b] hover:bg-[#f1f5f9] transition-all disabled:opacity-60"
+            >
+              No
+            </button>
+            <button
+              type="button"
+              disabled={visibilitySaving || !visibilityConfirm}
+              onClick={() => {
+                if (visibilityConfirm) void applyListingVisibility(visibilityConfirm);
+              }}
+              className="px-4 py-2 rounded-[10px] text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60"
+              style={{ background: "#DC5F12", fontFamily: "Archivo,sans-serif" }}
+            >
+              {visibilitySaving ? "Updating…" : "Yes"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Change Tenant Dialog ─────────────────────────────────────────── */}
       <Dialog open={showChangeTenantDialog} onOpenChange={setShowChangeTenantDialog}>

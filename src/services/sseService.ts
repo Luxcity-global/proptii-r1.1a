@@ -14,12 +14,31 @@ type SseListener = (event: SseMessagePayload) => void;
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+/**
+ * EventSource holds a connection open for the life of the stream. Browsers allow
+ * ~6 HTTP/1.1 connections per host — if SSE shares the Vite origin (`/api` proxy)
+ * with normal XHR/fetch, duplicate streams starve dashboard GETs (10s timeouts
+ * while Nest never sees the request). Prefer a direct Nest URL in local DEV.
+ */
+function getSseApiBaseUrl(): string {
+  const base = getResolvedApiBaseUrl().replace(/\/$/, '');
+  if (base.startsWith('/') && typeof window !== 'undefined') {
+    const nest = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://127.0.0.1:3002')
+      .trim()
+      .replace(/\/$/, '')
+      .replace(/\/\/localhost(?=[:/])/gi, '//127.0.0.1');
+    return nest.endsWith('/api') ? nest : `${nest}/api`;
+  }
+  return base;
+}
+
 class SseService {
   private sources: Map<string, EventSource> = new Map();
   private listeners: Map<string, Set<SseListener>> = new Map();
   private reconnectTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private reconnectAttempts: Map<string, number> = new Map();
-  private isConnecting: Map<string, boolean> = new Map();
+  /** In-flight connect promises — prevents duplicate EventSources (race on await token). */
+  private connecting: Map<string, Promise<EventSource | null>> = new Map();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -96,20 +115,29 @@ class SseService {
    * Uses an opaque SSE ticket for the communication channel where supported.
    */
   async ensureConnected(channel: string): Promise<EventSource | null> {
-    if (this.sources.has(channel)) {
-      return this.sources.get(channel)!;
+    const existing = this.sources.get(channel);
+    if (existing && existing.readyState !== EventSource.CLOSED) {
+      return existing;
     }
 
-    if (this.isConnecting.get(channel)) {
-      return null;
-    }
+    const inFlight = this.connecting.get(channel);
+    if (inFlight) return inFlight;
 
     if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
       return null;
     }
 
+    const connectPromise = this.openChannel(channel);
+    this.connecting.set(channel, connectPromise);
+    try {
+      return await connectPromise;
+    } finally {
+      this.connecting.delete(channel);
+    }
+  }
+
+  private async openChannel(channel: string): Promise<EventSource | null> {
     // Pre-flight auth check: do NOT open an SSE connection without a valid token.
-    // This prevents 401 Unauthorized errors and infinite reconnect loops before login.
     let token: string | null = null;
     try {
       token = await getAccessTokenForApiRequest();
@@ -118,21 +146,26 @@ class SseService {
     }
 
     if (!token) {
-      // User is not authenticated yet — defer connection until login
       return null;
     }
 
-    this.isConnecting.set(channel, true);
+    // Re-check after await — another caller may have connected meanwhile
+    const existing = this.sources.get(channel);
+    if (existing && existing.readyState !== EventSource.CLOSED) {
+      return existing;
+    }
 
     try {
-      const baseUrl = getResolvedApiBaseUrl().replace(/\/$/, '');
+      const baseUrl = getSseApiBaseUrl();
       let sseUrl: string;
 
       // For communication, exchange the Bearer token for a short-lived opaque ticket
       if (channel === 'communication') {
         let ticket: string | null = null;
         try {
-          const ticketRes = await fetch(`${baseUrl}/communication/sse-ticket`, {
+          // Ticket exchange can use same-origin /api (does not hold a long-lived slot)
+          const ticketBase = getResolvedApiBaseUrl().replace(/\/$/, '');
+          const ticketRes = await fetch(`${ticketBase}/communication/sse-ticket`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -154,6 +187,10 @@ class SseService {
         sseUrl = `${baseUrl}/${channel}/events?token=${encodeURIComponent(token)}`;
       }
 
+      if (import.meta.env.DEV) {
+        console.debug(`[SSE:${channel}] connecting → ${baseUrl}/${channel}/events`);
+      }
+
       const source = new EventSource(sseUrl);
 
       source.onopen = () => {
@@ -165,7 +202,6 @@ class SseService {
         }
       };
 
-      // Register addEventListener for every named event type
       const handleRawEvent = (eventType: string) => (msgEvent: MessageEvent) => {
         try {
           const raw = typeof msgEvent.data === 'string' ? JSON.parse(msgEvent.data) : msgEvent.data;
@@ -190,7 +226,6 @@ class SseService {
       ];
       namedEventTypes.forEach(type => source.addEventListener(type, handleRawEvent(type)));
 
-      // Fallback for unnamed events
       source.onmessage = (event) => {
         try {
           const parsed: SseMessagePayload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
@@ -212,8 +247,6 @@ class SseService {
       console.debug(`[SSE:${channel}] Connection error:`, err);
       this.scheduleReconnect(channel);
       return null;
-    } finally {
-      this.isConnecting.set(channel, false);
     }
   }
 
@@ -281,6 +314,7 @@ class SseService {
   disconnectAll(): void {
     this.sources.forEach(source => source.close());
     this.sources.clear();
+    this.connecting.clear();
     this.reconnectTimers.forEach(timer => clearTimeout(timer));
     this.reconnectTimers.clear();
     this.reconnectAttempts.clear();

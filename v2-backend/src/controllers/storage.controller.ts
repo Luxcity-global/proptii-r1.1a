@@ -1,12 +1,14 @@
 import {
   Controller,
   Post,
+  Get,
   Delete,
   UseInterceptors,
   UploadedFile,
   Body,
   Query,
   Req,
+  Res,
   BadRequestException,
   ForbiddenException,
   HttpCode,
@@ -28,6 +30,18 @@ export interface MulterUploadedFile {
   destination?: string;
   filename?: string;
   path?: string;
+}
+
+function isStaffUser(req: any): boolean {
+  if (req.user?.role === 'admin' || req.user?.admin === true) return true;
+  const email = String(req.user?.email || '').toLowerCase().trim();
+  if (!email) return false;
+  const raw = `${process.env.ADMIN_EMAILS || ''},${process.env.ADMIN_EMAIL || ''}`;
+  const adminEmails = raw
+    .split(/[,;\s]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.includes('@'));
+  return adminEmails.includes(email);
 }
 
 @ApiTags('Storage')
@@ -72,13 +86,84 @@ export class StorageController {
     // Sanitize folder against path traversal
     const safeFolder = requestedFolder.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '');
     const userId = req.user?.uid || 'user';
-    
-    // Automatically scope document uploads to the authenticated user's namespace
-    const targetFolder = safeFolder.startsWith('properties') 
-      ? safeFolder 
-      : `${safeFolder}/${userId}`;
 
-    return await this.storageService.uploadFile(file, targetFolder);
+    const isVerificationFolder =
+      safeFolder.includes('verification') ||
+      /\/(photo_id|proof_of_address|eicr|deposit-protection)(\/|$)/i.test(safeFolder);
+
+    // C1: verification docs must never land under publicly readable properties/
+    if (isVerificationFolder && safeFolder.startsWith('properties')) {
+      throw new BadRequestException(
+        'Verification documents must be uploaded under documents/{uid}/…, not properties/',
+      );
+    }
+
+    let targetFolder: string;
+    if (isVerificationFolder) {
+      // Force private documents/{uid}/… path (reuse existing storage.rules)
+      const rest = safeFolder.replace(/^documents\/?/, '').replace(new RegExp(`^${userId}/?`), '');
+      targetFolder = `documents/${userId}/${rest || 'verification'}`.replace(/\/+/g, '/');
+    } else if (safeFolder.startsWith('properties')) {
+      targetFolder = safeFolder;
+    } else if (safeFolder.startsWith(`documents/${userId}`)) {
+      targetFolder = safeFolder;
+    } else {
+      targetFolder = `${safeFolder}/${userId}`;
+    }
+
+    const result = await this.storageService.uploadFile(file, targetFolder);
+
+    // For verification uploads, prefer storagePath for authenticated download (C1)
+    if (isVerificationFolder) {
+      return {
+        ...result,
+        storagePath: result.fullPath,
+        // Keep url for backwards compatibility but clients should use /storage/download
+      };
+    }
+
+    return result;
+  }
+
+  /**
+   * GET /api/storage/download?path=documents/{uid}/…
+   * Owner or staff only. Used for C1 verification files (no public token reliance).
+   */
+  @Get('download')
+  @UseGuards(FirebaseAuthGuard)
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @ApiOperation({ summary: 'Authenticated download for private documents/{uid}/ files' })
+  @ApiQuery({ name: 'path', description: 'Storage object path' })
+  @ApiResponse({ status: 200, description: 'File bytes' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  async downloadFile(
+    @Req() req: any,
+    @Res() res: any,
+    @Query('path') filePath: string,
+  ) {
+    if (!filePath) {
+      throw new BadRequestException('Path parameter is required');
+    }
+
+    const safePath = decodeURIComponent(filePath).replace(/\.\./g, '').replace(/^\/+/, '');
+    const userId = req.user?.uid;
+    const staff = isStaffUser(req);
+
+    if (!safePath.startsWith('documents/')) {
+      throw new ForbiddenException('Only documents/ paths can be downloaded via this endpoint');
+    }
+
+    const ownerMatch = safePath.match(/^documents\/([^/]+)\//);
+    const ownerId = ownerMatch?.[1];
+    if (!staff && (!userId || ownerId !== userId)) {
+      throw new ForbiddenException('You do not have permission to download this file.');
+    }
+
+    const { buffer, contentType, fileName } = await this.storageService.downloadFile(safePath);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(buffer);
   }
 
   @Delete('file')
@@ -101,7 +186,7 @@ export class StorageController {
     // Sanitize path against directory traversal
     const safePath = rawPath.replace(/\.\./g, '').replace(/^\/+/, '');
     const userId = req.user?.uid;
-    const isAdmin = req.user?.role === 'admin' || req.user?.admin === true;
+    const isAdmin = isStaffUser(req);
 
     // Enforce ownership: standard users may only delete files in their own user directory.
     // Exception: files under 'properties/documents/' are portfolio documents — any authenticated

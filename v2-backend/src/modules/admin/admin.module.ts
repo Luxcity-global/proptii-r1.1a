@@ -16,9 +16,10 @@ import { SheetsService } from '../../services/sheets.service';
 import { BackupService } from '../../services/backup.service';
 import { GdprPurgeService } from '../../services/gdpr-purge.service';
 import { LeadsModule } from '../../leads/leads.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [LeadsModule],
+  imports: [LeadsModule, AuthModule],
   controllers: [
     HealthController,
     AdminDashboardController,

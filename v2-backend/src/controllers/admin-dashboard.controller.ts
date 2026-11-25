@@ -6,6 +6,7 @@ import { AdminGuard } from '../guards/admin.guard';
 import { AdminDashboardService } from '../services/admin-dashboard.service';
 import { BackupService } from '../services/backup.service';
 import { GdprPurgeService } from '../services/gdpr-purge.service';
+import { UserProfileService } from '../services/user-profile.service';
 
 export class AddAdminNoteDto {
   @ApiProperty({ description: 'Note content' })
@@ -28,6 +29,7 @@ export class AdminDashboardController {
     private readonly adminDashboard: AdminDashboardService,
     private readonly backupService: BackupService,
     private readonly gdprPurgeService: GdprPurgeService,
+    private readonly userProfileService: UserProfileService,
   ) {}
 
   @Get('me')
@@ -94,6 +96,14 @@ export class AdminDashboardController {
   @ApiResponse({ status: 200, description: 'Partner metrics' })
   partners(@Req() req: any) {
     return this.adminDashboard.partners(req.user?.email || 'unknown');
+  }
+
+  /** C1 — read-only list of landlord verification submissions */
+  @Get('verifications')
+  @ApiOperation({ summary: 'List landlord account verification submissions (photo ID / proof of address)' })
+  @ApiResponse({ status: 200, description: 'Read-only verification submission rows' })
+  listVerifications() {
+    return this.userProfileService.listVerificationSubmissions(200);
   }
 
   // ── Phase 5: Disaster Recovery & Backup ───────────────────────────────────

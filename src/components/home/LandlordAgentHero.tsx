@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, ChevronUp, FileSignature, LayoutDashboard, PlusCircle, Search, UserPlus, type LucideIcon,
+  ChevronUp, FileSignature, LayoutDashboard, PlusCircle, Search, UserPlus, type LucideIcon,
 } from 'lucide-react';
 import { SearchInput } from '../SearchInput';
 
@@ -95,11 +95,10 @@ export const LandlordAgentHero = ({
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto">
           <Link
             to={primaryTarget}
-            className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full font-bold text-base md:text-lg text-white bg-gradient-to-r from-[#DC5F12] to-[#F47A1A] shadow-lg shadow-orange-900/30 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+            className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full font-bold text-base md:text-lg text-white bg-gradient-to-r from-[#DC5F12] to-[#F47A1A] shadow-lg shadow-orange-900/30 hover:shadow-xl hover:-translate-y-0.5 transition-all"
           >
             {isSignedIn && <LayoutDashboard className="w-5 h-5" aria-hidden />}
             {isSignedIn ? 'Go to dashboard' : 'Get started'}
-            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </Link>
           <button
             type="button"

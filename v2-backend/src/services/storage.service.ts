@@ -157,4 +157,22 @@ export class StorageService {
       return true; // Optimistic deletion
     }
   }
+
+  /** Authenticated download for private documents/{uid}/ paths (C1 verification). */
+  async downloadFile(filePath: string): Promise<{ buffer: Buffer; contentType: string; fileName: string }> {
+    const bucket = this.getBucket();
+    const fileRef = bucket.file(filePath);
+    const [exists] = await fileRef.exists();
+    if (!exists) {
+      throw new BadRequestException('File not found');
+    }
+    const [buffer] = await fileRef.download();
+    const [metadata] = await fileRef.getMetadata();
+    const contentType = metadata?.contentType || 'application/octet-stream';
+    const fileName =
+      metadata?.metadata?.originalName ||
+      filePath.split('/').pop() ||
+      'download';
+    return { buffer, contentType, fileName: String(fileName) };
+  }
 }

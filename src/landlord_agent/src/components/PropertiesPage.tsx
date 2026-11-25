@@ -49,6 +49,7 @@ import { MobileAccordionCard } from '../../../components/common/MobileAccordionC
 import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
 import { countPortfolio, isUnitOccupied, isPropertyArchived } from '../utils/portfolioStats';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
+import { getAmenityLabel } from '../../../shared/propertyCatalogue';
 import '../styles/propertiesPage.css';
 
 interface PropertiesPageProps {
@@ -79,7 +80,7 @@ interface PropertiesPageProps {
 
 type FilterTab = 'all' | 'attention' | 'vacant' | 'expiring' | 'drafts' | 'archived';
 type ViewMode = 'table' | 'grid';
-type DisplayStatus = 'occupied' | 'vacant' | 'expiring' | 'renovation' | 'archived';
+type DisplayStatus = 'occupied' | 'vacant' | 'expiring' | 'renovation' | 'draft' | 'archived';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
@@ -181,6 +182,8 @@ function statusLabel(status: DisplayStatus): string {
       return 'Rent Expiring';
     case 'renovation':
       return 'Under Renovation';
+    case 'draft':
+      return 'Draft';
     case 'archived':
       return 'Archived';
     default:
@@ -384,8 +387,14 @@ export function PropertiesPage({
       tenants || [],
     );
 
+  const isDraft = (property: Property) =>
+    !isPropertyArchived(property) && (property.status as string) === 'draft';
+
   const isVacant = (property: Property, tenant?: Tenant) =>
-    !isPropertyArchived(property) && !isOccupied(property, tenant) && property.status !== 'under-renovation';
+    !isPropertyArchived(property) &&
+    !isDraft(property) &&
+    !isOccupied(property, tenant) &&
+    property.status !== 'under-renovation';
 
   const isLeaseExpiring = (tenant?: Tenant, withinDays = 90) => {
     if (!tenant || tenant.status !== 'active') return false;
@@ -395,6 +404,7 @@ export function PropertiesPage({
 
   const displayStatus = (property: Property, tenant?: Tenant): DisplayStatus => {
     if (isPropertyArchived(property)) return 'archived';
+    if (isDraft(property)) return 'draft';
     if (isLeaseExpiring(tenant, 90)) return 'expiring';
     if (isOccupied(property, tenant)) return 'occupied';
     if (property.status === 'under-renovation') return 'renovation';
@@ -599,6 +609,7 @@ export function PropertiesPage({
       if (leaseStatusFilter === 'occupied') matchesLease = occupied && !expiring;
       else if (leaseStatusFilter === 'vacant') matchesLease = vacant;
       else if (leaseStatusFilter === 'expiring') matchesLease = expiring;
+      else if (leaseStatusFilter === 'draft') matchesLease = isDraft(property);
 
       let matchesPayment = true;
       if (paymentFilter === 'overdue') matchesPayment = pay === 'overdue';
@@ -833,6 +844,7 @@ export function PropertiesPage({
     if (property.id === latestId) return { label: '★ Latest', className: 'latest' };
     if (highestRent > 0 && property.rent === highestRent) return { label: '★ Highest Rent', className: 'highest' };
     if (status === 'expiring') return { label: '★ Expiring Soon', className: 'expiring' };
+    if (status === 'draft') return { label: 'Draft', className: 'draft' };
     if (status === 'vacant') return { label: '★ Vacant', className: 'vacant' };
     return null;
   };
@@ -1112,6 +1124,7 @@ export function PropertiesPage({
                 { value: 'occupied', label: 'Occupied' },
                 { value: 'expiring', label: 'Rent Expiring' },
                 { value: 'vacant', label: 'Vacant' },
+                { value: 'draft', label: 'Draft' },
                 { value: 'archived', label: 'Archived' },
               ]}
             />
@@ -1456,6 +1469,7 @@ export function PropertiesPage({
                         </div>
                       )}
                     {badge && <div className={`ll-props-badge ${badge.className}`}>{badge.label}</div>}
+                    {status === 'draft' && <div className="ll-props-vacant-overlay" style={{ background: 'rgba(71, 85, 105, 0.78)' }}>Draft</div>}
                     {status === 'vacant' && <div className="ll-props-vacant-overlay">Vacant</div>}
                     {status === 'archived' && <div className="ll-props-vacant-overlay" style={{ background: 'rgba(51, 65, 85, 0.85)' }}>Archived</div>}
                     <button
@@ -1490,20 +1504,26 @@ export function PropertiesPage({
                       <div className="ll-props-card-tags">
                         {property.amenities.slice(0, 3).map((tag) => (
                           <span key={tag} className="ll-props-tag">
-                            {tag}
+                            {getAmenityLabel(tag)}
                           </span>
                         ))}
                     </div>
                     )}
-                    <div className={`ll-props-tenant-box ${status === 'renovation' ? 'vacant' : status}`}>
-                      {status === 'vacant' || status === 'renovation' || status === 'archived' ? (
+                    <div className={`ll-props-tenant-box ${status === 'renovation' || status === 'draft' ? 'vacant' : status}`}>
+                      {status === 'vacant' || status === 'renovation' || status === 'archived' || status === 'draft' ? (
                         <>
                           <div className="ll-props-tenant-label">
-                            <span className="dot" style={{ width: 6, height: 6, borderRadius: 99, background: '#94a3b8', display: 'inline-block' }} />
-                            {status === 'archived' ? 'Archived' : status === 'renovation' ? 'Under renovation' : 'Vacant'}
+                            <span className="dot" style={{ width: 6, height: 6, borderRadius: 99, background: status === 'draft' ? '#64748b' : '#94a3b8', display: 'inline-block' }} />
+                            {status === 'archived' ? 'Archived' : status === 'renovation' ? 'Under renovation' : status === 'draft' ? 'Draft' : 'Vacant'}
                     </div>
                           <div style={{ color: '#64748b', marginTop: 4 }}>
-                            {status === 'archived' ? 'Property is currently archived.' : status === 'renovation' ? 'Property is currently being renovated.' : 'No current tenant'}
+                            {status === 'archived'
+                              ? 'Property is currently archived.'
+                              : status === 'renovation'
+                                ? 'Property is currently being renovated.'
+                                : status === 'draft'
+                                  ? 'Saved as draft — not live on the market.'
+                                  : 'No current tenant'}
                           </div>
                         </>
                       ) : (

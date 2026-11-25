@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { Property } from '../types/property';
+import { getAmenityLabel } from '../shared/propertyCatalogue';
 
 export interface DynamicFeature {
   id: string;
@@ -257,7 +258,14 @@ function cleanAmenityString(str: string): string {
 export function getPropertyDynamicFeatures(property: Property): DynamicFeature[] {
   const fullText = `${property.title || ''} ${property.description || ''} ${property.propertyType || ''}`;
   const rawAmenities: string[] = (property.amenities || [])
-    .map((a: any) => cleanAmenityString(typeof a === 'string' ? a : (a?.description || a?.title || '')))
+    .map((a: any) => {
+      if (typeof a === 'string') {
+        // Catalogue ids → human labels; free-text amenities stay as cleaned strings
+        const labelled = getAmenityLabel(a);
+        return cleanAmenityString(labelled === a ? a.replace(/[_-]+/g, ' ') : labelled);
+      }
+      return cleanAmenityString(a?.description || a?.title || '');
+    })
     .filter(Boolean);
 
   const matchedFeatures: DynamicFeature[] = [];

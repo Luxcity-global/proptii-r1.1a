@@ -1,9 +1,13 @@
 import { PropsWithChildren, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { trackPageView, isAnalyticsEnabled } from '../../utils/analytics';
+import { trackPageView, isAnalyticsEnabled, initAnalytics } from '../../utils/analytics';
 
 export const AnalyticsProvider = ({ children }: PropsWithChildren) => {
   const location = useLocation();
+
+  useEffect(() => {
+    void initAnalytics();
+  }, []);
 
   useEffect(() => {
     if (!isAnalyticsEnabled()) return;

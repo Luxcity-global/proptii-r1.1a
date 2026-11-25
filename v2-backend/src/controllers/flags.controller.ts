@@ -52,19 +52,26 @@ import { getRedisClient } from '../utils/redis-client';
 export class FlagsResponseDto {
   @ApiProperty({ description: 'Whether the government data layer is enabled' })
   gov_data_layer: boolean;
+
+  @ApiProperty({ description: 'Whether C1 soft verification gate is enforced on publish' })
+  c1_verification_gate: boolean;
 }
 
-// Response type — deliberately minimal (not a flag collection, just one toggle)
 export interface FlagsResponse {
-  /**
-   * Whether the R1.4 government data layer is active.
-   * false = all R1.4 endpoints should be treated as unavailable by the frontend.
-   */
   gov_data_layer: boolean;
+  c1_verification_gate: boolean;
 }
 
-const FLAGS_CACHE_KEY = 'flags:gov_data_layer';
+const FLAGS_CACHE_KEY = 'flags:runtime_bundle_v3';
 const FLAGS_CACHE_TTL = 60; // seconds — propagation window after a Firestore flip
+
+/** Env override for C1 — same contract as ReadyToPublishService.isGateEnabled(). */
+function c1GateFromEnv(): boolean | null {
+  const env = process.env.C1_VERIFICATION_GATE ?? process.env.FLAG_C1_VERIFICATION_GATE;
+  if (env === 'true' || env === '1') return true;
+  if (env === 'false' || env === '0') return false;
+  return null;
+}
 
 @ApiTags('Runtime Flags')
 @Controller()
@@ -76,53 +83,61 @@ export class FlagsController {
   /**
    * GET /api/flags
    *
-   * Returns the current state of all R1.4 runtime feature flags.
+   * Response: { "gov_data_layer": true, "c1_verification_gate": false }
    *
-   * Response: { "gov_data_layer": true }
-   *
-   * Always HTTP 200. On Firestore error, defaults to true (fail-open)
-   * to avoid a Firestore outage looking like a deliberate rollback.
+   * Always HTTP 200. gov_data_layer fails open (default true).
+   * c1_verification_gate fails closed (default false) so current publish behaviour is preserved.
+   * Local/staging: `C1_VERIFICATION_GATE=true|false` overrides Firestore + Redis cache
+   * so FE Publish disable stays in sync with server enforcement.
    */
   @Get('flags')
   @ApiOperation({ summary: 'Get runtime feature flags (zero-deploy kill-switches)' })
   @ApiResponse({ status: 200, type: FlagsResponseDto, description: 'Runtime flags state' })
   async getFlags(): Promise<FlagsResponse> {
-    // ── 1. Check Redis cache (60s TTL) ────────────────────────────────────────
+    const c1Env = c1GateFromEnv();
+
     const cached = await this.getCached();
-    if (cached !== null) {
-      this.logger.debug(`[Flags] Cache hit → gov_data_layer=${cached}`);
-      return { gov_data_layer: cached };
+    if (cached) {
+      const payload =
+        c1Env === null ? cached : { ...cached, c1_verification_gate: c1Env };
+      this.logger.debug(`[Flags] Cache hit → ${JSON.stringify(payload)}`);
+      return payload;
     }
 
-    // ── 2. Read from Firestore ────────────────────────────────────────────────
-    const enabled = await this.factsStore.isGovDataLayerEnabled();
-    this.logger.log(`[Flags] Firestore read → gov_data_layer=${enabled}`);
-
-    // ── 3. Write to Redis cache ───────────────────────────────────────────────
-    await this.setCached(enabled);
-
-    return { gov_data_layer: enabled };
+    const [gov, c1Firestore] = await Promise.all([
+      this.factsStore.isGovDataLayerEnabled(),
+      this.factsStore.isRuntimeFlagEnabled('c1_verification_gate', false),
+    ]);
+    const payload: FlagsResponse = {
+      gov_data_layer: gov,
+      c1_verification_gate: c1Env ?? c1Firestore,
+    };
+    this.logger.log(`[Flags] Firestore/env read → ${JSON.stringify(payload)}`);
+    await this.setCached(payload);
+    return payload;
   }
 
-  // ── Redis helpers ──────────────────────────────────────────────────────────
-
-  private async getCached(): Promise<boolean | null> {
+  private async getCached(): Promise<FlagsResponse | null> {
     try {
       const redis = getRedisClient();
       const raw = await redis.get(FLAGS_CACHE_KEY);
       if (raw === null) return null;
-      return raw === 'true';
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.gov_data_layer === 'boolean' && typeof parsed?.c1_verification_gate === 'boolean') {
+        return parsed as FlagsResponse;
+      }
+      return null;
     } catch {
-      return null; // cache miss on error — fall through to Firestore
+      return null;
     }
   }
 
-  private async setCached(value: boolean): Promise<void> {
+  private async setCached(value: FlagsResponse): Promise<void> {
     try {
       const redis = getRedisClient();
-      await redis.set(FLAGS_CACHE_KEY, String(value), 'EX', FLAGS_CACHE_TTL);
+      await redis.set(FLAGS_CACHE_KEY, JSON.stringify(value), 'EX', FLAGS_CACHE_TTL);
     } catch {
-      // non-fatal — Firestore read already succeeded
+      // non-fatal
     }
   }
 }

@@ -3531,6 +3531,11 @@ export function AppContent() {
               const res = await fetch(`${apiBase}/storage/upload`, { method: 'POST', headers, body: fd });
               if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
               const { url } = await res.json() as { url: string };
+              const prop = properties.find((p) => p.id === propertyId);
+              const epcRating =
+                doc.type === 'epc'
+                  ? String((doc as any).epcRating || prop?.epcRating || '').trim() || undefined
+                  : undefined;
               const newDoc: Omit<PropertyDocument, 'id'> = {
                 name: doc.name,
                 type: doc.type as PropertyDocument['type'],
@@ -3538,6 +3543,7 @@ export function AppContent() {
                 issueDate: new Date(),
                 expiryDate: doc.expiryDate ? new Date(doc.expiryDate) : undefined,
                 status: 'valid',
+                ...(epcRating ? { epcRating } : {}),
               };
               addDocumentToProperty(propertyId, newDoc);
               await propertyService.addDocumentToProperty(propertyId, newDoc);

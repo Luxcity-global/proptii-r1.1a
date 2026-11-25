@@ -70,14 +70,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     if (!response.headersSent) {
-      response.status(status).json({
+      const payload: Record<string, unknown> = {
         statusCode: status,
         error: errorType,
         message: clientMessage,
         correlationId,
         path: request.url,
         timestamp: new Date().toISOString(),
-      });
+      };
+      // Preserve structured fields from BadRequestException objects (e.g. C1 missing[]).
+      if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+        const er = exceptionResponse as Record<string, unknown>;
+        if (er.code != null) payload.code = er.code;
+        if (Array.isArray(er.missing)) payload.missing = er.missing;
+      }
+      response.status(status).json(payload);
     }
   }
 }

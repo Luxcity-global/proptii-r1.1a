@@ -25,7 +25,8 @@ interface FreeTrialOfferProps {
 }
 
 const AUTO_OPEN_SESSION_KEY = 'proptii_free_trial_offer_seen';
-const AUTO_OPEN_DELAY_MS = 800;
+/** Delay auto-open so the offer doesn't block first paint / navigation. */
+const AUTO_OPEN_DELAY_MS = 60_000;
 
 const HIGHLIGHTS: { label: string; icon: LucideIcon }[] = [
   { label: 'Search properties', icon: Search },

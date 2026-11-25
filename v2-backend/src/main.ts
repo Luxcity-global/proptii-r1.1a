@@ -191,6 +191,9 @@ async function bootstrap() {
     'http://localhost:5173',
     'http://localhost:5176',
     'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5176',
+    'http://127.0.0.1:3000',
   ];
   const envOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
@@ -207,7 +210,7 @@ async function bootstrap() {
       ) {
         return callback(null, true);
       }
-      if (!isProd && /^http:\/\/localhost:\d+$/.test(origin)) {
+      if (!isProd && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
         return callback(null, true);
       }
       return callback(null, false);

@@ -57,7 +57,10 @@ const CookiePolicy: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold text-[#374957] mb-4">3. Analytics</h2>
               <p className="text-gray-600">
-                <span className="font-semibold text-[#374957]">Not used at present.</span> We do not set Google Analytics cookies. You can use Proptii without analytics cookies. A later update will let you opt in if we turn analytics on in the future.
+                With your consent, we use Google Analytics 4 (GA4) to understand how people use Proptii
+                (for example page views and feature usage). Analytics cookies are only set after you
+                choose <span className="font-semibold text-[#374957]">Accept analytics</span> on the
+                cookie notice. You can use the site with essential storage only.
               </p>
             </div>
 

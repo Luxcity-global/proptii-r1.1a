@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import { UprnMatchService } from '../gov-data/services/uprn-match.service';
 import { getRedisClient } from '../utils/redis-client';
 import { ReadyToPublishService } from './ready-to-publish.service';
+import { isPubliclySearchable } from '../utils/listing-visibility';
 
 function isPropertyAuthorized(existing: any, userId?: string, userEmail?: string): boolean {
   if (!existing) return false;
@@ -79,20 +80,30 @@ export interface PaginatedSearchOptions {
 @Injectable()
 export class NativePropertiesService {
   constructor(
+    private readonly readyToPublish: ReadyToPublishService,
     @Optional() private readonly uprnMatchService?: UprnMatchService,
-    @Optional() private readonly readyToPublish?: ReadyToPublishService,
   ) {}
 
-  /** C1: reject writes that would make a property publicly searchable without verification. */
+  /** Reject writes that would make a property publicly searchable without compliance / verification. */
   private async assertReadyToPublishOrThrow(
     landlordId: string,
     propertyId: string | undefined,
     nextStatus: string | undefined | null,
     previousStatus: string | undefined | null,
     documentsHint?: any[],
+    nextVisibility?: string | null,
+    previousVisibility?: string | null,
   ) {
-    if (!this.readyToPublish) return;
-    if (!this.readyToPublish.wouldBecomeSearchable(nextStatus, previousStatus)) return;
+    if (
+      !this.readyToPublish.wouldBecomeSearchable(
+        nextStatus,
+        previousStatus,
+        nextVisibility,
+        previousVisibility,
+      )
+    ) {
+      return;
+    }
 
     const result = await this.readyToPublish.check(landlordId, propertyId, documentsHint);
     if (result.ok) return;
@@ -205,12 +216,16 @@ export class NativePropertiesService {
         );
       }
 
+      // C2: exclude private / non-searchable listings from public search.
+      docs = docs.filter((d: any) => isPubliclySearchable(d));
+
       return { results: docs, nextCursor, total: docs.length };
     } catch (err: any) {
       console.warn('[NativePropertiesService] Firestore searchPublicPaginated fallback:', err?.message || err);
       // Fallback to basic query if composite index is pending
       const fallbackSnapshot = await col.limit(limitNum).get();
       let fallbackDocs = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      fallbackDocs = fallbackDocs.filter((d: any) => isPubliclySearchable(d));
       return { results: fallbackDocs, nextCursor: null, total: fallbackDocs.length };
     }
   }
@@ -283,12 +298,16 @@ export class NativePropertiesService {
 
     try {
       const landlordId = data.landlordId || data.userId;
+      // C2: new listings are private unless explicitly published to search.
+      const listingVisibility = data?.listingVisibility === 'public' ? 'public' : 'private';
       await this.assertReadyToPublishOrThrow(
         landlordId,
         undefined,
         data?.status,
         undefined,
         data?.documents,
+        listingVisibility,
+        undefined,
       );
 
       const docRef = col.doc();
@@ -321,6 +340,8 @@ export class NativePropertiesService {
       const propertyData = {
         ...data,
         id: docRef.id,
+        listingVisibility,
+        ...(listingVisibility === 'public' ? { listingEverPublished: true } : {}),
         uprn: resolvedUprn,
         price: rentAmount || data?.price,
         rentAmount: rentAmount || data?.price,
@@ -375,12 +396,18 @@ export class NativePropertiesService {
       nextStatus = cleanedData.status || 'vacant';
     }
     const landlordId = existing?.landlordId || existing?.userId || userId;
+    const nextVisibility =
+      cleanedData.listingVisibility !== undefined && cleanedData.listingVisibility !== null
+        ? cleanedData.listingVisibility
+        : existing?.listingVisibility;
     await this.assertReadyToPublishOrThrow(
       landlordId,
       id,
       nextStatus,
       existing?.status,
       cleanedData.documents ?? existing?.documents,
+      nextVisibility,
+      existing?.listingVisibility,
     );
 
     const mergedBeds = cleanedData.bedrooms !== undefined ? cleanedData.bedrooms : existing?.bedrooms;
@@ -390,11 +417,21 @@ export class NativePropertiesService {
       console.warn(`[NativePropertiesService] Property update specification anomaly: ${specWarning}`);
     }
 
-    const updatedData = {
+    const updatedData: Record<string, any> = {
       ...cleanedData,
       specificationWarning: specWarning || null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
+
+    // Once published, keep a sticky flag so the FE can show the visibility toggle
+    // even after the listing is later hidden from search.
+    if (
+      String(nextVisibility || '').toLowerCase() === 'public' ||
+      existing?.listingEverPublished === true ||
+      String(existing?.listingVisibility || '').toLowerCase() === 'public'
+    ) {
+      updatedData.listingEverPublished = true;
+    }
 
     if (cleanedData.status === 'vacant' || cleanedData.tenantId === null) {
       updatedData.status = cleanedData.status || 'vacant';

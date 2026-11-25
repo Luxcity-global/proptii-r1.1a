@@ -1,11 +1,14 @@
 /**
  * Single source of truth for the backend base URL used by axios (VITE_API_URL).
  *
- * In dev, if you open the app at http://localhost:5173 but VITE_API_URL points at
- * a deployed host (e.g. onrender.com), the browser will hit production and often
- * fail CORS. We default to local Nest unless VITE_USE_REMOTE_API=true.
+ * In local DEV we prefer same-origin `/api` so Vite's proxy forwards to Nest on
+ * :3002. That avoids cross-origin CORS/preflight flakiness that was causing
+ * browser uploads and dashboard GETs to hang while curl to :3002 worked.
+ *
+ * Set VITE_USE_REMOTE_API=true to call a remote/staging API from localhost.
  */
-const LOCAL_DEFAULT = 'http://127.0.0.1:3002/api';
+const LOCAL_PROXY = '/api';
+const LOCAL_ABSOLUTE = 'http://127.0.0.1:3002/api';
 
 function isBrowserLocalhost(): boolean {
   if (typeof window === 'undefined') return false;
@@ -14,7 +17,7 @@ function isBrowserLocalhost(): boolean {
 }
 
 function isRemoteUrl(url: string): boolean {
-  return url.length > 0 && !/localhost|127\.0\.0\.1/i.test(url);
+  return url.length > 0 && !/localhost|127\.0\.0\.1/i.test(url) && !url.startsWith('/');
 }
 
 export function getResolvedApiBaseUrl(): string {
@@ -26,19 +29,21 @@ export function getResolvedApiBaseUrl(): string {
     ''
   ).trim().replace(/\/$/, '');
 
-  const forceLocalBecauseRemoteEnvWhileOnLocalhost =
+  const useRemoteFromLocalhost =
     import.meta.env.DEV &&
     isBrowserLocalhost() &&
-    isRemoteUrl(envUrl) &&
-    import.meta.env.VITE_USE_REMOTE_API !== 'true';
+    import.meta.env.VITE_USE_REMOTE_API === 'true' &&
+    isRemoteUrl(envUrl);
 
-  if (forceLocalBecauseRemoteEnvWhileOnLocalhost) {
-    console.warn(
-      '[api] DEV on localhost: using local backend at',
-      LOCAL_DEFAULT,
-      '— VITE_API_URL points at a remote API. Set VITE_USE_REMOTE_API=true in .env to call that URL from localhost.',
-    );
-    return LOCAL_DEFAULT;
+  if (useRemoteFromLocalhost) {
+    let resolved = envUrl;
+    if (!resolved.endsWith('/api')) resolved = `${resolved}/api`;
+    return resolved;
+  }
+
+  // Local Vite + Nest: same-origin proxy (see vite.config.ts server.proxy['/api'])
+  if (import.meta.env.DEV && isBrowserLocalhost()) {
+    return LOCAL_PROXY;
   }
 
   if (envUrl) {
@@ -50,7 +55,7 @@ export function getResolvedApiBaseUrl(): string {
   }
 
   if (import.meta.env.DEV) {
-    return LOCAL_DEFAULT;
+    return LOCAL_ABSOLUTE;
   }
 
   return '/api';

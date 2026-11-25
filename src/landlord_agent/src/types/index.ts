@@ -108,6 +108,13 @@ export interface Property {
   squareFootage?: number;
   rent: number;
   status: 'vacant' | 'occupied' | 'under-renovation' | 'draft' | 'archived';
+  /**
+   * C2 — whether this listing appears in tenant property search.
+   * Orthogonal to occupancy status. New properties default to private.
+   */
+  listingVisibility?: 'private' | 'public';
+  /** Sticky after first publish — keeps visibility toggle when later hidden from search. */
+  listingEverPublished?: boolean;
   amenities: string[];
   notes: string;
   /** Public listing description shown to renters/buyers */

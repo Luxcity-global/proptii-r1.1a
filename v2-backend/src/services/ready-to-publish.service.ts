@@ -1,7 +1,10 @@
 /**
- * C1 — shared "ready to publish" check.
+ * C1 / C2 — shared "ready to publish" check.
  * Single source of truth for publish gates (native-properties write path + FE messaging).
- * When runtime flag `c1_verification_gate` is off, always returns ok (current behaviour preserved).
+ *
+ * Property compliance docs (gas / EICR / EPC / deposit) are always required to publish
+ * into tenant search. Account verification (photo ID / proof of address) is required
+ * only when runtime flag `c1_verification_gate` is on.
  */
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as admin from 'firebase-admin';
@@ -34,12 +37,26 @@ function hasDocOfType(docs: any[], type: string): boolean {
   return docs.some((d) => String(d?.type || '').toLowerCase() === type.toLowerCase());
 }
 
-function hasEpcWithRating(docs: any[]): boolean {
+/** Exported for unit tests — EPC file + rating on doc or property. */
+export function hasEpcWithRating(docs: any[], propertyLike?: any): boolean {
+  const propertyRating = String(propertyLike?.epcRating || propertyLike?.rating || '').trim();
+  const hasEpcDoc = docs.some((d) => String(d?.type || '').toLowerCase() === 'epc');
+  if (!hasEpcDoc) return false;
+  // Accept rating on the EPC document (preferred) or on the property record
+  // (Property Details UI saves the dropdown to property.epcRating).
+  if (propertyRating.length > 0) return true;
   return docs.some((d) => {
     if (String(d?.type || '').toLowerCase() !== 'epc') return false;
     const rating = d?.epcRating ?? d?.rating;
     return typeof rating === 'string' && rating.trim().length > 0;
   });
+}
+
+function hasDepositSatisfied(propertyLike: any, docs: any[]): boolean {
+  const takes = String(propertyLike?.takesDeposit || '').toLowerCase();
+  if (takes === 'no') return true;
+  if (propertyLike?.depositProtectionConfirmed === true) return true;
+  return hasDocOfType(docs, 'deposit-protection');
 }
 
 @Injectable()
@@ -80,52 +97,52 @@ export class ReadyToPublishService {
 
   /**
    * True when a write would make the property appear in public vacant search.
+   * C2: also true when turning listingVisibility to public (unless draft/archived/private).
    */
   wouldBecomeSearchable(
     nextStatus: string | undefined | null,
     previousStatus?: string | null,
+    nextVisibility?: string | null,
+    previousVisibility?: string | null,
   ): boolean {
     const next = (nextStatus || '').toLowerCase();
+    const nextVis =
+      nextVisibility == null || nextVisibility === ''
+        ? null
+        : String(nextVisibility).toLowerCase();
+    const prevVis =
+      previousVisibility == null || previousVisibility === ''
+        ? null
+        : String(previousVisibility).toLowerCase();
+
+    if (nextVis === 'private') return false;
+    if (next === 'draft' || next === 'archived') return false;
+
+    if (nextVis === 'public' && prevVis !== 'public') {
+      return true;
+    }
+
+    // Legacy status-only path (unchanged for callers that omit visibility).
     if (next !== 'vacant') return false;
-    if (previousStatus === undefined || previousStatus === null) return true; // create as vacant
+    if (previousStatus === undefined || previousStatus === null) return true;
     return String(previousStatus).toLowerCase() !== 'vacant';
   }
 
   async check(landlordId: string, propertyId?: string, propertyDocsHint?: any[]): Promise<ReadyToPublishResult> {
     const gateEnabled = await this.isGateEnabled();
-    if (!gateEnabled) {
-      return { ok: true, missing: [], gateEnabled: false };
-    }
-
     const missing: VerificationMissingItem[] = [];
     const db = this.db;
 
-    // Account-level: users.verification
-    let verification: any = {};
-    if (db && landlordId) {
-      try {
-        const userSnap = await db.collection('users').doc(landlordId).get();
-        verification = (userSnap.data() as any)?.verification || {};
-      } catch (err: any) {
-        this.logger.warn(`[C1] user verification read failed: ${err?.message || err}`);
-      }
-    }
-
-    if (!verification?.photoId?.storagePath && !verification?.photoId?.submittedAt) {
-      missing.push('photo_id');
-    }
-    if (!verification?.proofOfAddress?.storagePath && !verification?.proofOfAddress?.submittedAt) {
-      missing.push('proof_of_address');
-    }
-
-    // Property-level docs: property.documents + landlord_documents for this property
+    // Property-level docs: always required to publish into tenant search.
+    let propertyData: any = {};
     let docs: any[] = Array.isArray(propertyDocsHint) ? [...propertyDocsHint] : [];
 
     if (db && propertyId) {
       try {
         const propSnap = await db.collection('properties').doc(propertyId).get();
         if (propSnap.exists) {
-          const propDocs = (propSnap.data() as any)?.documents;
+          propertyData = propSnap.data() || {};
+          const propDocs = propertyData?.documents;
           if (Array.isArray(propDocs)) docs = [...docs, ...propDocs];
         }
       } catch (err: any) {
@@ -145,12 +162,34 @@ export class ReadyToPublishService {
 
     for (const type of PROPERTY_REQUIRED) {
       if (type === 'epc') {
-        if (!hasEpcWithRating(docs)) missing.push('epc');
+        if (!hasEpcWithRating(docs, propertyData)) missing.push('epc');
+      } else if (type === 'deposit-protection') {
+        if (!hasDepositSatisfied(propertyData, docs)) missing.push('deposit-protection');
       } else if (!hasDocOfType(docs, type)) {
         missing.push(type);
       }
     }
 
-    return { ok: missing.length === 0, missing, gateEnabled: true };
+    // Account-level verification only when C1 flag is on.
+    if (gateEnabled) {
+      let verification: any = {};
+      if (db && landlordId) {
+        try {
+          const userSnap = await db.collection('users').doc(landlordId).get();
+          verification = (userSnap.data() as any)?.verification || {};
+        } catch (err: any) {
+          this.logger.warn(`[C1] user verification read failed: ${err?.message || err}`);
+        }
+      }
+
+      if (!verification?.photoId?.storagePath && !verification?.photoId?.submittedAt) {
+        missing.push('photo_id');
+      }
+      if (!verification?.proofOfAddress?.storagePath && !verification?.proofOfAddress?.submittedAt) {
+        missing.push('proof_of_address');
+      }
+    }
+
+    return { ok: missing.length === 0, missing, gateEnabled };
   }
 }

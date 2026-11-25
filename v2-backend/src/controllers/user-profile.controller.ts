@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
@@ -116,6 +117,62 @@ export class UserProfileController {
   @ApiResponse({ status: 200, description: 'Company profile saved' })
   async updateCompanyProfile(@Req() req: any, @Body() body: any) {
     return this.userProfileService.updateProfile(req.user.uid, { companyProfile: body });
+  }
+
+  /** GET /api/users/me/verification — C1 account-level soft verification status */
+  @Get(['users/me/verification', 'users/profile/verification'])
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Get own landlord verification (photo ID + proof of address)' })
+  @ApiResponse({ status: 200, description: 'Verification status without public download URLs' })
+  async getOwnVerification(@Req() req: any) {
+    return this.userProfileService.getVerification(req.user.uid);
+  }
+
+  /** PUT /api/users/me/verification/:kind — submit/replace photo_id or proof_of_address */
+  @Put(['users/me/verification/:kind', 'users/profile/verification/:kind'])
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Upsert account-level verification document metadata' })
+  @ApiParam({ name: 'kind', description: 'photo_id | proof_of_address' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['storagePath', 'fileName'],
+      properties: {
+        storagePath: { type: 'string' },
+        fileName: { type: 'string' },
+        contentType: { type: 'string' },
+      },
+    },
+  })
+  async upsertOwnVerification(
+    @Req() req: any,
+    @Param('kind') kind: string,
+    @Body() body: { storagePath?: string; fileName?: string; contentType?: string },
+  ) {
+    const normalised = String(kind || '').toLowerCase().replace(/-/g, '_');
+    const field =
+      normalised === 'photo_id' || normalised === 'photoid'
+        ? 'photoId'
+        : normalised === 'proof_of_address' || normalised === 'proofofaddress'
+          ? 'proofOfAddress'
+          : null;
+    if (!field) {
+      throw new BadRequestException('kind must be photo_id or proof_of_address');
+    }
+    if (!body?.storagePath || !body?.fileName) {
+      throw new BadRequestException('storagePath and fileName are required');
+    }
+    try {
+      return await this.userProfileService.upsertVerificationItem(req.user.uid, field, {
+        storagePath: body.storagePath,
+        fileName: body.fileName,
+        contentType: body.contentType,
+      });
+    } catch (err: any) {
+      throw new BadRequestException(err?.message || 'Invalid verification upload');
+    }
   }
 
   @Put('users/:id')

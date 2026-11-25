@@ -28,15 +28,16 @@ function messageFromResponse(status: number, errText: string, fallback: string):
     try {
         const errJson = JSON.parse(errText);
         const raw = errJson.message ?? errJson;
+        const topMissing = Array.isArray(errJson.missing) ? errJson.missing.join(', ') : '';
         // Nest BadRequestException may nest C1 payload: { message, missing, code }
         if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-            const missing = Array.isArray(raw.missing) ? raw.missing.join(', ') : '';
+            const missing = Array.isArray(raw.missing) ? raw.missing.join(', ') : topMissing;
             const text = typeof raw.message === 'string' ? raw.message : fallback;
             errMsg = missing ? `${text} Missing: ${missing}` : text;
         } else if (Array.isArray(raw)) {
             errMsg = raw.join(', ');
         } else if (typeof raw === 'string') {
-            errMsg = raw;
+            errMsg = topMissing ? `${raw} Missing: ${topMissing}` : raw;
         }
     } catch {
         if (errText) errMsg = errText;
@@ -113,6 +114,19 @@ function mapFromApi(data: any): Property {
         squareFootage: data.squareFootage,
         rent: data.rent ?? data.rentAmount ?? data.price ?? 0,
         status: data.status ?? 'vacant',
+        listingVisibility:
+          data.listingVisibility === 'public' || data.listingVisibility === 'private'
+            ? data.listingVisibility
+            : undefined,
+        listingEverPublished: Boolean(data.listingEverPublished) || data.listingVisibility === 'public',
+        takesDeposit:
+          data.takesDeposit === 'yes' || data.takesDeposit === 'no' ? data.takesDeposit : null,
+        depositAmount: data.depositAmount ?? '',
+        depositProtectionConfirmed: Boolean(data.depositProtectionConfirmed),
+        depositProtectedBy:
+          data.depositProtectedBy === 'landlord' || data.depositProtectedBy === 'agent'
+            ? data.depositProtectedBy
+            : null,
         amenities: data.amenities ?? [],
         notes: data.notes ?? '',
         description: data.description ?? '',
@@ -208,6 +222,24 @@ function mapToApi(property: Omit<Property, 'id' | 'createdAt' | 'tenant'>): Reco
         photos,
         documents: property.documents ?? [],
         status: property.status ?? 'vacant',
+        ...(p.listingVisibility === 'public' || p.listingVisibility === 'private'
+          ? { listingVisibility: p.listingVisibility }
+          : {}),
+        ...(typeof p.listingEverPublished === 'boolean'
+          ? { listingEverPublished: p.listingEverPublished }
+          : {}),
+        ...(p.takesDeposit === 'yes' || p.takesDeposit === 'no'
+          ? { takesDeposit: p.takesDeposit }
+          : {}),
+        ...(p.depositAmount != null && p.depositAmount !== ''
+          ? { depositAmount: p.depositAmount }
+          : {}),
+        ...(typeof p.depositProtectionConfirmed === 'boolean'
+          ? { depositProtectionConfirmed: p.depositProtectionConfirmed }
+          : {}),
+        ...(p.depositProtectedBy === 'landlord' || p.depositProtectedBy === 'agent'
+          ? { depositProtectedBy: p.depositProtectedBy }
+          : {}),
         archived: Boolean(p.archived ?? (property.status === 'archived')),
         isArchived: Boolean(p.isArchived ?? p.archived ?? (property.status === 'archived')),
     };
@@ -297,14 +329,7 @@ class PropertyService {
         });
         if (!res.ok) {
             const errText = await res.text().catch(() => '');
-            let errMsg = `Failed to update property in database (HTTP ${res.status})`;
-            try {
-                const errJson = JSON.parse(errText);
-                if (errJson.message) errMsg = Array.isArray(errJson.message) ? errJson.message.join(', ') : errJson.message;
-            } catch {
-                if (errText) errMsg = errText;
-            }
-            throw new Error(errMsg);
+            throw new Error(messageFromResponse(res.status, errText, 'Failed to update property in database'));
         }
     }
 

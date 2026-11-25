@@ -1,4 +1,17 @@
 import type { PropertyTypeCategory } from '../types/filter';
+import {
+  getSearchCategoryForSubtype,
+  resolveClassificationFromStoredType,
+} from '../shared/propertyCatalogue';
+
+/** Normalise amenity ids/labels for keyword matching (underscores → spaces). */
+function amenityMatchText(am: unknown): string {
+  const raw =
+    typeof am === 'string'
+      ? am
+      : (am as any)?.description || (am as any)?.title || (am as any)?.label || '';
+  return String(raw).toLowerCase().replace(/[_-]+/g, ' ');
+}
 
 /**
  * Extracts a numeric monthly price in GBP from raw scraped price strings.
@@ -80,6 +93,18 @@ export function categorizePropertyType(
   const type = (typeStr || '').toLowerCase().trim();
   const title = (titleStr || '').toLowerCase().trim();
 
+  // Prefer structured UK catalogue classification when available
+  if (typeStr) {
+    const resolved = resolveClassificationFromStoredType(typeStr);
+    if (resolved) {
+      const searchCat = getSearchCategoryForSubtype(resolved.subtypeId);
+      if (searchCat === 'flat' || searchCat === 'house' || searchCat === 'studio' || searchCat === 'bungalow') {
+        return searchCat;
+      }
+      // shared / commercial / land are not filter buckets — fall through to heuristics
+    }
+  }
+
   // If typeStr is specific, prioritize it; otherwise combine type + title
   const target = (type && type !== 'property' && type !== 'residential') ? type : `${type} ${title}`;
 
@@ -157,12 +182,13 @@ export function extractFurnishingStatus(
  */
 export function hasParkingFeature(text: string | undefined | null): boolean {
   if (!text) return false;
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().replace(/[_-]+/g, ' ');
   return (
     lower.includes('parking') || 
     lower.includes('garage') || 
     lower.includes('allocated parking') || 
     lower.includes('driveway') ||
+    lower.includes('carport') ||
     lower.includes('resident permit')
   );
 }
@@ -172,13 +198,15 @@ export function hasParkingFeature(text: string | undefined | null): boolean {
  */
 export function hasBalconyOrGardenFeature(text: string | undefined | null): boolean {
   if (!text) return false;
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().replace(/[_-]+/g, ' ');
   return (
     lower.includes('balcony') || 
     lower.includes('garden') || 
     lower.includes('terrace') || 
     lower.includes('patio') ||
     lower.includes('roof terrace') ||
+    lower.includes('decking') ||
+    lower.includes('courtyard') ||
     lower.includes('communal garden')
   );
 }
@@ -200,10 +228,10 @@ export function extractPetPolicy(
   text: string | undefined | null,
   amenities?: string[] | null
 ): PetPolicy {
-  // 1. Check amenities array
+  // 1. Check amenities array (supports catalogue ids like pet-friendly / pets_considered)
   if (Array.isArray(amenities)) {
     for (const am of amenities) {
-      const lowerAm = (typeof am === 'string' ? am : (am as any)?.description || (am as any)?.title || '').toLowerCase();
+      const lowerAm = amenityMatchText(am);
       if (/\b(no\s+pets?|not\s+allowed|forbidden)\b/i.test(lowerAm)) {
         return 'forbidden';
       }
@@ -253,15 +281,17 @@ export function hasBillsIncludedFeature(
 ): boolean {
   if (Array.isArray(amenities)) {
     for (const am of amenities) {
-      const lowerAm = (typeof am === 'string' ? am : (am as any)?.description || (am as any)?.title || '').toLowerCase();
-      if (/\b(bills?\s+(inc|inclusive|included)|all\s+bills|utilities\s+included)\b/i.test(lowerAm)) {
+      const lowerAm = amenityMatchText(am);
+      if (
+        /\b(bills?\s+(inc|inclusive|included)|all\s+bills|utilities\s+included|bills included|all inclusive|wifi included|electricity included|gas included|water included|council tax included)\b/i.test(lowerAm)
+      ) {
         return true;
       }
     }
   }
 
   if (!text) return false;
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().replace(/[_-]+/g, ' ');
   return (
     /\b(bills?\s+(inc|inclusive|included)|all\s+bills\s+(inc|inclusive|included)|utilities\s+included|utility\s+bills\s+(covered|included)|gas\s+and\s+elec(tric)?\s+included)\b/i.test(lower) ||
     /\b(includes?|including)\s+(all\s+bills|utility\s+bills|electricity|utilities|water)\b/i.test(lower)

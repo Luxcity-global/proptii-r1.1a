@@ -1,9 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  denyAnalyticsConsent,
+  grantAnalyticsConsent,
+  trackPageView,
+} from '../utils/analytics';
 
 const KEY = 'proptii_cookie_notice_dismissed';
 
 export function CookieNotice() {
+  const location = useLocation();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -14,7 +20,7 @@ export function CookieNotice() {
     }
   }, []);
 
-  const dismiss = useCallback(() => {
+  const dismissNotice = useCallback(() => {
     try {
       localStorage.setItem(KEY, '1');
     } catch {
@@ -23,16 +29,28 @@ export function CookieNotice() {
     setOpen(false);
   }, []);
 
+  const acceptEssentialOnly = useCallback(() => {
+    denyAnalyticsConsent();
+    dismissNotice();
+  }, [dismissNotice]);
+
+  const acceptAll = useCallback(async () => {
+    await grantAnalyticsConsent();
+    dismissNotice();
+    const path = `${location.pathname}${location.search}`;
+    trackPageView(path);
+  }, [dismissNotice, location.pathname, location.search]);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        dismiss();
+        acceptEssentialOnly();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, dismiss]);
+  }, [open, acceptEssentialOnly]);
 
   if (!open) return null;
 
@@ -44,24 +62,34 @@ export function CookieNotice() {
     >
       <p className="opacity-90 max-w-3xl">
         <span>
-          We only use cookies and browser storage that are needed to run Proptii
-          (sign-in and the forms you submit).
+          We use essential cookies and browser storage to run Proptii (sign-in and the forms you
+          submit).
         </span>
         <span className="block">
-          We do not use analytics cookies. Read our{' '}
+          With your consent, we also use Google Analytics to understand how the site is used. Read
+          our{' '}
           <Link to="/cookie-policy" className="underline hover:text-gray-200">
             Cookie Policy
           </Link>
           .
         </span>
       </p>
-      <button
-        type="button"
-        onClick={dismiss}
-        className="shrink-0 px-4 py-2 bg-[#2C5B81] hover:bg-[#3A6B91] rounded text-white font-medium transition-colors"
-      >
-        OK
-      </button>
+      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={acceptEssentialOnly}
+          className="px-4 py-2 border border-white/30 hover:bg-white/10 rounded text-white font-medium transition-colors"
+        >
+          Essential only
+        </button>
+        <button
+          type="button"
+          onClick={() => void acceptAll()}
+          className="px-4 py-2 bg-[#2C5B81] hover:bg-[#3A6B91] rounded text-white font-medium transition-colors"
+        >
+          Accept analytics
+        </button>
+      </div>
     </div>
   );
 }

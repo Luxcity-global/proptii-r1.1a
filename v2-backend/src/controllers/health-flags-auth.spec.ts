@@ -29,6 +29,7 @@ describe('Section 1 & 2: Health, Runtime Flags & Auth Endpoints', () => {
     beforeEach(() => {
       mockFactsStore = {
         isGovDataLayerEnabled: vi.fn(),
+        isRuntimeFlagEnabled: vi.fn().mockResolvedValue(false),
       };
       flagsController = new FlagsController(mockFactsStore);
     });
@@ -36,14 +37,14 @@ describe('Section 1 & 2: Health, Runtime Flags & Auth Endpoints', () => {
     it('[GET /flags] returns gov_data_layer true when enabled', async () => {
       mockFactsStore.isGovDataLayerEnabled.mockResolvedValue(true);
       const res = await flagsController.getFlags();
-      expect(res).toEqual({ gov_data_layer: true });
+      expect(res).toEqual({ gov_data_layer: true, c1_verification_gate: false });
       expect(mockFactsStore.isGovDataLayerEnabled).toHaveBeenCalled();
     });
 
     it('[GET /flags] returns gov_data_layer false when disabled', async () => {
       mockFactsStore.isGovDataLayerEnabled.mockResolvedValue(false);
       const res = await flagsController.getFlags();
-      expect(res).toEqual({ gov_data_layer: false });
+      expect(res).toEqual({ gov_data_layer: false, c1_verification_gate: false });
     });
   });
 

@@ -48,6 +48,7 @@ import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 import { documentService, LandlordDocument } from '../services/documentService';
+import { AccountVerificationPanel } from './AccountVerificationPanel';
 import { MobileAccordionCard } from '../../../components/common/MobileAccordionCard';
 import '../styles/documentsPage.css';
 
@@ -2001,6 +2002,10 @@ export function DocumentsPage({
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="ll-docs-inner" style={{ marginTop: 16, marginBottom: 8 }}>
+          <AccountVerificationPanel />
         </div>
 
         {documentStats.expired > 0 && (

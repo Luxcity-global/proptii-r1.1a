@@ -120,7 +120,7 @@ export function matchKeywords(property: Property, keywords: string): boolean {
     property.location,
     property.description,
     property.propertyType,
-    ...(property.amenities || []),
+    ...(property.amenities || []).map((a) => String(a).replace(/[_-]+/g, ' ')),
   ]
     .filter(Boolean)
     .join(' ')
@@ -171,7 +171,7 @@ export function matchFurnishing(
     property.title,
     property.description,
     property.propertyType,
-    ...(property.amenities || []),
+    ...(property.amenities || []).map((a) => String(a).replace(/[_-]+/g, ' ')),
   ].filter(Boolean).join(' ');
 
   const status = extractFurnishingStatus(combinedText);
@@ -188,7 +188,7 @@ export function matchParking(property: Property, required: boolean): boolean {
     property.title,
     property.description,
     property.propertyType,
-    ...(property.amenities || []),
+    ...(property.amenities || []).map((a) => String(a).replace(/[_-]+/g, ' ')),
   ].filter(Boolean).join(' ');
 
   return hasParkingFeature(combinedText);
@@ -203,7 +203,7 @@ export function matchBalconyOrGarden(property: Property, required: boolean): boo
     property.title,
     property.description,
     property.propertyType,
-    ...(property.amenities || []),
+    ...(property.amenities || []).map((a) => String(a).replace(/[_-]+/g, ' ')),
   ].filter(Boolean).join(' ');
 
   return hasBalconyOrGardenFeature(combinedText);

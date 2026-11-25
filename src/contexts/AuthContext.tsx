@@ -15,6 +15,7 @@ import { notifyAuthReady } from '../services/authReady';
 import userService from '../services/userService';
 import EditProfileModal from '../components/profile/EditProfileModal';
 import { resolveMockTestUser } from '../data/mockTestUsers';
+import { resolveRole } from '../services/roleService';
 
 
 
@@ -189,10 +190,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         sessionManager.updateActivity('authentication', 'Session initialized via Firebase');
       }
 
-      // Asynchronously resolve role in the background without blocking login
+      // Resolve role in the background without blocking login.
+      // Static import — dynamic import() was failing after Vite HMR/env reloads
+      // ("Failed to fetch dynamically imported module: roleService.ts"), which
+      // left roles empty and bounced landlords to /select-role.
       void (async () => {
         try {
-          const { resolveRole } = await import('../services/roleService');
           const role = await resolveRole(userId, email);
           if (role && !cancelled) {
             setUser((prev) => (prev ? { ...prev, roles: [role], role: role, roleResolved: true } : prev));
@@ -201,7 +204,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } catch (err) {
           console.warn('[Auth] Role resolution notice:', err);
-          if (!cancelled) {
+          // Prefer cached role over empty so RoleGate doesn't false-redirect
+          const cached = localStorage.getItem(`proptii_role_${userId}`);
+          if (!cancelled && (cached === 'tenant' || cached === 'landlord' || cached === 'agent')) {
+            setUser((prev) =>
+              prev ? { ...prev, roles: [cached], role: cached, roleResolved: true } : prev,
+            );
+          } else if (!cancelled) {
             setUser((prev) => (prev ? { ...prev, roleResolved: true } : prev));
           }
         }

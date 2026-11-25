@@ -1114,6 +1114,14 @@
 
 .ll-props-status.vacant .dot { background: #94a3b8; }
 
+.ll-props-status.draft {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.ll-props-status.draft .dot { background: #64748b; }
+
 .ll-props-status.renovation {
   background: #eff6ff;
   color: #1d4ed8;
@@ -1304,6 +1312,11 @@
   background: rgba(15, 23, 42, 0.75);
   color: #fff;
   backdrop-filter: blur(4px);
+}
+
+.ll-props-badge.draft {
+  background: #475569;
+  color: #fff;
 }
 
 .ll-props-badge.archived {

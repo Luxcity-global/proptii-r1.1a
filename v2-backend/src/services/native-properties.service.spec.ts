@@ -10,7 +10,11 @@ describe('NativePropertiesService Ownership & Persistence', () => {
     vi.restoreAllMocks();
     propertiesMap = new Map();
 
-    service = new NativePropertiesService();
+    const readyToPublish = {
+      wouldBecomeSearchable: vi.fn().mockReturnValue(false),
+      check: vi.fn().mockResolvedValue({ ok: true, missing: [], gateEnabled: false }),
+    };
+    service = new NativePropertiesService(readyToPublish as any);
 
     const mockCollection = {
       doc: (id?: string) => {

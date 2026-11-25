@@ -59,6 +59,99 @@ export class UserProfileService {
     }
   }
 
+  /** C1 — account-level soft verification (photo ID + proof of address). */
+  async getVerification(uid: string): Promise<Record<string, any>> {
+    const profile = await this.getProfile(uid);
+    const verification = (profile as any)?.verification || {};
+    return {
+      photoId: verification.photoId
+        ? {
+            documentType: 'photo_id',
+            storagePath: verification.photoId.storagePath || '',
+            fileName: verification.photoId.fileName || '',
+            contentType: verification.photoId.contentType || '',
+            submittedAt: verification.photoId.submittedAt || null,
+            replacedAt: verification.photoId.replacedAt || null,
+          }
+        : null,
+      proofOfAddress: verification.proofOfAddress
+        ? {
+            documentType: 'proof_of_address',
+            storagePath: verification.proofOfAddress.storagePath || '',
+            fileName: verification.proofOfAddress.fileName || '',
+            contentType: verification.proofOfAddress.contentType || '',
+            submittedAt: verification.proofOfAddress.submittedAt || null,
+            replacedAt: verification.proofOfAddress.replacedAt || null,
+          }
+        : null,
+    };
+  }
+
+  async upsertVerificationItem(
+    uid: string,
+    kind: 'photoId' | 'proofOfAddress',
+    meta: {
+      storagePath: string;
+      fileName: string;
+      contentType?: string;
+    },
+  ) {
+    if (!meta?.storagePath || !String(meta.storagePath).startsWith(`documents/${uid}/`)) {
+      throw new Error('storagePath must be under documents/{uid}/');
+    }
+
+    const existing = await this.getVerification(uid);
+    const prev = (existing as any)[kind];
+    const now = new Date().toISOString();
+    const item = {
+      documentType: kind === 'photoId' ? 'photo_id' : 'proof_of_address',
+      storagePath: meta.storagePath,
+      fileName: meta.fileName || 'document',
+      contentType: meta.contentType || 'application/octet-stream',
+      submittedAt: prev?.submittedAt || now,
+      replacedAt: prev?.submittedAt ? now : undefined,
+    };
+
+    await this.updateProfile(uid, {
+      verification: {
+        ...(existing.photoId ? { photoId: existing.photoId } : {}),
+        ...(existing.proofOfAddress ? { proofOfAddress: existing.proofOfAddress } : {}),
+        [kind]: item,
+      },
+    });
+
+    return this.getVerification(uid);
+  }
+
+  /** Staff read-only: landlords who have any verification submission. */
+  async listVerificationSubmissions(limit = 100): Promise<any[]> {
+    const col = this.usersCol;
+    if (!col) return [];
+    try {
+      const snap = await col.limit(Math.min(Math.max(limit, 1), 500)).get();
+      const rows: any[] = [];
+      for (const doc of snap.docs) {
+        const data = doc.data() || {};
+        const v = data.verification || {};
+        if (!v.photoId && !v.proofOfAddress) continue;
+        rows.push({
+          uid: doc.id,
+          email: data.email || null,
+          name: data.name || data.displayName || null,
+          role: data.role || null,
+          photoIdSubmittedAt: v.photoId?.submittedAt || null,
+          proofOfAddressSubmittedAt: v.proofOfAddress?.submittedAt || null,
+          hasPhotoId: Boolean(v.photoId?.storagePath),
+          hasProofOfAddress: Boolean(v.proofOfAddress?.storagePath),
+        });
+      }
+      return rows;
+    } catch (err: any) {
+      this.logger.warn(`listVerificationSubmissions error: ${err?.message || err}`);
+      return [];
+    }
+  }
+
   async getReviews(propertyId?: string) {
     const col = this.reviewsCol;
     if (!col) return [];
