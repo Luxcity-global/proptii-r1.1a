@@ -89,11 +89,10 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     if (!validatedConfig.FIREBASE_SERVICE_ACCOUNT_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.FIREBASE_CLIENT_EMAIL) {
       missingKeys.push('FIREBASE_SERVICE_ACCOUNT_JSON (or GOOGLE_APPLICATION_CREDENTIALS)');
     }
-    if (!validatedConfig.STRIPE_SECRET_KEY) {
-      missingKeys.push('STRIPE_SECRET_KEY');
-    }
-    if (!validatedConfig.STRIPE_WEBHOOK_SECRET) {
-      missingKeys.push('STRIPE_WEBHOOK_SECRET');
+    if (!validatedConfig.STRIPE_SECRET_KEY || !validatedConfig.STRIPE_WEBHOOK_SECRET) {
+      console.warn(
+        '⚠️  [EnvValidation] STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET not set — Stripe checkout and webhooks are disabled (billing endpoints fail closed).',
+      );
     }
   }
 

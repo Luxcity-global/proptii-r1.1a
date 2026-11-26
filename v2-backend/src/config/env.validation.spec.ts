@@ -44,4 +44,17 @@ describe('validateEnv', () => {
 
     expect(() => validateEnv(config)).toThrow('[EnvValidation] FATAL: Missing critical production environment variables');
   });
+
+  it('allows production boot with a warning when Firebase and Redis are present without Stripe secrets', () => {
+    const config = {
+      NODE_ENV: 'production',
+      PORT: '10000',
+      FIREBASE_SERVICE_ACCOUNT_JSON: '{"project_id":"proptii-16946"}',
+      REDIS_URL: 'redis://red-123:6379',
+    };
+
+    const validated = validateEnv(config);
+    expect(validated.NODE_ENV).toBe(Environment.Production);
+    expect(validated.PORT).toBe(10000);
+  });
 });
