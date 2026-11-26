@@ -23,7 +23,7 @@ function opensTenantPassport(path: string): boolean {
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, login, loginWithEmail, isAuthenticated, isLoading } = useAuth();
+  const { user, login, loginWithEmail, resetPassword, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     sessionStorage.removeItem('redirect_in_progress');
@@ -40,6 +40,10 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [mode, setMode] = useState<'sign-in' | 'forgot-password'>(() =>
+    new URLSearchParams(location.search).get('forgot') === '1' ? 'forgot-password' : 'sign-in',
+  );
+  const [resetSent, setResetSent] = useState(false);
   const [autoLoginTriggered, setAutoLoginTriggered] = useState(false);
   const hasRedirectedRef = useRef(false);
 
@@ -185,6 +189,48 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setError('Please enter the email address for your account.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    setResetSent(false);
+    try {
+      trackEvent('password_reset_requested', { source: 'login' });
+      await resetPassword(email.trim());
+      setResetSent(true);
+    } catch (err: any) {
+      const code = err?.code;
+      // Avoid email enumeration: treat unknown users as a soft success.
+      if (code === 'auth/user-not-found') {
+        setResetSent(true);
+      } else if (code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many reset attempts. Please try again later.');
+      } else {
+        setError(err?.message || 'Could not send a reset email. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openForgotPassword = () => {
+    setMode('forgot-password');
+    setError('');
+    setResetSent(false);
+  };
+
+  const backToSignIn = () => {
+    setMode('sign-in');
+    setError('');
+    setResetSent(false);
+  };
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-50 via-slate-50 to-orange-50 relative overflow-hidden">
       {/* Decorative background elements */}
@@ -196,8 +242,14 @@ export const LoginPage: React.FC = () => {
           <div className="mx-auto flex items-center justify-center mb-5">
             <img src="/images/proptii-logo.png" alt="Proptii Logo" className="h-10 w-auto object-contain" />
           </div>
-          <h1 className="text-3xl font-archive font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-500 font-nunito text-sm">Sign in to continue to your dashboard</p>
+          <h1 className="text-3xl font-archive font-bold text-gray-900 mb-2">
+            {mode === 'forgot-password' ? 'Reset password' : 'Welcome Back'}
+          </h1>
+          <p className="text-gray-500 font-nunito text-sm">
+            {mode === 'forgot-password'
+              ? 'Enter your email and we’ll send a reset link'
+              : 'Sign in to continue to your dashboard'}
+          </p>
         </div>
 
         {error && (
@@ -206,102 +258,166 @@ export const LoginPage: React.FC = () => {
           </Alert>
         )}
 
-        {/* Email + Password Form */}
-        <form onSubmit={handleEmailLogin} className="space-y-4 mb-6">
-          <div>
-            <label htmlFor="login-email" className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
-              Email Address
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. alex@example.com"
-              disabled={submitting}
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all disabled:opacity-50"
-            />
-          </div>
+        {mode === 'forgot-password' ? (
+          <>
+            {resetSent ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 mb-6 text-left">
+                <p className="text-sm font-semibold text-emerald-900 mb-1">Check your email</p>
+                <p className="text-sm text-emerald-800 leading-relaxed">
+                  If an account exists for <span className="font-semibold">{email.trim()}</span>, we’ve
+                  sent a password reset link. It may take a minute to arrive — also check spam.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4 mb-6">
+                <div>
+                  <label
+                    htmlFor="reset-email"
+                    className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide"
+                  >
+                    Email Address
+                  </label>
+                  <input
+                    id="reset-email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. alex@example.com"
+                    disabled={submitting}
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all disabled:opacity-50"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-3.5 px-5 bg-[#DC5F12] hover:bg-[#E65D24] text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+                >
+                  {submitting ? 'Sending…' : 'Send reset link'}
+                </button>
+              </form>
+            )}
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="login-password" className="block text-xs font-bold text-gray-700 uppercase tracking-wide">
-                Password
-              </label>
+            <div className="text-center">
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-xs text-[#136C9E] hover:underline"
+                onClick={backToSignIn}
+                className="text-sm font-semibold text-[#136C9E] hover:underline"
               >
-                {showPassword ? 'Hide' : 'Show'}
+                ← Back to sign in
               </button>
             </div>
-            <input
-              id="login-password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              disabled={submitting}
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all disabled:opacity-50"
-            />
-          </div>
+          </>
+        ) : (
+          <>
+            {/* Email + Password Form */}
+            <form onSubmit={handleEmailLogin} className="space-y-4 mb-6">
+              <div>
+                <label htmlFor="login-email" className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
+                  Email Address
+                </label>
+                <input
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="e.g. alex@example.com"
+                  disabled={submitting}
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all disabled:opacity-50"
+                />
+              </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-3.5 px-5 bg-[#DC5F12] hover:bg-[#E65D24] text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
-          >
-            {submitting ? 'Signing in...' : 'Sign In →'}
-          </button>
-        </form>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="login-password" className="block text-xs font-bold text-gray-700 uppercase tracking-wide">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-xs text-[#136C9E] hover:underline"
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <input
+                  id="login-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  disabled={submitting}
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]/20 focus:border-[#136C9E] transition-all disabled:opacity-50"
+                />
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={openForgotPassword}
+                    className="text-xs font-semibold text-[#136C9E] hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              </div>
 
-        {/* Divider */}
-        <div className="relative my-6 text-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200" />
-          </div>
-          <span className="relative bg-white px-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-            Or
-          </span>
-        </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-3.5 px-5 bg-[#DC5F12] hover:bg-[#E65D24] text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+              >
+                {submitting ? 'Signing in...' : 'Sign In →'}
+              </button>
+            </form>
 
-        {/* Google Login Button */}
-        <div className="space-y-4">
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={submitting}
-            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-200 transition-all duration-200 shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 text-sm"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24">
-              <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
-              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
-              <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c0-.4 0-.8 0-1.4z" />
-              <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
-            </svg>
-            Continue with Google
-          </button>
-        </div>
+            {/* Divider */}
+            <div className="relative my-6 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <span className="relative bg-white px-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                Or
+              </span>
+            </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-gray-500 text-sm">
-            Don't have an account?{' '}
-            <button
-              onClick={() => {
-                const search = location.search;
-                navigate(`/signup${search}`);
-              }}
-              className="text-[#DC5F12] font-bold hover:underline transition-all"
-            >
-              Sign Up
-            </button>
-          </p>
-        </div>
+            {/* Google Login Button */}
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={submitting}
+                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-200 transition-all duration-200 shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 text-sm"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c0-.4 0-.8 0-1.4z" />
+                  <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
+                </svg>
+                Continue with Google
+              </button>
+            </div>
+
+            <div className="mt-8 text-center">
+              <p className="text-gray-500 text-sm">
+                Don't have an account?{' '}
+                <button
+                  onClick={() => {
+                    const search = location.search;
+                    navigate(`/signup${search}`);
+                  }}
+                  className="text-[#DC5F12] font-bold hover:underline transition-all"
+                >
+                  Sign Up
+                </button>
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

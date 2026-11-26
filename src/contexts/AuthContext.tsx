@@ -8,6 +8,7 @@ import {
   updateProfile,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import SessionManager from '../services/SessionManager';
@@ -43,6 +44,8 @@ interface AuthContextType {
   login: () => Promise<void>;
   signupWithEmail: (email: string, password: string, name?: string) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
+  /** Sends a Firebase password-reset email for email/password accounts. */
+  resetPassword: (email: string) => Promise<void>;
   loginAsMockUser: (id: string, role: string) => void;
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
@@ -298,6 +301,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const resetPassword = async (email: string): Promise<void> => {
+    const trimmed = email.trim();
+    if (!trimmed) throw new Error('Please enter your email address.');
+    try {
+      const continueUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/login`
+          : undefined;
+      await sendPasswordResetEmail(
+        auth,
+        trimmed,
+        continueUrl
+          ? { url: continueUrl, handleCodeInApp: false }
+          : undefined,
+      );
+    } catch (err) {
+      console.error('[Auth] Password reset failed:', err);
+      throw err;
+    }
+  };
+
   const logout = async (): Promise<void> => {
     sessionManager.updateActivity('interaction', 'User logout');
     setIsAuthenticated(false);
@@ -398,6 +422,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         signupWithEmail,
         loginWithEmail,
+        resetPassword,
         loginAsMockUser,
         logout,
         editProfile,

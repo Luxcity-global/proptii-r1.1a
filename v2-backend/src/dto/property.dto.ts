@@ -278,6 +278,21 @@ export class CreatePropertyDto {
   @IsOptional()
   listingEverPublished?: boolean;
 
+  @ApiPropertyOptional({ description: 'H4 normalised address match key' })
+  @IsString()
+  @IsOptional()
+  addressMatchKey?: string;
+
+  @ApiPropertyOptional({ description: 'H4 — newcomer publish hold while ownership claim is reviewed' })
+  @IsBoolean()
+  @IsOptional()
+  claimInReview?: boolean;
+
+  @ApiPropertyOptional({ description: 'H4 ownership claim case id' })
+  @IsString()
+  @IsOptional()
+  claimCaseId?: string;
+
   @ApiPropertyOptional({
     example: 'yes',
     enum: ['yes', 'no'],
@@ -622,6 +637,21 @@ export class UpdatePropertyDto {
   @IsBoolean()
   @IsOptional()
   listingEverPublished?: boolean;
+
+  @ApiPropertyOptional({ description: 'H4 normalised address match key' })
+  @IsString()
+  @IsOptional()
+  addressMatchKey?: string;
+
+  @ApiPropertyOptional({ description: 'H4 — newcomer publish hold' })
+  @IsBoolean()
+  @IsOptional()
+  claimInReview?: boolean;
+
+  @ApiPropertyOptional({ description: 'H4 ownership claim case id' })
+  @IsString()
+  @IsOptional()
+  claimCaseId?: string;
 
   @ApiPropertyOptional({ example: 'yes', enum: ['yes', 'no'] })
   @IsString()

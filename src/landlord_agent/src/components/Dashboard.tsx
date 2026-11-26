@@ -27,6 +27,14 @@ import viewingService from "../../../services/viewingService";
 import { listViewingsForLandlord } from "../../../services/viewingInboxService";
 import { useMessagingContext } from "../../../contexts/MessagingContext";
 import AuthContext from "../../../contexts/AuthContext";
+import { getAccountVerification } from "../services/verificationService";
+import {
+  buildOnboardingChecklist,
+  isFirstTimeLandlord,
+  markLandlordVisited,
+  readLandlordFirstVisit,
+  resolveLandlordGreeting,
+} from "../utils/firstTimeLandlord";
 import "../styles/dashboardOverview.css";
 
 interface DashboardProps {
@@ -255,6 +263,7 @@ function DashboardOverviewHeader({
   onViewMessages,
   addLabel = "Add Property",
   showInsights = true,
+  forceFirstVisitGreeting = false,
 }: {
   userName: string;
   onViewInsights?: () => void;
@@ -265,6 +274,8 @@ function DashboardOverviewHeader({
   onViewMessages?: () => void;
   addLabel?: string;
   showInsights?: boolean;
+  /** H3 empty portfolio — always show Welcome, not Welcome back */
+  forceFirstVisitGreeting?: boolean;
 }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { unreadCount } = useMessagingContext();
@@ -275,14 +286,29 @@ function DashboardOverviewHeader({
     window.setTimeout(() => setIsRefreshing(false), 700);
   };
 
+  const isFirstVisit = forceFirstVisitGreeting || readLandlordFirstVisit();
+  const greeting = resolveLandlordGreeting(isFirstVisit, userName);
+
+  useEffect(() => {
+    // Don't mark visited while still on the first-time empty portfolio —
+    // keep "Welcome" until they add a property and return to the normal dashboard.
+    if (!forceFirstVisitGreeting) markLandlordVisited();
+  }, [forceFirstVisitGreeting]);
+
   return (
     <header className="header-bar ll-header-bar">
       <div className="header-title-row">
         <div className="header-title-group">
           <h1>
-            Welcome, <span>{userName}</span>
+            {greeting.heading.includes(',') ? (
+              <>
+                {greeting.heading.split(',')[0]}, <span>{greeting.heading.split(',').slice(1).join(',').trim()}</span>
+              </>
+            ) : (
+              greeting.heading
+            )}
           </h1>
-          <p className="ll-header-subtitle">Here&apos;s the latest update on your portfolio today.</p>
+          <p className="ll-header-subtitle">{greeting.subtitle}</p>
         </div>
       </div>
       <div className="header-actions ll-header-actions">
@@ -574,6 +600,33 @@ function DashboardGlobalEmpty({
   onViewNotifications?: () => void;
 }) {
   const isGuest = variant === "guest";
+  const [accountVerified, setAccountVerified] = useState(false);
+
+  useEffect(() => {
+    if (isGuest) return;
+    getAccountVerification()
+      .then((v) => {
+        const photoOk = Boolean(v?.photoId?.storagePath || v?.photoId?.submittedAt);
+        const poaOk = Boolean(
+          v?.proofOfAddress?.storagePath || v?.proofOfAddress?.submittedAt,
+        );
+        setAccountVerified(photoOk && poaOk);
+      })
+      .catch(() => setAccountVerified(false));
+  }, [isGuest]);
+
+  const checklist = buildOnboardingChecklist({
+    accountVerified,
+    hasProperty: false,
+    propertyComplianceComplete: false,
+    hasPublishedListing: false,
+  });
+
+  const handlePrimaryAdd = () => {
+    trackEvent('landlord_first_step_add_property_clicked', { source: 'onboarding' });
+    onAddProperty?.();
+  };
+
   return (
     <div className="dashboard-root ll-overview">
       {!isGuest && (
@@ -585,22 +638,54 @@ function DashboardGlobalEmpty({
           onViewSettings={onViewSettings}
           onViewNotifications={onViewNotifications}
           addLabel="Add Property"
+          forceFirstVisitGreeting
         />
       )}
-      <div className="ll-overview-inner">
-        <div className="global-empty-state ll-global-empty">
-          <div className="global-empty-icon ll-global-empty-icon">
-            <Home size={32} />
+      <div className="ll-overview-inner ll-onboarding-shell">
+        <div className="ll-onboarding-card">
+          <div
+            className="ll-onboarding-icon"
+            aria-hidden="true"
+            style={{
+              background: isGuest ? '#e0f2fe' : 'linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%)',
+              color: isGuest ? '#136C9E' : '#DC5F12',
+            }}
+          >
+            <Home size={28} strokeWidth={2} />
           </div>
-          <div className="global-empty-title ll-global-empty-title">
-            Welcome to your Proptii Portfolio!
-          </div>
-          <div className="global-empty-desc ll-global-empty-desc">
+          <h2 className="ll-onboarding-title">
+            {isGuest ? 'Welcome to your Proptii Portfolio!' : 'Get started with your first listing'}
+          </h2>
+          <p className="ll-onboarding-desc">
             {isGuest
-              ? "Sign in to view and manage your properties, tenants, and contracts."
-              : "You don't have any properties or active tenancies yet. Add your first property listing to start tracking monthly revenue, tenant alerts, and occupancy rates."}
-          </div>
-          <div className="global-empty-actions">
+              ? 'Sign in to view and manage your properties, tenants, and contracts.'
+              : 'Add a property first. Then complete verification and compliance before you publish to search.'}
+          </p>
+
+          {!isGuest && (
+            <ol className="ll-onboarding-checklist" aria-label="Getting started checklist">
+              {checklist.map((item, index) => (
+                <li
+                  key={item.id}
+                  className={`ll-onboarding-check-item${item.done ? ' is-done' : ''}`}
+                >
+                  <span className="ll-onboarding-check-mark" aria-hidden="true">
+                    {item.done ? (
+                      <Check size={13} strokeWidth={3} />
+                    ) : (
+                      <span className="ll-onboarding-step-num">{index + 1}</span>
+                    )}
+                  </span>
+                  <span className="ll-onboarding-check-label">{item.label}</span>
+                  <span className="ll-onboarding-check-status">
+                    {item.done ? 'Done' : 'To do'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          <div className="ll-onboarding-actions">
             {isGuest ? (
               <button
                 type="button"
@@ -612,8 +697,8 @@ function DashboardGlobalEmpty({
             ) : (
               <button
                 type="button"
-                className="empty-state-btn primary"
-                onClick={onAddProperty}
+                className="empty-state-btn primary ll-onboarding-cta"
+                onClick={handlePrimaryAdd}
               >
                 <Plus size={16} strokeWidth={2.5} style={{ marginRight: 6 }} />
                 Add First Property
@@ -968,6 +1053,21 @@ export function Dashboard({
     return (
       <DashboardSkeleton
         userName={userName}
+        onRefresh={onRefresh}
+        onViewSettings={onViewSettings}
+        onViewNotifications={onViewNotifications}
+      />
+    );
+  }
+
+  // H3 — first-time landlords (no properties) get a single primary CTA + checklist.
+  if (isFirstTimeLandlord(properties)) {
+    return (
+      <DashboardGlobalEmpty
+        variant="new-user"
+        userName={userName}
+        onAddProperty={onAddProperty}
+        onViewInsights={onViewInsights}
         onRefresh={onRefresh}
         onViewSettings={onViewSettings}
         onViewNotifications={onViewNotifications}

@@ -119,6 +119,9 @@ function mapFromApi(data: any): Property {
             ? data.listingVisibility
             : undefined,
         listingEverPublished: Boolean(data.listingEverPublished) || data.listingVisibility === 'public',
+        addressMatchKey: data.addressMatchKey,
+        claimInReview: Boolean(data.claimInReview),
+        claimCaseId: data.claimCaseId || undefined,
         takesDeposit:
           data.takesDeposit === 'yes' || data.takesDeposit === 'no' ? data.takesDeposit : null,
         depositAmount: data.depositAmount ?? '',

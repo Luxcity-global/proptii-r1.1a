@@ -11,6 +11,7 @@ import { ADMIN_PATH } from './adminAccess';
 import { AdminRoute } from './AdminRoute';
 import { downloadXlsx } from './exportExcel';
 import { SignupsByChannelView } from './SignupsByChannelView';
+import OwnershipClaimsView from './OwnershipClaimsView';
 import './adminDashboard.css';
 
 function formatDate(value?: string | null) {
@@ -614,6 +615,7 @@ const ProptiiAdminPage: React.FC = () => {
           <NavLink to={`${ADMIN_PATH}/signups`} className={({ isActive }) => (isActive ? 'active' : '')}>Sign-ups by channel</NavLink>
           <NavLink to={`${ADMIN_PATH}/alerts`} className={({ isActive }) => (isActive ? 'active' : '')}>Ops alerts</NavLink>
           <NavLink to={`${ADMIN_PATH}/partners`} className={({ isActive }) => (isActive ? 'active' : '')}>B2B / API</NavLink>
+          <NavLink to={`${ADMIN_PATH}/ownership-claims`} className={({ isActive }) => (isActive ? 'active' : '')}>Ownership claims</NavLink>
         </nav>
         <div className="pa-sidebar-foot">
           Signed in as {user?.email}
@@ -628,6 +630,7 @@ const ProptiiAdminPage: React.FC = () => {
           <Route path="signups" element={<SignupsByChannelView />} />
           <Route path="alerts" element={<AlertsView />} />
           <Route path="partners" element={<PartnersView />} />
+          <Route path="ownership-claims" element={<OwnershipClaimsView />} />
           <Route path="customers/:id" element={<CustomerDetail />} />
           <Route path="*" element={<Navigate to={ADMIN_PATH} replace />} />
         </Routes>

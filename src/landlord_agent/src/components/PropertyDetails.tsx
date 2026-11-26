@@ -525,6 +525,13 @@ export function PropertyDetails({
   async function applyListingVisibility(next: "public" | "private") {
     if (!property) return;
     if (next === "public") {
+      if (property.claimInReview) {
+        setVisibilityConfirm(null);
+        setVisibilityError(
+          "Publishing is on hold while an ownership claim is under review.",
+        );
+        return;
+      }
       const gaps = getPropertyComplianceGaps(property);
       if (gaps.length > 0) {
         setVisibilityConfirm(null);
@@ -1787,6 +1794,22 @@ export function PropertyDetails({
                 )}
               </div>
             </SCard>
+
+            {property.claimInReview && (
+              <SCard className="p-4 border border-amber-200 bg-amber-50">
+                <p
+                  className="text-[13px] font-bold text-amber-900 mb-1"
+                  style={{ fontFamily: "Archivo,sans-serif" }}
+                >
+                  Ownership check in progress
+                </p>
+                <p className="text-[12.5px] text-amber-800 leading-relaxed">
+                  Publishing is held while we verify ownership for this address. You will get email
+                  updates if more documents are needed. Other accounts&apos; details are never shared
+                  with you.
+                </p>
+              </SCard>
+            )}
 
             {/* Listing publish / search visibility — directly under Quick Actions */}
             {!isPropertyArchived(property) && (

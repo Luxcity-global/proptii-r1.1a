@@ -3,6 +3,8 @@ import * as admin from 'firebase-admin';
 import { UprnMatchService } from '../gov-data/services/uprn-match.service';
 import { getRedisClient } from '../utils/redis-client';
 import { ReadyToPublishService } from './ready-to-publish.service';
+import { OwnershipClaimsService } from './ownership-claims.service';
+import { buildAddressMatchKey } from '../utils/address-match-key';
 import { isPubliclySearchable } from '../utils/listing-visibility';
 
 function isPropertyAuthorized(existing: any, userId?: string, userEmail?: string): boolean {
@@ -81,6 +83,7 @@ export interface PaginatedSearchOptions {
 export class NativePropertiesService {
   constructor(
     private readonly readyToPublish: ReadyToPublishService,
+    @Optional() private readonly ownershipClaims?: OwnershipClaimsService,
     @Optional() private readonly uprnMatchService?: UprnMatchService,
   ) {}
 
@@ -336,12 +339,19 @@ export class NativePropertiesService {
       }
 
       const rentAmount = Number(data?.rentAmount || data?.price || 0);
+      const addressMatchKey = buildAddressMatchKey({
+        address: data?.address,
+        postcode: data?.postcode,
+        city: data?.city,
+        uprn: resolvedUprn || data?.uprn,
+      });
 
       const propertyData = {
         ...data,
         id: docRef.id,
         listingVisibility,
         ...(listingVisibility === 'public' ? { listingEverPublished: true } : {}),
+        addressMatchKey,
         uprn: resolvedUprn,
         price: rentAmount || data?.price,
         rentAmount: rentAmount || data?.price,
@@ -351,6 +361,34 @@ export class NativePropertiesService {
       };
       await docRef.set(propertyData);
       console.log(`[NativePropertiesService] Successfully saved property ${docRef.id} to Firestore.`);
+
+      // H4 — hold newcomer publish if another landlord already claims this address.
+      // Never auto-unpublish an incumbent; force newcomer private if a claim is opened.
+      if (this.ownershipClaims && landlordId) {
+        try {
+          const hold = await this.ownershipClaims.detectAndHoldNewcomer({
+            propertyId: docRef.id,
+            landlordId,
+            address: data?.address,
+            postcode: data?.postcode,
+            city: data?.city,
+            uprn: resolvedUprn,
+            ownerEmail: data?.ownerEmail,
+          });
+          if (hold.claimInReview) {
+            (propertyData as any).claimInReview = true;
+            (propertyData as any).claimCaseId = hold.claimCaseId;
+            (propertyData as any).addressMatchKey = hold.addressMatchKey;
+            (propertyData as any).listingVisibility = 'private';
+            await docRef.set(
+              { listingVisibility: 'private', claimInReview: true, claimCaseId: hold.claimCaseId },
+              { merge: true },
+            );
+          }
+        } catch (claimErr: any) {
+          console.warn(`[NativePropertiesService] H4 claim detect non-fatal: ${claimErr?.message || claimErr}`);
+        }
+      }
 
       // ── Task p4-9: Pre-aggregate landlord financials with FieldValue.increment() ──
       if (landlordId) {
@@ -400,6 +438,16 @@ export class NativePropertiesService {
       cleanedData.listingVisibility !== undefined && cleanedData.listingVisibility !== null
         ? cleanedData.listingVisibility
         : existing?.listingVisibility;
+
+    // H4 — block newcomer publish while claim is in review (never auto-unpublish incumbent).
+    if (
+      this.ownershipClaims &&
+      String(nextVisibility || '').toLowerCase() === 'public' &&
+      String(existing?.listingVisibility || '').toLowerCase() !== 'public'
+    ) {
+      await this.ownershipClaims.assertCanPublish(id);
+    }
+
     await this.assertReadyToPublishOrThrow(
       landlordId,
       id,
@@ -409,6 +457,21 @@ export class NativePropertiesService {
       nextVisibility,
       existing?.listingVisibility,
     );
+
+    // Keep match key fresh on address/postcode edits; re-check duplicates for newcomers.
+    if (
+      cleanedData.address !== undefined ||
+      cleanedData.postcode !== undefined ||
+      cleanedData.city !== undefined ||
+      cleanedData.uprn !== undefined
+    ) {
+      cleanedData.addressMatchKey = buildAddressMatchKey({
+        address: cleanedData.address ?? existing?.address,
+        postcode: cleanedData.postcode ?? existing?.postcode,
+        city: cleanedData.city ?? existing?.city,
+        uprn: cleanedData.uprn ?? existing?.uprn,
+      });
+    }
 
     const mergedBeds = cleanedData.bedrooms !== undefined ? cleanedData.bedrooms : existing?.bedrooms;
     const mergedBaths = cleanedData.bathrooms !== undefined ? cleanedData.bathrooms : (cleanedData.bathroom_count !== undefined ? cleanedData.bathroom_count : (existing?.bathrooms ?? existing?.bathroom_count));
@@ -445,6 +508,30 @@ export class NativePropertiesService {
     const rentDiff = newRent - oldRent;
 
     await docRef.update(updatedData);
+
+    if (
+      this.ownershipClaims &&
+      landlordId &&
+      (cleanedData.address !== undefined ||
+        cleanedData.postcode !== undefined ||
+        cleanedData.city !== undefined ||
+        cleanedData.uprn !== undefined)
+    ) {
+      try {
+        await this.ownershipClaims.detectAndHoldNewcomer({
+          propertyId: id,
+          landlordId,
+          address: updatedData.address ?? existing?.address,
+          postcode: updatedData.postcode ?? existing?.postcode,
+          city: updatedData.city ?? existing?.city,
+          uprn: updatedData.uprn ?? existing?.uprn,
+          ownerEmail: existing?.ownerEmail || userEmail,
+        });
+      } catch (claimErr: any) {
+        console.warn(`[NativePropertiesService] H4 claim re-check non-fatal: ${claimErr?.message || claimErr}`);
+      }
+    }
+
     if (landlordId) {
       const wasArchived = existing?.status === 'archived' || existing?.archived === true || existing?.isArchived === true;
       const isNowArchived = updatedData?.status === 'archived' || updatedData?.archived === true || updatedData?.isArchived === true;

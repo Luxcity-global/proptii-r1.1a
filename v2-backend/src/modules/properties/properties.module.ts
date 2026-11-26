@@ -15,6 +15,8 @@ import { PropertySelectionsService } from '../../services/property-selections.se
 import { HomeownerService } from '../../services/homeowner.service';
 import { ClassifierService } from '../../search/classifier.service';
 import { ReadyToPublishService } from '../../services/ready-to-publish.service';
+import { OwnershipClaimsService } from '../../services/ownership-claims.service';
+import { OwnershipClaimsController } from '../../controllers/ownership-claims.controller';
 import { GovDataModule } from '../../gov-data/gov-data.module';
 
 @Module({
@@ -29,6 +31,7 @@ import { GovDataModule } from '../../gov-data/gov-data.module';
     ReportController,
     ClassifierController,
     FlagsController,
+    OwnershipClaimsController,
   ],
   providers: [
     NativePropertiesService,
@@ -37,6 +40,7 @@ import { GovDataModule } from '../../gov-data/gov-data.module';
     HomeownerService,
     ClassifierService,
     ReadyToPublishService,
+    OwnershipClaimsService,
   ],
   exports: [
     NativePropertiesService,
@@ -44,6 +48,7 @@ import { GovDataModule } from '../../gov-data/gov-data.module';
     PropertySelectionsService,
     HomeownerService,
     ReadyToPublishService,
+    OwnershipClaimsService,
   ],
 })
 export class PropertiesModule {}

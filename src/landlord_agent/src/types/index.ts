@@ -115,6 +115,11 @@ export interface Property {
   listingVisibility?: 'private' | 'public';
   /** Sticky after first publish — keeps visibility toggle when later hidden from search. */
   listingEverPublished?: boolean;
+  /** H4 normalised address key */
+  addressMatchKey?: string;
+  /** H4 — publish held while ownership claim is reviewed */
+  claimInReview?: boolean;
+  claimCaseId?: string;
   amenities: string[];
   notes: string;
   /** Public listing description shown to renters/buyers */
