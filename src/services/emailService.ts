@@ -53,7 +53,9 @@ function viewingNoticeHtml(emailContent: EmailContent): string {
   return renderProptiiEmail({
     title: emailContent.subject || 'Viewing update',
     buttonLabel: 'Open Proptii',
-    buttonHref: 'https://proptii.co',
+    buttonHref:
+      (import.meta as any)?.env?.VITE_APP_URL ||
+      (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://proptii.co'),
     bodyHtml: `
       <div class="details">
         <p><strong>Property:</strong> ${escapeHtml(address || 'Property viewing')}</p>

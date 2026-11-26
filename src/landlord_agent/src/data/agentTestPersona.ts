@@ -14,13 +14,13 @@ export const AGENT_TEST_PHONE = '+44 161 496 0123';
 export const AGENT_TEST_COMPANY_PROFILE: CompanyProfile = {
   companyName: AGENT_TEST_COMPANY,
   companyDescription: 'Independent letting agency covering Greater Manchester and the North West.',
-  website: 'https://bennettandco.example',
+  website: (import.meta as any)?.env?.VITE_AGENT_TEST_WEBSITE || '',
   officeAddress: '42 King Street, Manchester, M2 6AY',
   officePhone: AGENT_TEST_PHONE,
   officeEmail: AGENT_TEST_EMAIL,
 };
 
-const DUMMY_PDF = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+const DUMMY_PDF = (import.meta as any)?.env?.VITE_DUMMY_PDF_URL || '';
 
 export function isAgentTestAccount(userId?: string | null, email?: string | null): boolean {
   return false;

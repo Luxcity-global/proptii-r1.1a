@@ -4,7 +4,14 @@
  * The twin copy lives in v2-backend/src/utils/emailLayout.ts — keep them in sync.
  */
 
-const LOGO_URL = 'https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png';
+const LOGO_URL =
+  (import.meta as any)?.env?.VITE_EMAIL_LOGO_URL ||
+  'https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png';
+
+const PROPTII_WEB_URL = (
+  (import.meta as any)?.env?.VITE_APP_URL ||
+  (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://proptii.co')
+).trim();
 
 export function escapeEmailHtml(value: string): string {
   return String(value || '')
@@ -74,10 +81,10 @@ export function renderProptiiEmail(options: {
     </div>
     <hr />
     <div class="footer-desc">
-      <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.co" class="footer-link">here</a>.</em>
+      <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="${escapeEmailHtml(PROPTII_WEB_URL)}" class="footer-link">here</a>.</em>
     </div>
     <div class="footer-logo">
-      <img src="${LOGO_URL}" alt="Proptii Logo" />
+      <img src="${escapeEmailHtml(LOGO_URL)}" alt="Proptii Logo" />
     </div>
   </div>
 </body>
@@ -101,7 +108,7 @@ export function applyProptiiEmailLayout(html: string): string {
       title: 'Notification from Proptii',
       bodyHtml: '<p>You have received a new message from Proptii.</p>',
       buttonLabel: 'Open Proptii',
-      buttonHref: 'https://proptii.co',
+      buttonHref: PROPTII_WEB_URL,
     });
   }
   if (
@@ -115,6 +122,6 @@ export function applyProptiiEmailLayout(html: string): string {
   const hasLink = /<a\s[^>]*href=/i.test(inner);
   return renderProptiiEmail({
     bodyHtml: inner,
-    ...(hasLink ? {} : { buttonLabel: 'Open Proptii', buttonHref: 'https://proptii.co' }),
+    ...(hasLink ? {} : { buttonLabel: 'Open Proptii', buttonHref: PROPTII_WEB_URL }),
   });
 }

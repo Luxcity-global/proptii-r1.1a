@@ -27,6 +27,31 @@ export function extractPlaceQuery(text: string): string | null {
   return last;
 }
 
+const POSTCODES_API_BASE = (
+  (import.meta as any)?.env?.VITE_POSTCODES_API_URL ||
+  'https://api.postcodes.io'
+).trim().replace(/\/$/, '');
+
+const OSM_EMBED_BASE = (
+  (import.meta as any)?.env?.VITE_OSM_EMBED_URL ||
+  'https://www.openstreetmap.org/export/embed.html'
+).trim();
+
+const OSM_STATIC_DE_BASE = (
+  (import.meta as any)?.env?.VITE_OSM_STATIC_DE_URL ||
+  'https://staticmap.openstreetmap.de/staticmap.php'
+).trim();
+
+const OSM_WIKIMEDIA_BASE = (
+  (import.meta as any)?.env?.VITE_OSM_WIKIMEDIA_URL ||
+  'https://maps.wikimedia.org/img'
+).trim().replace(/\/$/, '');
+
+const OSM_STATIC_FR_BASE = (
+  (import.meta as any)?.env?.VITE_OSM_STATIC_FR_URL ||
+  'https://static-map.openstreetmap.fr/staticmap.php'
+).trim();
+
 /** OpenStreetMap iframe — loads MapLibre tiles client-side (often blocked or slow). */
 export function openStreetMapEmbedUrl(latitude: number, longitude: number, delta = 0.008): string {
   const minLat = latitude - delta;
@@ -34,7 +59,7 @@ export function openStreetMapEmbedUrl(latitude: number, longitude: number, delta
   const minLng = longitude - delta;
   const maxLng = longitude + delta;
   const bbox = `${minLng},${minLat},${maxLng},${maxLat}`;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(`${latitude},${longitude}`)}`;
+  return `${OSM_EMBED_BASE}?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(`${latitude},${longitude}`)}`;
 }
 
 /** Single pre-rendered OSM image — avoids tile.openstreetmap.org fetch storms in iframes. */
@@ -51,7 +76,7 @@ export function openStreetMapStaticImageUrl(
     zoom: String(zoom),
     size: `${width}x${height}`,
   });
-  return `https://staticmap.openstreetmap.de/staticmap.php?${params.toString()}`;
+  return `${OSM_STATIC_DE_BASE}?${params.toString()}`;
 }
 
 /** Wikimedia OSM static image — separate CDN from tile.openstreetmap.org. */
@@ -62,7 +87,7 @@ export function wikimediaStaticMapUrl(
   height = 320,
   zoom = 14,
 ): string {
-  return `https://maps.wikimedia.org/img/osm-intl,${zoom},${latitude},${longitude},${width}x${height}.png`;
+  return `${OSM_WIKIMEDIA_BASE}/osm-intl,${zoom},${latitude},${longitude},${width}x${height}.png`;
 }
 
 /** OpenStreetMap France static image — alternate OSM static host. */
@@ -79,7 +104,7 @@ export function openStreetMapFrStaticImageUrl(
     zoom: String(zoom),
     size: `${width}x${height}`,
   });
-  return `https://static-map.openstreetmap.fr/staticmap.php?${params.toString()}`;
+  return `${OSM_STATIC_FR_BASE}?${params.toString()}`;
 }
 
 export async function lookupPostcodeCentroid(
@@ -89,7 +114,7 @@ export async function lookupPostcodeCentroid(
   if (!compact) return null;
 
   try {
-    const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(compact)}`, {
+    const res = await fetch(`${POSTCODES_API_BASE}/postcodes/${encodeURIComponent(compact)}`, {
       headers: { Accept: 'application/json' },
     });
     if (!res.ok) return null;
@@ -133,7 +158,7 @@ export async function lookupOutcodeCentroid(outcode: string): Promise<{ lat: num
   const compact = outcode.replace(/\s/g, '').toUpperCase();
   if (!compact) return null;
   return lookupJsonCentroid(
-    `https://api.postcodes.io/outcodes/${encodeURIComponent(compact)}`,
+    `${POSTCODES_API_BASE}/outcodes/${encodeURIComponent(compact)}`,
     (data) => {
       const result = data.result as { latitude?: number; longitude?: number } | undefined;
       return asLatLng(result?.latitude, result?.longitude);
@@ -145,7 +170,7 @@ export async function lookupPlaceCentroid(place: string): Promise<{ lat: number;
   const query = place.trim();
   if (!query) return null;
   return lookupJsonCentroid(
-    `https://api.postcodes.io/places?q=${encodeURIComponent(query)}`,
+    `${POSTCODES_API_BASE}/places?q=${encodeURIComponent(query)}`,
     (data) => {
       const results = Array.isArray(data.result) ? data.result : [];
       const preferred =

@@ -232,7 +232,7 @@ function wizardToInitialData(property: Property): Partial<WizardPropertyData> {
 }
 
 /** Azure B2C sign-in URL for guest users in empty state */
-const SIGN_IN_URL = 'https://proptii.b2clogin.com/proptii.onmicrosoft.com/b2c_1_signupandsigninproptii/oauth2/v2.0/authorize?client_id=532e1fa0-18a6-4356-bd78-1f62bd6d5e2f&scope=openid%20profile%20email%20offline_access&redirect_uri=https%3A%2F%2Fproptii.co&client-request-id=019c89da-c0f9-7dde-8814-96ced1d1ac4a&response_mode=fragment&client_info=1&nonce=019c89da-c0fd-7ed4-acf5-ad3b2621c727&state=eyJpZCI6IjAxOWM4OWRhLWMwZmEtNzcwOC1iYjYwLTRiM2MzODZkZmJiZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D&claims=%7B%22id_token%22%3A%7B%22extension_PhoneNumber%22%3Anull%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=4.12.0&response_type=code&code_challenge=YWSXzXu9cBV85rUs9pzakoUBSnweIFd2NW-SzZdpjyI&code_challenge_method=S256';
+const SIGN_IN_URL = (import.meta as any)?.env?.VITE_AZURE_AD_SIGN_IN_URL || '';
 
 // Map URL paths to main-app navigation screens (shared by routing helpers below)
 const PATH_TO_NAV_SCREEN: Record<string, NavigationScreen> = {

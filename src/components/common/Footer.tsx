@@ -8,7 +8,7 @@ export const Footer: React.FC = () => {
         <div className="text-sm text-gray-600">
           © {new Date().getFullYear()}{' '}
           <a
-            href="https://proptii.com/"
+            href={(import.meta as any)?.env?.VITE_APP_URL || 'https://proptii.com/'}
             className="text-primary hover:text-primary/80"
           >
             Proptii

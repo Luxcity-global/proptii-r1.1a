@@ -223,7 +223,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const onAuthRequest = (event: MessageEvent) => {
       if (event.data?.type !== 'REQUEST_AUTH_STATE') return;
       const origin = event.origin;
-      if (origin !== window.location.origin && !origin.endsWith('.onrender.com')) return;
+      const allowedOrigins = ((import.meta as any)?.env?.VITE_ALLOWED_AUTH_ORIGINS || '.onrender.com')
+        .split(',')
+        .map((o: string) => o.trim())
+        .filter(Boolean);
+      const isAllowed =
+        origin === window.location.origin ||
+        allowedOrigins.some((allowed: string) => origin === allowed || origin.endsWith(allowed));
+      if (!isAllowed) return;
       event.source?.postMessage(
         { type: 'AUTH_STATE', payload: { isAuthenticated, user, isLoading } },
         { targetOrigin: origin } as WindowPostMessageOptions,

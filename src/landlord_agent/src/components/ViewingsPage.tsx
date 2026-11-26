@@ -1229,7 +1229,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
               html: renderProptiiEmail({
                 title: 'Your viewing is scheduled',
                 buttonLabel: 'View My Viewings on Proptii',
-                buttonHref: `${typeof window !== 'undefined' ? window.location.origin : 'https://proptii.co'}/dashboard/viewings`,
+                buttonHref: `${(import.meta as any)?.env?.VITE_APP_URL || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://proptii.co')}/dashboard/viewings`,
                 bodyHtml: `
                   <p>Hi ${safe(requestForm.tenantName || 'there')},</p>
                   <p>${safe(managerName || 'Your landlord')} has scheduled a property viewing for you.</p>

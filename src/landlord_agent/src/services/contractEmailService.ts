@@ -55,7 +55,9 @@ class ContractEmailService {
     return renderProptiiEmail({
       title: 'Contract for Review',
       buttonLabel: 'Open Proptii',
-      buttonHref: 'https://proptii.co',
+      buttonHref:
+        (import.meta as any)?.env?.VITE_APP_URL ||
+        (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://proptii.co'),
       bodyHtml: `
         <p>Dear ${recipientName},</p>
         <p>You have received a new contract document for your review:</p>

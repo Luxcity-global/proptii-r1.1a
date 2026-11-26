@@ -3,7 +3,7 @@ import type { Contract } from '../components/ContractsPage';
 export const LANDLORD_TWO_TEST_ID = 'landlord-test-002';
 export const LANDLORD_TWO_TEST_EMAIL = 'landlord-two@test.proptii.co';
 
-const DUMMY_PDF = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+const DUMMY_PDF = (import.meta as any)?.env?.VITE_DUMMY_PDF_URL || '';
 
 export function isLandlordTwoTestAccount(userId?: string | null, email?: string | null): boolean {
   return false;

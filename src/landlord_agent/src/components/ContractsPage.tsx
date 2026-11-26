@@ -430,7 +430,7 @@ export function ContractsPage({
         formData.append('html', renderProptiiEmail({
           title: 'Contract for Review',
           buttonLabel: 'View Contracts',
-          buttonHref: `${(typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://proptii.co'}/contracts`,
+          buttonHref: `${(import.meta as any)?.env?.VITE_APP_URL || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://proptii.co')}/contracts`,
           bodyHtml: `
             <p>Hello ${contractData.recipientName}!</p>
             <p>Please find attached your contract for review.</p>
@@ -539,7 +539,7 @@ export function ContractsPage({
         formData.append('html', renderProptiiEmail({
           title: 'Test Email from Proptii',
           buttonLabel: 'View Contracts',
-          buttonHref: `${(typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://proptii.co'}/contracts`,
+          buttonHref: `${(import.meta as any)?.env?.VITE_APP_URL || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://proptii.co')}/contracts`,
           bodyHtml: `
             <p>Hello ${contractData.recipientName}!</p>
             <p>This is a test email from Proptii Property Management System.</p>

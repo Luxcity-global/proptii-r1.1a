@@ -11,13 +11,18 @@
  * @property {boolean} [furnished]
  */
 
+const ZOOPLA_BASE_URL = (import.meta as any)?.env?.VITE_ZOOPLA_SEARCH_URL || 'https://www.zoopla.co.uk/to-rent/property/';
+const OPENRENT_BASE_URL = (import.meta as any)?.env?.VITE_OPENRENT_SEARCH_URL || 'https://www.openrent.co.uk/properties-to-rent/';
+const ONTHEMARKET_BASE_URL = (import.meta as any)?.env?.VITE_ONTHEMARKET_SEARCH_URL || 'https://www.onthemarket.com/to-rent/property/';
+const RIGHTMOVE_BASE_URL = (import.meta as any)?.env?.VITE_RIGHTMOVE_SEARCH_URL || 'https://www.rightmove.co.uk/property-to-rent/find.html';
+
 /**
  * Build Zoopla search URL and params.
  * @param {PropertySearchParams} params
  * @returns {string} Full Zoopla search URL
  */
 export function buildZooplaUrl(params) {
-  const base = 'https://www.zoopla.co.uk/to-rent/property/';
+  const base = ZOOPLA_BASE_URL;
   const loc = encodeURIComponent(params.location || '');
   const bedsMin = params.minBeds ? `&beds_min=${params.minBeds}` : '';
   const bedsMax = params.maxBeds ? `&beds_max=${params.maxBeds}` : '';
@@ -33,7 +38,7 @@ export function buildZooplaUrl(params) {
  * @returns {string} Full OpenRent search URL
  */
 export function buildOpenRentUrl(params) {
-  const base = 'https://www.openrent.co.uk/properties-to-rent/';
+  const base = OPENRENT_BASE_URL;
   const loc = encodeURIComponent(params.location || '');
   const priceMin = params.minPrice ? `&prices_min=${params.minPrice}` : '';
   const priceMax = params.maxPrice ? `&prices_max=${params.maxPrice}` : '';
@@ -47,7 +52,7 @@ export function buildOpenRentUrl(params) {
  * @returns {string} Full OnTheMarket search URL
  */
 export function buildOnTheMarketUrl(params) {
-  const base = 'https://www.onthemarket.com/to-rent/property/';
+  const base = ONTHEMARKET_BASE_URL;
   const loc = encodeURIComponent(params.location || '');
   const bedsMin = params.minBeds ? `&min-bedrooms=${params.minBeds}` : '';
   const bedsMax = params.maxBeds ? `&max-bedrooms=${params.maxBeds}` : '';
@@ -62,7 +67,7 @@ export function buildOnTheMarketUrl(params) {
  * @returns {string} Full Rightmove search URL
  */
 export function buildRightmoveUrl(params) {
-  const base = 'https://www.rightmove.co.uk/property-to-rent/find.html';
+  const base = RIGHTMOVE_BASE_URL;
   const loc = encodeURIComponent(params.location || '');
   const bedsMin = params.minBeds ? `&minBedrooms=${params.minBeds}` : '';
   const bedsMax = params.maxBeds ? `&maxBedrooms=${params.maxBeds}` : '';

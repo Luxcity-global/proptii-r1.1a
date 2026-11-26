@@ -158,7 +158,7 @@ class MarketInsightService {
             insightType = 'epc-requirements';
           }
           
-          let link = entry.querySelector('link')?.getAttribute('href') || entry.querySelector('id')?.textContent || 'https://www.gov.uk';
+          let link = entry.querySelector('link')?.getAttribute('href') || entry.querySelector('id')?.textContent || (import.meta as any)?.env?.VITE_GOV_UK_URL || 'https://www.gov.uk';
           const published = entry.querySelector('published')?.textContent || entry.querySelector('updated')?.textContent;
           const publishedDate = published ? new Date(published) : new Date();
           

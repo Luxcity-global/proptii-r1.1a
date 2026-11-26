@@ -81,7 +81,7 @@ export const diyGuides: DIYGuide[] = [
                 description: 'Close the filter compartment securely and turn your system back on. Check for proper airflow.',
             }
         ],
-        videoUrl: 'https://www.youtube.com/watch?v=example',
+        videoUrl: (import.meta as any)?.env?.VITE_DIY_GUIDE_VIDEO_URL || '',
         relatedGuides: ['guide-hvac-001', 'guide-hvac-004']
     },
     {

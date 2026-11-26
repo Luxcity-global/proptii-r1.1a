@@ -5,17 +5,17 @@
 
 export const developmentConfig = {
   "api": {
-    "baseUrl": "http://localhost:3002",
+    "baseUrl": (import.meta as any)?.env?.VITE_API_BASE_URL || (import.meta as any)?.env?.VITE_API_URL || '',
     "version": "v1"
   },
   "azure": {
     "ad": {
-      "clientId": "",
-      "tenantName": "proptii.onmicrosoft.com",
-      "policyName": "B2C_1_SignUpandSignInProptii"
+      "clientId": (import.meta as any)?.env?.VITE_AZURE_AD_CLIENT_ID || "",
+      "tenantName": (import.meta as any)?.env?.VITE_AZURE_AD_TENANT_NAME || "",
+      "policyName": (import.meta as any)?.env?.VITE_AZURE_AD_POLICY_NAME || ""
     },
     "storage": {
-      "url": "http://localhost:5173"
+      "url": (import.meta as any)?.env?.VITE_AZURE_STORAGE_URL || (import.meta as any)?.env?.VITE_APP_URL || ""
     }
   },
   "features": {

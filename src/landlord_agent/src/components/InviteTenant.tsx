@@ -136,9 +136,10 @@ function buildInviteLink(
   landlordId?: string
 ): string {
   const base =
-    typeof window !== 'undefined' && window.location.origin
+    (import.meta as any)?.env?.VITE_APP_URL ||
+    (typeof window !== 'undefined' && window.location.origin
       ? window.location.origin
-      : (import.meta as any)?.env?.VITE_APP_URL || 'https://proptii.co';
+      : 'https://proptii.co');
   const url = new URL('/invite/tenant', base);
   if (token) url.searchParams.set('token', token);
   if (propertyId) url.searchParams.set('propertyId', propertyId);

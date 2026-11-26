@@ -241,7 +241,8 @@ export class DocuSignService {
   }
 
   private getMockSigningUrl(): string {
-    const mockUrl = `https://demo.docusign.net/Signing/StartInSession.aspx?t=${Date.now()}`;
+    const baseUrl = (import.meta as any)?.env?.VITE_DOCUSIGN_SIGNING_URL || '';
+    const mockUrl = baseUrl ? `${baseUrl}?t=${Date.now()}` : `/signing-session?t=${Date.now()}`;
     console.log('🎭 Creating mock signing URL:', mockUrl);
     console.log('🔗 Mock signing URL ready! (Backend will handle real DocuSign API)');
     return mockUrl;
