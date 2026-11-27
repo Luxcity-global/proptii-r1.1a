@@ -175,6 +175,35 @@ const TenantContracts: React.FC = () => {
     setCurrentPage(1);
   }, [currentContracts.length, activeTab, searchQuery, partyFilter, dateFilter]);
 
+  const contractsHeader = (
+    <TenantPageHeader
+      title="Contracts"
+      subtitle="Manage and track your property lease agreements and legal documents."
+      primaryLabel="Sign & Send"
+      primaryIcon={<PenLine className="w-4 h-4" />}
+      onPrimary={() => openContractWorkspace()}
+    />
+  );
+
+  const contractsSkeleton = (
+    <div className="tn-ct">
+      {contractsHeader}
+      <div className="tn-ct-body">
+        <div className="tn-ct-kpi-grid">
+          <div className="tn-ct-skel" />
+          <div className="tn-ct-skel" />
+          <div className="tn-ct-skel" />
+          <div className="tn-ct-skel" />
+        </div>
+        <div className="tn-ct-skel tn-ct-skel-table" />
+      </div>
+    </div>
+  );
+
+  if (billingLoading) {
+    return contractsSkeleton;
+  }
+
   if (!canAccessSection('tenant-contracts', plan, status)) {
     return (
       <>
@@ -183,13 +212,11 @@ const TenantContracts: React.FC = () => {
           upgradeLabel={sectionUpgradeLabel('tenant-contracts')}
           segment="renters"
         />
-        {!billingLoading && (
-          <ContractModal
-            isOpen={isLockedModalOpen}
-            onClose={() => setIsLockedModalOpen(false)}
-            locked
-          />
-        )}
+        <ContractModal
+          isOpen={isLockedModalOpen}
+          onClose={() => setIsLockedModalOpen(false)}
+          locked
+        />
       </>
     );
   }
@@ -395,31 +422,8 @@ const TenantContracts: React.FC = () => {
     </DropdownMenu.Root>
   );
 
-  const contractsHeader = (
-    <TenantPageHeader
-      title="Contracts"
-      subtitle="Manage and track your property lease agreements and legal documents."
-      primaryLabel="Sign & Send"
-      primaryIcon={<PenLine className="w-4 h-4" />}
-      onPrimary={() => openContractWorkspace()}
-    />
-  );
-
   if (isLoading) {
-    return (
-      <div className="tn-ct">
-        {contractsHeader}
-        <div className="tn-ct-body">
-          <div className="tn-ct-kpi-grid">
-            <div className="tn-ct-skel" />
-            <div className="tn-ct-skel" />
-            <div className="tn-ct-skel" />
-            <div className="tn-ct-skel" />
-          </div>
-          <div className="tn-ct-skel tn-ct-skel-table" />
-        </div>
-      </div>
-    );
+    return contractsSkeleton;
   }
 
   const showEmpty = currentContracts.length === 0;

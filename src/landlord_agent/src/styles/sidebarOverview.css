@@ -193,11 +193,11 @@
 }
 
 .ll-sidebar-user {
-  padding: 14px 16px;
-  background: #fffdfa;
-  border: 1px solid #fed7aa;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: var(--ll-sb-radius);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
   transition: all 0.2s;
   flex-shrink: 0;
   min-width: 0;

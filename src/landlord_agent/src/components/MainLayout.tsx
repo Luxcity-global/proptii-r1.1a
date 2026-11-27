@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   LayoutGrid,
@@ -14,6 +14,8 @@ import {
   MessageSquare,
   Settings,
   ShieldCheck,
+  Sparkles,
+  User,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -21,9 +23,18 @@ import {
 } from './ui/sidebar';
 import { UserProfile, UserRole } from '../App';
 import LandlordDashboardHeader from './LandlordDashboardHeader';
+import LandlordPlanCompareModal from './LandlordPlanCompareModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { useIsMobile } from './ui/use-mobile';
+import { useLandlordBillingStatus } from '../hooks/useLandlordBillingStatus';
+import AuthContext from '../../../contexts/AuthContext';
 import { useMessagingContext } from '../../../contexts/MessagingContext';
+import {
+  LANDLORD_TOP_PLANS,
+  resolveSidebarTierState,
+  resolveUserDisplay,
+  type SidebarTierPillStyle,
+} from '../../../utils/subscriptionDisplay';
 import { MobileHeaderTopBar } from '../../../components/common/MobileHeaderTopBar';
 import { MobileBottomNav } from '../../../components/common/MobileBottomNav';
 import { MobileCommandSheet } from '../../../components/common/MobileCommandSheet';
@@ -179,15 +190,135 @@ function SidebarNavList({
   );
 }
 
-function SidebarUserCard({ userProfile, collapsed }: { userProfile: UserProfile | null; collapsed?: boolean }) {
+interface SidebarUserCardProps {
+  userProfile: UserProfile | null;
+  fallbackPhotoUrl?: string | null;
+  collapsed?: boolean;
+  tierName: string;
+  tierPillStyle: SidebarTierPillStyle;
+  billingLoading: boolean;
+  canUpgradeTier: boolean;
+  onUpgrade: () => void;
+  onManage: () => void;
+}
+
+function SidebarUserCard({
+  userProfile,
+  fallbackPhotoUrl,
+  collapsed,
+  tierName,
+  tierPillStyle,
+  billingLoading,
+  canUpgradeTier,
+  onUpgrade,
+  onManage,
+}: SidebarUserCardProps) {
+  const [avatarError, setAvatarError] = useState(false);
+  const { displayName, initials, photoUrl } = resolveUserDisplay(
+    userProfile
+      ? {
+          ...userProfile,
+          photoURL: userProfile.photoURL || fallbackPhotoUrl || undefined,
+        }
+      : null,
+  );
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [photoUrl]);
+
   if (!userProfile) return null;
 
   return (
-    <div className="ll-sidebar-user">
-      <div className="ll-sidebar-user-name">{collapsed ? userProfile.name.split(' ')[0] : userProfile.name}</div>
-      <div className="ll-sidebar-user-email">{userProfile.email}</div>
+    <div
+      className="ll-sidebar-user"
+      title={collapsed ? `${displayName} · ${tierName}` : undefined}
+    >
+      <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
+        {photoUrl && !avatarError ? (
+          <img
+            src={photoUrl}
+            alt={displayName}
+            onError={() => setAvatarError(true)}
+            className="h-8 w-8 rounded-full object-cover flex-shrink-0 border border-slate-200"
+          />
+        ) : initials ? (
+          <div
+            className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+            style={{ backgroundColor: '#E6F3FF', color: '#136C9E' }}
+            aria-label={displayName}
+          >
+            {initials}
+          </div>
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+            <User className="h-4 w-4 text-slate-600" />
+          </div>
+        )}
+
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <div className="ll-sidebar-user-name">{displayName}</div>
+            <div className="ll-sidebar-user-email">{userProfile.email}</div>
+          </div>
+        )}
+      </div>
+
+      {!collapsed && (
+        <div className="mt-2.5 flex items-center justify-between gap-2">
+          <span
+            data-testid="landlord-sidebar-tier-badge"
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold truncate min-w-0"
+            style={{
+              backgroundColor: tierPillStyle.bg,
+              color: tierPillStyle.text,
+            }}
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: tierPillStyle.dot }}
+              aria-hidden
+            />
+            <span className="truncate">{billingLoading ? 'Plan…' : tierName}</span>
+          </span>
+
+          {!billingLoading && (
+            canUpgradeTier ? (
+              <button
+                type="button"
+                onClick={onUpgrade}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-white shadow-xs hover:opacity-95 transition-opacity flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, #DC5F12 0%, #F15A22 100%)',
+                }}
+              >
+                <Sparkles className="w-2.5 h-2.5" aria-hidden />
+                <span>Upgrade</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onManage}
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors flex-shrink-0"
+              >
+                Manage
+              </button>
+            )
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+interface SidebarUserCardSectionProps {
+  fallbackPhotoUrl?: string | null;
+  tierName: string;
+  tierPillStyle: SidebarTierPillStyle;
+  billingLoading: boolean;
+  canUpgradeTier: boolean;
+  onUpgrade: () => void;
+  onManage: () => void;
 }
 
 function CustomSidebar({
@@ -195,11 +326,13 @@ function CustomSidebar({
   currentScreen,
   onNavigate,
   userProfile,
+  userCardProps,
 }: {
   navigationItems: NavItem[];
   currentScreen: NavigationScreen;
   onNavigate: (screen: NavigationScreen) => void;
   userProfile: UserProfile | null;
+  userCardProps: SidebarUserCardSectionProps;
 }) {
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === 'collapsed';
@@ -233,7 +366,11 @@ function CustomSidebar({
             {isCollapsed ? <ChevronRight className="h-[18px] w-[18px]" /> : <ChevronLeft className="h-[18px] w-[18px]" />}
           </button>
 
-          <SidebarUserCard userProfile={userProfile} collapsed={isCollapsed} />
+          <SidebarUserCard
+            userProfile={userProfile}
+            collapsed={isCollapsed}
+            {...userCardProps}
+          />
         </div>
       </aside>
 
@@ -252,6 +389,7 @@ function MobileSidebar({
   currentScreen,
   onNavigate,
   userProfile,
+  userCardProps,
   open,
   onOpenChange,
 }: {
@@ -259,6 +397,7 @@ function MobileSidebar({
   currentScreen: NavigationScreen;
   onNavigate: (screen: NavigationScreen) => void;
   userProfile: UserProfile | null;
+  userCardProps: SidebarUserCardSectionProps;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -282,7 +421,18 @@ function MobileSidebar({
             onItemClick={() => onOpenChange(false)}
           />
 
-          <SidebarUserCard userProfile={userProfile} />
+          <SidebarUserCard
+            userProfile={userProfile}
+            {...userCardProps}
+            onUpgrade={() => {
+              onOpenChange(false);
+              userCardProps.onUpgrade();
+            }}
+            onManage={() => {
+              onOpenChange(false);
+              userCardProps.onManage();
+            }}
+          />
         </div>
       </SheetContent>
     </Sheet>
@@ -300,8 +450,37 @@ export function MainLayout({
 }: MainLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [commandSheetOpen, setCommandSheetOpen] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const isMobile = useIsMobile();
   const { unreadCount } = useMessagingContext();
+  const authContext = useContext(AuthContext);
+  const {
+    plan,
+    status,
+    hasStripeCustomer,
+    loading: billingLoading,
+    refresh: refreshBilling,
+  } = useLandlordBillingStatus(isAuthenticated, {
+    email: userProfile?.email,
+    role: userRole,
+  });
+
+  const {
+    normalizedPlanId,
+    tierName,
+    canUpgradeTier,
+    tierPillStyle,
+  } = resolveSidebarTierState(plan, status, LANDLORD_TOP_PLANS);
+
+  const sidebarUserCardProps: SidebarUserCardSectionProps = {
+    fallbackPhotoUrl: authContext?.user?.photoURL ?? null,
+    tierName,
+    tierPillStyle,
+    billingLoading,
+    canUpgradeTier,
+    onUpgrade: () => setUpgradeModalOpen(true),
+    onManage: () => onNavigate('settings'),
+  };
 
   useEffect(() => {
     const handleOpenMobileSidebar = () => setMobileSidebarOpen(true);
@@ -376,6 +555,7 @@ export function MainLayout({
           currentScreen={currentScreen}
           onNavigate={onNavigate}
           userProfile={userProfile}
+          userCardProps={sidebarUserCardProps}
         />
 
         <MobileSidebar
@@ -383,6 +563,7 @@ export function MainLayout({
           currentScreen={currentScreen}
           onNavigate={onNavigate}
           userProfile={userProfile}
+          userCardProps={sidebarUserCardProps}
           open={mobileSidebarOpen}
           onOpenChange={setMobileSidebarOpen}
         />
@@ -483,6 +664,17 @@ export function MainLayout({
           }}
         />
       </div>
+
+      {upgradeModalOpen && (
+        <LandlordPlanCompareModal
+          open={upgradeModalOpen}
+          onClose={() => setUpgradeModalOpen(false)}
+          currentPlanId={normalizedPlanId}
+          defaultAudience={userRole === 'agent' ? 'agents' : 'landlords'}
+          billingStatus={{ hasStripeCustomer, status }}
+          onUpgradeSuccess={refreshBilling}
+        />
+      )}
     </SidebarProvider>
   );
 }

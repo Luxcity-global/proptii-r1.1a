@@ -6,7 +6,11 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useMessagingContext } from '../../../contexts/MessagingContext';
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
-import { getPlanById, type PlanId } from '../../../config/plans';
+import {
+  CONSUMER_TOP_PLANS,
+  resolveSidebarTierState,
+  resolveUserDisplay,
+} from '../../../utils/subscriptionDisplay';
 import PlanCompareModal from '../../billing/PlanCompareModal';
 
 // ---------------------------------------------------------------------------
@@ -45,36 +49,18 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   const [avatarError, setAvatarError] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
+  const {
+    normalizedPlanId,
+    tierName,
+    canUpgradeTier,
+    tierPillStyle,
+  } = resolveSidebarTierState(plan, status, CONSUMER_TOP_PLANS);
+
+  const { displayName, initials, photoUrl } = resolveUserDisplay(user);
+
   useEffect(() => {
     setAvatarError(false);
-  }, [user?.photoURL]);
-
-  const isInactiveSubscription = status === 'canceled' || status === 'unpaid';
-  const normalizedPlanId: PlanId =
-    !plan || plan === 'free' || isInactiveSubscription ? 'explorer' : (plan as PlanId);
-  const planConfig = getPlanById(normalizedPlanId);
-  const tierName = planConfig?.name ?? 'Explorer';
-  const isPaidTier = Boolean(planConfig && !planConfig.isFree && normalizedPlanId !== 'explorer');
-  const isPastDue = isPaidTier && status === 'past_due';
-  const canUpgradeTier = !['buyer_pro', 'elite', 'enterprise'].includes(normalizedPlanId);
-
-  const tierPillStyle = isPastDue
-    ? { bg: '#FAEEDA', text: '#BA7517', dot: '#BA7517' }
-    : isPaidTier
-      ? { bg: '#E6F3FF', text: '#136C9E', dot: '#136C9E' }
-      : { bg: '#F1F5F9', text: '#475569', dot: '#94A3B8' };
-
-  const displayName =
-    user?.name?.trim() ||
-    [user?.givenName, user?.familyName].filter(Boolean).join(' ').trim() ||
-    user?.email?.split('@')[0] ||
-    'User';
-
-  const initials = (() => {
-    const parts = displayName.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-    return displayName.slice(0, 2).toUpperCase();
-  })();
+  }, [photoUrl]);
 
   const handleNavClick = (sectionId: string, path: string) => {
     onSectionChange(sectionId);
@@ -242,9 +228,9 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}
                   title={isCollapsed ? `${displayName} · ${tierName}` : undefined}
                 >
-                  {user.photoURL && !avatarError ? (
+                  {photoUrl && !avatarError ? (
                     <img
-                      src={user.photoURL}
+                      src={photoUrl}
                       alt={displayName}
                       onError={() => setAvatarError(true)}
                       className="h-8 w-8 rounded-full object-cover flex-shrink-0 border border-slate-200"
