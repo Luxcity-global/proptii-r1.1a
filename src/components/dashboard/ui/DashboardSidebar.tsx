@@ -49,11 +49,20 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     setAvatarError(false);
   }, [user?.photoURL]);
 
-  const normalizedPlanId: PlanId = !plan || plan === 'free' ? 'explorer' : (plan as PlanId);
+  const isInactiveSubscription = status === 'canceled' || status === 'unpaid';
+  const normalizedPlanId: PlanId =
+    !plan || plan === 'free' || isInactiveSubscription ? 'explorer' : (plan as PlanId);
   const planConfig = getPlanById(normalizedPlanId);
   const tierName = planConfig?.name ?? 'Explorer';
   const isPaidTier = Boolean(planConfig && !planConfig.isFree && normalizedPlanId !== 'explorer');
+  const isPastDue = isPaidTier && status === 'past_due';
   const canUpgradeTier = !['buyer_pro', 'elite', 'enterprise'].includes(normalizedPlanId);
+
+  const tierPillStyle = isPastDue
+    ? { bg: '#FAEEDA', text: '#BA7517', dot: '#BA7517' }
+    : isPaidTier
+      ? { bg: '#E6F3FF', text: '#136C9E', dot: '#136C9E' }
+      : { bg: '#F1F5F9', text: '#475569', dot: '#94A3B8' };
 
   const displayName =
     user?.name?.trim() ||
@@ -270,15 +279,14 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                     <span
                       data-testid="sidebar-tier-badge"
                       className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold truncate min-w-0"
-                      style={
-                        isPaidTier
-                          ? { backgroundColor: '#E8F5F0', color: '#1D9E75' }
-                          : { backgroundColor: '#F0F6FF', color: '#136C9E' }
-                      }
+                      style={{
+                        backgroundColor: tierPillStyle.bg,
+                        color: tierPillStyle.text,
+                      }}
                     >
                       <span
                         className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: isPaidTier ? '#1D9E75' : '#136C9E' }}
+                        style={{ backgroundColor: tierPillStyle.dot }}
                         aria-hidden
                       />
                       <span className="truncate">{billingLoading ? 'Plan…' : tierName}</span>

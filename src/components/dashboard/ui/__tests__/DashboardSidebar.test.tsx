@@ -238,7 +238,9 @@ describe('DashboardSidebar — profile photo, tier badge & upgrade CTA', () => {
             />
         );
 
-        expect(screen.getByTestId('sidebar-tier-badge')).toHaveTextContent('Buyer Pro');
+        const badge = screen.getByTestId('sidebar-tier-badge');
+        expect(badge).toHaveTextContent('Buyer Pro');
+        expect(badge).toHaveStyle({ backgroundColor: '#E6F3FF', color: '#136C9E' });
         expect(screen.queryByRole('button', { name: /upgrade/i })).not.toBeInTheDocument();
 
         const manageBtn = screen.getByRole('button', { name: /manage/i });
@@ -247,5 +249,22 @@ describe('DashboardSidebar — profile photo, tier badge & upgrade CTA', () => {
 
         expect(onSectionChange).toHaveBeenCalledWith('settings');
         expect(mockNavigate).toHaveBeenCalledWith('/dashboard/settings');
+    });
+
+    it('falls back to Explorer and shows Upgrade when subscription status is canceled', () => {
+        mockBillingState = {
+            plan: 'buyer_pro',
+            status: 'canceled',
+            hasStripeCustomer: true,
+            loading: false,
+            refresh: vi.fn(),
+        };
+        renderSidebar(0);
+
+        const badge = screen.getByTestId('sidebar-tier-badge');
+        expect(badge).toHaveTextContent('Explorer');
+        expect(badge).toHaveStyle({ backgroundColor: '#F1F5F9', color: '#475569' });
+        expect(screen.getByRole('button', { name: /upgrade/i })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /manage/i })).not.toBeInTheDocument();
     });
 });
