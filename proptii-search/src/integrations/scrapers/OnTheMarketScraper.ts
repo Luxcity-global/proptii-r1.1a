@@ -225,9 +225,7 @@ export class OnTheMarketScraper implements IScraper {
     const q = query.toLowerCase().trim();
     const isRental = q.includes('rent') || q.includes('pcm') || !q.includes('sale');
     
-    // Improved location regex matching multi-word areas
-    const locMatch = q.match(/(?:in|around|near)\s+([a-z\s]+?)(?:\s+under|\s+for|\s+max|\s+from|\s*$)/i);
-    const location = locMatch ? locMatch[1].trim() : 'london';
+    const location = postcodeLocationService.extractLocationString(query).toLowerCase();
 
     let minBeds: string | undefined;
     let maxBeds: string | undefined;

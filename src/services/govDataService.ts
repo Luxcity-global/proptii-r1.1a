@@ -95,12 +95,24 @@ export function mockClassifyQuery(query: string): ClassifyResponse {
     entities.tenure = 'rent';
   }
 
-  // Location
-  const locationMatch = lower.match(
-    /\b(?:in|near|around|at)\s+([a-z][a-z\s'-]{1,40}?)(?:\s+(?:under|below|for|with|near|within|£|\d)|$)/i,
-  );
-  if (locationMatch) {
-    entities.location = locationMatch[1].trim().replace(/\s+/g, ' ');
+  // Location — inspect all preposition clauses so "near good schools in Bristol" picks "bristol".
+  const locCandidates: Array<{ score: number; value: string }> = [];
+  const locRegex =
+    /\b(in|near|around|at)\s+([a-z][a-z\s'-]{1,40}?)(?=\s+(?:in|near|around|at|under|below|for|with|within|£|\d)|$)/gi;
+  const facilityRe =
+    /\b(?:good\s+)?(?:schools?|stations?|tubes?|undergrounds?|trains?|parks?|shops?|supermarkets?|gyms?|hospitals?|universit(?:y|ies)|colleges?|amenities)\b/i;
+  let locExec: RegExpExecArray | null;
+  while ((locExec = locRegex.exec(lower)) !== null) {
+    const prep = locExec[1].toLowerCase();
+    const val = locExec[2].trim().replace(/\s+/g, ' ');
+    if (!val) continue;
+    let score = prep === 'in' ? 4 : prep === 'near' ? 1 : 2;
+    if (!facilityRe.test(val)) score += 10;
+    locCandidates.push({ score, value: val });
+  }
+  if (locCandidates.length > 0) {
+    locCandidates.sort((a, b) => b.score - a.score);
+    entities.location = locCandidates[0].value;
   }
 
   const COUNTRY_LEVEL =

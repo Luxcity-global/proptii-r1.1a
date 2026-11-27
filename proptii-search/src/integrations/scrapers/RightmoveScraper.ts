@@ -323,13 +323,12 @@ export class RightmoveScraper implements IScraper {
     const q = query.toLowerCase().trim();
     const isRental = q.includes('rent') || q.includes('pcm') || !q.includes('sale');
 
-    // Match multi-word locations after "in" or "around" or "near"
-    const locMatch = q.match(/(?:in|around|near)\s+([a-z\s]+?)(?:\s+under|\s+for|\s+max|\s+from|\s*$)/i);
+    const extractedLoc = postcodeLocationService.extractLocationString(query).toLowerCase();
     let rawLoc = 'london';
     let locationId = LOCATION_IDS['london'];
 
-    if (locMatch) {
-      const candidate = locMatch[1].trim();
+    if (extractedLoc) {
+      const candidate = extractedLoc.trim();
       const candidateNoSpaces = candidate.replace(/\s+/g, '');
       const firstWord = candidate.split(/\s+/)[0];
 

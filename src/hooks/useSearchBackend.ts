@@ -183,16 +183,18 @@ export const useSearchBackend = () => {
       // If user ONLY wants Proptii results, we stop here (wait for firestorePromise)
       if (type === 'proptii') {
         const results = await firestorePromise;
-        if (results.length === 0) {
-          throw new Error('No properties found on Proptii. Please try a different search.');
+        if (results.length > 0) {
+          const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+          const macroSig = `${searchQuery.trim().toLowerCase()}|${type}|beds:${urlParams.get('beds') || ''}|minP:${urlParams.get('minPrice') || ''}|maxP:${urlParams.get('maxPrice') || ''}|types:${urlParams.get('types') || ''}|tenure:${urlParams.get('tenure') || ''}|loc:${filters.location || ''}`;
+          sessionStorage.setItem('searchResults', JSON.stringify({
+            results,
+            query: searchQuery,
+            searchType: 'proptii',
+            filters,
+            macroSignature: macroSig,
+            timestamp: Date.now()
+          }));
         }
-        
-        sessionStorage.setItem('searchResults', JSON.stringify({
-          results,
-          query: searchQuery,
-          searchType: 'proptii',
-          timestamp: Date.now()
-        }));
         setIsLoading(false);
         return results;
       }

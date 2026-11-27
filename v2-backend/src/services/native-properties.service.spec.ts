@@ -181,4 +181,79 @@ describe('NativePropertiesService Ownership & Persistence', () => {
       expect(ids).not.toContain('p5');
     });
   });
+
+  describe('searchPublicPaginated natural-language matching', () => {
+    it('matches public compliant listings for natural-language queries like "3 bed house near good schools in Bristol"', async () => {
+      const publicDocs = [
+        {
+          id: 'bristol-3bed',
+          title: 'Georgian Terrace House',
+          address: '12 Park Street',
+          city: 'Bristol',
+          postcode: 'BS1 5JG',
+          bedrooms: 3,
+          propertyType: 'House',
+          status: 'vacant',
+          listingVisibility: 'public',
+          takesDeposit: 'no',
+          documents: [
+            { type: 'gas-cert' },
+            { type: 'eicr' },
+            { type: 'epc', epcRating: 'C' },
+          ],
+        },
+        {
+          id: 'london-2bed',
+          title: 'Modern Flat in Soho',
+          address: '10 Wardour Street',
+          city: 'London',
+          postcode: 'W1D 6QF',
+          bedrooms: 2,
+          propertyType: 'Flat',
+          status: 'vacant',
+          listingVisibility: 'public',
+          takesDeposit: 'no',
+          documents: [
+            { type: 'gas-cert' },
+            { type: 'eicr' },
+            { type: 'epc', epcRating: 'B' },
+          ],
+        },
+        {
+          id: 'bristol-private',
+          title: 'Private Bristol Listing',
+          city: 'Bristol',
+          bedrooms: 3,
+          status: 'vacant',
+          listingVisibility: 'private',
+          takesDeposit: 'no',
+          documents: [
+            { type: 'gas-cert' },
+            { type: 'eicr' },
+            { type: 'epc', epcRating: 'C' },
+          ],
+        },
+      ];
+
+      const col = {
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnValue({
+          get: vi.fn().mockResolvedValue({
+            docs: publicDocs.map((d) => ({ id: d.id, data: () => d })),
+          }),
+        }),
+      };
+      vi.spyOn(service as any, 'collection', 'get').mockReturnValue(col);
+
+      const res = await service.searchPublicPaginated({
+        query: '3 bed house near good schools in Bristol',
+        status: 'vacant',
+        limit: 50,
+      });
+
+      expect(res.results.map((r: any) => r.id)).toEqual(['bristol-3bed']);
+      expect(res.total).toBe(1);
+    });
+  });
 });

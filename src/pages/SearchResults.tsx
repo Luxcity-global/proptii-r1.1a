@@ -607,12 +607,25 @@ const SearchResults: React.FC = () => {
               <button
                 onClick={() => {
                   clearCache();
-                  navigate(`/?q=${encodeURIComponent(searchQuery)}&type=proptii`);
+                  navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${encodeURIComponent(searchType)}`);
                 }}
                 className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-[#E65D24] to-[#D54D14] hover:opacity-95 transition-all shadow-md"
               >
                 Start New Search
               </button>
+
+              {searchType === 'proptii' && !isFormatError && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearCache();
+                    navigate(`/search?q=${encodeURIComponent(searchQuery)}&type=onthemarket`);
+                  }}
+                  className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 transition-all"
+                >
+                  Try On The Market
+                </button>
+              )}
 
               {isNetworkError && (
                 <button
@@ -705,7 +718,7 @@ const SearchResults: React.FC = () => {
                     type="button"
                     onClick={() => {
                       clearCache();
-                      navigate(`/?q=${encodeURIComponent(searchQuery)}&type=proptii`);
+                      navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${encodeURIComponent(searchType)}`);
                     }}
                     className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-[#E65D24] to-[#D54D14] hover:opacity-95 transition-all shadow-md"
                   >

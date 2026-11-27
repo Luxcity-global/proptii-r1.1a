@@ -7,6 +7,69 @@ import { OwnershipClaimsService } from './ownership-claims.service';
 import { buildAddressMatchKey } from '../utils/address-match-key';
 import { isPubliclySearchable } from '../utils/listing-visibility';
 
+const NATIVE_SEARCH_STOP_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'in', 'at', 'on', 'near', 'around', 'by', 'to',
+  'for', 'of', 'with', 'without', 'within', 'from', 'under', 'below', 'over',
+  'above', 'max', 'min', 'between', 'rent', 'rental', 'let', 'buy', 'sale',
+  'purchase', 'pcm', 'pw', 'per', 'month', 'week', 'bed', 'beds', 'bedroom',
+  'bedrooms', 'br', 'flat', 'flats', 'apartment', 'apartments', 'house', 'houses',
+  'studio', 'studios', 'bungalow', 'bungalows', 'property', 'properties', 'home',
+  'homes', 'listing', 'listings', 'good', 'nice', 'great', 'quiet', 'modern',
+  'cheap', 'luxury', 'looking', 'find', 'search', 'schools', 'school', 'station',
+  'stations', 'shops', 'park', 'parks', 'pet', 'pets', 'friendly', 'bills',
+  'included', 'parking', 'garden', 'balcony', 'furnished', 'unfurnished',
+]);
+
+function matchesNaturalLanguageQuery(doc: any, rawQuery?: string): boolean {
+  const q = (rawQuery || '').toLowerCase().trim();
+  if (!q) return true;
+
+  const haystack = [
+    doc.title,
+    doc.address,
+    doc.city,
+    doc.postcode,
+    doc.description,
+    doc.notes,
+    doc.propertyType,
+    ...(Array.isArray(doc.amenities) ? doc.amenities : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (haystack.includes(q)) return true;
+
+  const isStudio = /\bstudio\b/i.test(q);
+  const bedsMatch = q.match(/\b(\d+)\s*(?:bed|beds|bedroom|bedrooms|br)\b/i);
+  const requestedBeds = isStudio ? 0 : bedsMatch ? parseInt(bedsMatch[1], 10) : null;
+
+  if (
+    requestedBeds !== null &&
+    doc.bedrooms !== undefined &&
+    doc.bedrooms !== null &&
+    doc.bedrooms !== ''
+  ) {
+    if (Number(doc.bedrooms) !== requestedBeds) return false;
+  }
+
+  const tokens = q
+    .split(/[\s,;!?/()]+/)
+    .map((t) => t.trim())
+    .filter((t) => {
+      if (!t || NATIVE_SEARCH_STOP_WORDS.has(t)) return false;
+      if (/^£?\d+(?:,\d+)*k?(?:pcm|pw)?$/i.test(t)) return false;
+      return true;
+    });
+
+  if (tokens.length === 0) return true;
+  return tokens.every((t) => haystack.includes(t));
+}
+
+function filterSearchableDocs(docs: any[], query?: string): any[] {
+  return docs.filter((d: any) => isPubliclySearchable(d) && matchesNaturalLanguageQuery(d, query));
+}
+
 function isPropertyAuthorized(existing: any, userId?: string, userEmail?: string): boolean {
   if (!existing) return false;
 
@@ -209,26 +272,16 @@ export class NativePropertiesService {
         docs = docs.slice(0, limitNum);
       }
 
-      if (options.query) {
-        const q = options.query.toLowerCase().trim();
-        docs = docs.filter((d: any) =>
-          (d.title && d.title.toLowerCase().includes(q)) ||
-          (d.address && d.address.toLowerCase().includes(q)) ||
-          (d.city && d.city.toLowerCase().includes(q)) ||
-          (d.postcode && d.postcode.toLowerCase().includes(q))
-        );
-      }
-
-      // C2: exclude private / non-searchable listings from public search.
-      docs = docs.filter((d: any) => isPubliclySearchable(d));
+      // C2: exclude private / non-searchable listings and apply token-aware query filtering.
+      docs = filterSearchableDocs(docs, options.query);
 
       return { results: docs, nextCursor, total: docs.length };
     } catch (err: any) {
       console.warn('[NativePropertiesService] Firestore searchPublicPaginated fallback:', err?.message || err);
       // Fallback to basic query if composite index is pending
       const fallbackSnapshot = await col.limit(limitNum).get();
-      let fallbackDocs = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fallbackDocs = fallbackDocs.filter((d: any) => isPubliclySearchable(d));
+      const rawFallbackDocs = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const fallbackDocs = filterSearchableDocs(rawFallbackDocs, options.query);
       return { results: fallbackDocs, nextCursor: null, total: fallbackDocs.length };
     }
   }

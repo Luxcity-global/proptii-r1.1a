@@ -305,8 +305,7 @@ export class ZooplaScraper implements IScraper {
     const q = query.toLowerCase().trim();
     const isRental = q.includes('rent') || q.includes('pcm') || !q.includes('sale');
 
-    const locMatch = q.match(/\b(?:in|around|near|at)\s+([a-z0-9\s-]+?)(?:\s+(?:under|for|max|min|from|between|with|pcm|pw|£)\b|\s*$)/i);
-    const location = locMatch ? locMatch[1].replace(/^(?:in|around|near|at)\s+/i, '').trim() : 'london';
+    const location = postcodeLocationService.extractLocationString(query).toLowerCase();
 
     let minBeds: string | undefined;
     let maxBeds: string | undefined;

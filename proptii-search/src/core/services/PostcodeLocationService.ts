@@ -165,8 +165,11 @@ const NON_LOCATION_WORDS = new Set([
   'pw', 'flat', 'flats', 'apartment', 'apartments', 'house', 'houses', 'studio',
   'studios', 'bed', 'beds', 'bedroom', 'bedrooms', 'under', 'max', 'min', 'price',
   'budget', 'property', 'properties', 'from', 'with', 'parking', 'balcony', 'garden',
-  'luxury', 'modern', 'cheap', 'furnished', 'unfurnished'
+  'luxury', 'modern', 'cheap', 'furnished', 'unfurnished', 'good', 'schools', 'school'
 ]);
+
+const PREP_LOCATION_REGEX = /\b(in|around|near|at)\s+([a-z0-9][a-z0-9\s'-]*?)(?=\s+(?:in|around|near|at|under|below|above|over|for|max|min|from|between|with|without|within|pcm|pw|£)\b|\s*$)/gi;
+const FACILITY_PHRASE_REGEX = /\b(?:good\s+)?(?:schools?|stations?|tubes?|undergrounds?|trains?|parks?|shops?|supermarkets?|gyms?|hospitals?|universit(?:y|ies)|colleges?|bars?|restaurants?|cafes?|transport|buses?|amenities)\b/i;
 
 const CACHE_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const MEMORY_CACHE = new Map<string, ResolvedLocation>();
@@ -242,11 +245,24 @@ export class PostcodeLocationService {
       return fullPostcodeMatch[0].toUpperCase();
     }
 
-    // 2. Check for location after "in", "around", "near", "at"
-    const prepMatch = q.match(/\b(?:in|around|near|at)\s+([a-z0-9\s-]+?)(?:\s+(?:under|for|max|min|from|between|with|pcm|pw|£)\b|\s*$)/i);
-    if (prepMatch && prepMatch[1]) {
-      const candidate = prepMatch[1].replace(/^(?:in|around|near|at)\s+/i, '').trim();
-      if (candidate.length > 0) return candidate;
+    // 2. Check for location after "in", "around", "near", "at" — evaluate all clauses so
+    // queries like "3 bed house near good schools in Bristol" pick "Bristol" over "good schools".
+    const candidates: Array<{ prep: string; value: string; score: number }> = [];
+    PREP_LOCATION_REGEX.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = PREP_LOCATION_REGEX.exec(q)) !== null) {
+      const prep = match[1].toLowerCase();
+      const value = match[2].trim();
+      if (!value) continue;
+      let score = prep === 'in' ? 4 : prep === 'near' ? 1 : 2;
+      if (!FACILITY_PHRASE_REGEX.test(value)) {
+        score += 10;
+      }
+      candidates.push({ prep, value, score });
+    }
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => b.score - a.score);
+      return candidates[0].value;
     }
 
     // 3. Check for standalone outcode token

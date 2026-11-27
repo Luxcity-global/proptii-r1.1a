@@ -32,6 +32,8 @@ describe('PostcodeLocationService', () => {
       expect(service.extractLocationString('penthouse in Canary Wharf under 5000')).toBe('Canary Wharf');
       expect(service.extractLocationString('flats around Richmond upon Thames')).toBe('Richmond upon Thames');
       expect(service.extractLocationString('apartments near Shoreditch')).toBe('Shoreditch');
+      expect(service.extractLocationString('3 bed house near good schools in Bristol')).toBe('Bristol');
+      expect(service.extractLocationString('2 bed flat near station in Manchester under 2000')).toBe('Manchester');
     });
 
     it('defaults to London for empty or unparseable queries', () => {
