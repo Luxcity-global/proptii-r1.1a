@@ -49,29 +49,41 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
 }) => {
   const [activeOpenPopover, setActiveOpenPopover] = useState<string | null>(null);
 
-  // Price pill badge label
-  let priceBadge: string | null = null;
+  // Price inline pill label (replaces raw label + count badge when active)
   const isPriceActive = filters.minPrice !== null || filters.maxPrice !== null;
+  let priceLabel = 'Price';
   if (filters.minPrice !== null && filters.maxPrice !== null) {
-    priceBadge = `£${filters.minPrice}–£${filters.maxPrice}`;
+    priceLabel = `£${filters.minPrice.toLocaleString('en-GB')}–£${filters.maxPrice.toLocaleString('en-GB')}`;
   } else if (filters.minPrice !== null) {
-    priceBadge = `From £${filters.minPrice}`;
+    priceLabel = `From £${filters.minPrice.toLocaleString('en-GB')}`;
   } else if (filters.maxPrice !== null) {
-    priceBadge = `Up to £${filters.maxPrice}`;
+    priceLabel = `Up to £${filters.maxPrice.toLocaleString('en-GB')}`;
   }
 
-  // Bedroom pill badge label
+  // Bedroom inline pill label
   const isBedsActive = filters.bedrooms !== 'any' && Array.isArray(filters.bedrooms) && filters.bedrooms.length > 0;
-  let bedsBadge: string | null = null;
+  let bedsLabel = 'Bedrooms';
   if (isBedsActive && Array.isArray(filters.bedrooms)) {
-    bedsBadge = filters.bedrooms
-      .map((b) => (b === 0 ? 'Studio' : b >= 4 ? '4+' : `${b}`))
-      .join(', ');
+    const formatted = filters.bedrooms.map((b) => (b === 0 ? 'Studio' : b >= 4 ? '4+' : `${b}`));
+    bedsLabel =
+      formatted.length === 1 && formatted[0] === 'Studio'
+        ? 'Studio'
+        : `${formatted.join(', ')} ${filters.bedrooms.length === 1 && filters.bedrooms[0] === 1 ? 'bed' : 'beds'}`;
   }
 
-  // Property type badge
+  // Property type inline pill label
   const isTypesActive = filters.propertyTypes.length > 0;
-  const typesBadge = isTypesActive ? `${filters.propertyTypes.length}` : null;
+  const TYPE_LABELS: Record<PropertyTypeCategory, string> = {
+    flat: 'Flats',
+    house: 'Houses',
+    studio: 'Studios',
+    bungalow: 'Bungalows',
+  };
+  const typesLabel = isTypesActive
+    ? filters.propertyTypes.length === 1
+      ? TYPE_LABELS[filters.propertyTypes[0]] || 'Property Type'
+      : `${filters.propertyTypes.length} types`
+    : 'Property Type';
 
   const containerClass =
     variant === 'card'
@@ -80,15 +92,12 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
 
   return (
     <div className={containerClass}>
-      {/* Top Filter Bar Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        {/* Left: Quick Pill Popovers */}
+      {/* Top Filter Bar Controls — 3 core facets (Price, Bedrooms, Property Type) + Clear all */}
+      <div className="flex items-center justify-between gap-2.5 flex-wrap">
         <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
-          
           {/* Price Popover */}
           <FilterPillDropdown
-            label="Price"
-            badge={priceBadge}
+            label={priceLabel}
             isActive={isPriceActive}
             isOpen={activeOpenPopover === 'price'}
             onToggle={() => setActiveOpenPopover(activeOpenPopover === 'price' ? null : 'price')}
@@ -110,8 +119,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
 
           {/* Bedrooms Popover */}
           <FilterPillDropdown
-            label="Bedrooms"
-            badge={bedsBadge}
+            label={bedsLabel}
             isActive={isBedsActive}
             isOpen={activeOpenPopover === 'bedrooms'}
             onToggle={() => setActiveOpenPopover(activeOpenPopover === 'bedrooms' ? null : 'bedrooms')}
@@ -127,8 +135,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
 
           {/* Property Type Popover */}
           <FilterPillDropdown
-            label="Property Type"
-            badge={typesBadge}
+            label={typesLabel}
             isActive={isTypesActive}
             isOpen={activeOpenPopover === 'types'}
             onToggle={() => setActiveOpenPopover(activeOpenPopover === 'types' ? null : 'types')}
@@ -141,53 +148,10 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               onClose={() => setActiveOpenPopover(null)}
             />
           </FilterPillDropdown>
-
-          {/* Furnished Quick Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              if (setFurnishing) {
-                setFurnishing(filters.furnishing === 'furnished' ? 'any' : 'furnished');
-              }
-            }}
-            className={`inline-flex items-center max-sm:flex-auto max-sm:justify-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all shadow-xs ${
-              filters.furnishing === 'furnished'
-                ? 'bg-[#136C9E] text-white border border-[#136C9E]'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            <span>Furnished</span>
-          </button>
-
-          {/* Parking Quick Toggle */}
-          <button
-            type="button"
-            onClick={() => toggleParking?.()}
-            className={`hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all shadow-xs ${
-              filters.hasParking
-                ? 'bg-[#136C9E] text-white border border-[#136C9E]'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            <span>Parking</span>
-          </button>
-
-          {/* Balcony / Garden Quick Toggle */}
-          <button
-            type="button"
-            onClick={() => toggleBalconyOrGarden?.()}
-            className={`hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all shadow-xs ${
-              filters.hasBalconyOrGarden
-                ? 'bg-[#136C9E] text-white border border-[#136C9E]'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            <span>Balcony/Garden</span>
-          </button>
         </div>
 
         {/* Right: Reset action (or Sort when explicitly enabled) */}
-        <div className="ml-auto flex items-center gap-3 max-sm:ml-0 max-sm:w-full">
+        <div className="ml-auto flex items-center gap-3 max-sm:ml-0">
           {counts.hasActiveFilters && (
             <button
               type="button"
@@ -201,7 +165,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
         </div>
       </div>
 
-      {/* Active Filter Chips Sub-bar (only secondary/non-pill filters in harmonized inline mode) */}
+      {/* Active Filter Chips Sub-bar (only secondary/modal filters in harmonized inline mode) */}
       <ActiveFilterChips
         filters={filters}
         counts={counts}

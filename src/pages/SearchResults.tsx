@@ -27,7 +27,7 @@ import communicationService from '../services/communicationService';
 import QuickRequestModal from '../components/enquiry/QuickRequestModal';
 import { SearchMap } from '../components/search/SearchMap';
 import { SearchResultsList } from '../components/search/SearchResultsList';
-import { LocationInsights, extractLocationLabel } from '../components/search/LocationInsights';
+import { LocationInsights, extractLocationLabel, formatLocationTitle } from '../components/search/LocationInsights';
 import { PropertyDetailsModal } from '../components/search/PropertyDetailsModal';
 import { SearchPageHeader } from '../components/search/SearchPageHeader';
 import '../styles/searchResults.css';
@@ -142,12 +142,10 @@ const SearchResults: React.FC = () => {
     toggleBedroom,
     setBedrooms,
     togglePropertyType,
-    setFurnishing,
-    toggleParking,
-    toggleBalconyOrGarden,
     setSortBy,
     resetFilters,
     removeFilter,
+    applyFilterPatch,
     filteredProperties,
     counts: filterCounts,
   } = usePropertyFilters(results, classification?.entities);
@@ -295,7 +293,8 @@ const SearchResults: React.FC = () => {
     navigate(`/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(searchType)}`);
   };
 
-  const locationLabel = classification?.entities?.location || extractLocationLabel(searchQuery);
+  const locationLabel =
+    formatLocationTitle(classification?.entities?.location || '') || extractLocationLabel(searchQuery);
   const isCached = Boolean(
     typeof sessionStorage !== 'undefined' && sessionStorage.getItem('searchResults')
   );
@@ -325,6 +324,17 @@ const SearchResults: React.FC = () => {
       notify(`Showing ${matchCount} ${matchCount === 1 ? 'property' : 'properties'} matching all filters`);
     },
     [clearCache, navigate, rawSearchTypeParam]
+  );
+
+  const handleApplyClientFilters = useCallback(
+    (
+      patch: Parameters<typeof applyFilterPatch>[0],
+      matchCount: number,
+    ) => {
+      applyFilterPatch(patch);
+      notify(`Showing ${matchCount} ${matchCount === 1 ? 'property' : 'properties'} matching filters`);
+    },
+    [applyFilterPatch]
   );
 
   const handleSaveSearch = () => {
@@ -453,9 +463,6 @@ const SearchResults: React.FC = () => {
         toggleBedroom={toggleBedroom}
         setBedrooms={setBedrooms}
         togglePropertyType={togglePropertyType}
-        setFurnishing={setFurnishing}
-        toggleParking={toggleParking}
-        toggleBalconyOrGarden={toggleBalconyOrGarden}
         resetFilters={resetFilters}
         removeFilter={removeFilter}
       />
@@ -489,11 +496,13 @@ const SearchResults: React.FC = () => {
     sortBy: filters.sortBy,
     onSortByChange: setSortBy,
     activeFilterCount: filterCounts.activeFilterCount,
+    currentFilters: filters,
     quickFilters: quickFiltersRail,
     classificationEntities: classification?.entities,
     isClassifying,
     results,
     onApplyFilters: handleApplyFilters,
+    onApplyClientFilters: handleApplyClientFilters,
   };
 
   if (effectiveIsLoading && results.length === 0) {

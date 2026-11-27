@@ -1,33 +1,38 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SearchFilterBar } from '../SearchFilterBar';
-import { extractLocationLabel } from '../LocationInsights';
+import { extractLocationLabel, formatLocationTitle } from '../LocationInsights';
 import type { PropertyFilterState, FilterCounts } from '../../../types/filter';
 
 describe('Harmonized search filters', () => {
-  it('extractLocationLabel selects the actual city in multi-preposition queries', () => {
-    expect(extractLocationLabel('3 bed house near good schools in Bristol')).toBe('Bristol');
-    expect(extractLocationLabel('2 bed flat in Camden near station')).toBe('Camden');
-    expect(extractLocationLabel('apartments near Shoreditch')).toBe('Shoreditch');
+  it('extractLocationLabel and formatLocationTitle normalize casing and pick the actual city', () => {
+    expect(extractLocationLabel('3 bed house near good schools in bristol')).toBe('Bristol');
+    expect(extractLocationLabel('2 bed flat in camden near station')).toBe('Camden');
+    expect(extractLocationLabel('apartments near shoreditch')).toBe('Shoreditch');
+    expect(formatLocationTitle('canary wharf')).toBe('Canary Wharf');
+    expect(formatLocationTitle('sw10 9el')).toBe('SW10 9EL');
   });
 
-  it('renders inline SearchFilterBar without duplicating Sort dropdown or pill-owned chips', () => {
+  it('renders 3 core inline pills with inline active values, secondary modal chips, and no duplicate Sort', () => {
     const filters: PropertyFilterState = {
       minPrice: null,
-      maxPrice: null,
+      maxPrice: 2000,
       bedrooms: [3],
       propertyTypes: ['house'],
       tenure: 'rent',
-      furnishing: 'any',
-      hasParking: false,
+      furnishing: 'furnished',
+      hasParking: true,
       hasBalconyOrGarden: false,
       isPetFriendly: true,
       billsIncluded: false,
       keywords: '',
       sortBy: 'recommended',
       filterSources: {
+        maxPrice: 'user',
         bedrooms: 'user',
         propertyTypes: 'user',
+        furnishing: 'user',
+        hasParking: 'user',
         isPetFriendly: 'user',
       },
     };
@@ -35,7 +40,7 @@ describe('Harmonized search filters', () => {
       total: 30,
       filtered: 27,
       hasActiveFilters: true,
-      activeFilterCount: 3,
+      activeFilterCount: 6,
     };
 
     render(
@@ -48,27 +53,24 @@ describe('Harmonized search filters', () => {
         toggleBedroom={vi.fn()}
         setBedrooms={vi.fn()}
         togglePropertyType={vi.fn()}
-        setFurnishing={vi.fn()}
-        toggleParking={vi.fn()}
-        toggleBalconyOrGarden={vi.fn()}
         resetFilters={vi.fn()}
         removeFilter={vi.fn()}
       />
     );
 
-    // Quick filter pills are visible
-    expect(screen.getByText('Bedrooms')).toBeInTheDocument();
-    expect(screen.getByText('Property Type')).toBeInTheDocument();
+    // Core 3 quick pills reflect active values directly in pill copy
+    expect(screen.getByText('Up to £2,000')).toBeInTheDocument();
+    expect(screen.getByText('3 beds')).toBeInTheDocument();
+    expect(screen.getByText('Houses')).toBeInTheDocument();
 
     // Sort dropdown is NOT duplicated inside SearchFilterBar
     expect(screen.queryByText('Sort:')).not.toBeInTheDocument();
 
-    // Quick-pill filters (3 Beds, Houses) are NOT duplicated in ActiveFilterChips, while secondary filter (Pet Friendly) IS shown
+    // Core-3 pills are NOT duplicated in sub-chips, while FiltersModal-managed options show as dismissible chips
     expect(screen.queryByText('3 Beds')).not.toBeInTheDocument();
-    expect(screen.queryByText('Houses')).not.toBeInTheDocument();
+    expect(screen.getByText('Furnished')).toBeInTheDocument();
+    expect(screen.getByText('Parking Included')).toBeInTheDocument();
     expect(screen.getByText('Pet Friendly')).toBeInTheDocument();
-
-    // Clear all is present
     expect(screen.getAllByText('Clear all').length).toBeGreaterThanOrEqual(1);
   });
 });

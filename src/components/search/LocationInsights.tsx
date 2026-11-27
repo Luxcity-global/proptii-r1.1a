@@ -5,6 +5,25 @@ const LOCATION_PREP_REGEX =
 const FACILITY_LABEL_REGEX =
   /\b(?:good\s+)?(?:schools?|stations?|tubes?|undergrounds?|trains?|parks?|shops?|supermarkets?|gyms?|hospitals?|universit(?:y|ies)|colleges?|amenities)\b/i;
 
+const LOWERCASE_JOINERS = new Set(['in', 'at', 'on', 'upon', 'of', 'the', 'and', 'by', 'under']);
+const UK_OUTCODE_OR_POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?(?:\s+\d[A-Z]{2})?$/i;
+
+export function formatLocationTitle(raw: string): string {
+  const cleaned = (raw || '').trim().replace(/,+$/, '').replace(/\s+/g, ' ');
+  if (!cleaned) return '';
+  if (UK_OUTCODE_OR_POSTCODE.test(cleaned)) return cleaned.toUpperCase();
+
+  return cleaned
+    .split(' ')
+    .map((word, index) => {
+      if (UK_OUTCODE_OR_POSTCODE.test(word)) return word.toUpperCase();
+      const lower = word.toLowerCase();
+      if (index > 0 && LOWERCASE_JOINERS.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+}
+
 export const extractLocationLabel = (query: string): string => {
   const candidates: Array<{ score: number; value: string }> = [];
   LOCATION_PREP_REGEX.lastIndex = 0;
@@ -19,7 +38,7 @@ export const extractLocationLabel = (query: string): string => {
   }
   if (candidates.length > 0) {
     candidates.sort((a, b) => b.score - a.score);
-    return candidates[0].value;
+    return formatLocationTitle(candidates[0].value) || 'this area';
   }
   return 'this area';
 };

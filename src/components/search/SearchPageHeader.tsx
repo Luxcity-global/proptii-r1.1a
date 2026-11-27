@@ -5,7 +5,7 @@ import { entitiesToPills } from './FilterPills';
 import { FiltersModal } from './FiltersModal';
 import type { ClassifyEntities } from '../../types/govData';
 import type { Property } from '../../types/property';
-import type { SortOption as FilterSortOption } from '../../types/filter';
+import type { PropertyFilterState, SortOption as FilterSortOption } from '../../types/filter';
 
 export type SortOption = 'Relevance' | 'Newest' | 'Price (low)' | 'Price (high)';
 
@@ -39,10 +39,28 @@ export interface SearchPageHeaderProps {
   classificationEntities?: ClassifyEntities | null;
   isClassifying?: boolean;
   activeFilterCount?: number;
+  currentFilters?: PropertyFilterState;
   quickFilters?: React.ReactNode;
   showMeta?: boolean;
   results?: Property[];
   onApplyFilters?: (query: string, matchCount: number) => void;
+  onApplyClientFilters?: (
+    patch: Partial<
+      Pick<
+        PropertyFilterState,
+        | 'minPrice'
+        | 'maxPrice'
+        | 'bedrooms'
+        | 'propertyTypes'
+        | 'furnishing'
+        | 'hasParking'
+        | 'hasBalconyOrGarden'
+        | 'isPetFriendly'
+        | 'billsIncluded'
+      >
+    >,
+    matchCount: number,
+  ) => void;
 }
 
 export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
@@ -67,10 +85,12 @@ export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
   classificationEntities,
   isClassifying: _isClassifying = false,
   activeFilterCount,
+  currentFilters,
   quickFilters,
   showMeta = true,
   results = [],
   onApplyFilters,
+  onApplyClientFilters,
 }) => {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
@@ -368,10 +388,15 @@ export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
         searchQuery={searchQuery}
         locationLabel={locationLabel}
         entities={classificationEntities}
+        currentFilters={currentFilters}
         results={results}
         onApply={(query, matchCount) => {
           setFiltersOpen(false);
           onApplyFilters?.(query, matchCount);
+        }}
+        onApplyClientFilters={(patch, matchCount) => {
+          setFiltersOpen(false);
+          onApplyClientFilters?.(patch, matchCount);
         }}
       />
     </>

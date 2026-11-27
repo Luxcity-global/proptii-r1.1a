@@ -653,6 +653,81 @@ export function usePropertyFilters(
     }));
   }, []);
 
+  /** Atomic batch update from FiltersModal so client-side refinements apply without a page reload. */
+  const applyFilterPatch = useCallback(
+    (
+      patch: Partial<
+        Pick<
+          PropertyFilterState,
+          | 'minPrice'
+          | 'maxPrice'
+          | 'bedrooms'
+          | 'propertyTypes'
+          | 'furnishing'
+          | 'hasParking'
+          | 'hasBalconyOrGarden'
+          | 'isPetFriendly'
+          | 'billsIncluded'
+        >
+      >,
+    ) => {
+      initializedFromClassifierRef.current = true;
+      setFilters((prev) => {
+        const nextSources: PropertyFilterState['filterSources'] = { ...prev.filterSources };
+        if ('minPrice' in patch || 'maxPrice' in patch) {
+          userModifiedFieldsRef.current.add('price');
+          if (patch.minPrice != null) nextSources.minPrice = 'user';
+          else delete nextSources.minPrice;
+          if (patch.maxPrice != null) nextSources.maxPrice = 'user';
+          else delete nextSources.maxPrice;
+        }
+        if ('bedrooms' in patch) {
+          userModifiedFieldsRef.current.add('bedrooms');
+          if (patch.bedrooms !== 'any' && Array.isArray(patch.bedrooms) && patch.bedrooms.length > 0) {
+            nextSources.bedrooms = 'user';
+          } else {
+            delete nextSources.bedrooms;
+          }
+        }
+        if ('propertyTypes' in patch) {
+          userModifiedFieldsRef.current.add('propertyTypes');
+          if (patch.propertyTypes && patch.propertyTypes.length > 0) {
+            nextSources.propertyTypes = 'user';
+          } else {
+            delete nextSources.propertyTypes;
+          }
+        }
+        if ('furnishing' in patch) {
+          userModifiedFieldsRef.current.add('furnishing');
+          if (patch.furnishing && patch.furnishing !== 'any') nextSources.furnishing = 'user';
+          else delete nextSources.furnishing;
+        }
+        if ('hasParking' in patch) {
+          userModifiedFieldsRef.current.add('parking');
+          if (patch.hasParking) nextSources.hasParking = 'user';
+          else delete nextSources.hasParking;
+        }
+        if ('hasBalconyOrGarden' in patch) {
+          userModifiedFieldsRef.current.add('outside');
+          if (patch.hasBalconyOrGarden) nextSources.hasBalconyOrGarden = 'user';
+          else delete nextSources.hasBalconyOrGarden;
+        }
+        if ('isPetFriendly' in patch) {
+          userModifiedFieldsRef.current.add('pets');
+          if (patch.isPetFriendly) nextSources.isPetFriendly = 'user';
+          else delete nextSources.isPetFriendly;
+        }
+        if ('billsIncluded' in patch) {
+          userModifiedFieldsRef.current.add('bills');
+          if (patch.billsIncluded) nextSources.billsIncluded = 'user';
+          else delete nextSources.billsIncluded;
+        }
+        return { ...prev, ...patch, filterSources: nextSources };
+      });
+    },
+    [],
+  );
+
   return {
     filters,
     filteredProperties,
@@ -671,6 +746,7 @@ export function usePropertyFilters(
     toggleBillsIncluded,
     setKeywords,
     setSortBy,
+    applyFilterPatch,
     resetFilters,
     removeFilter,
     promoteAiFilter,

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { ClassifyEntities } from '../../types/govData';
 import type { Property } from '../../types/property';
+import type { PropertyFilterState, PropertyTypeCategory } from '../../types/filter';
 
 export interface SearchFilterState {
   priceMin: number;
@@ -315,8 +316,73 @@ interface FiltersModalProps {
   searchQuery: string;
   locationLabel: string;
   entities?: ClassifyEntities | null;
+  currentFilters?: PropertyFilterState;
   results: Property[];
   onApply: (query: string, matchCount: number) => void;
+  onApplyClientFilters?: (
+    patch: Partial<
+      Pick<
+        PropertyFilterState,
+        | 'minPrice'
+        | 'maxPrice'
+        | 'bedrooms'
+        | 'propertyTypes'
+        | 'furnishing'
+        | 'hasParking'
+        | 'hasBalconyOrGarden'
+        | 'isPetFriendly'
+        | 'billsIncluded'
+      >
+    >,
+    matchCount: number,
+  ) => void;
+}
+
+function seedModalFromCurrentFilters(
+  query: string,
+  entities?: ClassifyEntities | null,
+  currentFilters?: PropertyFilterState,
+): { state: SearchFilterState; hasExplicitPrice: boolean } {
+  const base = seedFiltersFromSearch(query, entities);
+  if (!currentFilters) {
+    return { state: base, hasExplicitPrice: entities?.price_max != null };
+  }
+
+  const hasExplicitPrice = currentFilters.minPrice !== null || currentFilters.maxPrice !== null;
+  const beds: string[] =
+    currentFilters.bedrooms !== 'any' && Array.isArray(currentFilters.bedrooms)
+      ? currentFilters.bedrooms.map((b) => (b === 0 ? 'Studio' : b >= 5 ? '5+' : String(b)))
+      : [];
+
+  const outdoor = new Set<string>();
+  if (currentFilters.hasParking) outdoor.add('Off-street Parking');
+  if (currentFilters.hasBalconyOrGarden) outdoor.add('Private Garden');
+
+  const mappedPropTypes: string[] = [];
+  if (currentFilters.propertyTypes.includes('flat')) mappedPropTypes.push('Flat / Apartment');
+  if (currentFilters.propertyTypes.includes('house')) mappedPropTypes.push('Detached', 'Semi-detached', 'Terraced');
+  if (currentFilters.propertyTypes.includes('studio')) mappedPropTypes.push('Studio');
+  if (currentFilters.propertyTypes.includes('bungalow')) mappedPropTypes.push('Bungalow');
+
+  return {
+    hasExplicitPrice,
+    state: {
+      ...base,
+      priceMin: currentFilters.minPrice ?? 0,
+      priceMax: currentFilters.maxPrice ?? base.priceMax,
+      beds,
+      propTypes: mappedPropTypes,
+      furnishing:
+        currentFilters.furnishing === 'furnished'
+          ? 'Furnished'
+          : currentFilters.furnishing === 'unfurnished'
+          ? 'Unfurnished'
+          : '',
+      outdoor: Array.from(outdoor),
+      pets: currentFilters.isPetFriendly ? ['Dogs allowed'] : [],
+      billsIncluded: currentFilters.billsIncluded,
+    },
+  };
 }
 
 export function FiltersModal({
@@ -325,15 +391,21 @@ export function FiltersModal({
   searchQuery,
   locationLabel,
   entities,
+  currentFilters,
   results,
   onApply,
+  onApplyClientFilters,
 }: FiltersModalProps) {
-  const [draft, setDraft] = useState<SearchFilterState>(() => seedFiltersFromSearch(searchQuery, entities));
+  const initialSeed = seedModalFromCurrentFilters(searchQuery, entities, currentFilters);
+  const [draft, setDraft] = useState<SearchFilterState>(() => initialSeed.state);
+  const [priceDirty, setPriceDirty] = useState<boolean>(initialSeed.hasExplicitPrice);
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isOpen) return;
-    setDraft(seedFiltersFromSearch(searchQuery, entities));
+    const seeded = seedModalFromCurrentFilters(searchQuery, entities, currentFilters);
+    setDraft(seeded.state);
+    setPriceDirty(seeded.hasExplicitPrice);
     setOpenAccordions(new Set());
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps -- seed only when the dialog opens
 
@@ -401,22 +473,82 @@ export function FiltersModal({
   };
 
   const handleMinSlider = (raw: number) => {
+    setPriceDirty(true);
     const v = Math.min(raw, draft.priceMax - bounds.step);
     update({ priceMin: Math.max(0, v) });
   };
 
   const handleMaxSlider = (raw: number) => {
+    setPriceDirty(true);
     const v = Math.max(raw, draft.priceMin + bounds.step);
     update({ priceMax: Math.min(bounds.max, v) });
   };
 
   const handleApply = () => {
+    const initialTransaction: 'rent' | 'buy' =
+      entities?.tenure === 'buy' || /\bto buy\b|\bfor sale\b/i.test(searchQuery || '') ? 'buy' : 'rent';
+
+    const canApplyClientSide = Boolean(
+      onApplyClientFilters &&
+        results.length > 0 &&
+        draft.transaction === initialTransaction &&
+        draft.pricePeriod === 'monthly' &&
+        draft.furnishing !== 'Part-furnished' &&
+        !draft.commuteDest.trim() &&
+        draft.baths.length === 0 &&
+        draft.floors.length === 0 &&
+        draft.accessibility.length === 0 &&
+        draft.buildingAmenities.length === 0 &&
+        draft.propStyle.length === 0 &&
+        draft.rooms.length === 0 &&
+        !draft.floorplan &&
+        !draft.virtualTour &&
+        !draft.verifiedOnly &&
+        draft.availability === 'now',
+    );
+
+    if (canApplyClientSide && onApplyClientFilters) {
+      const mappedBeds = draft.beds
+        .map((b) => (b === 'Studio' ? 0 : b === '5+' ? 5 : parseInt(b, 10)))
+        .filter((n) => !isNaN(n));
+      const mappedTypes = new Set<PropertyTypeCategory>();
+      for (const t of draft.propTypes) {
+        if (t === 'Flat / Apartment') mappedTypes.add('flat');
+        else if (t === 'Detached' || t === 'Semi-detached' || t === 'Terraced') mappedTypes.add('house');
+        else if (t === 'Studio') mappedTypes.add('studio');
+        else if (t === 'Bungalow') mappedTypes.add('bungalow');
+      }
+
+      const monthlyMultiplier = 1;
+      onApplyClientFilters(
+        {
+          minPrice: priceDirty && draft.priceMin > 0 ? draft.priceMin * monthlyMultiplier : null,
+          maxPrice: priceDirty ? draft.priceMax * monthlyMultiplier : null,
+          bedrooms: mappedBeds.length > 0 ? mappedBeds : 'any',
+          propertyTypes: Array.from(mappedTypes),
+          furnishing:
+            draft.furnishing === 'Furnished'
+              ? 'furnished'
+              : draft.furnishing === 'Unfurnished'
+              ? 'unfurnished'
+              : 'any',
+          hasParking: draft.outdoor.some((o) => /parking|garage|ev/i.test(o)),
+          hasBalconyOrGarden: draft.outdoor.some((o) => /garden|balcony|terrace/i.test(o)),
+          isPetFriendly: draft.pets.length > 0,
+          billsIncluded: draft.billsIncluded,
+        },
+        matchCount,
+      );
+      return;
+    }
+
     const query = buildFilterSearchQuery(draft, location);
     if (!query) return;
     onApply(query, matchCount);
   };
 
   const handleReset = () => {
+    setPriceDirty(false);
     setDraft(seedFiltersFromSearch(searchQuery, entities));
   };
 

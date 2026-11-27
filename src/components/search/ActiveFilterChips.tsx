@@ -61,31 +61,29 @@ export const ActiveFilterChips: React.FC<ActiveFilterChipsProps> = ({
       };
       chips.push({ key: `type_${type}`, label: labels[type] || type });
     });
-
-    // Parking Chip
-    if (filters.hasParking) {
-      chips.push({
-        key: 'parking',
-        label: 'Parking Included',
-        icon: <Car className="w-3.5 h-3.5 text-[#136C9E]" aria-hidden="true" />,
-      });
-    }
-
-    // Balcony / Garden Chip
-    if (filters.hasBalconyOrGarden) {
-      chips.push({
-        key: 'outside',
-        label: 'Balcony / Garden',
-        icon: <Trees className="w-3.5 h-3.5 text-[#136C9E]" aria-hidden="true" />,
-      });
-    }
   }
 
-  // Unfurnished has no dedicated toggle button on the quick rail ("Furnished" only toggles furnished)
-  if (filters.furnishing && filters.furnishing !== 'any' && (!secondaryOnly || filters.furnishing === 'unfurnished')) {
+  // Show Furnished / Unfurnished / Parking / Balcony chips when they aren't rendered inline
+  if (filters.furnishing && filters.furnishing !== 'any') {
     chips.push({
       key: 'furnishing',
       label: filters.furnishing === 'furnished' ? 'Furnished' : 'Unfurnished',
+    });
+  }
+
+  if (filters.hasParking) {
+    chips.push({
+      key: 'parking',
+      label: 'Parking Included',
+      icon: <Car className="w-3.5 h-3.5 text-[#136C9E]" aria-hidden="true" />,
+    });
+  }
+
+  if (filters.hasBalconyOrGarden) {
+    chips.push({
+      key: 'outside',
+      label: 'Balcony / Garden',
+      icon: <Trees className="w-3.5 h-3.5 text-[#136C9E]" aria-hidden="true" />,
     });
   }
 
