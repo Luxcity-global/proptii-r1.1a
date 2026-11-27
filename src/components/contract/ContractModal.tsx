@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { showAlert } from 'utils/appDialog';
 import {
   UploadCloud, X, ChevronLeft, ChevronRight, ChevronDown, Check, FileText, HelpCircle, Search,
   Trash2, RotateCcw, Download, Lock, ArrowRight, ArrowUpRight, Send, Sparkles, CheckCircle2,
@@ -449,7 +450,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
       handleCustomize(template.id, template);
     } catch (error) {
       console.error('Error opening received contract:', error);
-      alert(error instanceof Error ? error.message : 'Failed to open this contract. Please try again.');
+      void showAlert(error instanceof Error ? error.message : 'Failed to open this contract. Please try again.');
     }
   };
 
@@ -468,11 +469,11 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
         }
       } else {
         console.error("Failed to delete template:", result.error);
-        alert("Failed to delete template. Please try again.");
+        void showAlert("Failed to delete template. Please try again.");
       }
     } catch (error) {
       console.error("Error deleting template:", error);
-      alert("Error deleting template. Please try again.");
+      void showAlert("Error deleting template. Please try again.");
     }
   };
 
@@ -489,11 +490,11 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
         }
       } else {
         console.error("Failed to restore template:", result.error);
-        alert("Failed to restore template. Please try again.");
+        void showAlert("Failed to restore template. Please try again.");
       }
     } catch (error) {
       console.error("Error restoring template:", error);
-      alert("Error restoring template. Please try again.");
+      void showAlert("Error restoring template. Please try again.");
     }
   };
 
@@ -507,11 +508,11 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
         console.log("Template permanently deleted from Firestore");
       } else {
         console.error("Failed to permanently delete template:", result.error);
-        alert("Failed to permanently delete template. Please try again.");
+        void showAlert("Failed to permanently delete template. Please try again.");
       }
     } catch (error) {
       console.error("Error permanently deleting template:", error);
-      alert("Error permanently deleting template. Please try again.");
+      void showAlert("Error permanently deleting template. Please try again.");
     }
   };
 
@@ -521,7 +522,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
     // Ensure user is authenticated
     if (!user?.id) {
       console.warn("User not authenticated during upload");
-      alert("You must be logged in to upload templates.");
+      void showAlert("You must be logged in to upload templates.");
       return;
     }
 
@@ -530,14 +531,14 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
     
     if (!file) {
       console.warn("No file selected");
-      alert("Please select a file to upload.");
+      void showAlert("Please select a file to upload.");
       return;
     }
     
     // Check file type
     if (file.type !== "application/pdf") {
       console.warn("Invalid file type:", file.type);
-      alert("Please select a PDF file. Only PDF files are supported.");
+      void showAlert("Please select a PDF file. Only PDF files are supported.");
       event.target.value = '';
       return;
     }
@@ -546,7 +547,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
     const maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
     if (file.size > maxFileSize) {
       console.warn("File too large:", file.size, "bytes");
-      alert(`File is too large. Maximum file size is 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`);
+      void showAlert(`File is too large. Maximum file size is 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`);
       event.target.value = '';
       return;
     }
@@ -554,7 +555,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
     // Check if file is too small (might be corrupted)
     if (file.size < 1024) { // Less than 1KB
       console.warn("File too small:", file.size, "bytes");
-      alert("File appears to be corrupted or empty. Please try a different file.");
+      void showAlert("File appears to be corrupted or empty. Please try a different file.");
       event.target.value = '';
       return;
     }
@@ -615,12 +616,12 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialT
         console.log("Template saved to Firestore successfully");
       } else {
         console.error("Failed to save template to Firestore:", result.error);
-        alert(`Failed to save template: ${result.error || 'Unknown error'}. Please try again.`);
+        void showAlert(`Failed to save template: ${result.error || 'Unknown error'}. Please try again.`);
       }
     } catch (error) {
       console.error("Error processing uploaded file:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Error processing file: ${errorMessage}. Please try again.`);
+      void showAlert(`Error processing file: ${errorMessage}. Please try again.`);
     } finally {
       setIsSaving(false);
     }

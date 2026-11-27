@@ -3,6 +3,7 @@ import { Download, Save, X, Move, RotateCcw, Trash2, FileText, PenTool, Type, Up
 import { PDFDocument, rgb } from 'pdf-lib';
 import * as pdfjs from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
+import { showAlert } from 'utils/appDialog';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 import SignaturePadComponent from './SignaturePad';
 import SignatureCaptureModal from './SignatureCaptureModal';
@@ -532,7 +533,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
 
       if (onPersistSigned) {
         await onPersistSigned(signedPdfBytes, finalDocumentUrl);
-        alert('Contract signed.');
+        await showAlert('Contract signed.');
         if (onSigned) onSigned(signedPdfBytes);
         return;
       }
@@ -610,7 +611,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
       // Just notify that signing is complete
       console.log('✅ Document signed successfully! Now go to the Send tab to email the contract.');
       if (variant !== 'wizard') {
-        alert('Contract signed successfully! Go to the "Send" tab to email the signed contract to recipients.');
+        await showAlert('Contract signed successfully! Go to the "Send" tab to email the signed contract to recipients.');
       }
       
       if (onSigned) {

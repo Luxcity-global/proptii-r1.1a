@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { showConfirm } from 'utils/appDialog';
 import { 
   Dialog, 
   DialogContent, 
@@ -97,9 +98,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     }
   }, [open]);
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (hasUnsavedChanges) {
-      if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
+      if (await showConfirm('You have unsaved changes. Are you sure you want to close?')) {
         onClose();
       }
     } else {

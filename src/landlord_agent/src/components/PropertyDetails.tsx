@@ -24,6 +24,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import { showConfirm } from "utils/appDialog";
 import {
   ArrowLeft,
   Edit3,
@@ -2088,9 +2089,9 @@ export function PropertyDetails({
                       {onRemoveTenant && (property.tenant?.id || property.tenantId) && (
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             const tid = property.tenant?.id || property.tenantId;
-                            if (tid && window.confirm(`Remove ${property.tenant?.name || 'this tenant'} from this property?`)) {
+                            if (tid && (await showConfirm(`Remove ${property.tenant?.name || 'this tenant'} from this property?`))) {
                               onRemoveTenant(tid, property.id);
                             }
                           }}

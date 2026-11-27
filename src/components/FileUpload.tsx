@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { uploadToFirebaseStorage } from '../services/storageService';
+import { showAlert } from 'utils/appDialog';
 
 interface StoredFile {
     name: string;
@@ -31,7 +32,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => 
     const handleUploadProcess = async (file: File) => {
         // Check file size (25MB limit)
         if (file.size > 25 * 1024 * 1024) {
-            alert('File size must be less than 25MB');
+            void showAlert('File size must be less than 25MB');
             return;
         }
 
@@ -52,11 +53,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => 
                 };
                 updateFormData("identity", { identityProof: storedFile });
             } else {
-                alert(uploadRes.error || 'Failed to upload document to storage');
+                void showAlert(uploadRes.error || 'Failed to upload document to storage');
             }
         } catch (err: any) {
             console.error('File upload failed:', err);
-            alert(err?.message || 'Upload error');
+            void showAlert(err?.message || 'Upload error');
         } finally {
             setIsUploading(false);
         }

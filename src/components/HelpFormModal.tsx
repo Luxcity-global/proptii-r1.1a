@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { firestoreService } from '../services/firestoreService';
+import { showAlert } from 'utils/appDialog';
 
 interface HelpFormModalProps {
     isOpen: boolean;
@@ -59,7 +60,7 @@ const HelpFormModal: React.FC<HelpFormModalProps> = ({ isOpen, onClose }) => {
             setShowSuccess(true);
         } catch (err) {
             console.error('Form submission error:', err);
-            alert('There was an error submitting your request. Please try again later.');
+            void showAlert('There was an error submitting your request. Please try again later.');
         } finally {
             setIsSubmitting(false);
         }

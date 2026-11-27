@@ -4,6 +4,7 @@ import { Calendar, Clock, MapPin, User, CheckCircle, Eye, X, Send, AlertCircle, 
 import { maskEmail } from '../../../utils/formatters';
 import { viewingService, ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import { listViewingsForTenant } from '../../../services/viewingInboxService';
+import { showAlert } from 'utils/appDialog';
 import { bookViewingRequestService, BookViewingRequest } from '../../../services/bookViewingRequestService';
 import { propertySelectionService, PropertySelection, PropertySelectionStats } from '../../../services/propertySelectionService';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -740,11 +741,11 @@ const Viewings: React.FC = () => {
 
   const sendRescheduleEmail = async () => {
     if (!selectedViewing || !rescheduleMessage.trim()) {
-      alert('Please enter a message');
+      void showAlert('Please enter a message');
       return;
     }
     if (!rescheduleNewDate || !rescheduleNewTime) {
-      alert('Please select the new date and time for the reschedule');
+      void showAlert('Please select the new date and time for the reschedule');
       return;
     }
 
@@ -752,7 +753,7 @@ const Viewings: React.FC = () => {
     try {
       const agentEmail = (rescheduleAgentEmail || landlordEmailOf(selectedViewing)).trim();
       if (!agentEmail.includes('@')) {
-        alert('Enter the landlord or agent email so they can receive this reschedule.');
+        void showAlert('Enter the landlord or agent email so they can receive this reschedule.');
         return;
       }
 
@@ -804,7 +805,7 @@ const Viewings: React.FC = () => {
           }
         );
         if (!updated.success) {
-          alert('The reschedule email was sent, but the viewing time could not be saved. Please try again.');
+          void showAlert('The reschedule email was sent, but the viewing time could not be saved. Please try again.');
           return;
         }
 
@@ -822,18 +823,18 @@ const Viewings: React.FC = () => {
             : item
         )));
 
-        alert('Reschedule request sent successfully!');
+        await showAlert('Reschedule request sent successfully!');
         setIsRescheduleModalOpen(false);
         setRescheduleNewDate('');
         setRescheduleNewTime('');
         setRescheduleMessage('');
         setSelectedViewing(null);
       } else {
-        alert(result.error || 'Failed to send reschedule request. Please try again.');
+        void showAlert(result.error || 'Failed to send reschedule request. Please try again.');
       }
     } catch (error) {
       console.error('Error sending reschedule email:', error);
-      alert('An error occurred while sending the reschedule request. Please try again.');
+      void showAlert('An error occurred while sending the reschedule request. Please try again.');
     } finally {
       setIsSendingEmail(false);
     }
@@ -896,16 +897,16 @@ const Viewings: React.FC = () => {
       if (result.success) {
         await viewingService.updateViewingStatus(selectedViewing.id, 'cancelled');
 
-        alert('Cancellation notice sent successfully!');
+        await showAlert('Cancellation notice sent successfully!');
         setIsCancelModalOpen(false);
         setCancelMessage('');
         setSelectedViewing(null);
       } else {
-        alert('Failed to send cancellation notice. Please try again.');
+        void showAlert('Failed to send cancellation notice. Please try again.');
       }
     } catch (error) {
       console.error('Error sending cancel email:', error);
-      alert('An error occurred while sending the cancellation notice. Please try again.');
+      void showAlert('An error occurred while sending the cancellation notice. Please try again.');
     } finally {
       setIsSendingEmail(false);
     }

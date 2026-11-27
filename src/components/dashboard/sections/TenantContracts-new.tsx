@@ -4,6 +4,7 @@ import { FileText, Download, Eye, CheckCircle, Clock, AlertTriangle, ChevronLeft
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
+import { showAlert, showConfirm } from 'utils/appDialog';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 
 import { useAuth } from '../../../contexts/AuthContext';
@@ -228,14 +229,18 @@ const TenantContracts: React.FC = () => {
         window.open(viewContract.documentUrl, '_blank');
       } else if (viewContract.documentUrl.startsWith('/')) {
         console.log('🔍 Mock contract document URL:', viewContract.documentUrl);
-        alert(`This is a demo contract. In a real application, this would open: ${viewContract.documentUrl}\n\nTo test the actual view functionality, please sign a real contract document.`);
+        await showAlert({
+          title: 'Demo Contract Preview',
+          message: `This is a demo contract. In a real application, this would open: ${viewContract.documentUrl}\n\nTo test the actual view functionality, please sign a real contract document.`,
+          tone: 'info',
+        });
       } else {
         console.log('🔍 Opening document URL:', viewContract.documentUrl);
         window.open(viewContract.documentUrl, '_blank');
       }
     } else {
       console.log('❌ No document URL available for contract:', contract.id);
-      alert('Document not available for viewing. This contract was created without a signed PDF document.');
+      await showAlert('Document not available for viewing. This contract was created without a signed PDF document.');
     }
   };
 
@@ -264,7 +269,11 @@ const TenantContracts: React.FC = () => {
         console.log('✅ Download initiated for contract:', contract.id);
       } else if (downloadContract.documentUrl.startsWith('/')) {
         console.log('🔍 Mock contract document URL:', downloadContract.documentUrl);
-        alert(`This is a demo contract. In a real application, this would download: ${downloadContract.documentUrl}\n\nTo test the actual download functionality, please sign a real contract document.`);
+        await showAlert({
+          title: 'Demo Contract Download',
+          message: `This is a demo contract. In a real application, this would download: ${downloadContract.documentUrl}\n\nTo test the actual download functionality, please sign a real contract document.`,
+          tone: 'info',
+        });
       } else {
         console.log('🔍 Downloading document URL:', downloadContract.documentUrl);
         const link = document.createElement('a');
@@ -278,26 +287,32 @@ const TenantContracts: React.FC = () => {
       }
     } else {
       console.log('❌ No document URL available for contract:', contract.id);
-      alert('Document not available for download. This contract was created without a signed PDF document.');
+      await showAlert('Document not available for download. This contract was created without a signed PDF document.');
     }
   };
 
   const handleDeleteContract = async (contractId: string) => {
     try {
       console.log('🔍 Delete button clicked for contract:', contractId);
-      if (window.confirm('Are you sure you want to delete this contract? This action cannot be undone.')) {
+      const confirmed = await showConfirm({
+        title: 'Delete Contract',
+        message: 'Are you sure you want to delete this contract? This action cannot be undone.',
+        confirmLabel: 'Delete',
+        tone: 'danger',
+      });
+      if (confirmed) {
         const result = await removeSignedContract(contractId);
 
         if (result.success) {
           console.log('✅ Contract deleted successfully:', contractId);
         } else {
           console.error('❌ Failed to delete contract:', result.error);
-          alert('Failed to delete contract. Please try again.');
+          await showAlert('Failed to delete contract. Please try again.');
         }
       }
     } catch (error) {
       console.error('❌ Error deleting contract:', error);
-      alert('Failed to delete contract. Please try again.');
+      await showAlert('Failed to delete contract. Please try again.');
     }
   };
 

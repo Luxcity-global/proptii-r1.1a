@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { showAlert, showConfirm } from 'utils/appDialog';
 import { 
   Hammer, 
   Plus, 
@@ -117,12 +118,12 @@ export function Projects({ projects, projectsLoading, onBack, openProjectFormMod
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    if (!confirm('Are you sure you want to delete this project?')) return;
+    if (!(await showConfirm('Are you sure you want to delete this project?'))) return;
     try {
       await homeownerProjectsFirestoreService.deleteProject(projectId);
     } catch (err) {
       console.error('Failed to delete project:', err);
-      alert('Failed to delete project. Please try again.');
+      void showAlert('Failed to delete project. Please try again.');
     }
   };
 

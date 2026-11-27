@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
+import { showAlert } from 'utils/appDialog';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
@@ -121,7 +122,7 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
       } catch (apiErr) {
         console.error('❌ Photo upload failed:', apiErr);
         // Surface the error rather than silently falling back to the client SDK
-        alert(`Failed to upload ${file.name}: ${(apiErr as Error).message}`);
+        void showAlert(`Failed to upload ${file.name}: ${(apiErr as Error).message}`);
         continue;
       }
 
@@ -211,7 +212,7 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
       skipSyncRef.current = true; // Prevent immediate sync that would overwrite our changes
     } catch (err: any) {
       console.error('Failed to save photos to database:', err);
-      alert(`Failed to save photos to database: ${err?.message || err}`);
+      void showAlert(`Failed to save photos to database: ${err?.message || err}`);
     }
   };
 

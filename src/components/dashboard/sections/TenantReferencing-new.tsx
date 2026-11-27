@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { showConfirm } from 'utils/appDialog';
 import {
   CheckCircle,
   Clock,
@@ -355,7 +356,7 @@ const TenantReferencing: React.FC = () => {
   };
 
   const handleDeleteShare = async (shareId: string, recipientName: string) => {
-    if (!window.confirm(`Revoke access and delete referencing share for ${recipientName}?`)) {
+    if (!(await showConfirm(`Revoke access and delete referencing share for ${recipientName}?`))) {
       return;
     }
 

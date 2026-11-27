@@ -4,6 +4,7 @@ import { maskEmail } from '../../../utils/formatters';
 import { viewingService, ViewingBooking } from '../../../services/viewingService';
 import emailService from '../../../services/emailService';
 import { useIsMobile } from '../ui/use-mobile';
+import { showAlert } from 'utils/appDialog';
 
 function landlordEmailOf(viewing: ViewingBooking): string {
   const extra = viewing as ViewingBooking & { agentEmail?: string; landlordEmail?: string };
@@ -36,11 +37,11 @@ const TenantRescheduleModal: React.FC<TenantRescheduleModalProps> = ({ viewing, 
 
   const submit = async () => {
     if (!message.trim()) {
-      alert('Please enter a message');
+      void showAlert('Please enter a message');
       return;
     }
     if (!newDate || !newTime) {
-      alert('Please select the new date and time for the reschedule');
+      void showAlert('Please select the new date and time for the reschedule');
       return;
     }
 
@@ -48,7 +49,7 @@ const TenantRescheduleModal: React.FC<TenantRescheduleModalProps> = ({ viewing, 
     try {
       const recipient = (agentEmail || landlordEmailOf(viewing)).trim();
       if (!recipient.includes('@')) {
-        alert('Enter the landlord or agent email so they can receive this reschedule.');
+        void showAlert('Enter the landlord or agent email so they can receive this reschedule.');
         return;
       }
 
@@ -84,7 +85,7 @@ const TenantRescheduleModal: React.FC<TenantRescheduleModalProps> = ({ viewing, 
       });
 
       if (!result.success) {
-        alert(result.error || 'Failed to send reschedule request. Please try again.');
+        void showAlert(result.error || 'Failed to send reschedule request. Please try again.');
         return;
       }
 
@@ -102,16 +103,16 @@ const TenantRescheduleModal: React.FC<TenantRescheduleModalProps> = ({ viewing, 
         }
       );
       if (!updated.success) {
-        alert('The reschedule email was sent, but the viewing time could not be saved. Please try again.');
+        void showAlert('The reschedule email was sent, but the viewing time could not be saved. Please try again.');
         return;
       }
 
       onRescheduled(viewing.id, newDate, newTime);
-      alert('Reschedule request sent successfully!');
+      await showAlert('Reschedule request sent successfully!');
       onClose();
     } catch (error) {
       console.error('Error sending reschedule email:', error);
-      alert('An error occurred while sending the reschedule request. Please try again.');
+      void showAlert('An error occurred while sending the reschedule request. Please try again.');
     } finally {
       setIsSending(false);
     }

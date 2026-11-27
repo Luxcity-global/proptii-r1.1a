@@ -4,6 +4,7 @@ import { useSavedProperties, SavedProperty } from '../../../contexts/SavedProper
 import BookViewingModal from '../../viewings/BookViewingModal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useIsMobile } from '../ui/use-mobile';
+import { showAlert } from 'utils/appDialog';
 import { trackEvent } from '../../../utils/analytics';
 import { useLocation, useNavigate } from 'react-router-dom';
 import communicationService from '../../../services/communicationService';
@@ -89,7 +90,7 @@ const SavedProperties: React.FC = () => {
       });
     } catch (error) {
       console.error('Failed to start conversation:', error);
-      alert('Failed to start conversation. Please try again.');
+      void showAlert('Failed to start conversation. Please try again.');
     }
   };
 

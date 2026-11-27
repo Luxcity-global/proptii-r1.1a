@@ -1,4 +1,5 @@
 import React, { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
+import { showConfirm } from 'utils/appDialog';
 import {
   Box,
   Button,
@@ -163,7 +164,7 @@ const DraftManager: React.FC<DraftManagerProps> = ({ propertyId }) => {
   
   // Handle loading a draft
   const handleLoadDraft = async (draft: Draft) => {
-    if (window.confirm('Loading this draft will replace your current progress. Are you sure?')) {
+    if (await showConfirm('Loading this draft will replace your current progress. Are you sure?')) {
       setIsLoading(true);
       setError(null);
       
@@ -200,7 +201,7 @@ const DraftManager: React.FC<DraftManagerProps> = ({ propertyId }) => {
   const handleDeleteDraft = async (draftId: string, event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation(); // Prevent triggering the load action
     
-    if (window.confirm('Are you sure you want to delete this draft?')) {
+    if (await showConfirm('Are you sure you want to delete this draft?')) {
       setIsLoading(true);
       setError(null);
       

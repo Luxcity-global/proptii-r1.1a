@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { showConfirm } from 'utils/appDialog';
 import {
   Calendar,
   Clock,
@@ -1474,7 +1475,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({
     if (selectedViewings.size === 0) return;
     
     const confirmMessage = `Are you sure you want to delete ${selectedViewings.size} viewing(s)? This action cannot be undone.`;
-    if (!window.confirm(confirmMessage)) return;
+    if (!(await showConfirm({ title: 'Delete Viewings', message: confirmMessage, confirmLabel: 'Delete', tone: 'danger' }))) return;
 
     setIsDeleting(true);
     try {

@@ -16,6 +16,7 @@ import communicationService from '../../services/communicationService';
 import sseService from '../../services/sseService';
 import AttachmentPill from './AttachmentPill';
 import { Pencil, Trash2, Ban, ChevronDown, Copy, Check, RotateCcw } from 'lucide-react';
+import { showAlert } from 'utils/appDialog';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -585,7 +586,7 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
                 setMessages(prev => prev.map(m => m.id === editingMessageId ? { ...m, body: res.body, editedAt: res.editedAt } : m));
             } catch (err) {
                 console.error(err);
-                alert('Failed to edit message.');
+                void showAlert('Failed to edit message.');
             }
         }
         setEditingMessageId(null);
@@ -598,7 +599,7 @@ const MessageThread = forwardRef<MessageThreadHandle, MessageThreadProps>(
             setMessages(prev => prev.map(m => m.id === messageToDelete ? { ...m, isDeleted: true, deletedAt: res.deletedAt } : m));
         } catch (err) {
             console.error(err);
-            alert('Failed to delete message.');
+            void showAlert('Failed to delete message.');
         }
         setMessageToDelete(null);
     };

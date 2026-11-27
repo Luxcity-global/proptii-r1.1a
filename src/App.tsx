@@ -17,6 +17,7 @@ import JoinPage from './pages/JoinPage';
 import CookieNotice from './components/CookieNotice';
 import DevAuthToolbar from './components/dev/DevAuthToolbar';
 import RoleGate from './components/common/RoleGate';
+import AppDialogHost from './components/common/AppDialogHost';
 
 // ─── Eagerly loaded (small, above-the-fold) ────────────────────────────────
 import HomeVariant from './pages/HomeVariant';
@@ -131,6 +132,7 @@ export const App: React.FC = () => {
               <AuthAnalyticsBridge />
               <SignupAttributionBridge />
               <CookieNotice />
+              <AppDialogHost />
               <StripeCheckoutReturnHandler />
               <AuthRedirectHandler />
               <BillingStatusBanner />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { showAlert } from 'utils/appDialog';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -275,7 +276,7 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                   className="w-full justify-start"
                   onClick={() => {
                     if (tenant.phone) window.open(`tel:${tenant.phone}`, '_self');
-                    else alert('No phone number on record for this tenant.');
+                    else void showAlert('No phone number on record for this tenant.');
                   }}
                 >
                   <Phone className="h-4 w-4 mr-2" />
@@ -286,7 +287,7 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                   className="w-full justify-start"
                   onClick={() => {
                     if (tenant.email) window.open(`mailto:${tenant.email}?subject=Rent%20Arrears%20Notice&body=Dear%20${encodeURIComponent(tenant.name)}%2C%0A%0AThis%20is%20a%20reminder%20that%20your%20rent%20payment%20is%20overdue.%0A%0APlease%20contact%20us%20at%20your%20earliest%20convenience.`, '_blank');
-                    else alert('No email address on record for this tenant.');
+                    else void showAlert('No email address on record for this tenant.');
                   }}
                 >
                   <Mail className="h-4 w-4 mr-2" />

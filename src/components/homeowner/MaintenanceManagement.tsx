@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { showAlert, showConfirm } from 'utils/appDialog';
 import {
   Wrench,
   Plus,
@@ -516,7 +517,7 @@ export function MaintenanceManagement({
                                 setCurrentGuideId(guides[0].id);
                                 setIsDIYGuideOpen(true);
                               } else {
-                                alert(
+                                void showAlert(
                                   'No DIY guide available for this task category yet.'
                                 );
                               }
@@ -540,13 +541,13 @@ export function MaintenanceManagement({
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();
-                              if (!confirm('Are you sure you want to delete this task?')) return;
+                              if (!(await showConfirm('Are you sure you want to delete this task?'))) return;
                               try {
                                 await homeownerMaintenanceFirestoreService.deleteTask(task.id);
                                 onDeleteTask(task.id);
                               } catch (err) {
                                 console.error('Failed to delete task:', err);
-                                alert('Failed to delete task. Please try again.');
+                                void showAlert('Failed to delete task. Please try again.');
                               }
                             }}
                             className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600 hover:text-red-700"
@@ -703,7 +704,7 @@ export function MaintenanceManagement({
             setIsTemplatesBrowserOpen(false);
           } catch (err) {
             console.error('Failed to create task from template:', err);
-            alert('Failed to add task. Please try again.');
+            void showAlert('Failed to add task. Please try again.');
           }
         }}
       />

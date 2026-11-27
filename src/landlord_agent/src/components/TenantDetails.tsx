@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { showAlert, showConfirm } from 'utils/appDialog';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { DocumentUploadModal } from './DocumentUploadModal';
@@ -346,7 +347,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onMessage, onTenantUpdat
 
   // Handle deleting a referee or guarantor response
   const handleDeleteResponse = async (responseId: string, responseType: 'referee' | 'guarantor') => {
-    if (!window.confirm(`Are you sure you want to delete this ${responseType} response? This action cannot be undone.`)) {
+    if (!(await showConfirm(`Are you sure you want to delete this ${responseType} response? This action cannot be undone.`))) {
       return;
     }
 
@@ -366,14 +367,14 @@ export function TenantDetails({ tenant, onBack, onEdit, onMessage, onTenantUpdat
         }
         
         // Optional: Show success message
-        alert(`${responseType.charAt(0).toUpperCase() + responseType.slice(1)} response deleted successfully`);
+        void showAlert(`${responseType.charAt(0).toUpperCase() + responseType.slice(1)} response deleted successfully`);
       } else {
         console.error(`❌ [TenantDetails] Failed to delete ${responseType} response:`, result.error);
-        alert(`Failed to delete response: ${result.error}`);
+        void showAlert(`Failed to delete response: ${result.error}`);
       }
     } catch (error) {
       console.error(`❌ [TenantDetails] Error deleting ${responseType} response:`, error);
-      alert('An unexpected error occurred while deleting the response');
+      void showAlert('An unexpected error occurred while deleting the response');
     }
   };
 
@@ -507,7 +508,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onMessage, onTenantUpdat
       
     } catch (error) {
       console.error('[TenantDetails] Error toggling payment status:', error);
-      alert('Unable to update payment status. Please try again.');
+      void showAlert('Unable to update payment status. Please try again.');
     } finally {
       setUpdatingPayments((prev) => {
         const next = { ...prev };
@@ -936,7 +937,7 @@ const asDate = (value: unknown): Date | null => {
                         const periods = await paymentScheduleService.getTenantPeriods(tenant.id);
                         setPaymentPeriods(periods);
                       } catch (error) {
-                        alert('Failed to generate schedule: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                        void showAlert('Failed to generate schedule: ' + (error instanceof Error ? error.message : 'Unknown error'));
                       } finally {
                         setIsLoadingPayments(false);
                       }

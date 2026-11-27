@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLink, faEnvelope } from "@fortawesome/free-solid-svg-icons";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import { PropertyFormData } from './types';
+import { showAlert } from 'utils/appDialog';
 
 interface ListingPreviewProps {
   data: PropertyFormData;
@@ -48,7 +49,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({ data, imagePreviews }) 
       icon: <FontAwesomeIcon icon={faLink} className="text-xl text-gray-700" />,
       action: () => {
         navigator.clipboard.writeText(window.location.href);
-        alert('Link copied to clipboard!');
+        void showAlert({ title: 'Link Copied', message: 'Link copied to clipboard!', tone: 'success' });
         setIsShareModalOpen(false);
       }
     },

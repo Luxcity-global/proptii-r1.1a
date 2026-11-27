@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MainLayout, HomeownerNavigationScreen } from './MainLayout';
+import { showConfirm } from 'utils/appDialog';
 import { Dashboard } from './Dashboard';
 import { MaintenanceManagement, MaintenanceTask } from './MaintenanceManagement';
 import { MaintenanceTaskDetails } from './MaintenanceTaskDetails';
@@ -116,9 +117,9 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
     console.log('View document:', document);
   };
 
-  const handleDeleteDocument = (documentId: string) => {
+  const handleDeleteDocument = async (documentId: string) => {
     // TODO: Confirm and delete document
-    if (confirm('Are you sure you want to delete this document?')) {
+    if (await showConfirm('Are you sure you want to delete this document?')) {
       console.log('Delete document:', documentId);
     }
   };

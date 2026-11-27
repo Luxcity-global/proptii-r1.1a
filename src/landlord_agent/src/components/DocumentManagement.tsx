@@ -10,6 +10,7 @@
  */
 import React, { useState } from 'react';
 import { Button } from './ui/button';
+import { showAlert } from 'utils/appDialog';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -200,11 +201,11 @@ export function DocumentManagement({
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedForms.length) { alert('Select at least one document'); return; }
+    if (!selectedForms.length) { void showAlert('Select at least one document'); return; }
     const incomplete = selectedForms.find(d => !d.name || !d.type || !d.issueDate);
-    if (incomplete) { alert('Fill in all required fields for each document'); return; }
+    if (incomplete) { void showAlert('Fill in all required fields for each document'); return; }
     const missingEpcRating = selectedForms.find(d => d.type === 'epc' && !d.epcRating.trim());
-    if (missingEpcRating) { alert('Enter the EPC rating (e.g. C) for EPC documents'); return; }
+    if (missingEpcRating) { void showAlert('Enter the EPC rating (e.g. C) for EPC documents'); return; }
 
     setIsUploading(true);
     const apiBase = getResolvedApiBaseUrl();
@@ -234,7 +235,7 @@ export function DocumentManagement({
           url = data.url || '';
           storagePath = data.storagePath || data.fullPath || '';
         } catch (err) {
-          alert(`Upload failed for ${form.file.name}: ${(err as Error).message}`);
+          void showAlert(`Upload failed for ${form.file.name}: ${(err as Error).message}`);
           continue;
         }
 
@@ -313,7 +314,7 @@ export function DocumentManagement({
       setAssignModalDocs([]);
       setAssignPropertyId('');
     } catch (err) {
-      alert(`Failed to assign: ${(err as Error).message}`);
+      void showAlert(`Failed to assign: ${(err as Error).message}`);
     } finally {
       setIsAssigning(false);
     }
@@ -341,7 +342,7 @@ export function DocumentManagement({
         }
       }
     } catch (err) {
-      alert(`Delete failed: ${(err as Error).message}`);
+      void showAlert(`Delete failed: ${(err as Error).message}`);
     } finally {
       setDeletingId(null);
       setDocumentToDelete(null);

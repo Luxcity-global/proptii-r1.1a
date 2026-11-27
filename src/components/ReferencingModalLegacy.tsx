@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { showConfirm } from 'utils/appDialog';
 import { 
   X, 
   Menu, 
@@ -795,8 +796,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     });
   };
 
-  const handleResetGuarantor = () => {
-    if (window.confirm('Are you sure you want to remove this verified guarantor and invite someone else? This will clear the verified guarantor status.')) {
+  const handleResetGuarantor = async () => {
+    if (await showConfirm('Are you sure you want to remove this verified guarantor and invite someone else? This will clear the verified guarantor status.')) {
       updateFormData('guarantor', {
         firstName: '',
         lastName: '',

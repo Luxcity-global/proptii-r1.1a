@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, X } from 'lucide-react';
 import { HomeDocument } from './DocumentationHub';
+import { showAlert } from 'utils/appDialog';
 
 interface DocumentUploadFormModalProps {
   isOpen: boolean;
@@ -68,7 +69,7 @@ export function DocumentUploadFormModal({
     e.preventDefault();
     
     if (!initialDocument && !selectedFile) {
-      alert('Please select a file to upload');
+      void showAlert('Please select a file to upload');
       return;
     }
 

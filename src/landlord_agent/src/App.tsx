@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { toast } from "sonner";
+import { showAlert } from 'utils/appDialog';
 import { TooltipProvider } from './components/ui/tooltip';
 import { Routes, Route, useLocation, MemoryRouter, useInRouterContext } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -2064,7 +2065,7 @@ export function AppContent() {
       console.log('Duplicated property, new id:', newId);
     } catch (error) {
       console.error('Failed to duplicate property:', error);
-      alert(`Failed to duplicate property: ${(error as any)?.message || 'Unknown error'}`);
+      void showAlert(`Failed to duplicate property: ${(error as any)?.message || 'Unknown error'}`);
     }
   };
 
@@ -2215,7 +2216,7 @@ export function AppContent() {
     }
 
     if (failed.length > 0) {
-      alert(`${created.length} propert${created.length === 1 ? 'y' : 'ies'} imported. ${failed.length} failed: ${failed.join(', ')}`);
+      void showAlert(`${created.length} propert${created.length === 1 ? 'y' : 'ies'} imported. ${failed.length} failed: ${failed.join(', ')}`);
     } else {
       console.log(`✅ Imported ${created.length} properties`);
     }
@@ -2399,7 +2400,7 @@ export function AppContent() {
                 }
               } catch (error) {
                 console.error('Error assigning document to property:', error);
-                alert('Failed to assign document to property. Please try again.');
+                void showAlert('Failed to assign document to property. Please try again.');
               }
             }}
             onDeleteDocuments={async (documentIds) => {
@@ -2466,7 +2467,7 @@ export function AppContent() {
                 console.log(`✅ Deleted ${documentIds.length} document(s)`);
               } catch (error) {
                 console.error('Error deleting documents:', error);
-                alert('Failed to delete documents. Please try again.');
+                void showAlert('Failed to delete documents. Please try again.');
               }
             }}
             onArchiveDocuments={async (documentIds) => {
@@ -2527,7 +2528,7 @@ export function AppContent() {
                 console.log(`✅ Archived ${documentIds.length} document(s)`);
               } catch (error) {
                 console.error('Error archiving documents:', error);
-                alert('Failed to archive documents. Please try again.');
+                void showAlert('Failed to archive documents. Please try again.');
               }
             }}
             onExportDocuments={(format, documentIds) => {
@@ -2548,7 +2549,7 @@ export function AppContent() {
                 });
 
                 if (selectedDocsWithProperty.length === 0) {
-                  alert('No documents selected for export');
+                  void showAlert('No documents selected for export');
                   return;
                 }
 
@@ -2639,7 +2640,7 @@ export function AppContent() {
                 console.log(`✅ Exported ${selectedDocsWithProperty.length} document(s) as ${format.toUpperCase()}`);
               } catch (error) {
                 console.error('Error exporting documents:', error);
-                alert('Failed to export documents. Please try again.');
+                void showAlert('Failed to export documents. Please try again.');
               }
             }}
             onRefresh={() => setPortfolioRefreshKey((key) => key + 1)}
@@ -2740,7 +2741,7 @@ export function AppContent() {
                 await tenantService.updateTenant(tenantId, { status: 'ended' });
               } catch (err) {
                 console.error('Failed to archive tenant:', err);
-                alert('Failed to archive tenant. Please try again.');
+                void showAlert('Failed to archive tenant. Please try again.');
               }
             }}
             onExportTenants={(format) => {
@@ -3600,7 +3601,7 @@ export function AppContent() {
                 }
               } catch (error) {
                 console.error('Failed to assign tenant to property:', error);
-                alert('Failed to assign tenant to property');
+                void showAlert('Failed to assign tenant to property');
               }
             }}
             onRemoveTenant={async (tenantId, propertyId) => {
@@ -3674,7 +3675,7 @@ export function AppContent() {
                 const newTenant = tenants.find(t => t.id === newTenantId);
 
                 if (!newTenant) {
-                  alert('Selected tenant not found');
+                  void showAlert('Selected tenant not found');
                   return;
                 }
 
@@ -3730,7 +3731,7 @@ export function AppContent() {
                 }
               } catch (error) {
                 console.error('Failed to change tenant:', error);
-                alert('Failed to change tenant');
+                void showAlert('Failed to change tenant');
               }
             }}
           />

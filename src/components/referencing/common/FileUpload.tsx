@@ -3,6 +3,7 @@ import { Button, Box, Typography, FormHelperText } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { showAlert } from 'utils/appDialog';
 
 interface FileUploadProps {
   label: string;
@@ -30,7 +31,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
     if (selectedFile) {
       // Check file size
       if (maxSize && selectedFile.size > maxSize) {
-        alert(`File is too large. Maximum size is ${maxSize / (1024 * 1024)}MB.`);
+        void showAlert(`File is too large. Maximum size is ${maxSize / (1024 * 1024)}MB.`);
         return;
       }
       

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Button } from './ui/button';
+import { showAlert, showConfirm } from 'utils/appDialog';
 import {
   Clock,
   CheckCircle,
@@ -397,7 +398,7 @@ export function ContractsPage({
         if (fileSizeMB > 25) {
           const errorMessage = 'File is too large. Maximum size is 25MB.';
           setError(errorMessage);
-          alert(errorMessage);
+          void showAlert(errorMessage);
           return;
         }
 
@@ -420,7 +421,7 @@ export function ContractsPage({
           console.error('Failed to save contract record:', saveError);
           const saveMsg = saveError?.message || 'Failed to save the contract record. Please try again.';
           setError(saveMsg);
-          alert(`Could not save contract: ${saveMsg}`);
+          void showAlert(`Could not save contract: ${saveMsg}`);
           return;
         }
 
@@ -468,14 +469,14 @@ export function ContractsPage({
           if (uploadError.code === 'ECONNABORTED') {
             errorMessage = 'Upload timed out. The file may be too large. Please try a smaller file or compress it.';
             setError(errorMessage);
-            alert('Upload timed out. The file may be too large. Please try:\n- Compressing the file\n- Using a smaller file\n- Checking your internet connection');
+            void showAlert('Upload timed out. The file may be too large. Please try:\n- Compressing the file\n- Using a smaller file\n- Checking your internet connection');
             return;
           }
           
           if (uploadError.response?.status === 413) {
             errorMessage = 'File is too large for the server. Maximum size is 50MB.';
             setError(errorMessage);
-            alert('File is too large for the server. Please use a file smaller than 50MB.');
+            void showAlert('File is too large for the server. Please use a file smaller than 50MB.');
             return;
           }
           
@@ -513,7 +514,7 @@ export function ContractsPage({
           }
           
           setError(errorMessage);
-          alert(`Upload failed: ${errorMessage}\n\nPlease check the console for more details.`);
+          void showAlert(`Upload failed: ${errorMessage}\n\nPlease check the console for more details.`);
           return;
         }
         
@@ -553,7 +554,7 @@ export function ContractsPage({
         });
         
         console.log('Test email sent successfully');
-        alert(`Test email sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!`);
+        await showAlert(`Test email sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!`);
       }
       
       setIsSendModalOpen(false);
@@ -563,7 +564,7 @@ export function ContractsPage({
       setError(errorMessage);
       
       // Show error message
-      alert(`Error sending email: ${errorMessage}`);
+      void showAlert(`Error sending email: ${errorMessage}`);
     }
   };
 
@@ -590,13 +591,13 @@ export function ContractsPage({
         }
       }
       if (!file) {
-        alert('This contract does not include a PDF yet, so it cannot be signed.');
+        void showAlert('This contract does not include a PDF yet, so it cannot be signed.');
         return;
       }
       setSigningContract({ contract, file, fileUrl: URL.createObjectURL(file) });
     } catch (err) {
       console.error('Error opening contract for signature:', err);
-      alert('Could not open this contract for signing. Please try again.');
+      void showAlert('Could not open this contract for signing. Please try again.');
     } finally {
       setOpeningSignature(false);
     }
@@ -665,7 +666,7 @@ export function ContractsPage({
     if (selectedContracts.size === 0) return;
     
     const confirmMessage = `Are you sure you want to delete ${selectedContracts.size} contract(s)? This action cannot be undone.`;
-    if (!window.confirm(confirmMessage)) return;
+    if (!(await showConfirm({ title: 'Delete Contracts', message: confirmMessage, confirmLabel: 'Delete', tone: 'danger' }))) return;
 
     setIsDeleting(true);
     try {
@@ -690,7 +691,7 @@ export function ContractsPage({
   };
 
   const handleDeleteOne = async (contractId: string) => {
-    if (!window.confirm('Delete this contract? This cannot be undone.')) return;
+    if (!(await showConfirm({ title: 'Delete Contract', message: 'Delete this contract? This cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }))) return;
     try {
       await contractService.deleteContract(contractId);
       setSelectedContracts((prev) => {
