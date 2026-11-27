@@ -228,9 +228,9 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           {/* User Profile & Subscription Tier */}
           {user && (
             <div className="border-t" style={{ borderColor: '#ebebeb' }}>
-              <div className={`py-2.5 ${isCollapsed ? 'px-2' : 'px-3'}`}>
+              <div className={`py-2.5 ${isCollapsed ? 'px-2' : 'px-4'}`}>
                 <div
-                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5 px-1'}`}
+                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}
                   title={isCollapsed ? `${displayName} · ${tierName}` : undefined}
                 >
                   {user.photoURL && !avatarError ? (
@@ -255,10 +255,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   )}
                   {!isCollapsed && (
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-semibold" style={{ color: '#374957' }}>
+                      <div className="truncate text-xs font-semibold leading-tight" style={{ color: '#374957' }}>
                         {displayName}
                       </div>
-                      <div className="truncate text-[11px] opacity-70" style={{ color: '#374957' }}>
+                      <div className="truncate text-[11px] opacity-70 leading-tight mt-0.5" style={{ color: '#374957' }}>
                         {user.email || ''}
                       </div>
                     </div>
@@ -266,10 +266,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                 </div>
 
                 {!isCollapsed && (
-                  <div className="mt-2 px-1 flex items-center justify-between gap-1.5">
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
                     <span
                       data-testid="sidebar-tier-badge"
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold truncate"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold truncate min-w-0"
                       style={
                         isPaidTier
                           ? { backgroundColor: '#E8F5F0', color: '#1D9E75' }
@@ -284,18 +284,29 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       <span className="truncate">{billingLoading ? 'Plan…' : tierName}</span>
                     </span>
 
-                    {!billingLoading && canUpgradeTier && (
-                      <button
-                        type="button"
-                        onClick={() => setUpgradeModalOpen(true)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-white shadow-xs hover:opacity-95 transition-opacity flex-shrink-0"
-                        style={{
-                          background: 'linear-gradient(135deg, #DC5F12 0%, #F15A22 100%)',
-                        }}
-                      >
-                        <Sparkles className="w-2.5 h-2.5" aria-hidden />
-                        <span>Upgrade</span>
-                      </button>
+                    {!billingLoading && (
+                      canUpgradeTier ? (
+                        <button
+                          type="button"
+                          onClick={() => setUpgradeModalOpen(true)}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-white shadow-xs hover:opacity-95 transition-opacity flex-shrink-0"
+                          style={{
+                            background: 'linear-gradient(135deg, #DC5F12 0%, #F15A22 100%)',
+                          }}
+                        >
+                          <Sparkles className="w-2.5 h-2.5" aria-hidden />
+                          <span>Upgrade</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleNavClick('settings', '/dashboard/settings')}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-slate-200 bg-white hover:bg-slate-50 transition-colors flex-shrink-0"
+                          style={{ color: '#374957' }}
+                        >
+                          Manage
+                        </button>
+                      )
                     )}
                   </div>
                 )}

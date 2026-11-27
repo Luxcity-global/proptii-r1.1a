@@ -13,8 +13,9 @@ import React from 'react';
 // ---------------------------------------------------------------------------
 
 // Mock react-router-dom so we don't need a Router wrapper
+const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({
-    useNavigate: () => vi.fn(),
+    useNavigate: () => mockNavigate,
 }));
 
 // Mock AuthContext
@@ -216,5 +217,35 @@ describe('DashboardSidebar — profile photo, tier badge & upgrade CTA', () => {
         const img = screen.getByAltText('Miracle Ohuka');
         fireEvent.error(img);
         expect(screen.getByText('MO')).toBeInTheDocument();
+    });
+
+    it('renders Manage button alongside Buyer Pro badge and navigates to settings', () => {
+        mockNavigate.mockClear();
+        mockBillingState = {
+            plan: 'buyer_pro',
+            status: 'active',
+            hasStripeCustomer: true,
+            loading: false,
+            refresh: vi.fn(),
+        };
+        const onSectionChange = vi.fn();
+        render(
+            <DashboardSidebar
+                activeSection="dashboard"
+                onSectionChange={onSectionChange}
+                isCollapsed={false}
+                onToggleCollapse={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('sidebar-tier-badge')).toHaveTextContent('Buyer Pro');
+        expect(screen.queryByRole('button', { name: /upgrade/i })).not.toBeInTheDocument();
+
+        const manageBtn = screen.getByRole('button', { name: /manage/i });
+        expect(manageBtn).toBeInTheDocument();
+        fireEvent.click(manageBtn);
+
+        expect(onSectionChange).toHaveBeenCalledWith('settings');
+        expect(mockNavigate).toHaveBeenCalledWith('/dashboard/settings');
     });
 });
