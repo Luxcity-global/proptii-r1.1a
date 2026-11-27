@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 
 // ---------------------------------------------------------------------------
@@ -18,8 +18,26 @@ vi.mock('react-router-dom', () => ({
 }));
 
 // Mock AuthContext
+let mockUser: any = null;
 vi.mock('../../../../contexts/AuthContext', () => ({
-    useAuth: () => ({ user: null }),
+    useAuth: () => ({ user: mockUser }),
+}));
+
+// Mock useBillingStatus
+let mockBillingState = {
+    plan: 'explorer',
+    status: null as string | null,
+    hasStripeCustomer: false,
+    loading: false,
+    refresh: vi.fn(),
+};
+vi.mock('../../../../hooks/useBillingStatus', () => ({
+    useBillingStatus: () => mockBillingState,
+}));
+
+vi.mock('../../../billing/PlanCompareModal', () => ({
+    default: ({ open }: { open: boolean }) =>
+        open ? <div data-testid="plan-compare-modal" /> : null,
 }));
 
 // Mock Dashboard to avoid importing the full module with all its deps
@@ -153,8 +171,50 @@ describe('DashboardSidebar — unread badge', () => {
     });
 
     it('badge is positioned absolutely over the icon', () => {
+        mockUser = null;
         renderSidebar(3);
         const badge = screen.getByTestId('unread-badge');
         expect(badge).toHaveStyle({ position: 'absolute' });
+    });
+});
+
+describe('DashboardSidebar — profile photo, tier badge & upgrade CTA', () => {
+    beforeEach(() => {
+        mockUser = {
+            id: 'u-1',
+            name: 'Miracle Ohuka',
+            email: 'miracleohuka12@gmail.com',
+            photoURL: 'https://example.com/avatar.jpg',
+            roles: ['tenant'],
+            roleResolved: true,
+        };
+        mockBillingState = {
+            plan: 'explorer',
+            status: null,
+            hasStripeCustomer: false,
+            loading: false,
+            refresh: vi.fn(),
+        };
+    });
+
+    it('renders user photo avatar, subscription tier badge, and Upgrade button', () => {
+        renderSidebar(0);
+        const img = screen.getByAltText('Miracle Ohuka') as HTMLImageElement;
+        expect(img).toBeInTheDocument();
+        expect(img.src).toBe('https://example.com/avatar.jpg');
+
+        expect(screen.getByTestId('sidebar-tier-badge')).toHaveTextContent('Explorer');
+        const upgradeBtn = screen.getByRole('button', { name: /upgrade/i });
+        expect(upgradeBtn).toBeInTheDocument();
+
+        fireEvent.click(upgradeBtn);
+        expect(screen.getByTestId('plan-compare-modal')).toBeInTheDocument();
+    });
+
+    it('falls back to initials if user photo fails to load', () => {
+        renderSidebar(0);
+        const img = screen.getByAltText('Miracle Ohuka');
+        fireEvent.error(img);
+        expect(screen.getByText('MO')).toBeInTheDocument();
     });
 });

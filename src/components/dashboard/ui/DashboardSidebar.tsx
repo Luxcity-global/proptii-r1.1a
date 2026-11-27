@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DASHBOARD_SECTIONS } from "../Dashboard";
-import { ChevronLeft, ChevronRight, Home, User, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, User, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useMessagingContext } from '../../../contexts/MessagingContext';
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
+import { getPlanById, type PlanId } from '../../../config/plans';
+import PlanCompareModal from '../../billing/PlanCompareModal';
 
 // ---------------------------------------------------------------------------
 // Badge helpers
@@ -39,7 +41,31 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { unreadCount } = useMessagingContext();
-  const { plan, status } = useBillingStatus();
+  const { plan, status, hasStripeCustomer, loading: billingLoading, refresh } = useBillingStatus();
+  const [avatarError, setAvatarError] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.photoURL]);
+
+  const normalizedPlanId: PlanId = !plan || plan === 'free' ? 'explorer' : (plan as PlanId);
+  const planConfig = getPlanById(normalizedPlanId);
+  const tierName = planConfig?.name ?? 'Explorer';
+  const isPaidTier = Boolean(planConfig && !planConfig.isFree && normalizedPlanId !== 'explorer');
+  const canUpgradeTier = !['buyer_pro', 'elite', 'enterprise'].includes(normalizedPlanId);
+
+  const displayName =
+    user?.name?.trim() ||
+    [user?.givenName, user?.familyName].filter(Boolean).join(' ').trim() ||
+    user?.email?.split('@')[0] ||
+    'User';
+
+  const initials = (() => {
+    const parts = displayName.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    return displayName.slice(0, 2).toUpperCase();
+  })();
 
   const handleNavClick = (sectionId: string, path: string) => {
     onSectionChange(sectionId);
@@ -199,25 +225,80 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             </div>
           </div>
 
-          {/* User Profile */}
+          {/* User Profile & Subscription Tier */}
           {user && (
             <div className="border-t" style={{ borderColor: '#ebebeb' }}>
-              <div className={`pt-2 pb-2 ${isCollapsed ? 'px-2' : 'pl-4 pr-2'}`}>
-                <div className={`flex items-center ${isCollapsed ? 'justify-center h-10' : 'h-8 px-2'}`}>
-                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                    <User className="h-4 w-4" style={{ color: '#374957' }} />
-                  </div>
+              <div className={`py-2.5 ${isCollapsed ? 'px-2' : 'px-3'}`}>
+                <div
+                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5 px-1'}`}
+                  title={isCollapsed ? `${displayName} · ${tierName}` : undefined}
+                >
+                  {user.photoURL && !avatarError ? (
+                    <img
+                      src={user.photoURL}
+                      alt={displayName}
+                      onError={() => setAvatarError(true)}
+                      className="h-8 w-8 rounded-full object-cover flex-shrink-0 border border-slate-200"
+                    />
+                  ) : initials ? (
+                    <div
+                      className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                      style={{ backgroundColor: '#E6F3FF', color: '#136C9E' }}
+                      aria-label={displayName}
+                    >
+                      {initials}
+                    </div>
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                      <User className="h-4 w-4" style={{ color: '#374957' }} />
+                    </div>
+                  )}
                   {!isCollapsed && (
-                    <div className="ml-2 min-w-0 flex-1">
+                    <div className="min-w-0 flex-1">
                       <div className="truncate text-xs font-semibold" style={{ color: '#374957' }}>
-                        {user.name || user.givenName || 'User'}
+                        {displayName}
                       </div>
-                      <div className="truncate text-xs opacity-70" style={{ color: '#374957' }}>
+                      <div className="truncate text-[11px] opacity-70" style={{ color: '#374957' }}>
                         {user.email || ''}
                       </div>
                     </div>
                   )}
                 </div>
+
+                {!isCollapsed && (
+                  <div className="mt-2 px-1 flex items-center justify-between gap-1.5">
+                    <span
+                      data-testid="sidebar-tier-badge"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold truncate"
+                      style={
+                        isPaidTier
+                          ? { backgroundColor: '#E8F5F0', color: '#1D9E75' }
+                          : { backgroundColor: '#F0F6FF', color: '#136C9E' }
+                      }
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: isPaidTier ? '#1D9E75' : '#136C9E' }}
+                        aria-hidden
+                      />
+                      <span className="truncate">{billingLoading ? 'Plan…' : tierName}</span>
+                    </span>
+
+                    {!billingLoading && canUpgradeTier && (
+                      <button
+                        type="button"
+                        onClick={() => setUpgradeModalOpen(true)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-white shadow-xs hover:opacity-95 transition-opacity flex-shrink-0"
+                        style={{
+                          background: 'linear-gradient(135deg, #DC5F12 0%, #F15A22 100%)',
+                        }}
+                      >
+                        <Sparkles className="w-2.5 h-2.5" aria-hidden />
+                        <span>Upgrade</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -281,6 +362,16 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           width: isCollapsed ? '56px' : '200px'
         }}
       />
+
+      {upgradeModalOpen && (
+        <PlanCompareModal
+          open={upgradeModalOpen}
+          onClose={() => setUpgradeModalOpen(false)}
+          currentPlanId={normalizedPlanId}
+          billingStatus={{ hasStripeCustomer, status }}
+          onUpgradeSuccess={refresh}
+        />
+      )}
     </div>
   );
 };
