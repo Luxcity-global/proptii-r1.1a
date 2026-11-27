@@ -206,37 +206,83 @@ const SearchResults: React.FC = () => {
   );
 
   const lastExecutedMacroSigRef = useRef<string | null>(null);
+  const currentSearchKey = `${searchQuery.trim().toLowerCase()}|${searchTypeParam}`;
+
+  const hasValidSessionCache = useCallback(
+    (sigToCheck?: string) => {
+      if (typeof sessionStorage === 'undefined' || !searchQuery.trim()) return false;
+      const cachedData = sessionStorage.getItem('searchResults');
+      if (!cachedData) return false;
+      try {
+        const parsed = JSON.parse(cachedData);
+        if (
+          parsed.query?.toLowerCase() === searchQuery.trim().toLowerCase() &&
+          parsed.searchType === searchTypeParam &&
+          (!sigToCheck || parsed.macroSignature === sigToCheck) &&
+          Array.isArray(parsed.results) &&
+          parsed.results.length > 0
+        ) {
+          return true;
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    },
+    [searchQuery, searchTypeParam]
+  );
+
+  const [settledSearchKey, setSettledSearchKey] = useState<string | null>(() =>
+    hasValidSessionCache() ? currentSearchKey : null
+  );
 
   useEffect(() => {
-    if (!searchQuery) return;
-    if (lastExecutedMacroSigRef.current === macroSignature) return;
+    if (!searchQuery.trim()) return;
+    if (searchQuery.trim().length >= 2 && isClassifying) return;
+    if (lastExecutedMacroSigRef.current === macroSignature) {
+      setSettledSearchKey((prev) => (prev === currentSearchKey ? prev : currentSearchKey));
+      return;
+    }
 
-    const timer = setTimeout(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
       lastExecutedMacroSigRef.current = macroSignature;
 
-      const cachedData = sessionStorage.getItem('searchResults');
-      if (cachedData) {
-        try {
-          const parsed = JSON.parse(cachedData);
-          if (
-            parsed.query?.toLowerCase() === searchQuery.toLowerCase() &&
-            parsed.searchType === searchTypeParam &&
-            parsed.macroSignature === macroSignature &&
-            Array.isArray(parsed.results) &&
-            parsed.results.length > 0
-          ) {
-            return;
-          }
-        } catch {
-          // fall through to a fresh search
-        }
+      if (hasValidSessionCache(macroSignature)) {
+        if (!cancelled) setSettledSearchKey(currentSearchKey);
+        return;
       }
 
-      searchProperties(searchQuery, searchType, macroFilters);
-    }, 450);
+      await searchProperties(searchQuery, searchType, macroFilters, classification?.entities);
+      if (!cancelled) {
+        setSettledSearchKey(currentSearchKey);
+      }
+    }, 60);
 
-    return () => clearTimeout(timer);
-  }, [macroSignature, searchQuery, searchTypeParam, searchType, macroFilters, searchProperties]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    macroSignature,
+    currentSearchKey,
+    searchQuery,
+    searchTypeParam,
+    searchType,
+    macroFilters,
+    classification?.entities,
+    isClassifying,
+    hasValidSessionCache,
+    searchProperties,
+  ]);
+
+  const effectiveIsLoading =
+    isLoading ||
+    (Boolean(searchQuery.trim()) &&
+      results.length === 0 &&
+      !error &&
+      settledSearchKey !== currentSearchKey &&
+      !hasValidSessionCache());
 
   const queryLocationMatch = searchQuery.match(/\b(?:in|at|near)\s+([A-Za-z\s,]+)/i);
   const queryLocation = (queryLocationMatch?.[1]?.trim() || '').replace(/\s{2,}/g, ' ');
@@ -421,7 +467,7 @@ const SearchResults: React.FC = () => {
     resultsCount: displayedResults.length,
     locationLabel,
     isCached,
-    isLoading,
+    isLoading: effectiveIsLoading,
     onRefresh: () => searchProperties(searchQuery, searchType),
     showMap,
     onToggleMap: () => {
@@ -443,7 +489,7 @@ const SearchResults: React.FC = () => {
     onApplyFilters: handleApplyFilters,
   };
 
-  if (isLoading && results.length === 0) {
+  if (effectiveIsLoading && results.length === 0) {
     return (
       <div className="sr-page">
         <SearchPageHeader {...headerProps} showMeta={false} />
