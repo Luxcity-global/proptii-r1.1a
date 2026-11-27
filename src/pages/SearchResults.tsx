@@ -29,14 +29,8 @@ import { SearchMap } from '../components/search/SearchMap';
 import { SearchResultsList } from '../components/search/SearchResultsList';
 import { LocationInsights, extractLocationLabel } from '../components/search/LocationInsights';
 import { PropertyDetailsModal } from '../components/search/PropertyDetailsModal';
-import { SearchPageHeader, type SortOption } from '../components/search/SearchPageHeader';
+import { SearchPageHeader } from '../components/search/SearchPageHeader';
 import '../styles/searchResults.css';
-
-const parsePriceValue = (price: string): number => {
-  if (!price) return 0;
-  const match = price.replace(/,/g, '').match(/(\d+)/);
-  return match ? parseInt(match[1], 10) : 0;
-};
 
 const LOCATION_PIN_PATH =
   'M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7zm0 9a2 2 0 100-4 2 2 0 000 4z';
@@ -122,7 +116,6 @@ const SearchResults: React.FC = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [searchSaved, setSearchSaved] = useState(false);
   const [draftQuery, setDraftQuery] = useState(searchQuery);
-  const [sortOption, setSortOption] = useState<SortOption>('Relevance');
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
   const { isAuthenticated, user, login } = useAuth();
   const { setActiveConversationId } = useMessagingContext();
@@ -302,20 +295,12 @@ const SearchResults: React.FC = () => {
     navigate(`/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(searchType)}`);
   };
 
-  const locationLabel = extractLocationLabel(searchQuery);
+  const locationLabel = classification?.entities?.location || extractLocationLabel(searchQuery);
   const isCached = Boolean(
     typeof sessionStorage !== 'undefined' && sessionStorage.getItem('searchResults')
   );
 
-  const displayedResults = useMemo(() => {
-    const list = [...filteredProperties];
-    if (sortOption === 'Price (low)') {
-      list.sort((a, b) => parsePriceValue(a.price) - parsePriceValue(b.price));
-    } else if (sortOption === 'Price (high)') {
-      list.sort((a, b) => parsePriceValue(b.price) - parsePriceValue(a.price));
-    }
-    return list;
-  }, [filteredProperties, sortOption]);
+  const displayedResults = filteredProperties;
 
   const notify = (message: string) => {
     setToastMessage(message);
@@ -457,6 +442,25 @@ const SearchResults: React.FC = () => {
     }
   };
 
+  const quickFiltersRail =
+    results.length > 0 ? (
+      <SearchFilterBar
+        variant="inline"
+        showSort={false}
+        filters={filters}
+        counts={filterCounts}
+        setPriceRange={setPriceRange}
+        toggleBedroom={toggleBedroom}
+        setBedrooms={setBedrooms}
+        togglePropertyType={togglePropertyType}
+        setFurnishing={setFurnishing}
+        toggleParking={toggleParking}
+        toggleBalconyOrGarden={toggleBalconyOrGarden}
+        resetFilters={resetFilters}
+        removeFilter={removeFilter}
+      />
+    ) : null;
+
   const headerProps = {
     searchQuery,
     draftQuery,
@@ -465,6 +469,7 @@ const SearchResults: React.FC = () => {
     onSaveSearch: handleSaveSearch,
     searchSaved,
     resultsCount: displayedResults.length,
+    totalCount: results.length,
     locationLabel,
     isCached,
     isLoading: effectiveIsLoading,
@@ -481,8 +486,10 @@ const SearchResults: React.FC = () => {
         return next;
       });
     },
-    sortOption,
-    onSortChange: setSortOption,
+    sortBy: filters.sortBy,
+    onSortByChange: setSortBy,
+    activeFilterCount: filterCounts.activeFilterCount,
+    quickFilters: quickFiltersRail,
     classificationEntities: classification?.entities,
     isClassifying,
     results,
@@ -702,25 +709,6 @@ const SearchResults: React.FC = () => {
 
       <div className="sr-main">
         <div className="sr-inner">
-          {results.length > 0 && (
-            <div className="mb-8">
-              <SearchFilterBar
-                filters={filters}
-                counts={filterCounts}
-                setPriceRange={setPriceRange}
-                toggleBedroom={toggleBedroom}
-                setBedrooms={setBedrooms}
-                togglePropertyType={togglePropertyType}
-                setFurnishing={setFurnishing}
-                toggleParking={toggleParking}
-                toggleBalconyOrGarden={toggleBalconyOrGarden}
-                setSortBy={setSortBy}
-                resetFilters={resetFilters}
-                removeFilter={removeFilter}
-              />
-            </div>
-          )}
-
           {results.length === 0 ? (
             <div className="py-16 sm:py-20">
               <div className="max-w-5xl mx-auto px-4">

@@ -1,11 +1,27 @@
 import React, { useState } from 'react';
 
+const LOCATION_PREP_REGEX =
+  /\b(in|around|near|at)\s+([A-Za-z][A-Za-z\s'-]*?)(?=\s+(?:in|around|near|at|under|over|below|above|for|with|within|to|pcm|pw)\b|\s*£|\s*\d|$)/gi;
+const FACILITY_LABEL_REGEX =
+  /\b(?:good\s+)?(?:schools?|stations?|tubes?|undergrounds?|trains?|parks?|shops?|supermarkets?|gyms?|hospitals?|universit(?:y|ies)|colleges?|amenities)\b/i;
+
 export const extractLocationLabel = (query: string): string => {
-  const locationMatch = query.match(
-    /\b(?:in|at|near)\s+([A-Za-z][A-Za-z\s]*?)(?=\s+(?:under|over|below|above|for|with|to|pcm|pw)\b|\s*£|\s*\d|$)/i
-  );
-  const location = locationMatch ? locationMatch[1].trim().replace(/,+$/, '') : '';
-  return location || 'this area';
+  const candidates: Array<{ score: number; value: string }> = [];
+  LOCATION_PREP_REGEX.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = LOCATION_PREP_REGEX.exec(query)) !== null) {
+    const prep = match[1].toLowerCase();
+    const val = match[2].trim().replace(/,+$/, '');
+    if (!val) continue;
+    let score = prep === 'in' ? 4 : prep === 'near' ? 1 : 2;
+    if (!FACILITY_LABEL_REGEX.test(val)) score += 10;
+    candidates.push({ score, value: val });
+  }
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0].value;
+  }
+  return 'this area';
 };
 
 interface LocationInsightsProps {

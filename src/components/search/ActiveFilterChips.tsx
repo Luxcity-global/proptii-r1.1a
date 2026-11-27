@@ -7,6 +7,8 @@ interface ActiveFilterChipsProps {
   counts: FilterCounts;
   onRemoveFilter: (key: string) => void;
   onResetAll: () => void;
+  /** When true, omit chips already reflected inside top quick-filter pills (Price, Bedrooms, Type, Furnished, Parking, Balcony/Garden). */
+  secondaryOnly?: boolean;
 }
 
 export const ActiveFilterChips: React.FC<ActiveFilterChipsProps> = ({
@@ -14,6 +16,7 @@ export const ActiveFilterChips: React.FC<ActiveFilterChipsProps> = ({
   counts,
   onRemoveFilter,
   onResetAll,
+  secondaryOnly = false,
 }) => {
   if (!counts.hasActiveFilters) {
     return null;
@@ -21,66 +24,68 @@ export const ActiveFilterChips: React.FC<ActiveFilterChipsProps> = ({
 
   const chips: { key: string; label: string; icon?: React.ReactNode }[] = [];
 
-  // Price Chip
-  if (filters.minPrice !== null && filters.maxPrice !== null) {
-    chips.push({
-      key: 'price',
-      label: `£${filters.minPrice.toLocaleString('en-GB')} – £${filters.maxPrice.toLocaleString('en-GB')}`,
+  if (!secondaryOnly) {
+    // Price Chip
+    if (filters.minPrice !== null && filters.maxPrice !== null) {
+      chips.push({
+        key: 'price',
+        label: `£${filters.minPrice.toLocaleString('en-GB')} – £${filters.maxPrice.toLocaleString('en-GB')}`,
+      });
+    } else if (filters.minPrice !== null) {
+      chips.push({
+        key: 'price',
+        label: `From £${filters.minPrice.toLocaleString('en-GB')}`,
+      });
+    } else if (filters.maxPrice !== null) {
+      chips.push({
+        key: 'price',
+        label: `Up to £${filters.maxPrice.toLocaleString('en-GB')}`,
+      });
+    }
+
+    // Bedroom Chips
+    if (filters.bedrooms !== 'any' && Array.isArray(filters.bedrooms)) {
+      filters.bedrooms.forEach((bed) => {
+        const label = bed === 0 ? 'Studio' : bed >= 4 ? '4+ Beds' : `${bed} ${bed === 1 ? 'Bed' : 'Beds'}`;
+        chips.push({ key: `bedroom_${bed}`, label });
+      });
+    }
+
+    // Property Type Chips
+    filters.propertyTypes.forEach((type) => {
+      const labels: Record<string, string> = {
+        flat: 'Flats',
+        house: 'Houses',
+        studio: 'Studios',
+        bungalow: 'Bungalows',
+      };
+      chips.push({ key: `type_${type}`, label: labels[type] || type });
     });
-  } else if (filters.minPrice !== null) {
-    chips.push({
-      key: 'price',
-      label: `From £${filters.minPrice.toLocaleString('en-GB')}`,
-    });
-  } else if (filters.maxPrice !== null) {
-    chips.push({
-      key: 'price',
-      label: `Up to £${filters.maxPrice.toLocaleString('en-GB')}`,
-    });
+
+    // Parking Chip
+    if (filters.hasParking) {
+      chips.push({
+        key: 'parking',
+        label: 'Parking Included',
+        icon: <Car className="w-3.5 h-3.5 text-[#136C9E]" aria-hidden="true" />,
+      });
+    }
+
+    // Balcony / Garden Chip
+    if (filters.hasBalconyOrGarden) {
+      chips.push({
+        key: 'outside',
+        label: 'Balcony / Garden',
+        icon: <Trees className="w-3.5 h-3.5 text-[#136C9E]" aria-hidden="true" />,
+      });
+    }
   }
 
-  // Bedroom Chips
-  if (filters.bedrooms !== 'any' && Array.isArray(filters.bedrooms)) {
-    filters.bedrooms.forEach((bed) => {
-      const label = bed === 0 ? 'Studio' : bed >= 4 ? '4+ Beds' : `${bed} ${bed === 1 ? 'Bed' : 'Beds'}`;
-      chips.push({ key: `bedroom_${bed}`, label });
-    });
-  }
-
-  // Property Type Chips
-  filters.propertyTypes.forEach((type) => {
-    const labels: Record<string, string> = {
-      flat: 'Flats',
-      house: 'Houses',
-      studio: 'Studios',
-      bungalow: 'Bungalows',
-    };
-    chips.push({ key: `type_${type}`, label: labels[type] || type });
-  });
-
-  // Furnishing Chip
-  if (filters.furnishing && filters.furnishing !== 'any') {
+  // Unfurnished has no dedicated toggle button on the quick rail ("Furnished" only toggles furnished)
+  if (filters.furnishing && filters.furnishing !== 'any' && (!secondaryOnly || filters.furnishing === 'unfurnished')) {
     chips.push({
       key: 'furnishing',
       label: filters.furnishing === 'furnished' ? 'Furnished' : 'Unfurnished',
-    });
-  }
-
-  // Parking Chip
-  if (filters.hasParking) {
-    chips.push({
-      key: 'parking',
-      label: 'Parking Included',
-      icon: <Car className="w-3.5 h-3.5 text-[#136C9E]" aria-hidden="true" />,
-    });
-  }
-
-  // Balcony / Garden Chip
-  if (filters.hasBalconyOrGarden) {
-    chips.push({
-      key: 'outside',
-      label: 'Balcony / Garden',
-      icon: <Trees className="w-3.5 h-3.5 text-[#136C9E]" aria-hidden="true" />,
     });
   }
 
@@ -110,14 +115,20 @@ export const ActiveFilterChips: React.FC<ActiveFilterChipsProps> = ({
     });
   }
 
+  if (chips.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-2 pt-3 pb-1 border-t border-gray-100">
-      <div className="text-xs font-semibold text-gray-500 mr-1 flex items-center gap-1.5 max-sm:w-full">
-        <span>Active filters:</span>
-        <span className="text-gray-900 font-bold">
-          {counts.filtered} of {counts.total} shown
-        </span>
-      </div>
+    <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100">
+      {!secondaryOnly && (
+        <div className="text-xs font-semibold text-gray-500 mr-1 flex items-center gap-1.5 max-sm:w-full">
+          <span>Active filters:</span>
+          <span className="text-gray-900 font-bold">
+            {counts.filtered} of {counts.total} shown
+          </span>
+        </div>
+      )}
 
       {chips.map((chip) => (
         <span

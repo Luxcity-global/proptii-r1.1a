@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { FilterPills, entitiesToPills } from './FilterPills';
+import { entitiesToPills } from './FilterPills';
 import { FiltersModal } from './FiltersModal';
 import type { ClassifyEntities } from '../../types/govData';
 import type { Property } from '../../types/property';
+import type { SortOption as FilterSortOption } from '../../types/filter';
 
 export type SortOption = 'Relevance' | 'Newest' | 'Price (low)' | 'Price (high)';
+
+const FILTER_SORT_LABELS: Record<FilterSortOption, string> = {
+  recommended: 'Recommended',
+  newest: 'Newest listed',
+  price_asc: 'Price (low to high)',
+  price_desc: 'Price (high to low)',
+  beds_desc: 'Most bedrooms',
+};
 
 export interface SearchPageHeaderProps {
   searchQuery: string;
@@ -16,16 +25,21 @@ export interface SearchPageHeaderProps {
   onSaveSearch: () => void;
   searchSaved?: boolean;
   resultsCount: number;
+  totalCount?: number;
   locationLabel: string;
   isCached?: boolean;
   isLoading?: boolean;
   onRefresh?: () => void;
   showMap: boolean;
   onToggleMap: () => void;
-  sortOption: SortOption;
-  onSortChange: (option: SortOption) => void;
+  sortOption?: SortOption;
+  onSortChange?: (option: SortOption) => void;
+  sortBy?: FilterSortOption;
+  onSortByChange?: (option: FilterSortOption) => void;
   classificationEntities?: ClassifyEntities | null;
   isClassifying?: boolean;
+  activeFilterCount?: number;
+  quickFilters?: React.ReactNode;
   showMeta?: boolean;
   results?: Property[];
   onApplyFilters?: (query: string, matchCount: number) => void;
@@ -39,16 +53,21 @@ export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
   onSaveSearch,
   searchSaved = false,
   resultsCount,
+  totalCount,
   locationLabel,
-  isCached = false,
+  isCached: _isCached = false,
   isLoading = false,
   onRefresh,
   showMap,
   onToggleMap,
-  sortOption,
+  sortOption = 'Relevance',
   onSortChange,
+  sortBy,
+  onSortByChange,
   classificationEntities,
-  isClassifying = false,
+  isClassifying: _isClassifying = false,
+  activeFilterCount,
+  quickFilters,
   showMeta = true,
   results = [],
   onApplyFilters,
@@ -59,6 +78,7 @@ export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const pillCount = entitiesToPills(classificationEntities).length;
+  const badgeCount = activeFilterCount ?? pillCount;
 
   useEffect(() => {
     if (!sortOpen) return;
@@ -198,28 +218,23 @@ export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
                   <line x1="11" y1="18" x2="13" y2="18" />
                 </svg>
                 <span>Filters</span>
-                {pillCount > 0 ? <span className="sr-filters-badge">{pillCount}</span> : null}
+                {badgeCount > 0 ? <span className="sr-filters-badge">{badgeCount}</span> : null}
               </button>
             </div>
 
-            <div className="sr-chips-row">
-              <FilterPills
-                entities={classificationEntities}
-                isClassifying={isClassifying}
-                variant="chip"
-                maxVisible={8}
-                showClearAll
-              />
-            </div>
+            {showMeta && quickFilters}
 
             {showMeta && (
               <div className="sr-meta">
                 <div className="sr-meta-left">
                   <p className="sr-count">
-                    <strong>{resultsCount}</strong>{' '}
+                    <strong>
+                      {totalCount !== undefined && totalCount > resultsCount
+                        ? `${resultsCount} of ${totalCount}`
+                        : resultsCount}
+                    </strong>{' '}
                     <span className="sr-count-rest">properties to rent in {locationLabel}</span>
                   </p>
-                  {isCached && <span className="sr-cached">cached</span>}
                   {onRefresh && (
                     <button
                       type="button"
@@ -237,7 +252,7 @@ export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
                       >
                         <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38" />
                       </svg>
-                      <span>Refresh results</span>
+                      <span>Refresh</span>
                     </button>
                   )}
                 </div>
@@ -275,9 +290,13 @@ export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
                       type="button"
                       className="sr-sort-btn"
                       onClick={() => setSortOpen((open) => !open)}
+                      aria-expanded={sortOpen}
+                      aria-haspopup="listbox"
                     >
                       <span>
-                        {sortOption === 'Price (low)'
+                        {sortBy
+                          ? `Sort: ${FILTER_SORT_LABELS[sortBy]}`
+                          : sortOption === 'Price (low)'
                           ? 'Price (low)'
                           : sortOption === 'Price (high)'
                           ? 'Price (high)'
@@ -296,26 +315,44 @@ export const SearchPageHeader: React.FC<SearchPageHeaderProps> = ({
                       </svg>
                     </button>
                     {sortOpen && (
-                      <div className="sr-sort-menu">
-                        {(['Relevance', 'Newest', 'Price (low)', 'Price (high)'] as SortOption[]).map(
-                          (option) => (
-                            <button
-                              key={option}
-                              type="button"
-                              className={sortOption === option ? 'is-active' : undefined}
-                              onClick={() => {
-                                onSortChange(option);
-                                setSortOpen(false);
-                              }}
-                            >
-                              {option === 'Price (low)'
-                                ? 'Price (low to high)'
-                                : option === 'Price (high)'
-                                ? 'Price (high to low)'
-                                : option}
-                            </button>
-                          )
-                        )}
+                      <div className="sr-sort-menu" role="listbox">
+                        {sortBy && onSortByChange
+                          ? (['recommended', 'newest', 'price_asc', 'price_desc', 'beds_desc'] as FilterSortOption[]).map(
+                              (option) => (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={sortBy === option}
+                                  className={sortBy === option ? 'is-active' : undefined}
+                                  onClick={() => {
+                                    onSortByChange(option);
+                                    setSortOpen(false);
+                                  }}
+                                >
+                                  {FILTER_SORT_LABELS[option]}
+                                </button>
+                              )
+                            )
+                          : (['Relevance', 'Newest', 'Price (low)', 'Price (high)'] as SortOption[]).map(
+                              (option) => (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  className={sortOption === option ? 'is-active' : undefined}
+                                  onClick={() => {
+                                    onSortChange?.(option);
+                                    setSortOpen(false);
+                                  }}
+                                >
+                                  {option === 'Price (low)'
+                                    ? 'Price (low to high)'
+                                    : option === 'Price (high)'
+                                    ? 'Price (high to low)'
+                                    : option}
+                                </button>
+                              )
+                            )}
                       </div>
                     )}
                   </div>

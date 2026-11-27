@@ -22,9 +22,11 @@ interface SearchFilterBarProps {
   setFurnishing?: (f: 'furnished' | 'unfurnished' | 'any') => void;
   toggleParking?: () => void;
   toggleBalconyOrGarden?: () => void;
-  setSortBy: (sort: SortOption) => void;
+  setSortBy?: (sort: SortOption) => void;
   resetFilters: () => void;
   removeFilter: (key: string) => void;
+  variant?: 'inline' | 'card';
+  showSort?: boolean;
   className?: string;
 }
 
@@ -41,6 +43,8 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   setSortBy,
   resetFilters,
   removeFilter,
+  variant = 'inline',
+  showSort = false,
   className = '',
 }) => {
   const [activeOpenPopover, setActiveOpenPopover] = useState<string | null>(null);
@@ -69,10 +73,15 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   const isTypesActive = filters.propertyTypes.length > 0;
   const typesBadge = isTypesActive ? `${filters.propertyTypes.length}` : null;
 
+  const containerClass =
+    variant === 'card'
+      ? `max-sm:relative bg-white rounded-2xl shadow-sm border border-gray-200/80 p-4 transition-all ${className}`
+      : `max-sm:relative pt-2.5 border-t border-slate-100 transition-all ${className}`;
+
   return (
-    <div className={`max-sm:relative bg-white rounded-2xl shadow-sm border border-gray-200/80 p-4 transition-all ${className}`}>
+    <div className={containerClass}>
       {/* Top Filter Bar Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
         {/* Left: Quick Pill Popovers */}
         <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
           
@@ -177,18 +186,28 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
           </button>
         </div>
 
-        {/* Right: Sort Dropdown */}
-        <div className="ml-auto max-sm:ml-0 max-sm:w-full">
-          <SortDropdown sortBy={filters.sortBy} onSelect={setSortBy} />
+        {/* Right: Reset action (or Sort when explicitly enabled) */}
+        <div className="ml-auto flex items-center gap-3 max-sm:ml-0 max-sm:w-full">
+          {counts.hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-xs font-semibold text-[#136C9E] hover:text-[#0f5a85] hover:underline px-2 py-1 rounded-md transition-colors"
+            >
+              Clear all
+            </button>
+          )}
+          {showSort && setSortBy && <SortDropdown sortBy={filters.sortBy} onSelect={setSortBy} />}
         </div>
       </div>
 
-      {/* Active Filter Chips Sub-bar */}
+      {/* Active Filter Chips Sub-bar (only secondary/non-pill filters in harmonized inline mode) */}
       <ActiveFilterChips
         filters={filters}
         counts={counts}
         onRemoveFilter={removeFilter}
         onResetAll={resetFilters}
+        secondaryOnly={variant === 'inline'}
       />
     </div>
   );
